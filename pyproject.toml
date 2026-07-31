@@ -21,7 +21,7 @@ classifiers = [
   "Typing :: Typed",
 ]
 dependencies = [
-  "mcp[cli]>=1.27,<2",
+  "mcp[cli]>=1.28.1,<2",
   "platformdirs>=4,<5",
   "playwright>=1.54,<2",
   "prometheus-client>=0.22,<1",

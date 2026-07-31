@@ -334,7 +334,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "mcp", extras = ["cli"], specifier = ">=1.27,<2" },
+    { name = "mcp", extras = ["cli"], specifier = ">=1.28.1,<2" },
     { name = "platformdirs", specifier = ">=4,<5" },
     { name = "playwright", specifier = ">=1.54,<2" },
     { name = "prometheus-client", specifier = ">=0.22,<1" },
