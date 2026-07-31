@@ -1,0 +1,186 @@
+from __future__ import annotations
+
+import email
+import subprocess
+import sys
+import tomllib
+import zipfile
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).parents[2]
+FORBIDDEN_RUNTIME_DEPENDENCIES = {
+    "alembic",
+    "psycopg",
+    "sqlalchemy",
+    "testcontainers",
+    "keyring",
+}
+PUBLIC_REPOSITORY_FILES = {
+    ".github/CODEOWNERS",
+    ".github/ISSUE_TEMPLATE/bug_report.yml",
+    ".github/ISSUE_TEMPLATE/config.yml",
+    ".github/ISSUE_TEMPLATE/feature_request.yml",
+    ".github/dependabot.yml",
+    ".github/pull_request_template.md",
+    ".github/workflows/ci.yml",
+    ".github/workflows/codeql.yml",
+    "CHANGELOG.md",
+    "CODE_OF_CONDUCT.md",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "README.md",
+    "SECURITY.md",
+}
+
+
+def test_build_configuration_packages_only_the_standalone_server() -> None:
+    configuration = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    project = configuration["project"]
+    wheel = configuration["tool"]["hatch"]["build"]["targets"]["wheel"]
+    dependencies = {
+        requirement.split("[", 1)[0].split(">", 1)[0].split("<", 1)[0].casefold()
+        for requirement in project["dependencies"]
+    }
+
+    assert project["name"] == "linkedin-mcp-server"
+    assert project["license"] == "Apache-2.0"
+    assert project["license-files"] == ["LICENSE"]
+    assert project["authors"] == [
+        {"name": "Prakhar Agarwal", "email": "prakharagarwal3031@gmail.com"}
+    ]
+    assert project["urls"]["Repository"] == (
+        "https://github.com/Prakhar-Agarwal-byte/linkedin-mcp-server"
+    )
+    assert wheel["packages"] == ["src/linkedin_mcp"]
+    assert dependencies.isdisjoint(FORBIDDEN_RUNTIME_DEPENDENCIES)
+    assert project["scripts"] == {"linkedin-mcp": "linkedin_mcp.__main__:main"}
+
+    production_sources = "\n".join(
+        path.read_text() for path in sorted((ROOT / "src" / "linkedin_mcp").rglob("*.py"))
+    )
+    assert "tests.simulator" not in production_sources
+    assert "startup_scanner" not in production_sources
+    assert "startup-scanner" not in production_sources
+
+
+def test_public_repository_metadata_is_complete() -> None:
+    missing = sorted(path for path in PUBLIC_REPOSITORY_FILES if not (ROOT / path).is_file())
+
+    assert missing == []
+    assert "Apache License" in (ROOT / "LICENSE").read_text()
+    assert "Report a vulnerability privately" in (ROOT / "SECURITY.md").read_text()
+
+
+def test_synthetic_fixtures_contain_no_session_or_trace_artifacts() -> None:
+    fixture_root = ROOT / "tests" / "fixtures"
+    forbidden_names = {
+        ".env",
+        "cookies.json",
+        "storage-state.json",
+        "storage_state.json",
+    }
+    forbidden_suffixes = {".har", ".trace", ".zip"}
+    forbidden_text = {
+        '"source": "live"',
+        "@gmail.com",
+        "@outlook.com",
+        "@yahoo.com",
+        "authorization: bearer",
+        "cookie: li_at",
+        "dms.licdn.com",
+        '"li_at"',
+        "media.licdn.com",
+        "password=",
+        "source: live",
+        "voyager/api",
+    }
+
+    for path in fixture_root.rglob("*"):
+        if not path.is_file():
+            continue
+        assert path.name.casefold() not in forbidden_names
+        assert path.suffix.casefold() not in forbidden_suffixes
+        content = path.read_text(errors="ignore").casefold()
+        assert all(token not in content for token in forbidden_text), path
+
+
+@pytest.mark.timeout(90)
+def test_wheel_excludes_tests_profiles_secrets_and_other_repositories(tmp_path: Path) -> None:
+    output = tmp_path / "dist"
+    completed = subprocess.run(
+        [
+            "uv",
+            "build",
+            "--offline",
+            "--wheel",
+            "--out-dir",
+            str(output),
+        ],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=80,
+    )
+    assert completed.returncode == 0, completed.stderr
+    wheels = tuple(output.glob("*.whl"))
+    assert len(wheels) == 1
+
+    with zipfile.ZipFile(wheels[0]) as archive:
+        names = tuple(archive.namelist())
+        lowered = tuple(name.casefold() for name in names)
+        assert "linkedin_mcp/server.py" in names
+        assert any(name.endswith(".dist-info/entry_points.txt") for name in names)
+        assert not any(name.startswith("tests/") for name in names)
+        assert not any("simulator" in name for name in lowered)
+        assert not any("startup-scanner" in name for name in lowered)
+        assert not any(
+            name.endswith((".env", "cookies.json", "storage-state.json")) for name in lowered
+        )
+        assert not any("/profile/" in name or "browser_profile" in name for name in lowered)
+
+        metadata_name = next(name for name in names if name.endswith(".dist-info/METADATA"))
+        metadata = email.message_from_bytes(archive.read(metadata_name))
+        requirements = tuple(metadata.get_all("Requires-Dist", []))
+        assert metadata["License-Expression"] == "Apache-2.0"
+        assert metadata["Author-email"] == ("Prakhar Agarwal <prakharagarwal3031@gmail.com>")
+        assert any(
+            value.endswith(
+                "Repository, https://github.com/Prakhar-Agarwal-byte/linkedin-mcp-server"
+            )
+            for value in metadata.get_all("Project-URL", [])
+        )
+        assert not any(
+            requirement.split("[", 1)[0].split(" ", 1)[0].casefold()
+            in FORBIDDEN_RUNTIME_DEPENDENCIES
+            for requirement in requirements
+        )
+        assert any(name.endswith(".dist-info/licenses/LICENSE") for name in names)
+
+        entry_points_name = next(
+            name for name in names if name.endswith(".dist-info/entry_points.txt")
+        )
+        entry_points = archive.read(entry_points_name).decode()
+        assert "linkedin-mcp = linkedin_mcp.__main__:main" in entry_points
+
+    imported = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import sys; "
+                f"sys.path.insert(0, {str(wheels[0])!r}); "
+                "import linkedin_mcp; "
+                "print(linkedin_mcp.__version__)"
+            ),
+        ],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+    assert imported.returncode == 0, imported.stderr
+    assert imported.stdout.strip()

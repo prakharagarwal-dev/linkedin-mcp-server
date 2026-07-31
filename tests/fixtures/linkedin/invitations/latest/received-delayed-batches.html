@@ -1,0 +1,53 @@
+<!doctype html>
+<!-- Current card roots with a synthetic two-wheel lazy-loading pause. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Delayed current received invitations</title>
+    <style>
+      main { height: 240px; overflow-y: scroll; }
+      #filler { height: 600px; }
+    </style>
+  </head>
+  <body>
+    <main id="invitation-main">
+      <div role="button" aria-expanded="false" tabindex="0">
+        <input aria-hidden="true" type="checkbox" checked />
+        Focused (3)
+      </div>
+      <div id="column" data-testid="lazy-column">
+        <div><div><div data-display-contents="true">
+          <div role="listitem">
+            <a href="/in/first-delayed/"><strong>First Delayed</strong></a>
+            <button aria-label="Accept First Delayed’s invitation">Accept</button>
+          </div>
+        </div></div></div>
+        <div id="filler"></div>
+      </div>
+      <template id="tail">
+        <div><div><div data-display-contents="true">
+          <div role="listitem">
+            <a href="/in/second-delayed/"><strong>Second Delayed</strong></a>
+            <button aria-label="Accept Second Delayed’s invitation">Accept</button>
+          </div>
+        </div></div></div>
+        <div><div><div data-display-contents="true">
+          <div role="listitem">
+            <a href="/in/third-delayed/"><strong>Third Delayed</strong></a>
+            <button aria-label="Accept Third Delayed’s invitation">Accept</button>
+          </div>
+        </div></div></div>
+      </template>
+    </main>
+    <script>
+      let wheelCount = 0;
+      document.querySelector("#invitation-main").addEventListener("wheel", () => {
+        wheelCount += 1;
+        if (wheelCount !== 2) return;
+        const tail = document.querySelector("#tail");
+        document.querySelector("#column").append(tail.content.cloneNode(true));
+        document.querySelector("#filler").remove();
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,78 @@
+<!doctype html>
+<html>
+  <head><style>.hidden { display: none; }</style></head>
+  <body>
+    <main>
+      <button id="category-trigger" class="msg-cross-pillar-inbox-filters-v3__drop-down-trigger">Focused</button>
+      <div id="categories" class="hidden">
+        <div role="button">Focused</div>
+        <div role="button">Other</div>
+        <div role="button">Archived</div>
+        <div role="button">Spam</div>
+      </div>
+      <input placeholder="Search messages">
+      <button aria-pressed="false" aria-checked="false">Jobs</button>
+      <button aria-pressed="false" aria-checked="false">Unread</button>
+      <button aria-pressed="false" aria-checked="false">Connections</button>
+      <button aria-pressed="false" aria-checked="false">InMail</button>
+      <button aria-pressed="false" aria-checked="false">Starred</button>
+      <div
+        id="conversation-list"
+        class="msg-conversations-container__conversations-list"
+        style="height: 100px; overflow-y: auto"
+      >
+        <ul id="cards">
+          <li class="msg-conversation-listitem">
+            <div class="msg-conversation-listitem__link">
+              <h3 class="msg-conversation-card__participant-names">Jane Doe</h3>
+              <p class="msg-conversation-card__message-snippet">Initial result.</p>
+              <time>Today</time>
+            </div>
+          </li>
+        </ul>
+        <div style="height: 300px"></div>
+      </div>
+    </main>
+    <script>
+      const trigger = document.querySelector("#category-trigger");
+      const categories = document.querySelector("#categories");
+      trigger.addEventListener("click", () => categories.classList.toggle("hidden"));
+      categories.querySelectorAll('[role="button"]').forEach(option => {
+        option.addEventListener("click", () => {
+          trigger.textContent = option.textContent;
+          categories.classList.add("hidden");
+        });
+      });
+      document.querySelectorAll('button[aria-pressed]').forEach(filter => {
+        filter.addEventListener("click", () => {
+          document.querySelectorAll('button[aria-pressed]').forEach(other => {
+            other.setAttribute("aria-pressed", "false");
+            other.setAttribute("aria-checked", "false");
+          });
+          filter.setAttribute("aria-pressed", "true");
+          filter.setAttribute("aria-checked", "true");
+        });
+      });
+      let wheelCount = 0;
+      document.querySelector("#conversation-list").addEventListener("wheel", event => {
+        if (event.deltaY <= 0) return;
+        wheelCount += 1;
+        if (wheelCount !== 3) return;
+        setTimeout(() => {
+          document.querySelector("#cards").insertAdjacentHTML("beforeend", `
+            <li class="msg-conversation-listitem">
+              <div class="msg-conversation-listitem__link">
+                <h3 class="msg-conversation-card__participant-names">Taylor Ray</h3>
+                <p class="msg-conversation-card__message-snippet">Delayed tail message.</p>
+                <time>Yesterday</time>
+              </div>
+            </li>`);
+          document.querySelector("main").insertAdjacentHTML(
+            "beforeend",
+            "<p>No more conversations</p>"
+          );
+        }, 350);
+      });
+    </script>
+  </body>
+</html>

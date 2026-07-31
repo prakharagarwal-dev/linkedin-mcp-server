@@ -1,0 +1,173 @@
+{
+  "provenance": "mock_verified",
+  "verified_at": "2026-07-30",
+  "source_surfaces": [
+    "visible LinkedIn Jobs search",
+    "visible LinkedIn All filters dialog",
+    "visible LinkedIn standalone job detail"
+  ],
+  "contains_live_data": false,
+  "contains_authentication_state": false,
+  "search_card_selector": "main li[data-occludable-job-id]",
+  "search_card_identity_selector": "[data-job-id]",
+  "search_title_selector": "a.job-card-list__title--link",
+  "search_company_selector": ".artdeco-entity-lockup__subtitle",
+  "search_location_selector": ".artdeco-entity-lockup__caption",
+  "search_company_identity_optional": true,
+  "search_pagination_selectors": [
+    "button[aria-label^=\"Page \"]",
+    "button[aria-label=\"View next page\"]",
+    "button[aria-label=\"View previous page\"]"
+  ],
+  "search_empty_signals": [
+    "0 results",
+    "Jobs you may be interested in"
+  ],
+  "filter_sections": [
+    "Sort by",
+    "Date posted",
+    "Experience level",
+    "Company",
+    "Job type",
+    "Remote",
+    "Easy Apply",
+    "Has verifications",
+    "Distance",
+    "Location",
+    "Industry",
+    "Job function",
+    "Title",
+    "Under 10 applicants",
+    "In your network",
+    "Fair Chance Employer",
+    "Benefits",
+    "Commitments"
+  ],
+  "all_filters_dialog_sections": [
+    "Sort by",
+    "Date posted",
+    "Experience level",
+    "Company",
+    "Job type",
+    "Remote",
+    "Easy Apply",
+    "Has verifications",
+    "Location",
+    "Industry",
+    "Job function",
+    "Title",
+    "Under 10 applicants",
+    "In your network",
+    "Fair Chance Employer",
+    "Benefits",
+    "Commitments"
+  ],
+  "top_filter_controls": [
+    "Distance"
+  ],
+  "sort_choices": [
+    "Most relevant",
+    "Most recent"
+  ],
+  "date_posted_choices": [
+    "Any time",
+    "Past month",
+    "Past week",
+    "Past 24 hours"
+  ],
+  "experience_level_choices": [
+    "Internship",
+    "Entry level",
+    "Associate",
+    "Mid-Senior level",
+    "Director",
+    "Executive"
+  ],
+  "job_type_choices": [
+    "Full-time",
+    "Part-time",
+    "Contract",
+    "Temporary",
+    "Volunteer",
+    "Internship",
+    "Other"
+  ],
+  "workplace_type_choices": [
+    "On-site",
+    "Remote",
+    "Hybrid"
+  ],
+  "boolean_filter_choices": [
+    "Easy Apply",
+    "Has verifications",
+    "Under 10 applicants",
+    "In your network",
+    "Fair Chance Employer"
+  ],
+  "benefit_choices": [
+    "Medical insurance",
+    "Vision insurance",
+    "Dental insurance",
+    "401(k)",
+    "Pension plan",
+    "Paid maternity leave",
+    "Paid paternity leave",
+    "Commuter benefits",
+    "Student loan assistance",
+    "Tuition assistance",
+    "Disability insurance"
+  ],
+  "commitment_choices": [
+    "Career growth and learning",
+    "Diversity, equity, and inclusion",
+    "Environmental sustainability",
+    "Social impact",
+    "Work-life balance"
+  ],
+  "distance_choices_miles": [
+    0,
+    5,
+    10,
+    25,
+    50,
+    100
+  ],
+  "distance_choices_observed_metric_labels": [
+    "0 km",
+    "8 km",
+    "16 km",
+    "40 km",
+    "80 km",
+    "160 km"
+  ],
+  "observed_query_parameters": {
+    "date_posted": "f_TPR",
+    "sort_by": "sortBy",
+    "location_geo_id": "geoId",
+    "distance": "distance",
+    "workplace_type": "f_WT",
+    "experience_level": "f_E",
+    "employment_type": "f_JT",
+    "locations": "f_PP",
+    "companies": "f_C",
+    "industries": "f_I",
+    "job_functions": "f_F",
+    "titles": "f_T",
+    "benefits": "f_BE",
+    "commitments": "f_CM",
+    "easy_apply": "f_AL",
+    "has_verifications": "f_VJ",
+    "under_10_applicants": "f_EA",
+    "in_your_network": "f_JIYN",
+    "fair_chance_employer": "f_FCE"
+  },
+  "excluded_upsell": "See jobs where you’re most likely to hear back has no filter input and is a Premium promotion, not a Jobs search filter.",
+  "detail_primary_anchor": "visible Save the job control with an enclosing exact current-job attribute link",
+  "detail_company_identity_optional": true,
+  "detail_description_selector": "[data-testid=\"expandable-text-box\"]",
+  "detail_description_expand_selector": "[data-testid=\"expandable-text-button\"]",
+  "detail_easy_apply_control": "link or button with accessible name containing Easy Apply",
+  "detail_external_apply_control": "button with accessible name Apply on company website",
+  "detail_hiring_team_anchor": "Meet the hiring team",
+  "notes": "Synthetic identities and text preserve only current selector, accessibility, complete account-visible filter, virtualized-card hydration, optional company identity, zero-result recommendation, pagination, primary-detail, application-method, expandable-JD, and hiring-team behavior reverified through the authenticated visible UI. Distance is a current top-level filter control rather than a section in the All filters dialog."
+}

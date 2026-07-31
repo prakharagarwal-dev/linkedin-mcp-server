@@ -1,0 +1,52 @@
+<!doctype html>
+<!-- Sanitized synthetic inbox with two idle scroll windows before its tail. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>LinkedIn Infinite Messaging Fixture</title>
+  </head>
+  <body>
+    <main>
+      <h1>Messaging</h1>
+      <label>
+        Search messages
+        <input aria-label="Search messages" />
+      </label>
+      <button aria-label="Filter messages">Filter messages</button>
+      <ul id="conversation-list">
+        <li class="msg-conversation-listitem">
+          <a href="/messaging/thread/thread-123/">Open conversation</a>
+          <a href="/in/jane-doe/">Jane Doe</a>
+          <p class="msg-conversation-card__message-snippet">Initial message.</p>
+          <time>10:30 AM</time>
+        </li>
+      </ul>
+      <p id="conversation-end" hidden>No more conversations</p>
+      <template id="conversation-tail">
+        <li class="msg-conversation-listitem">
+          <a href="/messaging/thread/thread-tail/">Open conversation</a>
+          <a href="/in/tail-contact-/">Tail Contact</a>
+          <p class="msg-conversation-card__message-snippet">Delayed tail message.</p>
+          <time>Yesterday</time>
+        </li>
+      </template>
+    </main>
+    <script>
+      let wheelCount = 0;
+      let loaded = false;
+      window.addEventListener("wheel", () => {
+        wheelCount += 1;
+        if (wheelCount === 3 && !loaded) {
+          loaded = true;
+          setTimeout(() => {
+            const tail = document.querySelector("#conversation-tail");
+            document
+              .querySelector("#conversation-list")
+              .append(tail.content.cloneNode(true));
+            document.querySelector("#conversation-end").hidden = false;
+          }, 600);
+        }
+      });
+    </script>
+  </body>
+</html>

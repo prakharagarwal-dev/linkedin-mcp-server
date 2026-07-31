@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Current LinkedIn Portaled Reaction Fixture</title>
+  </head>
+  <body>
+    <nav aria-label="Primary navigation">
+      <button type="button" aria-label="Open the Me menu"><span>Me</span></button>
+    </nav>
+    <main aria-label="Post detail">
+      <aside aria-label="Signed-in member profile">
+        <a href="/in/current-member/">
+          Current Member
+          <span>Platform Engineer</span>
+        </a>
+      </aside>
+      <article data-post-urn="urn:li:activity:7312345678901234567">
+        <a href="/in/jane-doe/">Jane Doe</a>
+        <p data-post-text>A visible post with the current reaction control.</p>
+        <button
+          id="current-reaction-control"
+          type="button"
+          aria-label="Reaction button state: no reaction"
+        >
+          Like
+        </button>
+      </article>
+    </main>
+    <div id="portaled-reactions" hidden>
+      <button type="button" aria-label="Like">Like</button>
+      <button type="button" aria-label="Celebrate">Celebrate</button>
+      <button type="button" aria-label="Support">Support</button>
+      <button type="button" aria-label="Love">Love</button>
+      <button type="button" aria-label="Insightful">Insightful</button>
+      <button type="button" aria-label="Funny">Funny</button>
+    </div>
+    <script>
+      const control = document.querySelector("#current-reaction-control");
+      const picker = document.querySelector("#portaled-reactions");
+      control.addEventListener("mouseenter", () => {
+        picker.hidden = false;
+      });
+      picker.querySelectorAll("button").forEach((option) => {
+        option.addEventListener("click", () => {
+          const reaction = option.getAttribute("aria-label");
+          control.setAttribute(
+            "aria-label",
+            `Reaction button state: ${reaction}`
+          );
+          control.textContent = reaction;
+          picker.hidden = true;
+        });
+      });
+    </script>
+  </body>
+</html>

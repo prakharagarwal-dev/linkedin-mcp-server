@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>LinkedIn Post Engagement Fixture</title>
+    <style>
+      .reaction-options {
+        display: none;
+      }
+
+      .reaction-group:hover .reaction-options,
+      .reaction-options:focus-within {
+        display: flex;
+        gap: 0.25rem;
+      }
+
+      .author-headline {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <nav aria-label="Primary navigation">
+      <button type="button" aria-label="Open the Me menu">
+        <span>Me</span>
+      </button>
+    </nav>
+
+    <main aria-label="Post detail and discussion">
+      <aside aria-label="Signed-in member profile">
+        <a href="/in/current-member/">
+          Current Member
+          <span class="author-headline">Platform Engineer</span>
+          <span>Builds reliable systems</span>
+        </a>
+        <a href="/in/current-member/">1,234</a>
+      </aside>
+      <article
+        id="target-post"
+        data-post-urn="urn:li:activity:7312345678901234567"
+      >
+        <a href="/in/jane-doe/">
+          Jane Doe
+          <span class="author-headline">Staff Engineer at Acme Cloud</span>
+        </a>
+        <time>2h</time>
+        <p data-post-text>A deterministic fixture post about reliable systems.</p>
+
+        <div class="reaction-group" data-reaction-group>
+          <button
+            type="button"
+            data-reaction-control
+            data-current-reaction="none"
+            aria-label="Like"
+            aria-pressed="false"
+          >
+            Like
+          </button>
+          <div class="reaction-options" aria-label="Post reaction choices">
+            <button type="button" data-reaction-option data-reaction="like">Like</button>
+            <button type="button" data-reaction-option data-reaction="celebrate">
+              Celebrate
+            </button>
+            <button type="button" data-reaction-option data-reaction="support">
+              Support
+            </button>
+            <button type="button" data-reaction-option data-reaction="love">Love</button>
+            <button type="button" data-reaction-option data-reaction="insightful">
+              Insightful
+            </button>
+            <button type="button" data-reaction-option data-reaction="funny">Funny</button>
+          </div>
+        </div>
+
+        <div
+          id="top-level-composer"
+          data-comment-composer
+          data-parent-comment=""
+        >
+          <label>
+            Add a comment
+            <textarea
+              aria-label="Text editor for creating comment"
+              maxlength="3000"
+            ></textarea>
+          </label>
+          <button type="button" aria-label="Show Emoji Picker">Emoji</button>
+          <button type="button" aria-label="Share photo" data-photo-control>Photo</button>
+          <button type="button" aria-label="Open GIF picker" data-gif-control>GIF</button>
+          <input type="file" accept="image/gif,image/jpeg,image/jpg,image/png,image/webp" hidden />
+          <button type="button" data-submit-comment>Comment</button>
+        </div>
+      </article>
+
+      <section id="discussion" aria-label="Comments">
+        <article
+          id="target-comment"
+          data-comment-urn="urn:li:comment:(ugcPost:7312345678901234566,111)"
+        >
+          <a href="/in/alex-ray/">
+            Alex Ray
+            <span class="author-headline">Principal Engineer</span>
+          </a>
+          <p data-comment-text>Helpful breakdown.</p>
+          <time>1h</time>
+
+          <div class="reaction-group" data-reaction-group>
+            <button
+              type="button"
+              data-reaction-control
+              data-current-reaction="like"
+              aria-label="Like"
+              aria-pressed="true"
+            >
+              Like
+            </button>
+            <div class="reaction-options" aria-label="Comment reaction choices">
+              <button type="button" data-reaction-option data-reaction="like">Like</button>
+              <button type="button" data-reaction-option data-reaction="celebrate">
+                Celebrate
+              </button>
+              <button type="button" data-reaction-option data-reaction="support">
+                Support
+              </button>
+              <button type="button" data-reaction-option data-reaction="love">Love</button>
+              <button type="button" data-reaction-option data-reaction="insightful">
+                Insightful
+              </button>
+              <button type="button" data-reaction-option data-reaction="funny">Funny</button>
+            </div>
+          </div>
+
+          <div
+            id="reply-composer"
+            data-comment-composer
+            data-parent-comment="urn:li:comment:(ugcPost:7312345678901234566,111)"
+          >
+            <label>
+              Write a reply
+              <textarea
+                aria-label="Text editor for creating reply"
+                maxlength="3000"
+              ></textarea>
+            </label>
+            <button type="button" aria-label="Show Emoji Picker">Emoji</button>
+            <button type="button" aria-label="Share photo" data-photo-control>Photo</button>
+            <button type="button" aria-label="Open GIF picker" data-gif-control>GIF</button>
+            <input
+              type="file"
+              accept="image/gif,image/jpeg,image/jpg,image/png,image/webp"
+              hidden
+            />
+            <button type="button" data-submit-comment>Reply</button>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <div id="mention-suggestions" role="listbox" aria-label="Mention suggestions">
+      <a role="option" href="/in/alex-ray/">Alex Ray</a>
+      <a role="option" href="/company/acme-cloud/">Acme Cloud</a>
+    </div>
+
+    <div id="gif-picker" role="dialog" aria-label="GIF picker" data-gif-picker hidden>
+      <label>
+        Search for GIFs
+        <input aria-label="Search for GIFs" placeholder="Search KLIPY" />
+      </label>
+      <button type="button" data-gif-result>
+        <img
+          alt="Celebration confetti GIF"
+          src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=="
+        />
+      </button>
+    </div>
+
+    <script>
+      let nextCommentId = 900;
+      let activeGifComposer = null;
+
+      function setReaction(group, value) {
+        const control = group.querySelector("[data-reaction-control]");
+        const label = value === "none"
+          ? "Like"
+          : value.charAt(0).toUpperCase() + value.slice(1);
+        control.dataset.currentReaction = value;
+        control.setAttribute("aria-pressed", value === "none" ? "false" : "true");
+        control.setAttribute("aria-label", label);
+        control.textContent = label;
+      }
+
+      document.querySelectorAll("[data-reaction-group]").forEach((group) => {
+        const control = group.querySelector("[data-reaction-control]");
+        control.addEventListener("click", () => {
+          if (control.dataset.currentReaction !== "none") {
+            setReaction(group, "none");
+          }
+        });
+        group.querySelectorAll("[data-reaction-option]").forEach((option) => {
+          option.addEventListener("click", () => {
+            setReaction(group, option.dataset.reaction);
+          });
+        });
+      });
+
+      document.querySelectorAll("[data-comment-composer]").forEach((composer) => {
+        const input = composer.querySelector('input[type="file"]');
+        input.addEventListener("change", () => {
+          composer.dataset.fileName = input.files.length ? input.files[0].name : "";
+        });
+        composer.querySelector("[data-photo-control]").addEventListener("click", () => {
+          input.click();
+        });
+        composer.querySelector("[data-gif-control]").addEventListener("click", () => {
+          activeGifComposer = composer;
+          document.querySelector("#gif-picker").hidden = false;
+        });
+        composer.querySelector("[data-submit-comment]").addEventListener("click", () => {
+          const text = composer.querySelector("textarea").value;
+          const gifLabel = composer.dataset.gifLabel;
+          const fileName = composer.dataset.fileName;
+          if (!text && !gifLabel && !fileName) {
+            return;
+          }
+          const comment = document.createElement("article");
+          const commentId = String(nextCommentId++);
+          comment.dataset.commentUrn =
+            `urn:li:comment:(ugcPost:7312345678901234566,${commentId})`;
+          if (composer.dataset.parentComment) {
+            comment.dataset.parentCommentUrn = composer.dataset.parentComment;
+          }
+          const author = document.createElement("a");
+          author.href = "/in/current-member/";
+          author.textContent = "Current Member";
+          const time = document.createElement("time");
+          time.textContent = "just now";
+          comment.append(author);
+          if (text) {
+            const body = document.createElement("p");
+            body.dataset.commentText = "";
+            body.textContent = text;
+            comment.append(body);
+          }
+          if (gifLabel || fileName) {
+            const attachment = document.createElement("span");
+            attachment.dataset.commentAttachment = "";
+            attachment.dataset.kind = gifLabel ? "gif" : "photo";
+            attachment.setAttribute(
+              "aria-label",
+              gifLabel || "Photo attachment"
+            );
+            attachment.style.display = "inline-block";
+            attachment.style.width = "10px";
+            attachment.style.height = "10px";
+            comment.append(attachment);
+          }
+          comment.append(time);
+          document.querySelector("#discussion").append(comment);
+        });
+      });
+
+      document.querySelectorAll("#mention-suggestions a").forEach((option) => {
+        option.addEventListener("click", (event) => event.preventDefault());
+      });
+
+      document.querySelector("[data-gif-result]").addEventListener("click", (event) => {
+        if (activeGifComposer) {
+          activeGifComposer.dataset.gifLabel =
+            event.currentTarget.querySelector("img").getAttribute("alt");
+        }
+        document.querySelector("#gif-picker").hidden = true;
+      });
+    </script>
+  </body>
+</html>

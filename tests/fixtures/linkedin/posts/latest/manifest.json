@@ -1,0 +1,153 @@
+{
+  "provenance": "mock_verified",
+  "verified_at": "2026-07-30",
+  "source_surfaces": [
+    "visible LinkedIn Posts search",
+    "visible LinkedIn Posts All filters panel",
+    "visible LinkedIn post detail for text, image, video, document, link-card, poll, and repost variants",
+    "visible personal post composer and every account-visible nested creation dialog",
+    "visible post and comment composers, GIF picker, and six-option reaction tray"
+  ],
+  "contains_live_data": false,
+  "contains_authentication_state": false,
+  "personal_post_creation_contract": {
+    "fixture": "../personal-post-composer.html",
+    "actor": "personal member only",
+    "modes": [
+      "text",
+      "images",
+      "video",
+      "document",
+      "poll",
+      "celebration",
+      "event",
+      "hiring",
+      "expert_request"
+    ],
+    "audiences": [
+      "Anyone",
+      "Connections only",
+      "Group"
+    ],
+    "comment_controls": [
+      "Anyone",
+      "Connections only",
+      "No one"
+    ],
+    "media_controls": [
+      "Add media",
+      "Edit",
+      "Tag",
+      "Alternative text",
+      "Captions",
+      "Video thumbnail"
+    ],
+    "additional_controls": [
+      "Brand partnership",
+      "Add collaborators",
+      "Schedule post"
+    ],
+    "company_page_publishing": false
+  },
+  "engagement_contract": {
+    "fixture": "../post-engagement.html",
+    "comment_controls": [
+      "Show Emoji Picker",
+      "Open GIF picker",
+      "Share photo"
+    ],
+    "gif_search": "Search for GIFs / Search KLIPY",
+    "reactions": [
+      "Like",
+      "Celebrate",
+      "Support",
+      "Love",
+      "Insightful",
+      "Funny"
+    ],
+    "discussion_alias_behavior": "activity post URLs may expose native ugc-post comment references"
+  },
+  "filter_sections": [
+    "Sort by",
+    "Date posted",
+    "Content type",
+    "From member",
+    "From company",
+    "Posted by",
+    "Mentioning member",
+    "Mentioning company",
+    "Author industry",
+    "Author company",
+    "Author Keywords"
+  ],
+  "sort_choices": [
+    "Top Match",
+    "Latest"
+  ],
+  "date_choices": [
+    "Any time",
+    "Past 24 hours",
+    "Past week",
+    "Past month"
+  ],
+  "content_type_choices": [
+    "Videos",
+    "Images",
+    "Job posts",
+    "Live videos",
+    "Documents"
+  ],
+  "posted_by_choices": [
+    "Me",
+    "1st connections",
+    "People you follow"
+  ],
+  "observed_query_parameters": {
+    "sort_by": "sortBy",
+    "date_posted": "datePosted",
+    "content_type": "contentType",
+    "from_member": "fromMember",
+    "from_company": "fromOrganization",
+    "posted_by": "postedBy",
+    "mentioning_member": "mentionsMember",
+    "mentioning_company": "mentionsOrganization",
+    "author_industry": "authorIndustry",
+    "author_company": "authorCompany",
+    "author_keywords": "authorJobTitle"
+  },
+  "filter_submission_selector": "a:has-text(\"Show results\")",
+  "search_card_selector": "main article, main [role=\"listitem\"]:has(button[aria-label^=\"Open control menu for post by \"])",
+  "detail_contract": {
+    "exact_post_control": "button[aria-label^=\"Open control menu for post by \"]",
+    "stable_reference_action": "Copy link to post",
+    "body": "[data-testid=\"expandable-text-box\"]",
+    "body_expansion": "[data-testid=\"expandable-text-button\"]",
+    "visibility": "[aria-label^=\"Visibility:\"]",
+    "reaction_state": "button[aria-label^=\"Reaction button state:\"]",
+    "comment_action": "button[aria-label=\"Comment\"]",
+    "repost_action": "button[aria-label=\"Repost\"]",
+    "document_controls": [
+      "Page N of M",
+      "Full screen",
+      "N pages"
+    ],
+    "poll_states": [
+      "open radio options",
+      "closed percentages and Poll closed"
+    ],
+    "repost_behavior": "The wrapper Copy link action resolves the original stable post reference; the original is read as a second bounded visible page."
+  },
+  "detail_fixtures": [
+    "detail-text.html",
+    "detail-image.html",
+    "detail-video.html",
+    "detail-live-video.html",
+    "detail-document.html",
+    "detail-article.html",
+    "detail-poll-open.html",
+    "detail-poll-closed.html",
+    "detail-repost.html",
+    "detail-repost-original.html"
+  ],
+  "notes": "Synthetic identities and text preserve only current accessibility, section-scoped typeahead, submitted-parameter, result-card, stable-reference, pagination, post-detail expansion, media, poll, engagement, and repost behavior observed through the authenticated visible UI. LinkedIn's current Content type control is single-choice; Images submits photos, Job posts submits jobs, and Live videos submits liveVideos. No live identity, content, raw DOM, cookie, credential, or browser state is retained."
+}

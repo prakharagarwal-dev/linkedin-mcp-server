@@ -1,0 +1,36 @@
+name: Capability or feature request
+description: Propose a bounded capability or project improvement.
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What operator or MCP-client need is currently unmet?
+    validations:
+      required: true
+
+  - type: textarea
+    id: contract
+    attributes:
+      label: Proposed contract
+      description: Describe the visible surface, typed inputs/outputs, scope, effect, bounds, and postcondition.
+    validations:
+      required: true
+
+  - type: textarea
+    id: safety
+    attributes:
+      label: Safety and privacy considerations
+      description: Explain account risk, authorization, confirmation, idempotency, and fixture needs.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: boundary
+    attributes:
+      label: Product boundary
+      options:
+        - label: This does not require generic browser control, private endpoints, bypass techniques, or credential collection.
+          required: true

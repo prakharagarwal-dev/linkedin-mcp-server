@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Current LinkedIn text post fixture</title>
+  </head>
+  <body>
+    <main aria-label="Post detail">
+      <div role="listitem">
+        <header>
+          <a href="/in/taylor-chen/">Taylor Chen</a>
+          <div>1st</div>
+          <div>Reliability Engineer</div>
+          <div>15m •</div>
+          <svg aria-label="Visibility: Global"></svg>
+          <button type="button" data-menu-open aria-label="Open control menu for post by Taylor Chen"></button>
+        </header>
+        <div data-testid="expandable-text-box">
+          A plain-text reminder: verify the postcondition before retrying. #reliability
+        </div>
+        <button type="button" aria-label="Reaction button state: no reaction">3</button>
+        <button type="button" aria-label="Comment" disabled></button>
+        <button type="button" aria-label="Repost"></button>
+      </div>
+    </main>
+    <script>
+      const copiedPostUrl =
+        "https://www.linkedin.com/feed/update/urn:li:activity:7312345678901234575/";
+      document.querySelector("[data-menu-open]").addEventListener("click", () => {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.textContent = "Copy link to post";
+        item.addEventListener("click", async () => {
+          await navigator.clipboard.writeText(copiedPostUrl);
+          item.remove();
+        });
+        document.body.append(item);
+      });
+    </script>
+  </body>
+</html>

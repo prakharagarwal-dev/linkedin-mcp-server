@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Current LinkedIn article post fixture</title>
+    <style>
+      .card { display: block; width: 520px; min-height: 180px; }
+      .card img { display: block; width: 220px; height: 120px; }
+    </style>
+  </head>
+  <body>
+    <main aria-label="Post detail">
+      <div role="listitem">
+        <header>
+          <a href="/in/avery-shah/">Avery Shah</a>
+          <div>2nd</div>
+          <div>Distributed Systems Researcher</div>
+          <div>3d •</div>
+          <svg aria-label="Visibility: Global"></svg>
+          <button type="button" data-menu-open aria-label="Open control menu for post by Avery Shah"></button>
+        </header>
+        <div data-testid="expandable-text-box">
+          A long-form analysis of recovery design.
+          <a href="/in/sam-kim/">Sam Kim</a>
+        </div>
+        <a class="card" href="https://www.linkedin.com/pulse/designing-recovery-avery-shah/">
+          <div>Designing Recovery Before Failure</div>
+          <div>A field guide to bounded, observable recovery workflows</div>
+          <img
+            alt="Article preview"
+            src="https://media.example.test/recovery-article.png"
+          />
+        </a>
+        <button type="button" aria-label="Reaction button state: no reaction">64</button>
+        <button type="button" aria-label="Comment">5</button>
+        <button type="button" aria-label="Repost"></button>
+      </div>
+    </main>
+    <script>
+      const copiedPostUrl =
+        "https://www.linkedin.com/feed/update/urn:li:activity:7312345678901234570/";
+      document.querySelector("[data-menu-open]").addEventListener("click", () => {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.textContent = "Copy link to post";
+        item.addEventListener("click", async () => {
+          await navigator.clipboard.writeText(copiedPostUrl);
+          item.remove();
+        });
+        document.body.append(item);
+      });
+    </script>
+  </body>
+</html>

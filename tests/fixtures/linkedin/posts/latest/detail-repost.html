@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Current LinkedIn repost wrapper fixture</title>
+  </head>
+  <body>
+    <main aria-label="Post detail">
+      <div role="listitem">
+        <header>
+          <a href="/in/riley-kapoor/">Riley Kapoor</a>
+          <div>1st</div>
+          <div>Site Reliability Engineer</div>
+          <div>2h •</div>
+          <svg aria-label="Visibility: Global"></svg>
+          <button type="button" data-menu-open aria-label="Open control menu for post by Riley Kapoor"></button>
+        </header>
+        <div>
+          <div data-testid="expandable-text-box">
+            This recovery guide is worth sharing with
+            <a href="/in/alex-ray/">Alex Ray</a>. #resilience
+          </div>
+        </div>
+        <section aria-label="Reposted content">
+          <div>
+            <a href="/company/example-labs/">Example Labs</a>
+            <div>42,115 followers</div>
+            <div>Software Development</div>
+            <div>1d •</div>
+          </div>
+          <div>
+            <div data-testid="expandable-text-box">
+              Recovery begins with a bounded plan.
+              <span>… truncated in the embedded card</span>
+            </div>
+            <button type="button" data-testid="expandable-text-button">… more</button>
+          </div>
+        </section>
+        <button type="button" aria-label="Reaction button state: support">31</button>
+        <button type="button" aria-label="Comment">6</button>
+        <button type="button" aria-label="Repost">3</button>
+      </div>
+    </main>
+    <script>
+      const copiedPostUrl =
+        "https://www.linkedin.com/feed/update/urn:li:share:7312345678901234574/";
+      document.querySelector("[data-menu-open]").addEventListener("click", () => {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.textContent = "Copy link to post";
+        item.addEventListener("click", async () => {
+          await navigator.clipboard.writeText(copiedPostUrl);
+          item.remove();
+        });
+        document.body.append(item);
+      });
+      // The embedded card deliberately does not expand. The production adapter must
+      // follow the visible stable original-post identity instead of forcing this control.
+    </script>
+  </body>
+</html>

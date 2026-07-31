@@ -1,0 +1,48 @@
+<!doctype html>
+<html>
+  <body>
+    <main>
+      <h1>Messaging</h1>
+      <label>
+        Search messages
+        <input aria-label="Search messages" />
+      </label>
+      <button aria-label="Filter messages">Filter messages</button>
+      <section aria-label="Conversation list">
+        <ul>
+          <li class="msg-conversation-listitem msg-conversation-listitem--unread"
+              aria-label="Unread conversation with Jane Doe">
+            <a href="/messaging/thread/thread-123/">Open conversation</a>
+            <a href="/in/jane-doe/">Jane Doe</a>
+            <p class="msg-conversation-card__message-snippet">Can we discuss the role?</p>
+            <time>10:30 AM</time>
+          </li>
+          <li class="msg-conversation-listitem">
+            <a href="/messaging/thread/thread-456/">Open conversation</a>
+            <a href="/in/alex-lee/">Alex Lee</a>
+            <p class="msg-conversation-card__message-snippet">You: Sounds good.</p>
+            <time>Yesterday</time>
+          </li>
+        </ul>
+      </section>
+      <section aria-label="Conversation with Jane Doe">
+        <h2>Jane Doe</h2>
+        <a href="/in/jane-doe/">Jane Doe</a>
+        <ol>
+          <li class="msg-s-event-listitem msg-s-event-listitem--incoming">
+            <span class="msg-s-message-group__name">Jane Doe</span>
+            <time>10:29 AM</time>
+            <p class="msg-s-event-listitem__body">Can we discuss the role?</p>
+          </li>
+          <li class="msg-s-event-listitem msg-s-event-listitem--outgoing">
+            <span class="msg-s-message-group__name">You</span>
+            <time>10:30 AM</time>
+            <p class="msg-s-event-listitem__body">Absolutely.</p>
+          </li>
+        </ol>
+        <div contenteditable="true" role="textbox" aria-label="Write a message"></div>
+        <button aria-label="Send">Send</button>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Current LinkedIn Jobs Filters Fixture</title>
+  </head>
+  <body>
+    <section aria-label="search filters">
+      <h2 class="a11y-text">Jobs search</h2>
+      <button
+        id="all-filters"
+        type="button"
+        aria-label="Show all filters. Clicking this button displays all available filter options."
+      >
+        All filters
+      </button>
+    </section>
+
+    <div id="filter-dialog" role="dialog" aria-label="All filters" hidden>
+      <h2>All filters</h2>
+
+      <section>
+        <h3>Location</h3>
+        <input
+          id="advanced-filter-populatedPlace-105214831"
+          name="location-filter-value"
+          type="checkbox"
+          value="105214831"
+        />
+        <label for="advanced-filter-populatedPlace-105214831">
+          Bengaluru
+          Filter by Bengaluru
+        </label>
+      </section>
+
+      <section>
+        <h3>Industry</h3>
+        <input
+          id="advanced-filter-industry-4"
+          name="industry-filter-value"
+          type="checkbox"
+          value="4"
+        />
+        <label for="advanced-filter-industry-4">
+          Software Development
+          Filter by Software Development
+        </label>
+      </section>
+
+      <section>
+        <h3>Job function</h3>
+        <input
+          id="advanced-filter-function-eng"
+          name="job-function-filter-value"
+          type="checkbox"
+          value="eng"
+        />
+        <label for="advanced-filter-function-eng">
+          Engineering
+          Filter by Engineering
+        </label>
+      </section>
+
+      <section>
+        <h3>Title</h3>
+        <input
+          id="advanced-filter-title-9"
+          name="title-filter-value"
+          type="checkbox"
+          value="9"
+        />
+        <label for="advanced-filter-title-9">
+          Software Engineer
+          Filter by Software Engineer
+        </label>
+      </section>
+
+      <section>
+        <h3>Company</h3>
+        <button id="add-company" type="button">Add a company</button>
+        <div id="company-typeahead" hidden>
+          <label for="company-query">Add a company</label>
+          <input
+            id="company-query"
+            role="combobox"
+            aria-label="Add a company"
+            type="text"
+          />
+          <ul id="company-options" role="listbox" hidden>
+            <li id="openai-option" role="option">
+              OpenAI Company • Research Services
+            </li>
+          </ul>
+        </div>
+        <div id="selected-companies"></div>
+      </section>
+
+      <button type="button">Reset</button>
+      <button type="button" aria-label="Apply current filters to show results">
+        Show results
+      </button>
+    </div>
+
+    <main class="scaffold-layout__list-detail">
+      <header class="scaffold-layout__list-header">
+        <h1>Software engineering jobs</h1>
+        <span>1 result</span>
+      </header>
+      <ul aria-label="Jobs">
+        <li data-occludable-job-id="4100000001">
+          <div data-job-id="4100000001" class="job-card-container job-card-list">
+            <div class="artdeco-entity-lockup__title">
+              <a
+                class="job-card-list__title--link"
+                href="/jobs/view/4100000001/"
+                aria-label="Senior Python Engineer"
+              >
+                <span aria-hidden="true"><strong>Senior Python Engineer</strong></span>
+                <span class="visually-hidden">Senior Python Engineer</span>
+              </a>
+            </div>
+            <div class="artdeco-entity-lockup__subtitle"><span>OpenAI</span></div>
+            <div class="artdeco-entity-lockup__caption">
+              <span>Bengaluru, Karnataka, India (Hybrid)</span>
+            </div>
+          </div>
+        </li>
+      </ul>
+      <button type="button" aria-label="Page 1">1</button>
+    </main>
+
+    <script>
+      const filterDialog = document.querySelector("#filter-dialog");
+      const companyTypeahead = document.querySelector("#company-typeahead");
+      const companyQuery = document.querySelector("#company-query");
+      const companyOptions = document.querySelector("#company-options");
+
+      document.querySelector("#all-filters").addEventListener("click", () => {
+        filterDialog.hidden = false;
+      });
+      document.querySelector("#add-company").addEventListener("click", () => {
+        companyTypeahead.hidden = false;
+        companyQuery.focus();
+      });
+      companyQuery.addEventListener("input", () => {
+        companyOptions.hidden = companyQuery.value.trim().toLowerCase() !== "openai";
+      });
+      document.querySelector("#openai-option").addEventListener("click", () => {
+        document.querySelector("#selected-companies").innerHTML = `
+          <input
+            id="advanced-filter-company-11130470"
+            name="company-filter-value"
+            type="checkbox"
+            value="11130470"
+            checked
+          />
+          <label for="advanced-filter-company-11130470">
+            OpenAI
+            Filter by OpenAI
+          </label>
+        `;
+        companyOptions.hidden = true;
+        companyTypeahead.hidden = true;
+      });
+    </script>
+  </body>
+</html>

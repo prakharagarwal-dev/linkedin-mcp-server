@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>LinkedIn Modern Comment Fixture</title>
+  </head>
+  <body>
+    <main aria-label="Post detail and discussion">
+      <article data-post-urn="urn:li:activity:7312345678901234567">
+        <a href="/in/jane-doe/">Jane Doe</a>
+        <p data-post-text>Modern discussion fixture.</p>
+        <button id="open-comments" type="button" aria-label="Comment">2</button>
+      </article>
+
+      <section id="discussion" aria-label="Comments" hidden>
+        <div
+          id="replaceableComment_urn:li:comment:(urn:li:activity:7312345678901234567,201)"
+        >
+          <a href="/in/alex-ray/">
+            Alex Ray
+            <span>Principal Engineer</span>
+          </a>
+          <p><span>6h</span></p>
+          <button
+            type="button"
+            aria-label="View more options for Alex Ray's comment."
+          ></button>
+          <div>
+            <p><span>Modern visible comment body.</span></p>
+          </div>
+          <button type="button" aria-label="Open reactions menu"></button>
+          <button type="button" aria-label="Reply"></button>
+
+          <section aria-label="Replies">
+            <div
+              id="replaceableComment_urn:li:comment:(urn:li:activity:7312345678901234567,202)"
+            >
+              <a href="/in/jane-doe/">Jane Doe</a>
+              <p><span>5h</span></p>
+              <button
+                type="button"
+                aria-label="View more options for Jane Doe's comment."
+              ></button>
+              <div>
+                <p><span>Modern nested reply.</span></p>
+              </div>
+              <button type="button" aria-label="Open reactions menu"></button>
+              <button type="button" aria-label="Reply"></button>
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      document.querySelector("#open-comments").addEventListener("click", () => {
+        document.querySelector("#discussion").hidden = false;
+      });
+    </script>
+  </body>
+</html>

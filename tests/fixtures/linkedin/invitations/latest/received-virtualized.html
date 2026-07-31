@@ -1,0 +1,43 @@
+<!doctype html>
+<!-- Current card roots whose one-card window is replaced on each wheel. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Virtualized current received invitations</title>
+    <style>
+      main { height: 220px; overflow-y: scroll; }
+      #filler { height: 500px; }
+    </style>
+  </head>
+  <body>
+    <main id="invitation-main">
+      <div role="button" aria-expanded="false" tabindex="0">
+        <input aria-hidden="true" type="checkbox" checked />
+        Focused (3)
+      </div>
+      <div id="column" data-testid="lazy-column"></div>
+      <div id="filler"></div>
+    </main>
+    <script>
+      const names = ["First Window", "Second Window", "Third Window"];
+      let index = 0;
+      const render = () => {
+        const name = names[index];
+        const slug = name.toLowerCase().replace(" ", "-");
+        document.querySelector("#column").innerHTML = `
+          <div><div><div data-display-contents="true">
+            <div role="listitem">
+              <a href="/in/${slug}/"><strong>${name}</strong></a>
+              <button aria-label="Accept ${name}’s invitation">Accept</button>
+            </div>
+          </div></div></div>`;
+      };
+      render();
+      document.querySelector("#invitation-main").addEventListener("wheel", () => {
+        if (index >= names.length - 1) return;
+        index += 1;
+        render();
+      });
+    </script>
+  </body>
+</html>

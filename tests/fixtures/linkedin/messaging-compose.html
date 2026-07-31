@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+  <body>
+    <main>
+      <h1>Messaging</h1>
+      <button id="compose" aria-label="Compose message">Compose</button>
+    </main>
+    <dialog id="compose-dialog" aria-label="New message">
+      <input id="recipient-search" role="combobox" placeholder="Type a name" />
+      <ul id="recipient-options" role="listbox">
+        <li role="option" id="target-recipient">
+          <img src="https://media.example.com/jane.jpg" alt="" />
+          <dl>
+            <dt>Jane Doe • 1st degree connection</dt>
+            <dd>Staff Engineer at Acme Cloud</dd>
+          </dl>
+        </li>
+        <li role="option">
+          <img src="https://media.example.com/other-jane.jpg" alt="" />
+          <dl>
+            <dt>Jane Doe • 2nd degree connection</dt>
+            <dd>Product Manager at Other Corp</dd>
+          </dl>
+        </li>
+      </ul>
+      <div id="selected-recipient"></div>
+      <ol id="compose-messages"></ol>
+      <div id="compose-editor" contenteditable="true" role="textbox"
+           aria-label="Write a message" maxlength="8000"></div>
+      <button id="compose-send" aria-label="Send">Send</button>
+    </dialog>
+    <script>
+      const dialog = document.querySelector("#compose-dialog");
+      const suggestions = document.querySelector("#recipient-options");
+      const search = document.querySelector("#recipient-search");
+      document.querySelector("#compose").addEventListener("click", () => dialog.showModal());
+      search.addEventListener("input", () => {
+        suggestions.hidden = false;
+      });
+      document.querySelector("#target-recipient").addEventListener("click", () => {
+        suggestions.hidden = true;
+        search.value = "";
+        document.querySelector("#selected-recipient").textContent = "Jane Doe";
+      });
+      document.querySelector("#compose-send").addEventListener("click", () => {
+        const composer = document.querySelector("#compose-editor");
+        const item = document.createElement("li");
+        item.className = "msg-s-event-listitem msg-s-event-listitem--outgoing";
+        item.innerHTML = '<span class="msg-s-message-group__name">You</span>' +
+          '<p class="msg-s-event-listitem__body"></p>';
+        item.querySelector("p").textContent = composer.innerText;
+        document.querySelector("#compose-messages").appendChild(item);
+        composer.innerText = "";
+      });
+    </script>
+  </body>
+</html>

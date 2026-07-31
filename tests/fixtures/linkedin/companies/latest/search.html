@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Company search | LinkedIn</title>
+  </head>
+  <body>
+    <button id="all-filters" type="button">All filters</button>
+    <aside id="company-filters" hidden>
+      <button aria-label="Close" type="button"></button>
+      <section data-filter-parameter="companyHqGeo">
+        <h2>Locations</h2>
+        <div class="selected-values"></div>
+        <button class="add-choice" type="button">Add a location</button>
+        <input hidden placeholder="Add a location" type="text" />
+        <div class="choices" hidden role="listbox">
+          <div data-facet-id="102713980" role="option">India</div>
+        </div>
+      </section>
+      <section data-filter-parameter="industryCompanyVertical">
+        <h2>Industry</h2>
+        <div class="selected-values">
+          <label>
+            <input
+              aria-label="Software Development"
+              data-facet-id="4"
+              type="checkbox"
+              value="4"
+            />
+            Software Development
+          </label>
+        </div>
+        <button class="add-choice" type="button">Add an industry</button>
+        <input hidden placeholder="Add an industry" type="text" />
+        <div class="choices" hidden role="listbox">
+          <div data-facet-id="4" role="option">Software Development</div>
+        </div>
+      </section>
+      <section data-filter-parameter="companySize">
+        <h2>Company size</h2>
+        <label><input aria-label="1-10 employees" type="checkbox" value="B" />1-10 employees</label>
+        <label><input aria-label="11-50 employees" type="checkbox" value="C" />11-50 employees</label>
+        <label><input aria-label="51-200 employees" type="checkbox" value="D" />51-200 employees</label>
+        <label><input aria-label="201-500 employees" type="checkbox" value="E" />201-500 employees</label>
+        <label><input aria-label="501-1,000 employees" type="checkbox" value="F" />501-1,000 employees</label>
+        <label><input aria-label="1,001-5,000 employees" type="checkbox" value="G" />1,001-5,000 employees</label>
+        <label><input aria-label="5,001-10,000 employees" type="checkbox" value="H" />5,001-10,000 employees</label>
+        <label><input aria-label="10,001+ employees" type="checkbox" value="I" />10,001+ employees</label>
+      </section>
+      <section data-filter-parameter="hasJobs">
+        <h2>Job listings on LinkedIn</h2>
+        <label><input aria-label="Yes" type="checkbox" value="1" />Yes</label>
+      </section>
+      <section data-filter-parameter="network">
+        <h2>Connections</h2>
+        <label><input aria-label="1st" type="checkbox" value="F" />1st</label>
+      </section>
+      <a id="show-results" href="/search/results/companies/?origin=FACETED_SEARCH">
+        Show results
+      </a>
+    </aside>
+    <main>
+      <h1>Company results</h1>
+      <ul>
+        <li>
+          <a href="https://www.linkedin.com/company/acme-cloud/">
+            <h2>Acme Cloud</h2>
+          </a>
+          <p>Reliable cloud infrastructure</p>
+          <p>Bengaluru, Karnataka, India</p>
+          <p>12,345 followers</p>
+          <p>2,400 associated members</p>
+          <button type="button">Follow</button>
+        </li>
+        <li>
+          <a href="/company/second-company/"><h2>Second Company</h2></a>
+          <p>Developer tools</p>
+          <p>San Francisco, California</p>
+        </li>
+      </ul>
+    </main>
+    <script>
+      const panel = document.querySelector("#company-filters");
+      const showResults = document.querySelector("#show-results");
+
+      function updateShowResults() {
+        const query = new URLSearchParams({
+          origin: "FACETED_SEARCH",
+        });
+        for (const section of panel.querySelectorAll("[data-filter-parameter]")) {
+          const values = Array.from(
+            section.querySelectorAll('input[type="checkbox"]:checked')
+          ).map((input) => input.value);
+          if (values.length) {
+            query.set(
+              section.dataset.filterParameter,
+              JSON.stringify(values)
+            );
+          }
+        }
+        showResults.href = `/search/results/companies/?${query.toString()}`;
+      }
+
+      document.querySelector("#all-filters").addEventListener("click", () => {
+        panel.hidden = false;
+      });
+
+      for (const section of panel.querySelectorAll("[data-filter-parameter]")) {
+        const addChoice = section.querySelector(".add-choice");
+        if (!addChoice) continue;
+        const input = section.querySelector('input[type="text"]');
+        const choices = section.querySelector(".choices");
+        addChoice.addEventListener("click", () => {
+          input.hidden = false;
+          choices.hidden = false;
+          input.focus();
+        });
+        input.addEventListener("input", () => {
+          for (const option of choices.querySelectorAll('[role="option"]')) {
+            option.hidden = !option.textContent
+              .trim()
+              .toLowerCase()
+              .includes(input.value.trim().toLowerCase());
+          }
+        });
+        for (const option of choices.querySelectorAll('[role="option"]')) {
+          option.addEventListener("click", () => {
+            const label = document.createElement("label");
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.checked = true;
+            checkbox.value = option.dataset.facetId;
+            checkbox.setAttribute("aria-label", option.textContent.trim());
+            label.append(checkbox, option.textContent.trim());
+            section.querySelector(".selected-values").append(label);
+            input.hidden = true;
+            choices.hidden = true;
+            updateShowResults();
+          });
+        }
+      }
+      panel.addEventListener("change", updateShowResults);
+    </script>
+  </body>
+</html>

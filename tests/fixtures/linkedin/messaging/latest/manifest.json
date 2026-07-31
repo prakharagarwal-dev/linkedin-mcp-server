@@ -1,0 +1,15 @@
+{
+  "status": "mock_verified",
+  "surface": "linkedin-desktop-messaging",
+  "observed_at": "2026-07-31",
+  "source": "sanitized current-shape fixture derived from authenticated visible UI inspection",
+  "covers": [
+    "Focused/Other/Archived/Spam category dropdown",
+    "recipient-or-keyword Search messages submission",
+    "mutually exclusive Jobs/Unread/Connections/InMail/Starred pills",
+    "current conversation cards without thread anchors",
+    "reverse-column virtualized message history",
+    "incoming/outgoing, edited, reply, reaction, and attachment observations",
+    "text/emoji, image, general-file, KLIPY GIF, and reply composition"
+  ]
+}
