@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Current LinkedIn open poll fixture</title>
+  </head>
+  <body>
+    <main aria-label="Post detail">
+      <div role="listitem">
+        <header>
+          <a href="/company/acme-cloud/">Acme Cloud</a>
+          <div>19,004 followers</div>
+          <div>Cloud Infrastructure</div>
+          <div>12h •</div>
+          <svg aria-label="Visibility: Global"></svg>
+          <button type="button" data-menu-open aria-label="Open control menu for post by Acme Cloud"></button>
+        </header>
+        <div data-testid="expandable-text-box">Vote for the next engineering session.</div>
+        <section aria-label="Poll">
+          <h2>What should we demonstrate live?</h2>
+          <label><input type="radio" name="poll" aria-label="Failover testing" />Failover testing</label>
+          <label><input type="radio" name="poll" aria-label="Queue backpressure" />Queue backpressure</label>
+          <label><input type="radio" name="poll" aria-label="Safe deployment" />Safe deployment</label>
+        </section>
+        <button type="button" aria-label="Reaction button state: no reaction">6</button>
+        <button type="button" aria-label="Comment"></button>
+        <button type="button" aria-label="Repost"></button>
+      </div>
+    </main>
+    <script>
+      const copiedPostUrl =
+        "https://www.linkedin.com/feed/update/urn:li:ugcPost:7312345678901234572/";
+      document.querySelector("[data-menu-open]").addEventListener("click", () => {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.textContent = "Copy link to post";
+        item.addEventListener("click", async () => {
+          await navigator.clipboard.writeText(copiedPostUrl);
+          item.remove();
+        });
+        document.body.append(item);
+      });
+    </script>
+  </body>
+</html>

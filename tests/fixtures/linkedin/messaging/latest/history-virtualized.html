@@ -1,0 +1,69 @@
+<!doctype html>
+<html>
+  <head>
+    <style>
+      .msg-s-message-list {
+        display: flex;
+        flex-direction: column-reverse;
+        height: 180px;
+        overflow-y: auto;
+      }
+      #spacer { height: 500px; flex: 0 0 500px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section aria-label="Conversation with Jane Doe">
+        <h2><a href="/in/jane-doe/">Jane Doe</a></h2>
+        <div class="msg-s-message-list msg-s-message-list--scroll-buffer scrollable">
+          <ol id="messages">
+            <li class="msg-s-message-list__event">
+              <div class="msg-s-event-listitem msg-s-event-listitem--other">
+                <span class="msg-s-message-group__name">Jane Doe</span>
+                <time>10:02 AM</time>
+                <p class="msg-s-event-listitem__body">Current window message.</p>
+              </div>
+            </li>
+            <li class="msg-s-message-list__event">
+              <div class="msg-s-event-listitem align-self-flex-end">
+                <span class="msg-s-message-group__name">You</span>
+                <time>10:03 AM</time>
+                <p class="msg-s-event-listitem__body">Newest message.</p>
+              </div>
+            </li>
+          </ol>
+          <div id="spacer"></div>
+        </div>
+      </section>
+    </main>
+    <script>
+      let loaded = false;
+      const scroller = document.querySelector(".msg-s-message-list");
+      scroller.addEventListener("wheel", event => {
+        if (event.deltaY >= 0 || loaded) return;
+        loaded = true;
+        setTimeout(() => {
+          document.querySelector("#messages").insertAdjacentHTML("afterbegin", `
+            <li class="msg-s-message-list__event">
+              <div class="msg-s-event-listitem align-self-flex-end">
+                <span class="msg-s-message-group__name">You</span>
+                <time>10:00 AM</time>
+                <p class="msg-s-event-listitem__body">Oldest message.</p>
+              </div>
+            </li>
+            <li class="msg-s-message-list__event">
+              <div class="msg-s-event-listitem msg-s-event-listitem--other">
+                <span class="msg-s-message-group__name">Jane Doe</span>
+                <time>10:01 AM</time>
+                <p class="msg-s-event-listitem__body">Older delayed message.</p>
+              </div>
+            </li>`);
+          document.querySelector("#spacer").insertAdjacentHTML(
+            "beforebegin",
+            "<p>Beginning of conversation</p>"
+          );
+        }, 650);
+      });
+    </script>
+  </body>
+</html>

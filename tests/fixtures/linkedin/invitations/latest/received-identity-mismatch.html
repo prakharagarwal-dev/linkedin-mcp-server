@@ -1,0 +1,24 @@
+<!doctype html>
+<!-- Current structure with deliberately conflicting link and action identities. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Mismatched current received invitation</title>
+  </head>
+  <body>
+    <main>
+      <div role="button" aria-expanded="false" tabindex="0">
+        <input aria-hidden="true" type="checkbox" checked />
+        Focused (1)
+      </div>
+      <div data-testid="lazy-column">
+        <div><div><div data-display-contents="true">
+          <div role="listitem">
+            <a href="/in/alice-visible/"><strong>Alice Visible</strong></a>
+            <button aria-label="Accept Bob Conflicting’s invitation">Accept</button>
+          </div>
+        </div></div></div>
+      </div>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,25 @@
+<!doctype html>
+<!-- Advertises two items but deliberately never renders the second current card. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Incomplete current received invitations</title>
+  </head>
+  <body>
+    <main>
+      <div role="button" aria-expanded="false" tabindex="0">
+        <input aria-hidden="true" type="checkbox" checked />
+        Focused (2)
+      </div>
+      <div data-testid="lazy-column">
+        <div><div><div data-display-contents="true">
+          <div role="listitem">
+            <a href="/in/only-rendered/"><strong>Only Rendered</strong></a>
+            <button aria-label="Accept Only Rendered’s invitation">Accept</button>
+          </div>
+        </div></div></div>
+      </div>
+      <p>No more invitations</p>
+    </main>
+  </body>
+</html>

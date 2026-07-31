@@ -1,0 +1,259 @@
+<!doctype html>
+<html>
+  <head>
+    <style>
+      .hidden { display: none; }
+      .msg-s-message-list {
+        display: flex;
+        flex-direction: column-reverse;
+        height: 240px;
+        overflow-y: auto;
+      }
+      .msg-s-event-listitem__hover-action-button { display: block; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Messaging</h1>
+      <button
+        class="artdeco-dropdown__trigger msg-cross-pillar-inbox-filters-v3__drop-down-trigger"
+        id="category-trigger"
+      >Focused</button>
+      <div id="category-options" class="hidden">
+        <div role="button" class="artdeco-dropdown__item msg-cross-pillar-inbox-filters-v3__filter">Focused</div>
+        <div role="button" class="artdeco-dropdown__item msg-cross-pillar-inbox-filters-v3__filter">Other</div>
+        <div role="button" class="artdeco-dropdown__item msg-cross-pillar-inbox-filters-v3__filter">Archived</div>
+        <div role="button" class="artdeco-dropdown__item msg-cross-pillar-inbox-filters-v3__filter">Spam</div>
+      </div>
+
+      <input class="msg-cross-pillar-search-form__search-field" placeholder="Search messages">
+      <div aria-label="Message filters">
+        <button aria-pressed="false" aria-checked="false">Jobs</button>
+        <button aria-pressed="false" aria-checked="false">Unread</button>
+        <button aria-pressed="false" aria-checked="false">Connections</button>
+        <button aria-pressed="false" aria-checked="false">InMail</button>
+        <button aria-pressed="false" aria-checked="false">Starred</button>
+      </div>
+
+      <div class="msg-conversations-container__conversations-list" style="height: 180px; overflow-y: auto">
+        <ul aria-label="Conversation list">
+          <li class="msg-conversation-listitem msg-conversations-container__convo-item">
+            <div class="msg-conversation-card msg-conversation-card__convo-item-container--unread">
+              <div class="msg-conversation-listitem__link msg-conversations-container__convo-item-link" id="jane-card">
+                <h3 class="msg-conversation-listitem__participant-names msg-conversation-card__participant-names t-bold">Jane Doe</h3>
+                <p class="msg-conversation-card__message-snippet msg-conversation-card__message-snippet--unread">Can we discuss the role?</p>
+                <time class="msg-conversation-card__time-stamp">10:30 AM</time>
+                <span class="msg-conversation-card__pill">Jobs</span>
+                <div role="img" aria-label="Unstar conversation" class="msg-conversation-card__star-icon"></div>
+              </div>
+            </div>
+          </li>
+          <li class="msg-conversation-listitem msg-conversations-container__convo-item">
+            <div class="msg-conversation-card">
+              <div class="msg-conversation-listitem__link msg-conversations-container__convo-item-link">
+                <h3 class="msg-conversation-listitem__participant-names msg-conversation-card__participant-names">Alex Lee</h3>
+                <p class="msg-conversation-card__message-snippet">You: Sounds good.</p>
+                <time class="msg-conversation-card__time-stamp">Yesterday</time>
+                <div class="msg-conversation-card__mute-icon-holder" aria-label="Muted"></div>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <section id="thread" aria-label="Conversation with Jane Doe" class="hidden">
+        <h2><a href="/in/jane-doe/">Jane Doe</a></h2>
+        <div class="msg-s-message-list msg-s-message-list--scroll-buffer full-width scrollable">
+          <ol id="messages">
+            <li class="msg-s-message-list__event">
+              <div class="msg-s-event-listitem msg-s-event-listitem--other msg-s-event-listitem--last-in-group">
+                <a class="msg-s-message-group__profile-link" href="/in/jane-doe/">
+                  <span class="msg-s-message-group__name">Jane Doe</span>
+                </a>
+                <time class="msg-s-message-group__timestamp">10:29 AM</time>
+                <div class="msg-s-event-listitem__message-bubble">
+                  <p class="msg-s-event-listitem__body">Can we discuss the role?</p>
+                </div>
+                <div class="msg-s-event-listitem__reactions-summary" aria-label="1 like reaction">1</div>
+                <button class="msg-s-event-listitem__hover-action-button" aria-label="Reply to this message">Reply</button>
+              </div>
+            </li>
+            <li class="msg-s-message-list__event">
+              <div class="msg-s-event-listitem align-self-flex-end msg-s-event-listitem--last-in-group">
+                <span class="msg-s-message-group__name">You</span>
+                <time class="msg-s-message-group__timestamp">10:30 AM</time>
+                <div class="msg-s-event-listitem__message-bubble">
+                  <div class="msg-s-event-listitem__reply-to">
+                    <span class="msg-s-event-listitem__reply-to-sender">Jane Doe</span>
+                    <p class="msg-s-event-listitem__reply-to-body">Can we discuss the role?</p>
+                  </div>
+                  <p class="msg-s-event-listitem__body">Absolutely.</p>
+                  <span>Edited</span>
+                </div>
+                <button class="msg-s-event-listitem__hover-action-button" aria-label="Reply to this message">Reply</button>
+              </div>
+            </li>
+            <li class="msg-s-message-list__event">
+              <div class="msg-s-event-listitem msg-s-event-listitem--other msg-s-event-listitem--last-in-group">
+                <a class="msg-s-message-group__profile-link" href="/in/jane-doe/">
+                  <span class="msg-s-message-group__name">Jane Doe</span>
+                </a>
+                <time class="msg-s-message-group__timestamp">10:31 AM</time>
+                <div class="msg-s-event-listitem__message-bubble">
+                  <p class="msg-s-event-listitem__body">Here is the brief.</p>
+                  <a
+                    class="msg-s-event-listitem__attachment"
+                    data-test-message-attachment
+                    data-kind="document"
+                    data-file-name="brief.pdf"
+                    href="https://media.licdn.com/brief.pdf"
+                  >brief.pdf</a>
+                </div>
+                <button class="msg-s-event-listitem__hover-action-button" aria-label="Reply to this message">Reply</button>
+              </div>
+            </li>
+          </ol>
+        </div>
+
+        <form class="msg-form">
+          <div class="msg-form__reply-context hidden" id="reply-context">
+            <div class="msg-s-event-listitem__reply-to">
+              <span class="msg-s-event-listitem__reply-to-sender" id="reply-sender"></span>
+              <p class="msg-s-event-listitem__reply-to-body" id="reply-body"></p>
+            </div>
+            <button type="button" aria-label="Cancel reply">Cancel reply</button>
+          </div>
+          <div class="msg-form__contenteditable" contenteditable="true" role="textbox" aria-label="Write a message…"></div>
+          <input class="msg-form__attachment-upload-input hidden" type="file" accept="image/*">
+          <input class="msg-form__attachment-upload-input hidden" type="file" accept="image/*,.ai,.psd,.pdf,.doc,.docx,.ppt,.pptx,.pps,.ppsx,.xls,.xlsx,.txt,.eml,.mov,.mp4">
+          <button type="button" class="msg-form__footer-action gif-button" aria-label="Open GIF Keyboard">GIF</button>
+          <section class="tenor-gif hidden" aria-label="GIF picker">
+            <input class="tenor-gif__search-input artdeco-text-input" placeholder="Search KLIPY">
+            <button type="button" class="tenor-gif__select-gif hidden">
+              <img alt='A GIF image titled "Celebration Dance", that matches your search for celebration.'>
+            </button>
+          </section>
+          <button type="button" class="msg-form__send-button">Send</button>
+          <button type="button" class="msg-form__send-toggle">Open send options</button>
+        </form>
+      </section>
+    </main>
+    <script>
+      const categoryTrigger = document.querySelector("#category-trigger");
+      const categoryOptions = document.querySelector("#category-options");
+      categoryTrigger.addEventListener("click", () => categoryOptions.classList.toggle("hidden"));
+      categoryOptions.querySelectorAll('[role="button"]').forEach(option => {
+        option.addEventListener("click", () => {
+          categoryTrigger.textContent = option.textContent;
+          categoryOptions.classList.add("hidden");
+        });
+      });
+      const filters = Array.from(document.querySelectorAll('[aria-label="Message filters"] button'));
+      filters.forEach(filter => filter.addEventListener("click", () => {
+        filters.forEach(other => {
+          other.setAttribute("aria-pressed", "false");
+          other.setAttribute("aria-checked", "false");
+        });
+        filter.setAttribute("aria-pressed", "true");
+        filter.setAttribute("aria-checked", "true");
+      }));
+      document.querySelector("#jane-card").addEventListener("click", () => {
+        document.querySelector("#thread").classList.remove("hidden");
+        history.pushState({}, "", "/messaging/thread/thread-current/");
+      });
+      if (location.pathname.includes("/messaging/thread/")) {
+        document.querySelector("#thread").classList.remove("hidden");
+      }
+      const replyContext = document.querySelector("#reply-context");
+      document.querySelectorAll('[aria-label="Reply to this message"]').forEach(button => {
+        button.addEventListener("click", () => {
+          const item = button.closest("li");
+          document.querySelector("#reply-sender").textContent =
+            item.querySelector(".msg-s-message-group__name")?.textContent || "";
+          document.querySelector("#reply-body").textContent =
+            item.querySelector(".msg-s-event-listitem__body")?.textContent ||
+            item.querySelector("[data-test-message-attachment]")?.textContent ||
+            "";
+          replyContext.classList.remove("hidden");
+        });
+      });
+      document.querySelector('[aria-label="Cancel reply"]').addEventListener("click", () => {
+        replyContext.classList.add("hidden");
+      });
+      function appendReplyQuote(container) {
+        if (replyContext.classList.contains("hidden")) return;
+        const quote = document.createElement("div");
+        quote.className = "msg-s-event-listitem__reply-to";
+        const sender = document.createElement("span");
+        sender.className = "msg-s-event-listitem__reply-to-sender";
+        sender.textContent = document.querySelector("#reply-sender").textContent;
+        const body = document.createElement("p");
+        body.className = "msg-s-event-listitem__reply-to-body";
+        body.textContent = document.querySelector("#reply-body").textContent;
+        quote.append(sender, body);
+        container.prepend(quote);
+      }
+      document.querySelector(".gif-button").addEventListener("click", () => {
+        document.querySelector(".tenor-gif").classList.remove("hidden");
+      });
+      document.querySelector(".tenor-gif__search-input").addEventListener("input", () => {
+        setTimeout(
+          () => document.querySelector(".tenor-gif__select-gif").classList.remove("hidden"),
+          750
+        );
+      });
+      let pendingFiles = [];
+      document.querySelectorAll('.msg-form__attachment-upload-input').forEach(input => {
+        input.addEventListener("change", () => {
+          pendingFiles.push(...Array.from(input.files).map(file => file.name));
+        });
+      });
+      document.querySelector(".msg-form__send-button").addEventListener("click", () => {
+        const composer = document.querySelector(".msg-form__contenteditable");
+        const item = document.createElement("li");
+        item.className = "msg-s-message-list__event";
+        item.innerHTML = `
+          <div class="msg-s-event-listitem align-self-flex-end msg-s-event-listitem--last-in-group">
+            <span class="msg-s-message-group__name">You</span>
+            <div class="msg-s-event-listitem__message-bubble">
+              <p class="msg-s-event-listitem__body"></p>
+            </div>
+          </div>`;
+        item.querySelector("p").textContent = composer.innerText;
+        appendReplyQuote(item.querySelector(".msg-s-event-listitem__message-bubble"));
+        pendingFiles.forEach(name => {
+          const attachment = document.createElement("span");
+          const suffix = name.split(".").pop().toLowerCase();
+          attachment.dataset.testMessageAttachment = "";
+          attachment.dataset.fileName = name;
+          attachment.dataset.kind = ["mov", "mp4"].includes(suffix)
+            ? "video"
+            : ["bmp", "gif", "heic", "heif", "jpeg", "jpg", "png", "tif", "tiff", "webp"].includes(suffix)
+              ? "image"
+              : "document";
+          attachment.textContent = name;
+          item.querySelector(".msg-s-event-listitem__message-bubble").appendChild(attachment);
+        });
+        document.querySelector("#messages").appendChild(item);
+        composer.innerText = "";
+        pendingFiles = [];
+        replyContext.classList.add("hidden");
+      });
+      document.querySelector(".tenor-gif__select-gif").addEventListener("click", () => {
+        const item = document.createElement("li");
+        item.className = "msg-s-message-list__event";
+        item.innerHTML = `
+          <div class="msg-s-event-listitem align-self-flex-end msg-s-event-listitem--last-in-group">
+            <span class="msg-s-message-group__name">You</span>
+            <div class="msg-s-event-listitem__message-bubble">
+              <span data-test-message-attachment data-kind="gif" aria-label="Celebration Dance">Celebration Dance</span>
+            </div>
+          </div>`;
+        appendReplyQuote(item.querySelector(".msg-s-event-listitem__message-bubble"));
+        document.querySelector("#messages").appendChild(item);
+        document.querySelector(".tenor-gif").classList.add("hidden");
+        replyContext.classList.add("hidden");
+      });
+    </script>
+  </body>
+</html>

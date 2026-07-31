@@ -1,0 +1,67 @@
+{
+  "provenance": "mock_verified",
+  "verified_at": "2026-07-30",
+  "source_surfaces": [
+    "visible LinkedIn People search",
+    "visible LinkedIn People filters panel"
+  ],
+  "contains_live_data": false,
+  "contains_authentication_state": false,
+  "filter_sections": [
+    "Connections",
+    "Actively hiring",
+    "Locations",
+    "Current companies",
+    "Connections of",
+    "Followers of",
+    "Past companies",
+    "Schools",
+    "Industries",
+    "Profile Languages",
+    "Service categories",
+    "Keywords"
+  ],
+  "connection_choices": [
+    "1st",
+    "2nd",
+    "3rd+"
+  ],
+  "actively_hiring_choices": [
+    "Any job title",
+    "Hiring for job title"
+  ],
+  "keyword_fields": [
+    "First name",
+    "Last name",
+    "Title",
+    "Company",
+    "School"
+  ],
+  "observed_query_parameters": {
+    "connection_degrees": "network",
+    "actively_hiring_job_titles": "activelyHiringForJobTitles",
+    "locations": "geoUrn",
+    "current_companies": "currentCompany",
+    "connections_of": "connectionOf",
+    "followers_of": "followerOf",
+    "past_companies": "pastCompany",
+    "schools": "schoolFilter",
+    "industries": "industry",
+    "profile_languages": "profileLanguage",
+    "service_categories": "serviceCategory",
+    "first_name": "firstName",
+    "last_name": "lastName",
+    "title": "title",
+    "company": "company",
+    "school": "schoolFreetext"
+  },
+  "filter_panel_selector": "aside:has-text(\"People filters\")",
+  "filter_submission_selector": "a:has-text(\"Show results\")",
+  "search_card_selector": "main [role=\"listitem\"]",
+  "pagination_selector": "[role=\"button\"][aria-label^=\"Page \"], [role=\"button\"][aria-label=\"Next\"], [role=\"button\"][aria-label=\"Previous\"]",
+  "unavailable_to_configured_account": [
+    "Talks about",
+    "Open to volunteering"
+  ],
+  "notes": "Synthetic identities and values preserve only the selector, accessibility, typeahead, checkbox, keyword, submitted-parameter, result-card, restricted-member, and pagination behavior reverified through the authenticated visible UI. The current configured account exposes exactly the listed filter sections; no live identity, profile content, raw DOM, cookie, credential, or browser state is retained."
+}

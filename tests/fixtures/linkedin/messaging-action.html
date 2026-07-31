@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+  <body>
+    <main>
+      <h1>Messaging</h1>
+      <section aria-label="Conversation with Jane Doe">
+        <h2>Jane Doe</h2>
+        <a href="/in/jane-doe/">Jane Doe</a>
+        <ol id="messages">
+          <li class="msg-s-event-listitem msg-s-event-listitem--incoming">
+            <span class="msg-s-message-group__name">Jane Doe</span>
+            <p class="msg-s-event-listitem__body">Hello!</p>
+          </li>
+        </ol>
+        <div id="composer" contenteditable="true" role="textbox"
+             aria-label="Write a message" maxlength="8000"></div>
+        <button id="send" aria-label="Send">Send</button>
+      </section>
+    </main>
+    <script>
+      document.querySelector("#send").addEventListener("click", () => {
+        const composer = document.querySelector("#composer");
+        const item = document.createElement("li");
+        item.className = "msg-s-event-listitem";
+        item.innerHTML = `
+          <span class="msg-s-message-group__name">Current Member</span>
+          <p class="msg-s-event-listitem__body"></p>
+        `;
+        item.querySelector("p").textContent = composer.innerText;
+        document.querySelector("#messages").appendChild(item);
+        composer.innerText = "";
+      });
+    </script>
+  </body>
+</html>

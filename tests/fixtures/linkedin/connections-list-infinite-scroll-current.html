@@ -1,0 +1,123 @@
+<!doctype html>
+<!--
+  Sanitized synthetic fixture. Its lazy-column/direct-card shape mirrors the
+  visible LinkedIn Connections surface; identities and loading behavior are
+  synthetic.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Current LinkedIn Infinite Connections Fixture</title>
+  </head>
+  <body>
+    <main>
+      <h1>Connections</h1>
+      <input aria-label="Search by name" />
+      <div
+        id="connection-members"
+        data-testid="lazy-column"
+        data-component-type="LazyColumn"
+      >
+        <div data-display-contents="true">
+          <div>
+            <img src="https://media.example.com/jane.jpg" alt="Jane Doe" />
+            <a href="/in/jane-doe/" aria-label="View Jane Doe's profile"></a>
+          </div>
+          <div>
+            <a href="/in/jane-doe/">Jane Doe</a>
+            <p>Staff Engineer at Acme Cloud</p>
+            <p>Bengaluru, Karnataka</p>
+          </div>
+          <a href="/messaging/compose/?recipient=jane-doe">Message</a>
+        </div>
+      </div>
+      <p id="connection-end" hidden>No more connections</p>
+      <template id="connection-next-batch">
+        <div data-display-contents="true">
+          <div>
+            <img src="https://media.example.com/alex.jpg" alt="Alex Lee" />
+            <a href="/in/alex-lee/" aria-label="View Alex Lee's profile"></a>
+          </div>
+          <div>
+            <a href="/in/alex-lee/">Alex Lee</a>
+            <p>Founder at Reliable Systems</p>
+            <p>San Francisco Bay Area</p>
+          </div>
+          <a href="/messaging/compose/?recipient=alex-lee">Message</a>
+        </div>
+        <div data-display-contents="true">
+          <div>
+            <img src="https://media.example.com/sam.jpg" alt="Sam Kim" />
+            <a href="/in/sam-kim/" aria-label="View Sam Kim's profile"></a>
+          </div>
+          <div>
+            <a href="/in/sam-kim/">Sam Kim</a>
+            <p>Product Engineer at Example Labs</p>
+            <p>Pune, Maharashtra</p>
+          </div>
+          <a href="/messaging/compose/?recipient=sam-kim">Message</a>
+        </div>
+        <div data-display-contents="true">
+          <div>
+            <img src="https://media.example.com/morgan.jpg" alt="Morgan Ellis" />
+            <a
+              href="/in/morgan-ellis-/"
+              aria-label="View Morgan Ellis's profile"
+            ></a>
+          </div>
+          <div>
+            <a href="/in/morgan-ellis-/">Morgan Ellis</a>
+            <p>Engineering Leader at Example Cloud</p>
+            <p>Delhi, India</p>
+          </div>
+          <a href="/messaging/compose/?recipient=morgan-ellis-">Message</a>
+        </div>
+        <div data-display-contents="true">
+          <div>
+            <img src="https://media.example.com/riley.jpg" alt="Riley Quinn" />
+            <a
+              href="/in/riley-quinn--/"
+              aria-label="View Riley Quinn's profile"
+            ></a>
+          </div>
+          <div>
+            <a href="/in/riley-quinn--/">Riley Quinn</a>
+            <p>Software Engineer at Example Systems</p>
+            <p>Bengaluru, India</p>
+          </div>
+          <a href="/messaging/compose/?recipient=riley-quinn--">Message</a>
+        </div>
+        <div data-display-contents="true">
+          <div>
+            <img src="https://media.example.com/jordan.jpg" alt="Jordan Lee" />
+            <a href="/in/jordan-lee-/" aria-label="View Jordan Lee's profile"></a>
+          </div>
+          <div>
+            <a href="/in/jordan-lee-/">Jordan Lee</a>
+            <p>Product Engineer at Example Data</p>
+            <p>Pune, India</p>
+          </div>
+          <a href="/messaging/compose/?recipient=jordan-lee-">Message</a>
+        </div>
+      </template>
+    </main>
+    <script>
+      let wheelCount = 0;
+      let loaded = false;
+      window.addEventListener("wheel", () => {
+        wheelCount += 1;
+        // Two complete settle windows intentionally remain idle before the
+        // third scroll makes the final batch eligible to render.
+        if (wheelCount === 3 && !loaded) {
+          loaded = true;
+          setTimeout(() => {
+            const batch = document.querySelector("#connection-next-batch");
+            const members = document.querySelector("#connection-members");
+            members.append(batch.content.cloneNode(true));
+            document.querySelector("#connection-end").hidden = false;
+          }, 50);
+        }
+      });
+    </script>
+  </body>
+</html>

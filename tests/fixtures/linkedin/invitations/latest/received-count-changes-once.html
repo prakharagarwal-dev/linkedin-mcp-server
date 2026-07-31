@@ -1,0 +1,50 @@
+<!doctype html>
+<!-- The advertised count changes once, then a clean reload exposes a stable inventory. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Changing current received invitations</title>
+    <style>
+      main { height: 220px; overflow-y: scroll; }
+      #filler { height: 500px; }
+    </style>
+  </head>
+  <body>
+    <main id="invitation-main"></main>
+    <script>
+      const stable = sessionStorage.getItem("invitation-count-changed") === "yes";
+      const card = (name, slug) => `
+        <div><div><div data-display-contents="true">
+          <div role="listitem">
+            <a href="/in/${slug}/"><strong>${name}</strong></a>
+            <button aria-label="Accept ${name}’s invitation">Accept</button>
+          </div>
+        </div></div></div>`;
+      const main = document.querySelector("#invitation-main");
+      if (stable) {
+        main.innerHTML = `
+          <div role="button" aria-expanded="false" tabindex="0">
+            <input aria-hidden="true" type="checkbox" checked />
+            Focused (3)
+          </div>
+          <div data-testid="lazy-column">
+            ${card("Stable One", "stable-one")}
+            ${card("Stable Two", "stable-two")}
+            ${card("Stable Three", "stable-three")}
+          </div>`;
+      } else {
+        main.innerHTML = `
+          <div role="button" aria-expanded="false" tabindex="0">
+            <input aria-hidden="true" type="checkbox" checked />
+            <span id="count">Focused (2)</span>
+          </div>
+          <div data-testid="lazy-column">${card("Initial One", "initial-one")}</div>
+          <div id="filler"></div>`;
+        main.addEventListener("wheel", () => {
+          sessionStorage.setItem("invitation-count-changed", "yes");
+          document.querySelector("#count").textContent = "Focused (3)";
+        }, { once: true });
+      }
+    </script>
+  </body>
+</html>

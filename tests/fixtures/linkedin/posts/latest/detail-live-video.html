@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Current LinkedIn live-video post fixture</title>
+    <style>video { display: block; width: 640px; height: 360px; }</style>
+  </head>
+  <body>
+    <main aria-label="Post detail">
+      <div role="listitem">
+        <header>
+          <a href="/company/example-labs/">Example Labs</a>
+          <div>42,115 followers</div>
+          <div>Software Development</div>
+          <div>1m •</div>
+          <svg aria-label="Visibility: Global"></svg>
+          <button type="button" data-menu-open aria-label="Open control menu for post by Example Labs"></button>
+        </header>
+        <div data-testid="expandable-text-box">Live recovery exercise.</div>
+        <div>Live</div>
+        <video
+          aria-label="Live recovery exercise"
+          src="https://media.example.test/live-recovery.mp4"
+          poster="https://media.example.test/live-recovery.jpg"
+        ></video>
+        <button type="button" aria-label="Reaction button state: no reaction">14</button>
+        <button type="button" aria-label="Comment">2</button>
+        <button type="button" aria-label="Repost"></button>
+      </div>
+    </main>
+    <script>
+      const copiedPostUrl =
+        "https://www.linkedin.com/feed/update/urn:li:ugcPost:7312345678901234576/";
+      document.querySelector("[data-menu-open]").addEventListener("click", () => {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.textContent = "Copy link to post";
+        item.addEventListener("click", async () => {
+          await navigator.clipboard.writeText(copiedPostUrl);
+          item.remove();
+        });
+        document.body.append(item);
+      });
+    </script>
+  </body>
+</html>

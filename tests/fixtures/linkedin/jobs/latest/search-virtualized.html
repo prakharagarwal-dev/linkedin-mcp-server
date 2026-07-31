@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Current Virtualized LinkedIn Jobs Fixture</title>
+    <style>
+      #results-scroller {
+        height: 230px;
+        overflow-y: auto;
+      }
+      li[data-occludable-job-id] {
+        min-height: 110px;
+      }
+    </style>
+  </head>
+  <body>
+    <section aria-label="search filters">
+      <h2 class="a11y-text">Jobs search</h2>
+      <button type="button" aria-label="Show all filters">All filters</button>
+    </section>
+    <main class="scaffold-layout__list-detail">
+      <header class="scaffold-layout__list-header">
+        <h1>platform engineer in India</h1>
+        <span>8 results</span>
+      </header>
+      <div id="results-scroller">
+        <ul id="results-list" aria-label="Jobs">
+          <li data-occludable-job-id="4100000101"></li>
+          <li data-occludable-job-id="4100000102"></li>
+          <li data-occludable-job-id="4100000103"></li>
+          <li data-occludable-job-id="4100000104"></li>
+          <li data-occludable-job-id="4100000105"></li>
+          <li data-occludable-job-id="4100000106"></li>
+          <li data-occludable-job-id="4100000107"></li>
+          <li data-occludable-job-id="4100000108"></li>
+        </ul>
+      </div>
+      <nav aria-label="Pagination">
+        <button type="button" aria-label="Page 1">1</button>
+      </nav>
+    </main>
+    <script>
+      const hydrate = (shell) => {
+        if (shell.dataset.hydrated === "true") return;
+        const id = shell.dataset.occludableJobId;
+        const index = Number(id.slice(-2));
+        shell.dataset.hydrated = "true";
+        shell.innerHTML = `
+          <div data-job-id="${id}" class="job-card-container job-card-list">
+            <div class="artdeco-entity-lockup__title">
+              <a
+                class="job-card-list__title--link"
+                href="/jobs/view/${id}/"
+                aria-label="Platform Engineer ${index}"
+              >
+                <span aria-hidden="true"><strong>Platform Engineer ${index}</strong></span>
+                <span class="visually-hidden">Platform Engineer ${index}</span>
+              </a>
+            </div>
+            <div class="artdeco-entity-lockup__subtitle">
+              <span>Fixture Company ${index}</span>
+            </div>
+            <div class="artdeco-entity-lockup__caption">
+              <span>India (Remote)</span>
+            </div>
+            <ul class="job-card-list__footer-wrapper">
+              <li>${index} hours ago</li>
+            </ul>
+          </div>
+        `;
+      };
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.filter((entry) => entry.isIntersecting).forEach((entry) => {
+            window.setTimeout(() => hydrate(entry.target), 20);
+          });
+        },
+        { root: document.querySelector("#results-scroller"), threshold: 0.01 },
+      );
+      document
+        .querySelectorAll("li[data-occludable-job-id]")
+        .forEach((shell) => observer.observe(shell));
+    </script>
+  </body>
+</html>
