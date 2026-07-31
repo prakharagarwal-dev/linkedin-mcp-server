@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Current LinkedIn invitation-send fixture</title>
+  </head>
+  <body data-send-outcome="pending" data-counter-mode="accurate">
+    <main>
+      <h1>Jane Doe</h1>
+      <p>Staff Engineer at Example Cloud</p>
+      <p>2nd degree connection</p>
+      <button
+        id="connect"
+        type="button"
+        aria-label="Invite Jane Doe to connect"
+      >Connect</button>
+    </main>
+    <dialog id="invite-dialog" aria-label="Add a note to your invitation?">
+      <p>Dialog content start.</p>
+      <h2>Add a note to your invitation?</h2>
+      <p>
+        Personalize your invitation to Jane Doe by adding a note. LinkedIn members
+        are more likely to accept invitations that include a personal note.
+      </p>
+      <button type="button" aria-label="Dismiss">Dismiss</button>
+      <button id="add-note" type="button" aria-label="Add a note">Add a note</button>
+      <button
+        id="send-without-note"
+        type="button"
+        aria-label="Send without a note"
+      >Send without a note</button>
+      <p>Dialog content end.</p>
+    </dialog>
+
+    <dialog id="note-dialog" aria-label="Add a note to your invitation">
+      <button type="button" aria-label="Dismiss">Dismiss</button>
+      <h2>Add a note to your invitation</h2>
+      <p>1 personalized invitation remaining for this month.</p>
+      <p>Please limit personal note to 300 characters.</p>
+      <textarea placeholder="Ex: We know each other from…"></textarea>
+      <span id="note-counter">0/200</span>
+      <p>Want more personalized invitations? Try Premium for free.</p>
+      <button type="button" aria-label="Cancel adding a note">Cancel</button>
+      <button id="send-invitation" type="button" aria-label="Send invitation">Send</button>
+    </dialog>
+
+    <script>
+      const connect = document.querySelector("#connect");
+      const inviteDialog = document.querySelector("#invite-dialog");
+      const noteDialog = document.querySelector("#note-dialog");
+      const textbox = noteDialog.querySelector("textarea");
+      const counter = document.querySelector("#note-counter");
+      const stateKey = "mock-invitation-send-state";
+
+      function renderPending() {
+        inviteDialog.close();
+        noteDialog.close();
+        connect.setAttribute("aria-label", "Pending");
+        connect.textContent = "Pending";
+      }
+      function renderState() {
+        if (sessionStorage.getItem(stateKey) === "pending") renderPending();
+      }
+
+      connect.addEventListener("click", event => {
+        event.preventDefault();
+        if (sessionStorage.getItem(stateKey) === "pending") return;
+        inviteDialog.showModal();
+      });
+      document.querySelector("#add-note").addEventListener("click", () => {
+        inviteDialog.close();
+        noteDialog.showModal();
+      });
+      textbox.addEventListener("input", () => {
+        if (document.body.dataset.counterMode === "accurate") {
+          counter.textContent = `${textbox.value.length}/200`;
+        }
+      });
+      function finishSend() {
+        inviteDialog.close();
+        noteDialog.close();
+        if (document.body.dataset.sendOutcome === "pending") {
+          sessionStorage.setItem(stateKey, "pending");
+          renderPending();
+        }
+      }
+      document.querySelector("#send-without-note").addEventListener("click", finishSend);
+      document.querySelector("#send-invitation").addEventListener("click", finishSend);
+      renderState();
+    </script>
+  </body>
+</html>

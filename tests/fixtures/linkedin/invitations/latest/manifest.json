@@ -1,0 +1,19 @@
+{
+  "provenance": "mock_verified",
+  "verified_at": "2026-07-29",
+  "source_surface": "visible LinkedIn invitation manager",
+  "contains_live_data": false,
+  "contains_authentication_state": false,
+  "received_bucket_selector": "main [role=\"button\"]:has(input[type=\"checkbox\"]:checked)",
+  "received_bucket_option_selector": "main [role=\"menu\"] [role=\"menuitem\"]",
+  "received_category_selector": "main [role=\"radio\"][aria-checked]",
+  "received_card_selector": "main [data-testid=\"lazy-column\"] [data-display-contents] > [role=\"listitem\"]",
+  "received_card_actions": [
+    "Ignore an invitation to connect from {name}",
+    "Accept {name}’s invitation"
+  ],
+  "sent_count_selector": "main a[href$=\"/sent/CONNECTION/\"]",
+  "sent_card_selector": "main [data-testid=\"lazy-column\"] > [role=\"listitem\"]",
+  "sent_card_action": "Withdraw invitation sent to {name}",
+  "notes": "Synthetic identities and content preserve only the sanitized current Focused/Other picker, four received radio filters, Received/Sent card roots, and action-adjacent note structure."
+}

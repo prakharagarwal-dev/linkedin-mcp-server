@@ -1,0 +1,135 @@
+<!doctype html>
+<!--
+  Sanitized synthetic fixture. The nested main scroller, transient visible
+  loader, stable physical bottom, and absent terminal copy mirror the visible
+  LinkedIn member-list mechanics observed on 2026-07-28. Identities, text,
+  timing, and inventory are synthetic.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Current LinkedIn Connections Terminal Fixture</title>
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+      }
+
+      main {
+        height: 320px;
+        overflow-y: auto;
+      }
+
+      [data-display-contents] {
+        box-sizing: border-box;
+        display: block;
+        min-height: 240px;
+        padding: 16px;
+      }
+
+      #connection-loader {
+        min-height: 40px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Connections</h1>
+      <p>6 connections</p>
+      <input aria-label="Search by name" />
+      <div
+        id="connection-members"
+        data-testid="lazy-column"
+        data-component-type="LazyColumn"
+      >
+        <div data-display-contents="true">
+          <a href="/in/jane-doe/" aria-label="View Jane Doe's profile">Jane Doe</a>
+          <p>Staff Engineer at Acme Cloud</p>
+          <p>Bengaluru, Karnataka</p>
+          <a href="/messaging/compose/?recipient=jane-doe">Message</a>
+        </div>
+      </div>
+      <div
+        id="connection-loader"
+        role="progressbar"
+        aria-label="Loading more connections"
+        hidden
+      >
+        Loading
+      </div>
+      <template id="connection-next-batch">
+        <div data-display-contents="true">
+          <a href="/in/alex-lee/" aria-label="View Alex Lee's profile">Alex Lee</a>
+          <p>Founder at Reliable Systems</p>
+          <p>San Francisco Bay Area</p>
+          <a href="/messaging/compose/?recipient=alex-lee">Message</a>
+        </div>
+        <div data-display-contents="true">
+          <a href="/in/sam-kim/" aria-label="View Sam Kim's profile">Sam Kim</a>
+          <p>Product Engineer at Example Labs</p>
+          <p>Pune, India</p>
+          <a href="/messaging/compose/?recipient=sam-kim">Message</a>
+        </div>
+        <div data-display-contents="true">
+          <a
+            href="/in/morgan-ellis-/"
+            aria-label="View Morgan Ellis's profile"
+          >
+            Morgan Ellis
+          </a>
+          <p>Engineering Leader at Example Cloud</p>
+          <p>Delhi, India</p>
+          <a href="/messaging/compose/?recipient=morgan-ellis-">Message</a>
+        </div>
+        <div data-display-contents="true">
+          <a
+            href="/in/riley-quinn--/"
+            aria-label="View Riley Quinn's profile"
+          >
+            Riley Quinn
+          </a>
+          <p>Software Engineer at Example Systems</p>
+          <p>Bengaluru, India</p>
+          <a href="/messaging/compose/?recipient=riley-quinn--">Message</a>
+        </div>
+        <div data-display-contents="true">
+          <a href="/in/jordan-lee-/" aria-label="View Jordan Lee's profile">
+            Jordan Lee
+          </a>
+          <p>Product Engineer at Example Data</p>
+          <p>Pune, India</p>
+          <a href="/messaging/compose/?recipient=jordan-lee-">Message</a>
+        </div>
+      </template>
+    </main>
+    <script>
+      const main = document.querySelector("main");
+      const loader = document.querySelector("#connection-loader");
+      let loading = false;
+      let loaded = false;
+      let wheelCount = 0;
+
+      main.addEventListener(
+        "wheel",
+        () => {
+          if (loading || loaded) return;
+          wheelCount += 1;
+          if (wheelCount < 4) return;
+          loading = true;
+          loader.hidden = false;
+          setTimeout(() => {
+            const batch = document.querySelector("#connection-next-batch");
+            const members = document.querySelector("#connection-members");
+            members.append(batch.content.cloneNode(true));
+            loader.hidden = true;
+            loaded = true;
+            loading = false;
+          }, 50);
+        },
+        { passive: true },
+      );
+    </script>
+  </body>
+</html>

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Current LinkedIn original post fixture</title>
+    <style>.card { display: block; width: 520px; min-height: 160px; }</style>
+  </head>
+  <body>
+    <main aria-label="Post detail">
+      <div role="listitem">
+        <header>
+          <a href="/company/example-labs/">Example Labs</a>
+          <div>42,115 followers</div>
+          <div>Software Development</div>
+          <div>1d •</div>
+          <svg width="16" height="16" aria-label="Verified profile"></svg>
+          <svg aria-label="Visibility: Global"></svg>
+          <button type="button" data-menu-open aria-label="Open control menu for post by Example Labs"></button>
+        </header>
+        <div>
+          <div data-testid="expandable-text-box">
+            Recovery begins with a bounded plan.
+            <span data-full hidden>Measure the postcondition and stop on ambiguous state.</span>
+          </div>
+          <button type="button" data-testid="expandable-text-button">… more</button>
+        </div>
+        <a class="card" href="https://example.test/recovery-guide">
+          <div>The Bounded Recovery Guide</div>
+          <div>Observable postconditions for production automation</div>
+        </a>
+        <button type="button" aria-label="Reaction button state: no reaction">210</button>
+        <button type="button" aria-label="Comment">27</button>
+        <button type="button" aria-label="Repost">15</button>
+      </div>
+    </main>
+    <script>
+      const copiedPostUrl =
+        "https://www.linkedin.com/feed/update/urn:li:share:7312345678901234574/";
+      document.querySelector("[data-menu-open]").addEventListener("click", () => {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.textContent = "Copy link to post";
+        item.addEventListener("click", async () => {
+          await navigator.clipboard.writeText(copiedPostUrl);
+          item.remove();
+        });
+        document.body.append(item);
+      });
+      document
+        .querySelector("[data-testid='expandable-text-button']")
+        .addEventListener("click", (event) => {
+          document.querySelector("[data-full]").hidden = false;
+          event.currentTarget.remove();
+        });
+    </script>
+  </body>
+</html>

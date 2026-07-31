@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Current LinkedIn incoming invitation fixture</title>
+  </head>
+  <body>
+    <main>
+      <h1>Jane Doe</h1>
+      <p>Staff Engineer at Example Cloud</p>
+      <p id="relationship">2nd degree connection</p>
+      <section id="request-actions">
+        <button
+          id="accept"
+          type="button"
+          aria-label="Accept Jane Doe’s request to connect"
+        >Accept</button>
+        <button
+          id="ignore"
+          type="button"
+          aria-label="Ignore Jane Doe’s request to connect"
+        >Ignore</button>
+      </section>
+    </main>
+
+    <script>
+      const main = document.querySelector("main");
+      const relationship = document.querySelector("#relationship");
+      const actions = document.querySelector("#request-actions");
+
+      function renderState() {
+        const state = sessionStorage.getItem("mock-connection-request-state") || "pending";
+        document.querySelector("#message")?.remove();
+        document.querySelector("#connect")?.remove();
+        if (state === "pending") {
+          actions.hidden = false;
+          relationship.textContent = "2nd degree connection";
+          return;
+        }
+        actions.hidden = true;
+        if (state === "connected") {
+          relationship.textContent = "1st degree connection";
+          main.insertAdjacentHTML(
+            "beforeend",
+            '<a id="message" href="/messaging/compose/" aria-label="Message Jane Doe">Message</a>',
+          );
+          return;
+        }
+        relationship.textContent = "2nd degree connection";
+        main.insertAdjacentHTML(
+          "beforeend",
+          '<a id="connect" href="/preload/custom-invite/?vanityName=jane-doe" ' +
+            'aria-label="Invite Jane Doe to connect">Connect</a>',
+        );
+      }
+
+      document.querySelector("#accept").addEventListener("click", () => {
+        sessionStorage.setItem("mock-connection-request-state", "connected");
+        renderState();
+      });
+      document.querySelector("#ignore").addEventListener("click", () => {
+        sessionStorage.setItem("mock-connection-request-state", "ignored");
+        renderState();
+      });
+      renderState();
+    </script>
+  </body>
+</html>

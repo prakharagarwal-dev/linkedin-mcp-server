@@ -1,0 +1,213 @@
+<!doctype html>
+<!-- Sanitized mock verified against LinkedIn's current received-invitation structure. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Current received invitations</title>
+  </head>
+  <body>
+    <main>
+      <p>Manage invitations</p>
+      <nav aria-label="Invitation direction">
+        <a aria-current="page" href="/mynetwork/invitation-manager/received">Received</a>
+        <a href="/mynetwork/invitation-manager/sent">Sent</a>
+      </nav>
+      <div id="bucket-picker" role="button" aria-expanded="false" tabindex="0">
+        <input aria-hidden="true" type="checkbox" checked />
+        <span id="bucket-label">Focused (4)</span>
+      </div>
+      <div id="bucket-menu" role="menu" hidden>
+        <div role="menuitem" data-bucket="focused" tabindex="0">
+          <p>Focused (4)</p>
+          <p>Priority invitations</p>
+        </div>
+        <div role="menuitem" data-bucket="other" tabindex="0">
+          <p>Other (3)</p>
+          <p>Other invitations to review</p>
+        </div>
+      </div>
+      <div role="radio" aria-checked="false" tabindex="0">
+        <input aria-hidden="true" type="checkbox" />
+        Verified (1)
+      </div>
+      <div role="radio" aria-checked="false" tabindex="0">
+        <input aria-hidden="true" type="checkbox" />
+        Mutual Connections (1)
+      </div>
+      <div role="radio" aria-checked="false" tabindex="0">
+        <input aria-hidden="true" type="checkbox" />
+        Your Company (1)
+      </div>
+      <div role="radio" aria-checked="false" tabindex="0">
+        <input aria-hidden="true" type="checkbox" />
+        Your School (1)
+      </div>
+      <div
+        id="focused-column"
+        data-testid="lazy-column"
+        data-component-type="LazyColumn"
+      >
+        <hr role="presentation" />
+        <div><div><div data-display-contents="true">
+          <div role="listitem">
+            <a href="/in/alex-member-/">
+              <img alt="Alex Member’s profile picture" src="/alex.png" />
+            </a>
+            <p><a href="/in/alex-member-/"><strong>Alex Member</strong></a></p>
+            <p>Staff Engineer at Example Cloud</p>
+            <p>12 mutual connections</p>
+            <div>
+              <button aria-label="Ignore an invitation to connect from Alex Member">
+                Ignore
+              </button>
+            </div>
+            <div>
+              <button aria-label="Accept Alex Member’s invitation">Accept</button>
+            </div>
+            <p>Thanks for considering this invitation.</p>
+            <div>
+              <a href="/messaging/compose/?invitation=urn%3Ali%3Afsd_invitation%3A1001">
+                Message
+              </a>
+            </div>
+          </div>
+        </div></div></div>
+        <hr role="presentation" />
+        <div><div><div data-display-contents="true">
+          <div role="listitem">
+            <a href="/in/casey-inviter/"><strong>Casey Inviter</strong></a>
+            <p>Invited you to follow</p>
+            <a href="/company/example-systems/"><strong>Example Systems</strong></a>
+            <button aria-label="Ignore an invitation from Casey Inviter">Ignore</button>
+            <button aria-label="Accept Casey Inviter’s invitation">Accept</button>
+          </div>
+        </div></div></div>
+        <hr role="presentation" />
+        <div><div><div data-display-contents="true">
+          <div role="listitem">
+            <a href="/in/drew-inviter/"><strong>Drew Inviter</strong></a>
+            <p>Invited you to follow their school</p>
+            <a href="/school/example-institute/"><strong>Example Institute</strong></a>
+            <button aria-label="Ignore an invitation from Drew Inviter">Ignore</button>
+            <button aria-label="Accept Drew Inviter’s invitation">Accept</button>
+          </div>
+        </div></div></div>
+        <hr role="presentation" />
+        <div><div><div data-display-contents="true">
+          <div role="listitem">
+            <a href="/in/erin-inviter/"><strong>Erin Inviter</strong></a>
+            <p>Invited you to join</p>
+            <a href="/groups/12345/"><strong>Distributed Systems Group</strong></a>
+            <button aria-label="Ignore an invitation from Erin Inviter">Ignore</button>
+            <button aria-label="Accept Erin Inviter’s invitation">Accept</button>
+          </div>
+        </div></div></div>
+      </div>
+      <div
+        id="other-column"
+        data-testid="lazy-column"
+        data-component-type="LazyColumn"
+        hidden
+      >
+        <hr role="presentation" />
+        <div><div><div data-display-contents="true">
+          <div role="listitem">
+            <a href="/in/frank-inviter/"><strong>Frank Inviter</strong></a>
+            <p>Invited you to an event</p>
+            <a href="/events/platform-meetup-748/"><strong>Platform Meetup</strong></a>
+            <button aria-label="Ignore an invitation from Frank Inviter">Ignore</button>
+            <button aria-label="Accept Frank Inviter’s invitation">Accept</button>
+          </div>
+        </div></div></div>
+        <hr role="presentation" />
+        <div><div><div data-display-contents="true">
+          <div role="listitem">
+            <a href="/in/gale-inviter/"><strong>Gale Inviter</strong></a>
+            <p>Invited you to subscribe</p>
+            <a href="/newsletters/engineering-weekly-123/">
+              <strong>Engineering Weekly</strong>
+            </a>
+            <button aria-label="Ignore an invitation from Gale Inviter">Ignore</button>
+            <button aria-label="Accept Gale Inviter’s invitation">Accept</button>
+          </div>
+        </div></div></div>
+        <hr role="presentation" />
+        <div><div><div data-display-contents="true">
+          <div role="listitem">
+            <p>Other Sender</p>
+            <p>Invited you to a newly introduced LinkedIn surface</p>
+            <button aria-label="Ignore an invitation from Other Sender">Ignore</button>
+            <button aria-label="Accept Other Sender’s invitation">Accept</button>
+          </div>
+        </div></div></div>
+        <hr role="presentation" />
+        <div><div><div data-display-contents="true">
+          <div role="listitem">
+            <a href="/in/recommended-member/"><strong>Recommended Member</strong></a>
+            <p>People you may know</p>
+            <button aria-label="Connect with Recommended Member">Connect</button>
+          </div>
+        </div></div></div>
+      </div>
+      <div
+        id="category-column"
+        data-testid="lazy-column"
+        data-component-type="LazyColumn"
+        hidden
+      >
+        <div><div><div data-display-contents="true">
+          <div role="listitem">
+            <a href="/in/filter-member-/"><strong>Filter Member</strong></a>
+            <p>Visible member for the selected filter</p>
+            <button aria-label="Ignore an invitation from Filter Member">Ignore</button>
+            <button aria-label="Accept Filter Member’s invitation">Accept</button>
+          </div>
+        </div></div></div>
+      </div>
+      <script>
+        const picker = document.querySelector("#bucket-picker");
+        const pickerCheckbox = picker.querySelector('input[type="checkbox"]');
+        const menu = document.querySelector("#bucket-menu");
+        const label = document.querySelector("#bucket-label");
+        const focused = document.querySelector("#focused-column");
+        const other = document.querySelector("#other-column");
+        const category = document.querySelector("#category-column");
+        const radios = Array.from(document.querySelectorAll('[role="radio"]'));
+        picker.addEventListener("click", () => {
+          menu.hidden = !menu.hidden;
+          picker.setAttribute("aria-expanded", String(!menu.hidden));
+        });
+        for (const option of menu.querySelectorAll('[role="menuitem"]')) {
+          option.addEventListener("click", () => {
+            const selected = option.dataset.bucket;
+            label.textContent = selected === "focused" ? "Focused (4)" : "Other (3)";
+            pickerCheckbox.checked = true;
+            focused.hidden = selected !== "focused";
+            other.hidden = selected !== "other";
+            category.hidden = true;
+            for (const radio of radios) {
+              radio.hidden = selected === "other";
+              radio.setAttribute("aria-checked", "false");
+              radio.querySelector('input[type="checkbox"]').checked = false;
+            }
+            menu.hidden = true;
+            picker.setAttribute("aria-expanded", "false");
+          });
+        }
+        for (const radio of radios) {
+          radio.addEventListener("click", () => {
+            pickerCheckbox.checked = false;
+            focused.hidden = true;
+            other.hidden = true;
+            category.hidden = false;
+            for (const candidate of radios) {
+              const selected = candidate === radio;
+              candidate.setAttribute("aria-checked", String(selected));
+              candidate.querySelector('input[type="checkbox"]').checked = selected;
+            }
+          });
+        }
+      </script>
+    </main>
+  </body>
+</html>

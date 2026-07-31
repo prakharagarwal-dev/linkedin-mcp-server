@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Current LinkedIn image post fixture</title>
+    <style>
+      .post-media { display: block; width: 480px; height: 300px; }
+      .avatar { width: 48px; height: 48px; }
+    </style>
+  </head>
+  <body>
+    <main aria-label="Post detail">
+      <div role="listitem">
+        <header>
+          <a href="/in/jane-doe/">
+            <img class="avatar" alt="Jane Doe" src="https://media.example.test/jane.png" />
+            Jane Doe
+          </a>
+          <div>1st</div>
+          <div>Staff Engineer at Acme Cloud</div>
+          <div>2mo • Edited</div>
+          <svg width="16" height="16" aria-label="Verified profile"></svg>
+          <svg aria-label="Visibility: Global"></svg>
+          <button type="button" data-menu-open aria-label="Open control menu for post by Jane Doe"></button>
+        </header>
+        <div>
+          <div data-testid="expandable-text-box">
+            A practical guide to reliable Python services with
+            <a href="/in/alex-ray/">Alex Ray</a> and
+            <a href="/company/acme-cloud/">Acme Cloud</a>.
+            <a href="https://example.test/reliability-guide">Read the guide</a>
+            <a href="https://www.linkedin.com/feed/hashtag/python/">#python</a>
+            <span data-full hidden>Production lessons, failure modes, and recovery checks.</span>
+          </div>
+          <button type="button" data-testid="expandable-text-button">… more</button>
+        </div>
+        <img
+          class="post-media"
+          alt="Reliability architecture diagram"
+          src="https://media.example.test/reliability.png"
+        />
+        <button type="button" aria-label="Reaction button state: like">128</button>
+        <button id="open-comments" type="button" aria-label="Comment">34</button>
+        <button type="button" aria-label="Repost">7</button>
+        <a href="/analytics/post-summary/7312345678901234567/">49 impressions</a>
+      </div>
+      <section id="discussion" aria-label="Comments" hidden>
+        <div
+          id="replaceableComment_urn:li:comment:(urn:li:activity:7312345678901234567,201)"
+        >
+          <a href="/in/alex-ray/">
+            Alex Ray
+            <span style="display: block">Principal Engineer</span>
+          </a>
+          <p><span>6h</span></p>
+          <button
+            type="button"
+            aria-label="View more options for Alex Ray's comment."
+          ></button>
+          <div><p><span>Modern visible comment body.</span></p></div>
+          <button type="button" aria-label="Open reactions menu"></button>
+          <button type="button" aria-label="Reply"></button>
+          <section aria-label="Replies">
+            <div
+              id="replaceableComment_urn:li:comment:(urn:li:activity:7312345678901234567,202)"
+            >
+              <a href="/in/jane-doe/">Jane Doe</a>
+              <p><span>5h</span></p>
+              <button
+                type="button"
+                aria-label="View more options for Jane Doe's comment."
+              ></button>
+              <div><p><span>Modern nested reply.</span></p></div>
+              <button type="button" aria-label="Open reactions menu"></button>
+              <button type="button" aria-label="Reply"></button>
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+    <script>
+      const copiedPostUrl =
+        "https://www.linkedin.com/feed/update/urn:li:activity:7312345678901234567/";
+      document.querySelector("[data-menu-open]").addEventListener("click", () => {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.textContent = "Copy link to post";
+        item.addEventListener("click", async () => {
+          await navigator.clipboard.writeText(copiedPostUrl);
+          item.remove();
+        });
+        document.body.append(item);
+      });
+      document
+        .querySelector("[data-testid='expandable-text-button']")
+        .addEventListener("click", (event) => {
+          document.querySelector("[data-full]").hidden = false;
+          event.currentTarget.remove();
+        });
+      document.querySelector("#open-comments").addEventListener("click", () => {
+        document.querySelector("#discussion").hidden = false;
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,64 @@
+<!doctype html>
+<!--
+  Sanitized synthetic fixture for a virtualized Connections column. The
+  rendered card count stays constant while the visible identity is replaced.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Current LinkedIn Virtualized Connections Fixture</title>
+  </head>
+  <body>
+    <main>
+      <h1>Connections</h1>
+      <input aria-label="Search by name" />
+      <div
+        id="connection-members"
+        data-testid="lazy-column"
+        data-component-type="LazyColumn"
+      >
+        <div id="virtual-card" data-display-contents="true">
+          <div>
+            <img src="https://media.example.com/jane.jpg" alt="Jane Doe" />
+            <a href="/in/jane-doe/" aria-label="View Jane Doe's profile"></a>
+          </div>
+          <div>
+            <a href="/in/jane-doe/">Jane Doe</a>
+            <p>Staff Engineer at Acme Cloud</p>
+            <p>Bengaluru, India</p>
+          </div>
+          <a href="/messaging/compose/?recipient=jane-doe">Message</a>
+        </div>
+      </div>
+      <p id="connection-end" hidden>No more connections</p>
+    </main>
+    <script>
+      let wheelCount = 0;
+      let replaced = false;
+      window.addEventListener("wheel", () => {
+        wheelCount += 1;
+        if (wheelCount === 3 && !replaced) {
+          replaced = true;
+          setTimeout(() => {
+            document.querySelector("#virtual-card").innerHTML = `
+              <div>
+                <img src="https://media.example.com/tail.jpg" alt="Tail Member" />
+                <a
+                  href="/in/tail-member-/"
+                  aria-label="View Tail Member's profile"
+                ></a>
+              </div>
+              <div>
+                <a href="/in/tail-member-/">Tail Member</a>
+                <p>Principal Engineer at Example Systems</p>
+                <p>Hyderabad, India</p>
+              </div>
+              <a href="/messaging/compose/?recipient=tail-member-">Message</a>
+            `;
+            document.querySelector("#connection-end").hidden = false;
+          }, 50);
+        }
+      });
+    </script>
+  </body>
+</html>

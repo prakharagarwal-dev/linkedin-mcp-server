@@ -1,0 +1,48 @@
+{
+  "provenance": "mock_verified",
+  "verified_at": "2026-07-30",
+  "contains_live_data": false,
+  "source": "Sanitized from an authenticated, read-only inspection of the current LinkedIn desktop UI.",
+  "send_profile_control": {
+    "role": "button",
+    "accessible_name": "Invite {name} to connect"
+  },
+  "send_initial_dialog": {
+    "heading": "Add a note to your invitation?",
+    "controls": [
+      "Dismiss",
+      "Add a note",
+      "Send without a note"
+    ]
+  },
+  "send_note_dialog": {
+    "heading": "Add a note to your invitation",
+    "textbox_placeholder": "Ex: We know each other from…",
+    "visible_counter": "0/200",
+    "controls": [
+      "Dismiss",
+      "Cancel adding a note",
+      "Send invitation"
+    ]
+  },
+  "send_execution_contract": {
+    "pre_click_checks": [
+      "exact note textbox value",
+      "exact visible character counter",
+      "enabled and Playwright-actionable Send control"
+    ],
+    "success": "A fresh exact-profile read visibly shows Pending.",
+    "failure": "A fresh exact-profile read still visibly shows Connect.",
+    "uncertain": "The final click or fresh exact-profile state cannot be verified."
+  },
+  "incoming_profile_controls": {
+    "accept": "Accept {name}’s request to connect",
+    "ignore": "Ignore {name}’s request to connect"
+  },
+  "postconditions": {
+    "send": "A fresh exact-profile load visibly exposes Pending for success or Connect for failure.",
+    "accept": "The exact profile removes both request controls and visibly exposes a first-degree connection plus Message.",
+    "ignore": "A fresh exact-profile read removes both request controls without exposing a first-degree connection."
+  },
+  "notes": "The current direct profile action was revalidated through a read-only live Playwright trace as a button named Invite {name} to connect; the dialog, counter, and send-control contract was previously revalidated through a live read/prepare MCP run. The synthetic send fixture models only the public contract: Pending after a fresh exact-profile load is success, while Connect is failure. It retains no live identity, raw DOM, browser state, or generated CSS class."
+}

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Senior Python Engineer | Acme Cloud | LinkedIn</title>
+    <style>
+      #job-top-card > * {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section aria-label="Primary content">
+        <div id="job-top-card">
+          <a href="https://www.linkedin.com/company/acme-cloud/life/">Acme Cloud</a>
+          <p>Senior Python Engineer</p>
+          <p>
+            Bengaluru, Karnataka, India · 3 hours ago · Over 100 applicants
+          </p>
+          <p>Promoted by hirer · No response insights available yet</p>
+          <a href="https://www.linkedin.com/jobs/view/4100000001/">Hybrid</a>
+          <a href="https://www.linkedin.com/jobs/view/4100000001/">Full-time</a>
+          <a
+            href="https://www.linkedin.com/jobs/view/4100000001/apply/?openSDUIApplyFlow=true"
+            aria-label="Easy Apply to this job"
+          >
+            Easy Apply
+          </a>
+          <button type="button" aria-label="Save the job">Save</button>
+        </div>
+
+        <div id="hiring-team">
+          <p>Meet the hiring team</p>
+          <a href="https://www.linkedin.com/in/leena-shah-fixture/">
+            <span style="display: block">Leena Shah</span>
+            <span style="display: block">• 2nd</span>
+            <span style="display: block">Engineering Leader at Acme Cloud</span>
+            <span style="display: block">11 mutual connections</span>
+            <span style="display: block">Job poster</span>
+          </a>
+          <a href="https://www.linkedin.com/in/leena-shah-fixture/">Leena Shah</a>
+          <a href="/messaging/compose/?recipient=fixture">Message</a>
+        </div>
+
+        <section id="about-job">
+          <div><h2>About the job</h2></div>
+          <div
+            data-testid="expandable-text-box"
+            style="display: block; max-height: 72px; overflow: hidden"
+          >
+            <p>Build reliable Python services for a global developer platform.</p>
+            <p><strong>Responsibilities</strong></p>
+            <ul>
+              <li>Design distributed systems.</li>
+              <li>Improve PostgreSQL performance and observability.</li>
+            </ul>
+            <button
+              type="button"
+              aria-hidden="true"
+              data-testid="expandable-text-button"
+              style="pointer-events: none"
+            >
+              <span style="pointer-events: auto"><span>…</span><span> more</span></span>
+            </button>
+          </div>
+        </section>
+      </section>
+      <footer>Noise that must not enter retained job evidence.</footer>
+    </main>
+    <script>
+      document
+        .querySelector('[data-testid="expandable-text-button"]')
+        .addEventListener("click", (event) => {
+          const box = event.currentTarget.closest(
+            '[data-testid="expandable-text-box"]',
+          );
+          box.style.maxHeight = "none";
+          event.currentTarget.remove();
+        });
+    </script>
+  </body>
+</html>

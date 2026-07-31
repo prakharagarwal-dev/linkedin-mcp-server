@@ -1,0 +1,62 @@
+name: Bug report
+description: Report a reproducible defect using synthetic or redacted data.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include cookies, credentials, browser profiles, private messages,
+        real member data, or authenticated DOM. Report security issues privately.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: 0.14.0 or commit SHA
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, Python version, transport, and headed/headless mode.
+      placeholder: macOS 15, Python 3.12, stdio, headless
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the observed behavior and the expected behavior.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Provide exact redacted steps or a synthetic test case.
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized diagnostics
+      description: Include safe error categories or logs only after removing personal data and local paths.
+      render: text
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety checks
+      options:
+        - label: I searched existing issues.
+          required: true
+        - label: I removed credentials, cookies, real LinkedIn content, and personal data.
+          required: true
+        - label: This is not a security vulnerability.
+          required: true

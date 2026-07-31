@@ -1,0 +1,370 @@
+<!doctype html>
+<!-- Sanitized mock reverified against LinkedIn People filters on 2026-07-30. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Current LinkedIn People search</title>
+    <style>
+      [role="listitem"] > a,
+      [role="listitem"] > a > span {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <button id="all-filters" type="button">All filters</button>
+    <aside id="people-filters" hidden>
+      <p>People filters</p>
+      <button type="button" aria-label="Close">Close</button>
+
+      <section>
+        <h2>Connections</h2>
+        <label><input data-array-param="network" value="F" type="checkbox" /> 1st</label>
+        <label><input data-array-param="network" value="S" type="checkbox" /> 2nd</label>
+        <label><input data-array-param="network" value="O" type="checkbox" /> 3rd+</label>
+      </section>
+
+      <section data-facet="actively-hiring">
+        <h2>Actively hiring</h2>
+        <label>
+          <input
+            data-array-param="activelyHiringForJobTitles"
+            value="ANY"
+            type="checkbox"
+          />
+          Any job title
+        </label>
+        <button type="button" data-add="hiring-title">Hiring for job title</button>
+        <input
+          data-input="hiring-title"
+          placeholder="Hiring for job title"
+          hidden
+        />
+        <div data-option="hiring-title" role="option" hidden>
+          Fixture Engineer
+          Job title
+        </div>
+        <label data-selected="hiring-title" hidden>
+          <input
+            data-array-param="activelyHiringForJobTitles"
+            value="101"
+            type="checkbox"
+            checked
+          />
+          Fixture Engineer
+        </label>
+      </section>
+
+      <section data-facet="location">
+        <h2>Locations</h2>
+        <button type="button" data-add="location">Add a location</button>
+        <input data-input="location" placeholder="Add a location" hidden />
+        <div data-option="location" role="option" hidden>
+          Fixture City
+          Location
+        </div>
+        <label data-selected="location" hidden>
+          <input
+            data-array-param="geoUrn"
+            value="102713980"
+            type="checkbox"
+            checked
+          />
+          Fixture City
+        </label>
+      </section>
+
+      <section data-facet="current-company">
+        <h2>Current companies</h2>
+        <button type="button" data-add="current-company">Add a company</button>
+        <input
+          data-input="current-company"
+          placeholder="Add a company"
+          hidden
+        />
+        <div data-option="current-company" role="option" hidden>
+          Fixture Current Company
+          Company
+        </div>
+        <label data-selected="current-company" hidden>
+          <input
+            data-array-param="currentCompany"
+            value="11130470"
+            type="checkbox"
+            checked
+          />
+          Fixture Current Company
+        </label>
+      </section>
+
+      <section data-facet="connections-of">
+        <h2>Connections of</h2>
+        <button type="button" data-add="connection">Add a connection</button>
+        <input data-input="connection" placeholder="Add a connection" hidden />
+        <div data-option="connection" role="option" hidden>
+          Fixture Connector
+          Member
+        </div>
+        <label data-selected="connection" hidden>
+          <input
+            data-array-param="connectionOf"
+            value="ACoFixtureConnector"
+            type="checkbox"
+            checked
+          />
+          Fixture Connector
+        </label>
+      </section>
+
+      <section data-facet="followers-of">
+        <h2>Followers of</h2>
+        <button type="button" data-add="creator">Add a creator</button>
+        <input data-input="creator" placeholder="Add a creator" hidden />
+        <div data-option="creator" role="option" hidden>
+          Fixture Creator
+          Member
+        </div>
+        <label data-selected="creator" hidden>
+          <input
+            data-array-param="followerOf"
+            value="ACoFixtureCreator"
+            type="checkbox"
+            checked
+          />
+          Fixture Creator
+        </label>
+      </section>
+
+      <section data-facet="past-company">
+        <h2>Past companies</h2>
+        <button type="button" data-add="past-company">Add a company</button>
+        <input data-input="past-company" placeholder="Add a company" hidden />
+        <div data-option="past-company" role="option" hidden>
+          Fixture Past Company
+          Company
+        </div>
+        <label data-selected="past-company" hidden>
+          <input
+            data-array-param="pastCompany"
+            value="1035"
+            type="checkbox"
+            checked
+          />
+          Fixture Past Company
+        </label>
+      </section>
+
+      <section data-facet="school">
+        <h2>Schools</h2>
+        <button type="button" data-add="school">Add a school</button>
+        <input data-input="school" placeholder="Add a school" hidden />
+        <div data-option="school" role="option" hidden>
+          Fixture University
+          School
+        </div>
+        <label data-selected="school" hidden>
+          <input
+            data-array-param="schoolFilter"
+            value="17939"
+            type="checkbox"
+            checked
+          />
+          Fixture University
+        </label>
+      </section>
+
+      <section data-facet="industry">
+        <h2>Industries</h2>
+        <button type="button" data-add="industry">Add an industry</button>
+        <input data-input="industry" placeholder="Add an industry" hidden />
+        <div data-option="industry" role="option" hidden>
+          Fixture Industry
+          Industry
+        </div>
+        <label data-selected="industry" hidden>
+          <input
+            data-array-param="industry"
+            value="4"
+            type="checkbox"
+            checked
+          />
+          Fixture Industry
+        </label>
+      </section>
+
+      <section>
+        <h2>Profile Languages</h2>
+        <label>
+          <input
+            data-array-param="profileLanguage"
+            value="en"
+            type="checkbox"
+          />
+          English
+        </label>
+        <label>
+          <input
+            data-array-param="profileLanguage"
+            value="de"
+            type="checkbox"
+          />
+          German
+        </label>
+      </section>
+
+      <section data-facet="service">
+        <h2>Service categories</h2>
+        <button type="button" data-add="service">Add a service category</button>
+        <input
+          data-input="service"
+          placeholder="Add a service category"
+          hidden
+        />
+        <div data-option="service" role="option" hidden>
+          Fixture Service
+          Service category
+        </div>
+        <label data-selected="service" hidden>
+          <input
+            data-array-param="serviceCategory"
+            value="123"
+            type="checkbox"
+            checked
+          />
+          Fixture Service
+        </label>
+      </section>
+
+      <section>
+        <h2>Keywords</h2>
+        <label>First name <input data-text-param="firstName" type="text" /></label>
+        <label>Last name <input data-text-param="lastName" type="text" /></label>
+        <label>Title <input data-text-param="title" type="text" /></label>
+        <label>Company <input data-text-param="company" type="text" /></label>
+        <label>School <input data-text-param="schoolFreetext" type="text" /></label>
+      </section>
+
+      <button id="reset" type="button">Reset</button>
+      <a
+        id="show-results"
+        href="https://www.linkedin.com/search/results/people/?origin=FACETED_SEARCH"
+      >
+        Show results
+      </a>
+    </aside>
+
+    <main>
+      <h1>People results</h1>
+      <div role="list">
+        <div role="listitem">
+          <a
+            href="/in/jordan-result-/"
+            aria-label="View Jordan Result's profile"
+          >
+            Jordan Result
+          </a>
+          <a href="/in/jordan-result-/">
+            Jordan Result
+            <span>2nd</span>
+          </a>
+          <p>Staff Software Engineer at Example Cloud</p>
+          <p>Bengaluru, Karnataka, India</p>
+          <p>12 mutual connections</p>
+          <button type="button">Connect</button>
+        </div>
+        <div role="listitem">
+          <a href="/in/alex-result/">Alex Result</a>
+          <p>Engineering Manager at Example Systems</p>
+          <p>London, United Kingdom</p>
+          <p>3rd+</p>
+          <button type="button">Follow</button>
+        </div>
+      </div>
+      <nav aria-label="Search results pages">
+        <button type="button" aria-label="Page 1" aria-current="true">1</button>
+        <button type="button" aria-label="Page 2" aria-current="false">2</button>
+        <button type="button" aria-label="Next">Next</button>
+      </nav>
+    </main>
+
+    <script>
+      const panel = document.querySelector("#people-filters");
+      const showResults = document.querySelector("#show-results");
+      let target = new URL(showResults.href);
+
+      const updateHref = () => {
+        showResults.href = target.toString();
+      };
+      const setArrayValue = (parameter, value, checked) => {
+        let values = [];
+        if (target.searchParams.has(parameter)) {
+          values = JSON.parse(target.searchParams.get(parameter));
+        }
+        values = values.filter((candidate) => candidate !== value);
+        if (checked) values.push(value);
+        if (values.length) {
+          target.searchParams.set(parameter, JSON.stringify(values));
+        } else {
+          target.searchParams.delete(parameter);
+        }
+        updateHref();
+      };
+      window.initializePeopleSearchFixture = (url) => {
+        target = new URL(url);
+        target.searchParams.set("origin", "FACETED_SEARCH");
+        updateHref();
+      };
+
+      document.querySelector("#all-filters").addEventListener("click", () => {
+        panel.hidden = false;
+      });
+      panel.querySelector('[aria-label="Close"]').addEventListener("click", () => {
+        panel.hidden = true;
+      });
+      for (const input of panel.querySelectorAll("[data-array-param]")) {
+        input.addEventListener("change", () => {
+          setArrayValue(input.dataset.arrayParam, input.value, input.checked);
+        });
+      }
+      for (const input of panel.querySelectorAll("[data-text-param]")) {
+        input.addEventListener("input", () => {
+          if (input.value) {
+            target.searchParams.set(input.dataset.textParam, input.value);
+          } else {
+            target.searchParams.delete(input.dataset.textParam);
+          }
+          updateHref();
+        });
+      }
+      for (const button of panel.querySelectorAll("[data-add]")) {
+        button.addEventListener("click", () => {
+          const key = button.dataset.add;
+          panel.querySelector(`[data-input="${key}"]`).hidden = false;
+          panel.querySelector(`[data-option="${key}"]`).hidden = false;
+        });
+      }
+      for (const option of panel.querySelectorAll("[data-option]")) {
+        option.addEventListener("click", () => {
+          const key = option.dataset.option;
+          const selected = panel.querySelector(`[data-selected="${key}"]`);
+          const input = selected.querySelector("[data-array-param]");
+          selected.hidden = false;
+          input.checked = true;
+          panel.querySelector(`[data-input="${key}"]`).hidden = true;
+          option.hidden = true;
+          setArrayValue(input.dataset.arrayParam, input.value, true);
+        });
+      }
+      document.querySelector("#reset").addEventListener("click", () => {
+        target = new URL(
+          "https://www.linkedin.com/search/results/people/?origin=FACETED_SEARCH"
+        );
+        for (const input of panel.querySelectorAll("input")) {
+          if (input.type === "checkbox") input.checked = false;
+          if (input.type === "text") input.value = "";
+        }
+        updateHref();
+      });
+    </script>
+  </body>
+</html>

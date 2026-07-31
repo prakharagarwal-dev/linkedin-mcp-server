@@ -1,0 +1,69 @@
+{
+  "provenance": "mock_verified",
+  "verified_at": "2026-07-29",
+  "source_surfaces": [
+    "visible LinkedIn My Connections",
+    "visible LinkedIn People filters"
+  ],
+  "contains_live_data": false,
+  "contains_authentication_state": false,
+  "list_url": "/mynetwork/invite-connect/connections/",
+  "list_count_copy": "{count} connections",
+  "list_card_selector": "main [data-testid=\"lazy-column\"] > [data-display-contents]",
+  "list_search_selector": "main input[placeholder=\"Search by name\"]",
+  "list_search_with_filters_selector": "main a:has-text(\"Search with filters\")",
+  "list_sort_selector": "main [role=\"button\"][aria-expanded]",
+  "list_sort_options": [
+    "Recently added",
+    "First name",
+    "Last name"
+  ],
+  "filter_panel_selector": "aside:has-text(\"People filters\")",
+  "filter_sections": [
+    "Connections",
+    "Actively hiring",
+    "Locations",
+    "Current companies",
+    "Connections of",
+    "Followers of",
+    "Past companies",
+    "Schools",
+    "Industries",
+    "Profile Languages",
+    "Service categories",
+    "Keywords"
+  ],
+  "keyword_fields": [
+    "First name",
+    "Last name",
+    "Title",
+    "Company",
+    "School"
+  ],
+  "filter_submission_selector": "a:has-text(\"Show results\")",
+  "connections_search_degree": "first",
+  "connections_search_exposes_degree_filter": false,
+  "broad_degree_filter_owner": "linkedin.people.search",
+  "search_card_selector": "main [role=\"listitem\"]",
+  "unidentifiable_search_card_signal": "visible result card whose first line is LinkedIn Member, with an image and no /in/ profile link",
+  "search_pagination_selector": "[role=\"button\"][aria-label^=\"Page \"], [role=\"button\"][aria-label=\"Next\"], [role=\"button\"][aria-label=\"Previous\"]",
+  "observed_query_parameters": {
+    "connection_degrees": "network",
+    "actively_hiring_job_titles": "activelyHiringForJobTitles",
+    "locations": "geoUrn",
+    "current_companies": "currentCompany",
+    "connections_of": "connectionOf",
+    "followers_of": "followerOf",
+    "past_companies": "pastCompany",
+    "schools": "schoolFilter",
+    "industries": "industry",
+    "profile_languages": "profileLanguage",
+    "service_categories": "serviceCategory",
+    "first_name": "firstName",
+    "last_name": "lastName",
+    "title": "title",
+    "company": "company",
+    "school": "schoolFreetext"
+  },
+  "notes": "Synthetic identities and values preserve only selector, accessibility, filter-submission, sort, result-card, and pagination behavior observed through the authenticated visible UI. The shared People panel visibly exposes all degrees, but linkedin.connections.search always submits first degree; broader degree selection belongs to linkedin.people.search."
+}

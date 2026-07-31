@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Current LinkedIn document post fixture</title>
+    <style>.document-preview { display: block; width: 560px; height: 720px; }</style>
+  </head>
+  <body>
+    <main aria-label="Post detail">
+      <div role="listitem">
+        <header>
+          <a href="/in/morgan-lee-/">Morgan Lee</a>
+          <div>3rd+</div>
+          <div>Principal Platform Engineer</div>
+          <div>1w •</div>
+          <svg aria-label="Visibility: Connections only"></svg>
+          <button type="button" data-menu-open aria-label="Open control menu for post by Morgan Lee"></button>
+        </header>
+        <div data-testid="expandable-text-box">Five practical checks for resilient services.</div>
+        <section aria-label="Document viewer">
+          <h2>Reliable systems handbook</h2>
+          <button type="button" aria-label="Page 1 of 5"></button>
+          <button type="button" aria-label="Full screen"></button>
+          <span>5 pages</span>
+          <img
+            class="document-preview"
+            alt="Reliable systems handbook cover"
+            src="https://media.example.test/reliable-systems-page-1.png"
+          />
+        </section>
+        <button type="button" aria-label="Reaction button state: insightful">203</button>
+        <button type="button" aria-label="Comment">18</button>
+        <button type="button" aria-label="Repost">11</button>
+      </div>
+    </main>
+    <script>
+      const copiedPostUrl =
+        "https://www.linkedin.com/feed/update/urn:li:share:7312345678901234569/";
+      document.querySelector("[data-menu-open]").addEventListener("click", () => {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.textContent = "Copy link to post";
+        item.addEventListener("click", async () => {
+          await navigator.clipboard.writeText(copiedPostUrl);
+          item.remove();
+        });
+        document.body.append(item);
+      });
+    </script>
+  </body>
+</html>

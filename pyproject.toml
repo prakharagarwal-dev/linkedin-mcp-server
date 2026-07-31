@@ -1,0 +1,90 @@
+[project]
+name = "linkedin-mcp-server"
+version = "0.14.0"
+description = "A typed, policy-enforced MCP server for authorized LinkedIn capabilities."
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Prakhar Agarwal", email = "prakharagarwal3031@gmail.com" }]
+keywords = ["linkedin", "mcp", "model-context-protocol", "playwright", "automation"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Typing :: Typed",
+]
+dependencies = [
+  "mcp[cli]>=1.27,<2",
+  "platformdirs>=4,<5",
+  "playwright>=1.54,<2",
+  "prometheus-client>=0.22,<1",
+  "pyrate-limiter>=4.4,<5",
+  "pydantic>=2.12,<3",
+  "pydantic-settings>=2.10,<3",
+  "structlog>=25,<26",
+]
+
+[project.urls]
+Homepage = "https://github.com/Prakhar-Agarwal-byte/linkedin-mcp-server"
+Repository = "https://github.com/Prakhar-Agarwal-byte/linkedin-mcp-server"
+Issues = "https://github.com/Prakhar-Agarwal-byte/linkedin-mcp-server/issues"
+Changelog = "https://github.com/Prakhar-Agarwal-byte/linkedin-mcp-server/blob/main/CHANGELOG.md"
+
+[project.scripts]
+linkedin-mcp = "linkedin_mcp.__main__:main"
+
+[dependency-groups]
+dev = [
+  "httpx>=0.28,<1",
+  "pyright>=1.1.400,<2",
+  "pytest>=8.4,<10",
+  "pytest-asyncio>=1,<2",
+  "pytest-cov>=6,<8",
+  "pytest-timeout>=2.4,<3",
+  "ruff>=0.12,<1",
+]
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/linkedin_mcp"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-config --strict-markers"
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["linkedin_mcp"]
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true
+skip_covered = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC", "C4", "DTZ", "RUF", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]
+
+[tool.pyright]
+include = ["src", "tests"]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+venvPath = "."
+venv = ".venv"

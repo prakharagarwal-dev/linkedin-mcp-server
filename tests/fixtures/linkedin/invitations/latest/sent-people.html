@@ -1,0 +1,51 @@
+<!doctype html>
+<!-- Sanitized mock verified against LinkedIn's current sent-invitation structure. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Current sent invitations</title>
+  </head>
+  <body>
+    <main>
+      <p>Manage invitations</p>
+      <nav aria-label="Invitation direction">
+        <a href="/mynetwork/invitation-manager/received">Received</a>
+        <a aria-current="page" href="/mynetwork/invitation-manager/sent">Sent</a>
+      </nav>
+      <a href="/mynetwork/invitation-manager/sent/CONNECTION/">People (2)</a>
+      <div data-testid="lazy-column" data-component-type="LazyColumn">
+        <hr role="presentation" />
+        <div role="listitem">
+          <a href="/in/jordan-sent-/">
+            <img alt="Jordan Sent’s profile picture" src="/jordan.png" />
+          </a>
+          <p>Jordan Sent</p>
+          <p>Engineering Manager at Example Systems</p>
+          <p>Sent 2 weeks ago</p>
+          <a
+            href="/mynetwork/invitation-manager/sent/"
+            aria-label="Withdraw invitation sent to Jordan Sent"
+          >
+            Withdraw
+          </a>
+        </div>
+        <hr role="presentation" />
+        <div role="listitem">
+          <a href="/in/morgan-sent/">
+            <img alt="" src="/morgan.png" />
+          </a>
+          <p>Morgan Sent</p>
+          <p>Product Engineer</p>
+          <p>Sent 3 months ago</p>
+          <a
+            href="/mynetwork/invitation-manager/sent/"
+            aria-label="Withdraw invitation sent to Morgan Sent"
+          >
+            Withdraw
+          </a>
+          <p>Thanks for considering my invitation.</p>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

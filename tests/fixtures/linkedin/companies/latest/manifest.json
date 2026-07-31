@@ -1,0 +1,72 @@
+{
+  "provenance": "mock_verified",
+  "verified_at": "2026-07-30",
+  "source_surfaces": [
+    "visible LinkedIn Company search",
+    "visible LinkedIn Company All filters side panel",
+    "visible LinkedIn Company overview",
+    "visible LinkedIn Company About page"
+  ],
+  "contains_live_data": false,
+  "contains_authentication_state": false,
+  "search_result_identity": "visible /company/{slug}/ link inside main",
+  "search_result_regions": [
+    "closest visible li",
+    "closest data-chameleon-result-urn container",
+    "closest data-view-name container"
+  ],
+  "search_filter_container": "smallest visible ancestor containing Show results and the Locations, Industry, and Company size headings",
+  "filter_sections": [
+    "Locations",
+    "Industry",
+    "Company size",
+    "Job listings on LinkedIn",
+    "Connections"
+  ],
+  "location_typeahead": {
+    "add_control": "Add a location",
+    "input_placeholder": "Add a location",
+    "exact_option_role": "option",
+    "query_parameter": "companyHqGeo"
+  },
+  "industry_typeahead": {
+    "add_control": "Add an industry",
+    "input_placeholder": "Add an industry",
+    "exact_option_role": "option",
+    "query_parameter": "industryCompanyVertical"
+  },
+  "company_size_choices": [
+    "1-10 employees",
+    "11-50 employees",
+    "51-200 employees",
+    "201-500 employees",
+    "501-1,000 employees",
+    "1,001-5,000 employees",
+    "5,001-10,000 employees",
+    "10,001+ employees"
+  ],
+  "query_parameter_mapping": {
+    "company_sizes": "companySize",
+    "has_job_listings": "hasJobs=[\"1\"]",
+    "has_first_degree_connections": "network=[\"F\"]"
+  },
+  "filter_submission_control": "visible Show results link",
+  "pagination_controls": [
+    "button[aria-label^=\"Page \"]",
+    "[data-testid=\"pagination-controls-next-button-visible\"]"
+  ],
+  "profile_routes": {
+    "overview": "/company/{slug}/",
+    "about": "/company/{slug}/about/"
+  },
+  "about_fields": [
+    "Website",
+    "Industry",
+    "Company size",
+    "Headquarters",
+    "Type",
+    "Founded",
+    "Specialties"
+  ],
+  "notes": "Synthetic identities and text preserve only current accessible controls, exact typeahead selection, submitted query parameters, result-card identity, pagination, and fixed Overview-plus-About behavior observed through the authenticated visible UI."
+}

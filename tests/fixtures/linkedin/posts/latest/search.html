@@ -1,0 +1,294 @@
+<!doctype html>
+<!-- Sanitized mock verified against LinkedIn Posts filters on 2026-07-30. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Current LinkedIn Posts search</title>
+  </head>
+  <body>
+    <button
+      id="all-filters"
+      type="button"
+      aria-label="Show all filters. Clicking this button displays all available filter options."
+    >
+      All filters
+    </button>
+
+    <aside id="post-filters" hidden>
+      <button type="button" aria-label="Close">Close</button>
+
+      <section>
+        <h2>Sort by</h2>
+        <label><input name="sort" type="radio" value="top_match" checked />Top Match</label>
+        <label><input name="sort" type="radio" value="date_posted" />Latest</label>
+      </section>
+
+      <section>
+        <h2>Date posted</h2>
+        <label><input name="date" type="radio" value="past-24h" />Past 24 hours</label>
+        <label><input name="date" type="radio" value="past-week" />Past week</label>
+        <label><input name="date" type="radio" value="past-month" />Past month</label>
+      </section>
+
+      <section>
+        <h2>Content type</h2>
+        <label><input name="content" type="radio" value="videos" />Videos</label>
+        <label><input name="content" type="radio" value="photos" />Images</label>
+        <label><input name="content" type="radio" value="jobs" />Job posts</label>
+        <label><input name="content" type="radio" value="liveVideos" />Live videos</label>
+        <label><input name="content" type="radio" value="documents" />Documents</label>
+      </section>
+
+      <section data-facet="from-member" data-filter-parameter="fromMember">
+        <h2>From member</h2>
+        <div class="selected-values"></div>
+        <button class="add-choice" type="button">Add a person</button>
+        <input hidden placeholder="Add a person" type="text" />
+        <div class="choices" hidden role="listbox">
+          <div data-facet-id="ACoJane" role="option">
+            <span>Jane Doe</span>
+            <span>Member</span>
+          </div>
+        </div>
+      </section>
+
+      <section data-facet="from-company" data-filter-parameter="fromOrganization">
+        <h2>From company</h2>
+        <div class="selected-values"></div>
+        <button class="add-choice" type="button">Add a company's name</button>
+        <input hidden placeholder="Add a company's name" type="text" />
+        <div class="choices" hidden role="listbox">
+          <div data-facet-id="12345" role="option">
+            <span>Acme Cloud</span>
+            <span>Software Development</span>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Posted by</h2>
+        <label><input data-posted-by="me" type="checkbox" value="me" />Me</label>
+        <label>
+          <input data-posted-by="first" type="checkbox" value="first" />
+          1st connections
+        </label>
+        <label>
+          <input data-posted-by="following" type="checkbox" value="following" />
+          People you follow
+        </label>
+      </section>
+
+      <section data-facet="mentions-member" data-filter-parameter="mentionsMember">
+        <h2>Mentioning member</h2>
+        <div class="selected-values"></div>
+        <button class="add-choice" type="button">Add a person</button>
+        <input hidden placeholder="Add a person" type="text" />
+        <div class="choices" hidden role="listbox">
+          <div data-facet-id="ACoAlex" role="option">
+            <span>Alex Ray</span>
+            <span>Member</span>
+          </div>
+        </div>
+      </section>
+
+      <section
+        data-facet="mentions-company"
+        data-filter-parameter="mentionsOrganization"
+      >
+        <h2>Mentioning company</h2>
+        <div class="selected-values"></div>
+        <button class="add-choice" type="button">Add a company's name</button>
+        <input hidden placeholder="Add a company's name" type="text" />
+        <div class="choices" hidden role="listbox">
+          <div data-facet-id="67890" role="option">
+            <span>Example Labs</span>
+            <span>Software Development</span>
+          </div>
+        </div>
+      </section>
+
+      <section data-facet="author-industry" data-filter-parameter="authorIndustry">
+        <h2>Author industry</h2>
+        <div class="selected-values"></div>
+        <button class="add-choice" type="button">Add an industry</button>
+        <input hidden placeholder="Add an industry" type="text" />
+        <div class="choices" hidden role="listbox">
+          <div data-facet-id="4" role="option">
+            <span>Software Development</span>
+            <span>Industry</span>
+          </div>
+        </div>
+      </section>
+
+      <section data-facet="author-company" data-filter-parameter="authorCompany">
+        <h2>Author company</h2>
+        <div class="selected-values"></div>
+        <button class="add-choice" type="button">Add a company</button>
+        <input hidden placeholder="Add a company" type="text" />
+        <div class="choices" hidden role="listbox">
+          <div data-facet-id="12345" role="option">
+            <span>Acme Cloud</span>
+            <span>Software Development</span>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Author Keywords</h2>
+        <label>Title <input id="author-keywords" type="text" /></label>
+      </section>
+
+      <button type="button">Reset</button>
+      <a id="show-results" href="/search/results/content/?origin=FACETED_SEARCH">
+        Show results
+      </a>
+    </aside>
+
+    <main aria-label="Post search results">
+      <h1>Posts</h1>
+      <div role="listitem">
+        <a href="/in/article-author/">Article Author</a>
+        <time>1h</time>
+        <p>A content card without a stable post identifier.</p>
+        <button
+          type="button"
+          aria-label="Open control menu for post by Article Author"
+          data-open-post-menu
+        >
+          More
+        </button>
+        <div data-post-menu hidden>
+          <button
+            type="button"
+            data-copy-post-link
+            data-copy-url="https://www.linkedin.com/pulse/reliable-systems-article/"
+          >
+            Copy link to post
+          </button>
+        </div>
+      </div>
+      <div role="listitem">
+        <a href="/in/jane-doe/"><img alt="Jane Doe" src="jane.png" /></a>
+        <a href="/in/jane-doe/">Jane Doe</a>
+        <p>Staff Engineer at Acme Cloud</p>
+        <time>2h</time>
+        <p>
+          <span data-testid="expandable-text-box">
+            A practical guide to reliable Python services. #python
+            <button data-testid="expandable-text-button" type="button">… more</button>
+          </span>
+        </p>
+        <p>12 reactions</p>
+        <p>3 comments</p>
+        <p>1 repost</p>
+        <button
+          type="button"
+          aria-label="Open control menu for post by Jane Doe"
+          data-open-post-menu
+        >
+          More
+        </button>
+        <div data-post-menu hidden>
+          <button
+            type="button"
+            data-copy-post-link
+            data-copy-url="https://www.linkedin.com/posts/jane-doe_python-activity-7312345678901234567-x/"
+          >
+            Copy link to post
+          </button>
+        </div>
+        <button type="button">Like</button>
+        <button type="button">Comment</button>
+      </div>
+      <article data-urn="urn:li:ugcPost:7312345678901234999">
+        <a href="/company/acme-cloud/">
+          Acme Cloud
+          <span>Reliable cloud infrastructure</span>
+        </a>
+        <time>3d</time>
+        <p data-post-text>Infrastructure release notes for engineering teams.</p>
+        <p>8 reactions</p>
+        <p>2 comments</p>
+      </article>
+    </main>
+
+    <script>
+      (() => {
+      const panel = document.querySelector("#post-filters");
+      const showResults = document.querySelector("#show-results");
+
+      function updateShowResults() {
+        const query = new URLSearchParams({ origin: "FACETED_SEARCH" });
+        for (const section of panel.querySelectorAll("[data-filter-parameter]")) {
+          const values = Array.from(
+            section.querySelectorAll('input[type="checkbox"]:checked')
+          ).map((input) => input.value);
+          if (values.length) {
+            query.set(section.dataset.filterParameter, JSON.stringify(values));
+          }
+        }
+        showResults.href = `/search/results/content/?${query.toString()}`;
+      }
+
+      document.querySelector("#all-filters").addEventListener("click", () => {
+        panel.hidden = false;
+      });
+
+      for (const section of panel.querySelectorAll("[data-filter-parameter]")) {
+        const addChoice = section.querySelector(".add-choice");
+        const input = section.querySelector('input[type="text"]');
+        const choices = section.querySelector(".choices");
+        addChoice.addEventListener("click", () => {
+          input.hidden = false;
+          choices.hidden = false;
+          input.focus();
+        });
+        input.addEventListener("input", () => {
+          for (const option of choices.querySelectorAll('[role="option"]')) {
+            const label = option.querySelector("span").textContent.trim();
+            option.hidden = label.toLowerCase() !== input.value.trim().toLowerCase();
+          }
+        });
+        for (const option of choices.querySelectorAll('[role="option"]')) {
+          option.addEventListener("click", () => {
+            const visibleLabel = option.querySelector("span").textContent.trim();
+            const label = document.createElement("label");
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.checked = true;
+            checkbox.value = option.dataset.facetId;
+            checkbox.setAttribute("aria-label", visibleLabel);
+            label.append(checkbox, visibleLabel);
+            section.querySelector(".selected-values").append(label);
+            input.hidden = true;
+            choices.hidden = true;
+            updateShowResults();
+          });
+        }
+      }
+
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: { writeText: async () => {} },
+      });
+      document.querySelectorAll("[data-open-post-menu]").forEach((opener) => {
+        const region = opener.closest('[role="listitem"]');
+        const menu = region.querySelector("[data-post-menu]");
+        const copy = region.querySelector("[data-copy-post-link]");
+        opener.addEventListener("click", () => {
+          menu.hidden = false;
+        });
+        copy.addEventListener("click", async () => {
+          await navigator.clipboard.writeText(copy.dataset.copyUrl);
+          menu.hidden = true;
+        });
+      });
+      document
+        .querySelector('[data-testid="expandable-text-button"]')
+        .addEventListener("click", (event) => {
+          event.currentTarget.remove();
+        });
+      })();
+    </script>
+  </body>
+</html>

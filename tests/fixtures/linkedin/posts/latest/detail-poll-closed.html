@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Current LinkedIn closed poll fixture</title>
+    <style>.poll-option span { display: block; }</style>
+  </head>
+  <body>
+    <main aria-label="Post detail">
+      <div role="listitem">
+        <header>
+          <a href="/in/devon-patel/">Devon Patel</a>
+          <div>1st</div>
+          <div>Engineering Manager</div>
+          <div>6d •</div>
+          <svg aria-label="Visibility: Global"></svg>
+          <button type="button" data-menu-open aria-label="Open control menu for post by Devon Patel"></button>
+        </header>
+        <div data-testid="expandable-text-box">Help shape our next reliability workshop.</div>
+        <section aria-label="Poll">
+          <h2>Which reliability topic should we cover next?</h2>
+          <div class="poll-option"><span>Incident response</span><span>40 %</span><span>2 votes</span></div>
+          <div class="poll-option"><span>Load shedding</span><span>20 %</span><span>1 vote</span></div>
+          <div class="poll-option"><span>Data recovery</span><span>20 %</span><span>1 vote</span></div>
+          <div class="poll-option"><span>Capacity planning</span><span>20 %</span><span>1 vote</span></div>
+          <div>5 votes</div>
+          <div>Poll closed</div>
+        </section>
+        <button type="button" aria-label="Reaction button state: no reaction">17</button>
+        <button type="button" aria-label="Comment">4</button>
+        <button type="button" aria-label="Repost">1</button>
+      </div>
+    </main>
+    <script>
+      const copiedPostUrl =
+        "https://www.linkedin.com/feed/update/urn:li:activity:7312345678901234571/";
+      document.querySelector("[data-menu-open]").addEventListener("click", () => {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.textContent = "Copy link to post";
+        item.addEventListener("click", async () => {
+          await navigator.clipboard.writeText(copiedPostUrl);
+          item.remove();
+        });
+        document.body.append(item);
+      });
+    </script>
+  </body>
+</html>

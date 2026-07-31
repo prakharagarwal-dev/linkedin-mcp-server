@@ -1,0 +1,58 @@
+<!doctype html>
+<!-- Sanitized current-layout fixture shared by every visible received filter. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Current received invitation filters</title>
+  </head>
+  <body>
+    <main>
+      <div id="bucket-picker" role="button" aria-expanded="false" tabindex="0">
+        <input aria-hidden="true" type="checkbox" checked />
+        Focused (1)
+      </div>
+      <div role="radio" aria-checked="false" tabindex="0">
+        <input aria-hidden="true" type="checkbox" />
+        Verified (1)
+      </div>
+      <div role="radio" aria-checked="false" tabindex="0">
+        <input aria-hidden="true" type="checkbox" />
+        Mutual Connections (1)
+      </div>
+      <div role="radio" aria-checked="false" tabindex="0">
+        <input aria-hidden="true" type="checkbox" />
+        Your Company (1)
+      </div>
+      <div role="radio" aria-checked="false" tabindex="0">
+        <input aria-hidden="true" type="checkbox" />
+        Your School (1)
+      </div>
+      <div data-testid="lazy-column">
+        <div><div><div data-display-contents="true">
+          <div role="listitem">
+            <a href="/in/filter-member-/"><strong>Filter Member</strong></a>
+            <p>Visible member for the selected filter</p>
+            <button aria-label="Ignore an invitation from Filter Member">Ignore</button>
+            <button aria-label="Accept Filter Member’s invitation">Accept</button>
+          </div>
+        </div></div></div>
+      </div>
+      <script>
+        const bucketCheckbox = document.querySelector(
+          '#bucket-picker input[type="checkbox"]'
+        );
+        const radios = Array.from(document.querySelectorAll('[role="radio"]'));
+        for (const radio of radios) {
+          radio.addEventListener("click", () => {
+            bucketCheckbox.checked = false;
+            for (const candidate of radios) {
+              const selected = candidate === radio;
+              candidate.setAttribute("aria-checked", String(selected));
+              candidate.querySelector('input[type="checkbox"]').checked = selected;
+            }
+          });
+        }
+      </script>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,122 @@
+<!doctype html>
+<!-- Sanitized mock verified against LinkedIn My Connections on 2026-07-29. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Current My Connections</title>
+  </head>
+  <body>
+    <main>
+      <h1>Connections</h1>
+      <p>3 connections</p>
+      <input placeholder="Search by name" />
+      <a
+        href="https://www.linkedin.com/search/results/people/?network=%5B%22F%22%5D&amp;origin=MEMBER_PROFILE_CANNED_SEARCH"
+      >
+        Search with filters
+      </a>
+      <div
+        id="sort-trigger"
+        role="button"
+        aria-expanded="false"
+        tabindex="0"
+      >
+        Recently added
+      </div>
+      <div id="sort-menu" role="menu" hidden>
+        <div role="menuitem" data-sort="Recently added" tabindex="0">
+          Recently added
+        </div>
+        <div role="menuitem" data-sort="First name" tabindex="0">
+          First name
+        </div>
+        <div role="menuitem" data-sort="Last name" tabindex="0">
+          Last name
+        </div>
+      </div>
+      <div data-testid="lazy-column" data-component-type="LazyColumn">
+        <div data-display-contents="true" data-first="Jordan" data-last="Ng">
+          <div>
+            <a href="/in/jordan-ng-/">
+              <img alt="Jordan Ng’s profile picture" src="/jordan.png" />
+            </a>
+          </div>
+          <div>
+            <a href="/in/jordan-ng-/">Jordan Ng</a>
+            <p>Staff Engineer at Example Cloud</p>
+            <p>Bengaluru, Karnataka, India</p>
+            <p>Connected 2 weeks ago</p>
+          </div>
+          <a
+            href="/messaging/compose/?recipient=jordan-ng-"
+            aria-label="Message Jordan Ng"
+          >
+            Message
+          </a>
+        </div>
+        <div data-display-contents="true" data-first="Alex" data-last="Rivera">
+          <div>
+            <a href="/in/alex-rivera/">
+              <img alt="Alex Rivera’s profile picture" src="/alex.png" />
+            </a>
+          </div>
+          <div>
+            <a href="/in/alex-rivera/">Alex Rivera</a>
+            <p>Founder at Example Systems</p>
+            <p>San Francisco Bay Area</p>
+            <p>Connected 1 month ago</p>
+          </div>
+          <a
+            href="/messaging/compose/?recipient=alex-rivera"
+            aria-label="Message Alex Rivera"
+          >
+            Message
+          </a>
+        </div>
+        <div data-display-contents="true" data-first="Casey" data-last="Lee">
+          <div>
+            <a href="/in/casey-lee/">
+              <img alt="Casey Lee’s profile picture" src="/casey.png" />
+            </a>
+          </div>
+          <div>
+            <a href="/in/casey-lee/">Casey Lee</a>
+            <p>Product Engineer at Example Labs</p>
+            <p>Pune, Maharashtra, India</p>
+            <p>Connected 3 months ago</p>
+          </div>
+          <a
+            href="/messaging/compose/?recipient=casey-lee"
+            aria-label="Message Casey Lee"
+          >
+            Message
+          </a>
+        </div>
+      </div>
+    </main>
+    <script>
+      const trigger = document.querySelector("#sort-trigger");
+      const menu = document.querySelector("#sort-menu");
+      trigger.addEventListener("click", () => {
+        menu.hidden = !menu.hidden;
+        trigger.setAttribute("aria-expanded", String(!menu.hidden));
+      });
+      for (const option of menu.querySelectorAll('[role="menuitem"]')) {
+        option.addEventListener("click", () => {
+          const selected = option.dataset.sort;
+          trigger.textContent = selected;
+          trigger.setAttribute("aria-expanded", "false");
+          menu.hidden = true;
+          if (selected === "Recently added") return;
+          const key = selected === "First name" ? "first" : "last";
+          const column = document.querySelector('[data-testid="lazy-column"]');
+          const cards = Array.from(column.children);
+          cards.sort((left, right) =>
+            left.dataset[key].localeCompare(right.dataset[key])
+          );
+          for (const card of cards) column.append(card);
+        });
+      }
+    </script>
+  </body>
+</html>
