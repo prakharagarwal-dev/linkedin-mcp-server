@@ -3,13 +3,23 @@ name: Publish release
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to publish
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: publish-${{ github.event.release.tag_name }}
+  group: publish-${{ github.event.release.tag_name || inputs.tag }}
   cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+  MCP_SERVER_NAME: io.github.prakharagarwal-dev/linkedin-mcp-server
 
 jobs:
   build:
@@ -24,7 +34,7 @@ jobs:
       - name: Check out release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.0
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ env.RELEASE_TAG }}
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -37,8 +47,6 @@ jobs:
           version: "0.11.12"
 
       - name: Verify release version
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           VERSION="$(uv version --short)"
           test "$RELEASE_TAG" = "v$VERSION"
@@ -59,7 +67,7 @@ jobs:
           cp assets/icon.png .release/mcpb/icon.png
           npx --yes @anthropic-ai/mcpb@2.1.2 validate .release/mcpb/manifest.json
           npx --yes @anthropic-ai/mcpb@2.1.2 pack .release/mcpb \
-            "dist/linkedin-mcp-server-${GITHUB_REF_NAME#v}.mcpb"
+            "dist/linkedin-mcp-server-${RELEASE_TAG#v}.mcpb"
 
       - name: Attest release artifacts
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.2.0
@@ -105,7 +113,6 @@ jobs:
       - name: Create checksums and attach assets
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
           REPOSITORY: ${{ github.repository }}
         run: |
           cd release-assets
@@ -132,6 +139,100 @@ jobs:
       - name: Publish distributions with Trusted Publishing
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
 
+  mcp-registry:
+    name: Publish to the official MCP Registry
+    needs: pypi
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.0
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Wait for the published PyPI version
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          for ATTEMPT in {1..12}; do
+            if curl --fail --silent --show-error \
+              "https://pypi.org/pypi/linkedin-mcp-local/$VERSION/json" \
+              >/dev/null; then
+              exit 0
+            fi
+            if [ "$ATTEMPT" -eq 12 ]; then
+              echo "PyPI version $VERSION was not visible after 12 attempts." >&2
+              exit 1
+            fi
+            sleep 10
+          done
+
+      - name: Install the verified MCP publisher
+        env:
+          PUBLISHER_VERSION: "1.8.0"
+          PUBLISHER_SHA256: 1370446bbe74d562608e8005a6ccce02d146a661fbd78674e11cc70b9618d6cf
+        run: |
+          ARCHIVE="mcp-publisher_linux_amd64.tar.gz"
+          curl --fail --location --silent --show-error \
+            --output "$ARCHIVE" \
+            "https://github.com/modelcontextprotocol/registry/releases/download/v$PUBLISHER_VERSION/$ARCHIVE"
+          echo "$PUBLISHER_SHA256  $ARCHIVE" | sha256sum --check --strict
+          tar --extract --gzip --file "$ARCHIVE" mcp-publisher
+          ./mcp-publisher --version
+
+      - name: Validate registry metadata
+        run: ./mcp-publisher validate
+
+      - name: Check for an existing registry version
+        id: registry-version
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          curl --fail --silent --show-error --get \
+            --data-urlencode "search=$MCP_SERVER_NAME" \
+            https://registry.modelcontextprotocol.io/v0.1/servers \
+            --output registry-response.json
+          if jq --exit-status \
+            --arg name "$MCP_SERVER_NAME" \
+            --arg version "$VERSION" \
+            'any(.servers[]?; .server.name == $name and .server.version == $version)' \
+            registry-response.json >/dev/null; then
+            echo "exists=true" >>"$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >>"$GITHUB_OUTPUT"
+          fi
+
+      - name: Authenticate to the MCP Registry
+        if: steps.registry-version.outputs.exists != 'true'
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish registry metadata
+        if: steps.registry-version.outputs.exists != 'true'
+        run: ./mcp-publisher publish
+
+      - name: Verify the published registry version
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          for ATTEMPT in {1..12}; do
+            curl --fail --silent --show-error --get \
+              --data-urlencode "search=$MCP_SERVER_NAME" \
+              https://registry.modelcontextprotocol.io/v0.1/servers \
+              --output registry-response.json
+            if jq --exit-status \
+              --arg name "$MCP_SERVER_NAME" \
+              --arg version "$VERSION" \
+              'any(.servers[]?; .server.name == $name and .server.version == $version)' \
+              registry-response.json >/dev/null; then
+              exit 0
+            fi
+            if [ "$ATTEMPT" -eq 12 ]; then
+              echo "Registry version $MCP_SERVER_NAME@$VERSION was not visible after 12 attempts." >&2
+              exit 1
+            fi
+            sleep 10
+          done
+
   container:
     name: Publish GHCR image
     runs-on: ubuntu-latest
@@ -145,7 +246,10 @@ jobs:
       - name: Check out release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.0
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
       - name: Log in to GHCR
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
@@ -159,9 +263,10 @@ jobs:
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
         with:
           images: ghcr.io/${{ github.repository }}
+          flavor: latest=false
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{version}},value=${{ env.RELEASE_TAG }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ env.RELEASE_TAG }}
             type=raw,value=latest
 
       - name: Build and push image
