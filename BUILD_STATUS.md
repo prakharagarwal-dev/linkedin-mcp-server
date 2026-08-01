@@ -19,11 +19,12 @@ Updated: 2026-08-01
 - MCP initialization tests now verify the package version over in-memory,
   stdio, and loopback Streamable HTTP transports. MCPB builds use only tracked
   files and are byte-reproducible across independent builds.
-- Virtualized connection, inbox, and message-history collection now retries one
+- [Pull request 14](https://github.com/prakharagarwal-dev/linkedin-mcp-server/pull/14)
+  made virtualized connection, inbox, and message-history collection retry one
   idle wheel delivery within the existing bounded polling budget. The three
-  formerly flaky browser cases passed 90 consecutive stress iterations, and
-  the complete 437-test offline suite passes locally with Ruff and strict
-  Pyright.
+  formerly flaky browser cases passed 90 consecutive stress iterations; the
+  complete 437-test offline suite, Ruff, strict Pyright, and CodeQL pass both
+  locally and on Python 3.12 and 3.13 CI.
 
 ## Publication status
 
@@ -45,17 +46,21 @@ Updated: 2026-08-01
 - Awesome MCP Servers: submitted in
   [`punkpeye/awesome-mcp-servers#11316`](https://github.com/punkpeye/awesome-mcp-servers/pull/11316);
   that directory requires a verified Glama listing before merge.
-- MCPRepository: accepted into its processing queue at the
-  [canonical listing URL](https://mcprepository.com/prakharagarwal-dev/linkedin-mcp-server).
+- MCPRepository: the
+  [canonical public listing](https://mcprepository.com/prakharagarwal-dev/linkedin-mcp-server)
+  is live and links back to the intended GitHub repository.
 - PyPI: release publication reached GitHub OIDC, but PyPI returned
   `invalid-publisher`. It awaits creation of the `linkedin-mcp-local` pending
   Trusted Publisher for owner `prakharagarwal-dev`, repository
   `linkedin-mcp-server`, workflow `publish.yml`, environment `pypi`.
-- Official MCP Registry: OCI-backed metadata passes the official publisher's
-  live validation. A dedicated workflow now uses secretless GitHub OIDC and
-  verifies the exact public GHCR image independently of PyPI.
-- GitHub MCP Registry and PulseMCP: await automatic ingestion from the Official
-  MCP Registry.
+- Official MCP Registry: [`v0.14.1` is published and active](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.prakharagarwal-dev%2Flinkedin-mcp-server).
+  The [dedicated publication workflow](https://github.com/prakharagarwal-dev/linkedin-mcp-server/actions/runs/30701800799)
+  passed GitHub OIDC authentication, OCI ownership validation, publication,
+  and exact public API readback against the intended GHCR image.
+- GitHub MCP Registry, PulseMCP, and Glama: await their periodic downstream
+  ingestion of the newly published Official MCP Registry record. Immediate
+  post-publication searches returned no listing; no separate submission error
+  was reported.
 - MCP Central: its documented publisher endpoint currently resolves to an
   Azure Container Apps hostname with no reachable address record, so the
   publisher cannot connect; its public catalog API remains online.
