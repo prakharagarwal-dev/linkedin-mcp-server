@@ -27,6 +27,7 @@ PUBLIC_REPOSITORY_FILES = {
     ".github/pull_request_template.md",
     ".github/workflows/ci.yml",
     ".github/workflows/codeql.yml",
+    ".github/workflows/publish-registries.yml",
     ".github/workflows/publish.yml",
     "assets/icon.png",
     "CHANGELOG.md",
@@ -89,15 +90,14 @@ def test_registry_and_bundle_metadata_share_the_release_identity() -> None:
     assert registry["version"] == project["version"] == bundle["version"]
     assert registry["packages"] == [
         {
-            "registryType": "pypi",
-            "registryBaseUrl": "https://pypi.org",
-            "identifier": "linkedin-mcp-local",
+            "registryType": "oci",
+            "identifier": (f"ghcr.io/prakharagarwal-dev/linkedin-mcp-server:{project['version']}"),
             "version": project["version"],
-            "runtimeHint": "uvx",
             "transport": {"type": "stdio"},
             "packageArguments": [
                 {"type": "positional", "value": "serve"},
-                {"type": "named", "name": "--transport", "value": "stdio"},
+                {"type": "positional", "value": "--transport"},
+                {"type": "positional", "value": "stdio"},
             ],
             "environmentVariables": [
                 {

@@ -25,11 +25,13 @@ repository to match the distribution.
 4. Merge the focused release pull request into `main`.
 5. Publish a GitHub release from an annotated `vX.Y.Z` tag.
 
-Publishing the GitHub release triggers `.github/workflows/publish.yml`. The
-workflow builds and validates the wheel, source distribution, and MCPB bundle;
-attaches them and their checksums to the release; publishes the Python
-distributions to PyPI using Trusted Publishing; and publishes the versioned
-container to GitHub Container Registry.
+Publishing the GitHub release triggers `.github/workflows/publish.yml` and
+`.github/workflows/publish-registries.yml`. The release workflow builds and
+validates the wheel, source distribution, and MCPB bundle; attaches them and
+their checksums to the release; publishes the Python distributions to PyPI
+using Trusted Publishing; and publishes the versioned container to GitHub
+Container Registry. The registry workflow waits for that public OCI package,
+validates `server.json`, and publishes it with GitHub OIDC.
 
 The `pypi` GitHub environment and PyPI Trusted Publisher must remain scoped to:
 
@@ -44,9 +46,14 @@ No long-lived PyPI token belongs in GitHub secrets.
 ## Registry metadata
 
 `server.json` is the canonical Official MCP Registry metadata. Validate it
-with the current official `mcp-publisher validate` command and publish it only
-after the exact PyPI version is available. The hidden `mcp-name` marker in the
-packaged README proves PyPI ownership to the registry.
+with the current official `mcp-publisher validate` command. Its package entry
+must point to the exact versioned GHCR image, whose Dockerfile carries the
+matching `io.modelcontextprotocol.server.name` ownership label. Registry
+publication is intentionally independent from PyPI, so a PyPI account or
+outage cannot block Official Registry, GitHub Registry, or downstream catalog
+discovery. The hidden `mcp-name` marker remains in the packaged README so the
+PyPI distribution can also prove registry ownership in a future metadata
+version.
 
 `packaging/mcpb/manifest.json` is the canonical desktop-bundle manifest. The
 release workflow stages the runtime-only project files and icon before packing

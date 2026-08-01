@@ -1,0 +1,146 @@
+name: Publish registry metadata
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref containing the server.json metadata to publish
+        required: true
+        default: main
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: registry-${{ github.event.release.tag_name || inputs.ref }}
+  cancel-in-progress: false
+
+env:
+  MCP_SERVER_NAME: io.github.prakharagarwal-dev/linkedin-mcp-server
+  METADATA_REF: ${{ github.event.release.tag_name || inputs.ref }}
+  REGISTRY_URL: https://registry.modelcontextprotocol.io
+
+jobs:
+  mcp-registry:
+    name: Publish to the official MCP Registry
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out registry metadata
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.0
+        with:
+          ref: ${{ env.METADATA_REF }}
+
+      - name: Resolve the immutable OCI package
+        id: package
+        run: |
+          VERSION="$(jq --raw-output .version server.json)"
+          IMAGE_COUNT="$(
+            jq '[.packages[]? | select(.registryType == "oci")] | length' \
+              server.json
+          )"
+          test "$IMAGE_COUNT" -eq 1
+          IMAGE="$(
+            jq --raw-output \
+              '.packages[] | select(.registryType == "oci") | .identifier' \
+              server.json
+          )"
+          test "$IMAGE" = "ghcr.io/prakharagarwal-dev/linkedin-mcp-server:$VERSION"
+          echo "version=$VERSION" >>"$GITHUB_OUTPUT"
+          echo "image=$IMAGE" >>"$GITHUB_OUTPUT"
+
+      - name: Wait for the public OCI package
+        env:
+          IMAGE: ${{ steps.package.outputs.image }}
+        run: |
+          for ATTEMPT in {1..30}; do
+            if docker manifest inspect "$IMAGE" >/dev/null 2>&1; then
+              exit 0
+            fi
+            if [ "$ATTEMPT" -eq 30 ]; then
+              echo "OCI package $IMAGE was not visible after 30 attempts." >&2
+              exit 1
+            fi
+            sleep 10
+          done
+
+      - name: Install the verified MCP publisher
+        env:
+          PUBLISHER_VERSION: "1.8.0"
+          PUBLISHER_SHA256: 1370446bbe74d562608e8005a6ccce02d146a661fbd78674e11cc70b9618d6cf
+        run: |
+          ARCHIVE="mcp-publisher_linux_amd64.tar.gz"
+          curl --fail --location --silent --show-error \
+            --output "$ARCHIVE" \
+            "https://github.com/modelcontextprotocol/registry/releases/download/v$PUBLISHER_VERSION/$ARCHIVE"
+          echo "$PUBLISHER_SHA256  $ARCHIVE" | sha256sum --check --strict
+          tar --extract --gzip --file "$ARCHIVE" mcp-publisher
+          ./mcp-publisher --version
+
+      - name: Validate registry metadata
+        run: ./mcp-publisher validate
+
+      - name: Check for an existing registry version
+        id: registry-version
+        env:
+          VERSION: ${{ steps.package.outputs.version }}
+        run: |
+          curl --fail --silent --show-error --get \
+            --data-urlencode "search=$MCP_SERVER_NAME" \
+            "$REGISTRY_URL/v0.1/servers" \
+            --output registry-response.json
+          if jq --exit-status \
+            --arg name "$MCP_SERVER_NAME" \
+            --arg version "$VERSION" \
+            'any(.servers[]?; .server.name == $name and .server.version == $version)' \
+            registry-response.json >/dev/null; then
+            echo "exists=true" >>"$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >>"$GITHUB_OUTPUT"
+          fi
+
+      - name: Authenticate to the MCP Registry
+        if: steps.registry-version.outputs.exists != 'true'
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish registry metadata
+        if: steps.registry-version.outputs.exists != 'true'
+        run: ./mcp-publisher publish
+
+      - name: Verify the published registry version
+        env:
+          IMAGE: ${{ steps.package.outputs.image }}
+          VERSION: ${{ steps.package.outputs.version }}
+        run: |
+          for ATTEMPT in {1..12}; do
+            curl --fail --silent --show-error --get \
+              --data-urlencode "search=$MCP_SERVER_NAME" \
+              "$REGISTRY_URL/v0.1/servers" \
+              --output registry-response.json
+            if jq --exit-status \
+              --arg image "$IMAGE" \
+              --arg name "$MCP_SERVER_NAME" \
+              --arg version "$VERSION" \
+              'any(
+                .servers[]?;
+                .server.name == $name and
+                .server.version == $version and
+                any(
+                  .server.packages[]?;
+                  .registryType == "oci" and .identifier == $image
+                )
+              )' registry-response.json >/dev/null; then
+              exit 0
+            fi
+            if [ "$ATTEMPT" -eq 12 ]; then
+              echo "Registry version $MCP_SERVER_NAME@$VERSION was not visible after 12 attempts." >&2
+              exit 1
+            fi
+            sleep 10
+          done
