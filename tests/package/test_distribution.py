@@ -80,6 +80,18 @@ def test_public_repository_metadata_is_complete() -> None:
     assert "Report a vulnerability privately" in (ROOT / "SECURITY.md").read_text()
 
 
+def test_release_workflow_has_a_non_mutating_pypi_retry_target() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "publish.yml").read_text()
+    all_surfaces_gate = "if: ${{ github.event_name == 'release' || inputs.target == 'all' }}"
+    pypi_job = workflow.split("\n  pypi:\n", 1)[1].split("\n  container:\n", 1)[0]
+
+    assert "      target:\n" in workflow
+    assert "        default: all\n" in workflow
+    assert "          - all\n          - pypi\n" in workflow
+    assert workflow.count(all_surfaces_gate) == 2
+    assert all_surfaces_gate not in pypi_job
+
+
 def test_registry_and_bundle_metadata_share_the_release_identity() -> None:
     registry = json.loads((ROOT / "server.json").read_text())
     bundle = json.loads((ROOT / "packaging" / "mcpb" / "manifest.json").read_text())
