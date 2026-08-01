@@ -25,7 +25,7 @@ schedulers, ranking, memory, and natural-language planning belong in clients
 that call this server. Agents never receive cookies, arbitrary browser control,
 generic navigation, JavaScript execution, or unrestricted network access.
 
-Version `0.14.0` has no database, migration, Docker-service, keyring, or
+Version `0.14.1` has no database, migration, Docker-service, keyring, or
 application-state dependency. It uses one local Playwright Chromium profile to
 preserve the LinkedIn login and keeps capability execution state only for the
 lifetime of one server process.
@@ -211,7 +211,7 @@ The project builds as a normal wheel:
 
 ```bash
 uv build
-uvx --from ./dist/linkedin_mcp_local-0.14.0-py3-none-any.whl \
+uvx --from ./dist/linkedin_mcp_local-0.14.1-py3-none-any.whl \
   linkedin-mcp doctor
 ```
 
@@ -284,7 +284,7 @@ Use the published package from any repository:
 command = "uvx"
 args = [
   "--from",
-  "linkedin-mcp-local==0.14.0",
+  "linkedin-mcp-local==0.14.1",
   "linkedin-mcp",
   "serve",
   "--transport",
@@ -395,7 +395,7 @@ variable and read-only defaults.
 The optional image has no companion database:
 
 ```bash
-docker build -t linkedin-mcp-server:0.14.0 .
+docker build -t linkedin-mcp-server:0.14.1 .
 ```
 
 It runs as UID/GID `10001`, includes Chromium, defaults to stdio, and stores the

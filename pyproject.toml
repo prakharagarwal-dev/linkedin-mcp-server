@@ -1,6 +1,6 @@
 [project]
 name = "linkedin-mcp-local"
-version = "0.14.0"
+version = "0.14.1"
 description = "A typed, policy-enforced MCP server for authorized LinkedIn capabilities."
 readme = "README.md"
 requires-python = ">=3.12,<3.14"

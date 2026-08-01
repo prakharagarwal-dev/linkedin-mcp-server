@@ -17,6 +17,7 @@ from mcp.shared.message import SessionMessage
 from mcp.types import TextContent, TextResourceContents
 from pydantic import AnyUrl, HttpUrl, TypeAdapter
 
+from linkedin_mcp import __version__
 from linkedin_mcp.application import (
     AccountProcessLock,
     CapabilityExecutor,
@@ -1006,6 +1007,7 @@ async def test_mcp_client_discovers_calls_and_reads_evidence() -> None:
         async with ClientSession(server_to_client_receive, client_to_server_send) as session:
             initialized = await session.initialize()
             assert initialized.serverInfo.name == "linkedin-mcp-server"
+            assert initialized.serverInfo.version == __version__
 
             tools = await session.list_tools()
             names = {tool.name for tool in tools.tools}
@@ -2210,6 +2212,7 @@ async def test_stdio_transport_runs_as_a_real_child_process() -> None:
         result = await session.call_tool("linkedin.server.status", {})
 
     assert initialized.serverInfo.name == "linkedin-mcp-server"
+    assert initialized.serverInfo.version == __version__
     assert result.isError is False
     assert result.structuredContent is not None
     assert result.structuredContent["transport"] == "stdio"
@@ -2252,6 +2255,7 @@ async def test_streamable_http_transport_runs_on_loopback(unused_tcp_port: int) 
             server.should_exit = True
 
         assert initialized.serverInfo.name == "linkedin-mcp-server"
+        assert initialized.serverInfo.version == __version__
         assert result.isError is False
         assert result.structuredContent is not None
         assert result.structuredContent["transport"] == "stdio"
