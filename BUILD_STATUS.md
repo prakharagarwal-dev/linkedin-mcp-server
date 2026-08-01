@@ -23,8 +23,10 @@ Updated: 2026-08-01
 - GHCR: the first release run exposed a missing Buildx setup step for
   provenance and SBOM output. The workflow fix and an explicit existing-tag
   retry path are prepared and validated.
-- Official and downstream MCP registries: await the PyPI publication required
-  by `server.json`.
+- Official MCP Registry: validated metadata is ready, and the release workflow
+  now uses secretless GitHub OIDC publication after PyPI succeeds.
+- Downstream MCP registries: await the canonical PyPI and Official Registry
+  publications required for package verification and ingestion.
 
 No LinkedIn credentials, cookies, browser profiles, or reusable test sessions
 are shared with publication services.
