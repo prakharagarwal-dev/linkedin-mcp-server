@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM python:3.12-slim-bookworm
+FROM mcr.microsoft.com/playwright/python:v1.61.0-noble@sha256:a9731514f24121d1dcd25d58d0a38146646d290a5998fd80d3e533e7b5e21c69
 
 ARG UV_VERSION=0.11.12
 ARG VERSION=0.14.0
@@ -34,7 +34,6 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 COPY src ./src
 RUN uv sync --frozen --no-dev \
-    && playwright install --with-deps chromium \
     && chmod -R a+rX /ms-playwright
 
 RUN groupadd --system --gid 10001 linkedin-mcp \
