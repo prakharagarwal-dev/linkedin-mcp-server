@@ -173,6 +173,8 @@ def create_mcp_server(container: AppContainer) -> FastMCP[None]:
         log_level=container.settings.log_level,
         lifespan=lifespan,
     )
+    # FastMCP does not currently forward a product version to its low-level server.
+    mcp._mcp_server.version = __version__  # pyright: ignore[reportPrivateUsage]
 
     local_read = ToolAnnotations(
         readOnlyHint=True,

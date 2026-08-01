@@ -6,6 +6,15 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-08-01
+
+### Fixed
+
+- Advertise the LinkedIn MCP server package version during MCP initialization
+  instead of inheriting the Python SDK version.
+- Publish GHCR images for both `linux/amd64` and `linux/arm64`.
+- Produce byte-reproducible MCPB release bundles from tracked source files.
+
 ## [0.14.0] - 2026-07-31
 
 ### Added
@@ -31,5 +40,6 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   executable, Python import package, repository, and MCP server identity are
   unchanged.
 
-[Unreleased]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/compare/v0.14.1...HEAD
+[0.14.1]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases/tag/v0.14.1
 [0.14.0]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases/tag/v0.14.0
