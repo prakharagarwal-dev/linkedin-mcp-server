@@ -392,9 +392,11 @@ variable and read-only defaults.
 
 ## Container image
 
-The optional image has no companion database:
+Pull the signed multi-architecture image, or build it locally. It has no
+companion database:
 
 ```bash
+docker pull ghcr.io/prakharagarwal-dev/linkedin-mcp-server:0.14.1
 docker build -t linkedin-mcp-server:0.14.1 .
 ```
 
