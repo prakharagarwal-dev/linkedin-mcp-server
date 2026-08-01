@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import email
+import json
 import subprocess
 import sys
 import tomllib
@@ -26,12 +27,17 @@ PUBLIC_REPOSITORY_FILES = {
     ".github/pull_request_template.md",
     ".github/workflows/ci.yml",
     ".github/workflows/codeql.yml",
+    ".github/workflows/publish.yml",
+    "assets/icon.png",
     "CHANGELOG.md",
     "CODE_OF_CONDUCT.md",
     "CONTRIBUTING.md",
     "LICENSE",
     "README.md",
     "SECURITY.md",
+    "docs/PUBLISHING.md",
+    "packaging/mcpb/manifest.json",
+    "server.json",
 }
 
 
@@ -44,7 +50,7 @@ def test_build_configuration_packages_only_the_standalone_server() -> None:
         for requirement in project["dependencies"]
     }
 
-    assert project["name"] == "linkedin-mcp-server"
+    assert project["name"] == "linkedin-mcp-local"
     assert project["license"] == "Apache-2.0"
     assert project["license-files"] == ["LICENSE"]
     assert project["authors"] == [
@@ -71,6 +77,46 @@ def test_public_repository_metadata_is_complete() -> None:
     assert missing == []
     assert "Apache License" in (ROOT / "LICENSE").read_text()
     assert "Report a vulnerability privately" in (ROOT / "SECURITY.md").read_text()
+
+
+def test_registry_and_bundle_metadata_share_the_release_identity() -> None:
+    registry = json.loads((ROOT / "server.json").read_text())
+    bundle = json.loads((ROOT / "packaging" / "mcpb" / "manifest.json").read_text())
+    configuration = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    project = configuration["project"]
+
+    assert registry["name"] == "io.github.prakharagarwal-dev/linkedin-mcp-server"
+    assert registry["version"] == project["version"] == bundle["version"]
+    assert registry["packages"] == [
+        {
+            "registryType": "pypi",
+            "registryBaseUrl": "https://pypi.org",
+            "identifier": "linkedin-mcp-local",
+            "version": project["version"],
+            "runtimeHint": "uvx",
+            "transport": {"type": "stdio"},
+            "packageArguments": [
+                {"type": "positional", "value": "serve"},
+                {"type": "named", "name": "--transport", "value": "stdio"},
+            ],
+            "environmentVariables": [
+                {
+                    "name": "LINKEDIN_MCP_LIVE_ENABLED",
+                    "description": "Enable authorized access to visible LinkedIn web UI surfaces.",
+                    "format": "boolean",
+                    "default": "false",
+                }
+            ],
+        }
+    ]
+    assert bundle["manifest_version"] == "0.4"
+    assert bundle["name"] == "linkedin-mcp-server"
+    assert bundle["server"]["type"] == "uv"
+    assert bundle["privacy_policies"] == ["https://www.linkedin.com/legal/privacy-policy"]
+    assert (
+        "<!-- mcp-name: io.github.prakharagarwal-dev/linkedin-mcp-server -->"
+        in (ROOT / "README.md").read_text()
+    )
 
 
 def test_synthetic_fixtures_contain_no_session_or_trace_artifacts() -> None:

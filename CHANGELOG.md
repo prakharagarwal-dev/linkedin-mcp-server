@@ -21,6 +21,15 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Streamable HTTP transports, and an optional container image.
 - Fully offline `mock_verified` simulator, semantic fixtures, protocol tests,
   workflow tests, package tests, and network isolation.
+- Official MCP Registry metadata, an MCPB desktop bundle manifest, a project
+  icon, and automated PyPI, GitHub Release, and GHCR publication.
+
+### Changed
+
+- The PyPI distribution is named `linkedin-mcp-local` because the unrelated
+  `linkedin-mcp-server` name is already registered. The `linkedin-mcp`
+  executable, Python import package, repository, and MCP server identity are
+  unchanged.
 
 [Unreleased]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/compare/v0.14.0...HEAD
 [0.14.0]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases/tag/v0.14.0

@@ -307,7 +307,7 @@ wheels = [
 ]
 
 [[package]]
-name = "linkedin-mcp-server"
+name = "linkedin-mcp-local"
 version = "0.14.0"
 source = { editable = "." }
 dependencies = [
