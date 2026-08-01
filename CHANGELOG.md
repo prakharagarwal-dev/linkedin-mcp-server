@@ -22,5 +22,5 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Fully offline `mock_verified` simulator, semantic fixtures, protocol tests,
   workflow tests, package tests, and network isolation.
 
-[Unreleased]: https://github.com/Prakhar-Agarwal-byte/linkedin-mcp-server/compare/v0.14.0...HEAD
-[0.14.0]: https://github.com/Prakhar-Agarwal-byte/linkedin-mcp-server/releases/tag/v0.14.0
+[Unreleased]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases/tag/v0.14.0

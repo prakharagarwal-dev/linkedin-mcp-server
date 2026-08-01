@@ -32,10 +32,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Prakhar-Agarwal-byte/linkedin-mcp-server"
-Repository = "https://github.com/Prakhar-Agarwal-byte/linkedin-mcp-server"
-Issues = "https://github.com/Prakhar-Agarwal-byte/linkedin-mcp-server/issues"
-Changelog = "https://github.com/Prakhar-Agarwal-byte/linkedin-mcp-server/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/prakharagarwal-dev/linkedin-mcp-server"
+Repository = "https://github.com/prakharagarwal-dev/linkedin-mcp-server"
+Issues = "https://github.com/prakharagarwal-dev/linkedin-mcp-server/issues"
+Changelog = "https://github.com/prakharagarwal-dev/linkedin-mcp-server/blob/main/CHANGELOG.md"
 
 [project.scripts]
 linkedin-mcp = "linkedin_mcp.__main__:main"

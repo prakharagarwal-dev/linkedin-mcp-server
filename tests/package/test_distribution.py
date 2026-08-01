@@ -51,7 +51,7 @@ def test_build_configuration_packages_only_the_standalone_server() -> None:
         {"name": "Prakhar Agarwal", "email": "prakharagarwal3031@gmail.com"}
     ]
     assert project["urls"]["Repository"] == (
-        "https://github.com/Prakhar-Agarwal-byte/linkedin-mcp-server"
+        "https://github.com/prakharagarwal-dev/linkedin-mcp-server"
     )
     assert wheel["packages"] == ["src/linkedin_mcp"]
     assert dependencies.isdisjoint(FORBIDDEN_RUNTIME_DEPENDENCIES)
@@ -147,9 +147,7 @@ def test_wheel_excludes_tests_profiles_secrets_and_other_repositories(tmp_path: 
         assert metadata["License-Expression"] == "Apache-2.0"
         assert metadata["Author-email"] == ("Prakhar Agarwal <prakharagarwal3031@gmail.com>")
         assert any(
-            value.endswith(
-                "Repository, https://github.com/Prakhar-Agarwal-byte/linkedin-mcp-server"
-            )
+            value.endswith("Repository, https://github.com/prakharagarwal-dev/linkedin-mcp-server")
             for value in metadata.get_all("Project-URL", [])
         )
         assert not any(

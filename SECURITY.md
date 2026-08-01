@@ -12,7 +12,7 @@ Security fixes are applied to the latest release and `main`.
 ## Report a vulnerability privately
 
 Do not open a public issue for a vulnerability. Use
-[GitHub's private vulnerability reporting](https://github.com/Prakhar-Agarwal-byte/linkedin-mcp-server/security/advisories/new).
+[GitHub's private vulnerability reporting](https://github.com/prakharagarwal-dev/linkedin-mcp-server/security/advisories/new).
 If that channel is unavailable, email `prakharagarwal3031@gmail.com` with the
 subject `linkedin-mcp-server security report`.
 

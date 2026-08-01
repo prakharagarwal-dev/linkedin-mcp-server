@@ -1,7 +1,7 @@
 # LinkedIn MCP Server
 
-[![CI](https://github.com/Prakhar-Agarwal-byte/linkedin-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/Prakhar-Agarwal-byte/linkedin-mcp-server/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/Prakhar-Agarwal-byte/linkedin-mcp-server/actions/workflows/codeql.yml/badge.svg)](https://github.com/Prakhar-Agarwal-byte/linkedin-mcp-server/actions/workflows/codeql.yml)
+[![CI](https://github.com/prakharagarwal-dev/linkedin-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/prakharagarwal-dev/linkedin-mcp-server/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/prakharagarwal-dev/linkedin-mcp-server/actions/workflows/codeql.yml/badge.svg)](https://github.com/prakharagarwal-dev/linkedin-mcp-server/actions/workflows/codeql.yml)
 [![Python 3.12–3.13](https://img.shields.io/badge/Python-3.12%E2%80%933.13-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 
@@ -184,7 +184,7 @@ Prerequisites are Python 3.12 or 3.13 and
 Clone and validate a source checkout:
 
 ```bash
-git clone https://github.com/Prakhar-Agarwal-byte/linkedin-mcp-server.git
+git clone https://github.com/prakharagarwal-dev/linkedin-mcp-server.git
 cd linkedin-mcp-server
 uv sync --frozen --all-groups
 uv run linkedin-mcp doctor

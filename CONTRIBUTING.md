@@ -17,7 +17,7 @@ LinkedIn account.
 Install Python 3.12 or 3.13 and [`uv`](https://docs.astral.sh/uv/), then run:
 
 ```bash
-git clone https://github.com/Prakhar-Agarwal-byte/linkedin-mcp-server.git
+git clone https://github.com/prakharagarwal-dev/linkedin-mcp-server.git
 cd linkedin-mcp-server
 uv sync --frozen --all-groups
 uv run playwright install chromium
