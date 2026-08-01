@@ -92,7 +92,6 @@ def test_registry_and_bundle_metadata_share_the_release_identity() -> None:
         {
             "registryType": "oci",
             "identifier": (f"ghcr.io/prakharagarwal-dev/linkedin-mcp-server:{project['version']}"),
-            "version": project["version"],
             "transport": {"type": "stdio"},
             "packageArguments": [
                 {"type": "positional", "value": "serve"},
