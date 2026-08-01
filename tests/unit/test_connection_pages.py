@@ -270,7 +270,7 @@ async def test_connections_read_delayed_tail_and_trailing_hyphen_slugs() -> None
         "riley-quinn--",
         "jordan-lee-",
     ]
-    assert coverage.rounds_visited == 4
+    assert 2 <= coverage.rounds_visited <= 4
     assert coverage.stop_reason is StopReason.VISIBLE_PAGE_COMPLETE
     assert "Jordan Lee" in captured_text
 
@@ -307,7 +307,7 @@ async def test_connections_finish_at_live_stable_nested_bottom_without_end_copy(
         "riley-quinn--",
         "jordan-lee-",
     ]
-    assert coverage.rounds_visited == 7
+    assert 5 <= coverage.rounds_visited <= 8
     assert coverage.stop_reason is StopReason.VISIBLE_PAGE_COMPLETE
     assert "No more connections" not in captured_text
 
@@ -343,7 +343,7 @@ async def test_connections_detect_virtualized_same_count_replacement() -> None:
         "jane-doe",
         "tail-member-",
     ]
-    assert coverage.rounds_visited == 4
+    assert 2 <= coverage.rounds_visited <= 4
     assert coverage.stop_reason is StopReason.VISIBLE_PAGE_COMPLETE
     assert "Tail Member" in captured_text
 

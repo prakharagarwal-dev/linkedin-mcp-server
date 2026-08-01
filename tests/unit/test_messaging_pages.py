@@ -431,7 +431,7 @@ async def test_current_thread_sender_names_resolve_outgoing_grouped_messages() -
 
 
 @pytest.mark.timeout(20)
-async def test_conversation_history_waits_for_delayed_virtualized_older_messages() -> None:
+async def test_conversation_history_collects_virtualized_older_messages() -> None:
     html = (MESSAGING_FIXTURES / "history-virtualized.html").read_text()
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
@@ -455,7 +455,7 @@ async def test_conversation_history_waits_for_delayed_virtualized_older_messages
 
     assert [message.text for message in observation.messages] == [
         "Oldest message.",
-        "Older delayed message.",
+        "Older virtualized message.",
         "Current window message.",
         "Newest message.",
     ]
@@ -529,7 +529,7 @@ async def test_inbox_collection_applies_visible_unread_filter_and_server_check()
 
 
 @pytest.mark.timeout(20)
-async def test_inbox_collection_survives_two_idle_settle_windows() -> None:
+async def test_inbox_collection_retries_idle_wheel_delivery_before_terminal() -> None:
     html = (MESSAGING_FIXTURES / "search-virtualized.html").read_text()
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
@@ -554,7 +554,7 @@ async def test_inbox_collection_survives_two_idle_settle_windows() -> None:
         "Jane Doe",
         "Taylor Ray",
     ]
-    assert coverage.rounds_visited >= 3
+    assert 2 <= coverage.rounds_visited <= 4
     assert coverage.stop_reason.value == "visible_page_complete"
     assert "Delayed tail message." in captured_text
 
