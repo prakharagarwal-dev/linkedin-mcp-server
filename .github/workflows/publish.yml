@@ -63,10 +63,40 @@ jobs:
           mkdir -p .release/mcpb
           cp packaging/mcpb/manifest.json .release/mcpb/manifest.json
           cp pyproject.toml uv.lock README.md LICENSE .release/mcpb/
-          cp -R src .release/mcpb/src
+          git archive HEAD src | tar -x -C .release/mcpb
           cp assets/icon.png .release/mcpb/icon.png
           npx --yes @anthropic-ai/mcpb@2.1.2 validate .release/mcpb/manifest.json
-          npx --yes @anthropic-ai/mcpb@2.1.2 pack .release/mcpb \
+          python - <<'PY'
+          import os
+          import subprocess
+          import time
+          from pathlib import Path
+          from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
+
+          root = Path(".release/mcpb")
+          version = os.environ["RELEASE_TAG"].removeprefix("v")
+          output = Path("dist") / f"linkedin-mcp-server-{version}.mcpb"
+          epoch = int(
+              subprocess.check_output(
+                  ["git", "show", "-s", "--format=%ct", "HEAD"],
+                  text=True,
+              ).strip()
+          )
+          timestamp = time.gmtime(epoch)[:6]
+
+          with ZipFile(output, "w") as bundle:
+              for path in sorted(item for item in root.rglob("*") if item.is_file()):
+                  info = ZipInfo(path.relative_to(root).as_posix(), date_time=timestamp)
+                  info.create_system = 3
+                  info.external_attr = 0o100644 << 16
+                  bundle.writestr(
+                      info,
+                      path.read_bytes(),
+                      compress_type=ZIP_DEFLATED,
+                      compresslevel=9,
+                  )
+          PY
+          npx --yes @anthropic-ai/mcpb@2.1.2 info \
             "dist/linkedin-mcp-server-${RELEASE_TAG#v}.mcpb"
 
       - name: Attest release artifacts
