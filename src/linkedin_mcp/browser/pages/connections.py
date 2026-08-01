@@ -18,7 +18,8 @@ from pydantic import HttpUrl
 from linkedin_mcp.browser.convergence import (
     CollectionSettleOutcome,
     CollectionSettleResult,
-    wait_for_collection_change,
+    dispatch_bubbling_wheel,
+    wait_for_collection_interaction,
 )
 from linkedin_mcp.browser.manager import BrowserManager
 from linkedin_mcp.domain.models import (
@@ -523,15 +524,23 @@ async def _settle_scroll(
 ) -> CollectionSettleResult:
     baseline = await read_signature(page)
     main = page.locator("main").first
-    await main.hover()
-    await page.mouse.wheel(0, 3_000)
+    delivery_attempt = 0
+
+    async def scroll() -> None:
+        nonlocal delivery_attempt
+        delivery_attempt += 1
+        await main.hover()
+        await page.mouse.wheel(0, 3_000)
+        if delivery_attempt > 1:
+            await dispatch_bubbling_wheel(main, delta_y=3_000)
 
     async def explicit_end() -> bool:
         return _member_list_has_explicit_end(await _visible_text(page))
 
-    return await wait_for_collection_change(
+    return await wait_for_collection_interaction(
         page,
         baseline=baseline,
+        interact=scroll,
         read_signature=lambda: read_signature(page),
         read_explicit_end=explicit_end if allow_explicit_end else None,
         attempts=_SCROLL_PROGRESS_POLL_ATTEMPTS,

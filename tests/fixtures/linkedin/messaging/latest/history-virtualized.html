@@ -39,31 +39,33 @@
     <script>
       let loaded = false;
       const scroller = document.querySelector(".msg-s-message-list");
-      scroller.addEventListener("wheel", event => {
-        if (event.deltaY >= 0 || loaded) return;
+      const loadOlderMessages = () => {
+        if (loaded) return;
         loaded = true;
-        setTimeout(() => {
-          document.querySelector("#messages").insertAdjacentHTML("afterbegin", `
-            <li class="msg-s-message-list__event">
-              <div class="msg-s-event-listitem align-self-flex-end">
-                <span class="msg-s-message-group__name">You</span>
-                <time>10:00 AM</time>
-                <p class="msg-s-event-listitem__body">Oldest message.</p>
-              </div>
-            </li>
-            <li class="msg-s-message-list__event">
-              <div class="msg-s-event-listitem msg-s-event-listitem--other">
-                <span class="msg-s-message-group__name">Jane Doe</span>
-                <time>10:01 AM</time>
-                <p class="msg-s-event-listitem__body">Older delayed message.</p>
-              </div>
-            </li>`);
-          document.querySelector("#spacer").insertAdjacentHTML(
-            "beforebegin",
-            "<p>Beginning of conversation</p>"
-          );
-        }, 650);
+        document.querySelector("#messages").insertAdjacentHTML("afterbegin", `
+          <li class="msg-s-message-list__event">
+            <div class="msg-s-event-listitem align-self-flex-end">
+              <span class="msg-s-message-group__name">You</span>
+              <time>10:00 AM</time>
+              <p class="msg-s-event-listitem__body">Oldest message.</p>
+            </div>
+          </li>
+          <li class="msg-s-message-list__event">
+            <div class="msg-s-event-listitem msg-s-event-listitem--other">
+              <span class="msg-s-message-group__name">Jane Doe</span>
+              <time>10:01 AM</time>
+              <p class="msg-s-event-listitem__body">Older virtualized message.</p>
+            </div>
+          </li>`);
+        document.querySelector("#spacer").insertAdjacentHTML(
+          "beforebegin",
+          "<p>Beginning of conversation</p>"
+        );
+      };
+      scroller.addEventListener("wheel", event => {
+        if (event.deltaY < 0) loadOlderMessages();
       });
+      scroller.addEventListener("scroll", loadOlderMessages);
     </script>
   </body>
 </html>

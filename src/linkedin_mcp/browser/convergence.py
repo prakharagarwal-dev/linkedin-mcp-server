@@ -5,13 +5,21 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import cast
+from typing import Protocol, cast
 
 from playwright.async_api import Locator, Page
 
 CollectionSignature = tuple[str, ...]
 SignatureReader = Callable[[], Awaitable[CollectionSignature]]
 EndReader = Callable[[], Awaitable[bool]]
+
+
+class _EventDispatcher(Protocol):
+    def dispatch_event(
+        self,
+        event_type: str,
+        event_init: dict[str, object],
+    ) -> Awaitable[None]: ...
 
 
 class CollectionSettleOutcome(StrEnum):
@@ -26,6 +34,16 @@ class CollectionSettleOutcome(StrEnum):
 class CollectionSettleResult:
     outcome: CollectionSettleOutcome
     signature: CollectionSignature
+
+
+async def dispatch_bubbling_wheel(locator: Locator, *, delta_y: int) -> None:
+    """Dispatch one bounded locator-scoped wheel fallback with explicit typing."""
+
+    dispatcher = cast(_EventDispatcher, locator)
+    await dispatcher.dispatch_event(
+        "wheel",
+        {"bubbles": True, "cancelable": True, "deltaY": delta_y},
+    )
 
 
 async def wait_for_collection_change(
@@ -62,6 +80,50 @@ async def wait_for_collection_change(
         outcome=CollectionSettleOutcome.IDLE,
         signature=signature,
     )
+
+
+async def wait_for_collection_interaction(
+    page: Page,
+    *,
+    baseline: CollectionSignature,
+    interact: Callable[[], Awaitable[None]],
+    read_signature: SignatureReader,
+    read_explicit_end: EndReader | None = None,
+    interaction_attempts: int = 2,
+    attempts: int = 8,
+    delay_ms: int = 250,
+) -> CollectionSettleResult:
+    """Retry an idle UI interaction without expanding its total polling budget."""
+
+    if interaction_attempts < 1:
+        raise ValueError("Collection interaction settling requires at least one interaction.")
+    if attempts < 1:
+        raise ValueError("Collection interaction settling requires at least one poll attempt.")
+    if delay_ms < 1:
+        raise ValueError("Collection interaction settling requires a positive poll delay.")
+
+    bounded_interactions = min(interaction_attempts, attempts)
+    remaining_polls = attempts
+    result = CollectionSettleResult(
+        outcome=CollectionSettleOutcome.IDLE,
+        signature=baseline,
+    )
+    for interaction_index in range(bounded_interactions):
+        remaining_interactions = bounded_interactions - interaction_index
+        poll_attempts = remaining_polls // remaining_interactions
+        remaining_polls -= poll_attempts
+        await interact()
+        result = await wait_for_collection_change(
+            page,
+            baseline=baseline,
+            read_signature=read_signature,
+            read_explicit_end=read_explicit_end,
+            attempts=poll_attempts,
+            delay_ms=delay_ms,
+        )
+        if result.outcome is not CollectionSettleOutcome.IDLE:
+            return result
+    return result
 
 
 async def wait_for_collection_initial_state(

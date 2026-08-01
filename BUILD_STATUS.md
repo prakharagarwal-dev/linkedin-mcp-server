@@ -19,6 +19,11 @@ Updated: 2026-08-01
 - MCP initialization tests now verify the package version over in-memory,
   stdio, and loopback Streamable HTTP transports. MCPB builds use only tracked
   files and are byte-reproducible across independent builds.
+- Virtualized connection, inbox, and message-history collection now retries one
+  idle wheel delivery within the existing bounded polling budget. The three
+  formerly flaky browser cases passed 90 consecutive stress iterations, and
+  the complete 437-test offline suite passes locally with Ruff and strict
+  Pyright.
 
 ## Publication status
 

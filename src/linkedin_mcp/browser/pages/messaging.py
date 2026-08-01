@@ -20,7 +20,8 @@ from linkedin_mcp.assets import LocalAssetStore
 from linkedin_mcp.browser.convergence import (
     CollectionSettleOutcome,
     CollectionSettleResult,
-    wait_for_collection_change,
+    dispatch_bubbling_wheel,
+    wait_for_collection_interaction,
 )
 from linkedin_mcp.browser.manager import BrowserManager
 from linkedin_mcp.domain.models import (
@@ -227,26 +228,32 @@ async def _settle_conversation_scroll(page: Page) -> CollectionSettleResult:
             last_visible = candidate
     if last_visible is not None:
         await last_visible.scroll_into_view_if_needed()
+    main = page.locator("main").first
+    wheel_target = main
     containers = page.locator('main [class*="msg-conversations-container__conversations-list"]')
     for index in range(await containers.count()):
         container = containers.nth(index)
         if not await container.is_visible():
             continue
-        box = await container.bounding_box()
-        if box is not None:
-            await page.mouse.move(
-                box["x"] + box["width"] / 2,
-                box["y"] + box["height"] / 2,
-            )
-            break
-    await page.mouse.wheel(0, 1_500)
+        wheel_target = container
+        break
+    delivery_attempt = 0
+
+    async def scroll() -> None:
+        nonlocal delivery_attempt
+        delivery_attempt += 1
+        await wheel_target.hover()
+        await page.mouse.wheel(0, 1_500)
+        if delivery_attempt > 1:
+            await dispatch_bubbling_wheel(wheel_target, delta_y=1_500)
 
     async def explicit_end() -> bool:
         return _conversation_search_has_explicit_end(await _visible_text(page.locator("main")))
 
-    return await wait_for_collection_change(
+    return await wait_for_collection_interaction(
         page,
         baseline=baseline,
+        interact=scroll,
         read_signature=lambda: _visible_conversation_signature(page),
         read_explicit_end=explicit_end,
         attempts=_SCROLL_PROGRESS_POLL_ATTEMPTS,
@@ -564,18 +571,38 @@ async def _settle_history_scroll(
     box = await scroller.bounding_box()
     if box is None:
         raise ParserDriftError("LinkedIn's conversation-history scroller is not visible.")
-    await page.mouse.move(
-        box["x"] + box["width"] / 2,
-        box["y"] + min(20, box["height"] / 2),
-    )
-    await page.mouse.wheel(0, -1_800)
+    delivery_attempt = 0
+
+    async def scroll() -> None:
+        nonlocal delivery_attempt
+        delivery_attempt += 1
+        await scroller.hover(
+            position={
+                "x": box["width"] / 2,
+                "y": min(20, box["height"] / 2),
+            }
+        )
+        await page.mouse.wheel(0, -1_800)
+        await scroller.evaluate(
+            """
+            element => {
+              const boundary = Math.max(0, element.scrollHeight - element.clientHeight);
+              element.scrollTop = getComputedStyle(element).flexDirection === "column-reverse"
+                ? -boundary
+                : 0;
+            }
+            """
+        )
+        if delivery_attempt > 1:
+            await dispatch_bubbling_wheel(scroller, delta_y=-1_800)
 
     async def explicit_start() -> bool:
         return _history_has_explicit_start(await _visible_text(root))
 
-    return await wait_for_collection_change(
+    return await wait_for_collection_interaction(
         page,
         baseline=baseline,
+        interact=scroll,
         read_signature=lambda: _history_signature(root),
         read_explicit_end=explicit_start,
         attempts=_SCROLL_PROGRESS_POLL_ATTEMPTS,
