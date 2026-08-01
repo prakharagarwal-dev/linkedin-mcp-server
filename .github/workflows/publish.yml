@@ -9,6 +9,14 @@ on:
         description: Existing release tag to publish
         required: true
         type: string
+      target:
+        description: Release surfaces to publish
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - pypi
 
 permissions:
   contents: read
@@ -122,6 +130,7 @@ jobs:
 
   github-release:
     name: Attach verified release artifacts
+    if: ${{ github.event_name == 'release' || inputs.target == 'all' }}
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -171,6 +180,7 @@ jobs:
 
   container:
     name: Publish GHCR image
+    if: ${{ github.event_name == 'release' || inputs.target == 'all' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:

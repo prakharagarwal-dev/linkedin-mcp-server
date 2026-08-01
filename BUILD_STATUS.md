@@ -50,9 +50,13 @@ Updated: 2026-08-01
   [canonical public listing](https://mcprepository.com/prakharagarwal-dev/linkedin-mcp-server)
   is live and links back to the intended GitHub repository.
 - PyPI: release publication reached GitHub OIDC, but PyPI returned
-  `invalid-publisher`. It awaits creation of the `linkedin-mcp-local` pending
-  Trusted Publisher for owner `prakharagarwal-dev`, repository
-  `linkedin-mcp-server`, workflow `publish.yml`, environment `pypi`.
+  `invalid-publisher`. A second OIDC attempt returned the same exact publisher
+  claims, confirming that the pending publisher is still absent. It awaits
+  creation of the `linkedin-mcp-local` pending Trusted Publisher for owner
+  `prakharagarwal-dev`, repository `linkedin-mcp-server`, workflow
+  `publish.yml`, environment `pypi`. The release workflow now has a `pypi`
+  dispatch target that rebuilds and publishes only the Python distributions,
+  without touching GHCR or the GitHub Release.
 - Official MCP Registry: [`v0.14.1` is published and active](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.prakharagarwal-dev%2Flinkedin-mcp-server).
   The [dedicated publication workflow](https://github.com/prakharagarwal-dev/linkedin-mcp-server/actions/runs/30701800799)
   passed GitHub OIDC authentication, OCI ownership validation, publication,
