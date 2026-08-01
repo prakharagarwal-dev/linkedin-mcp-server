@@ -1,0 +1,43 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.prakharagarwal-dev/linkedin-mcp-server",
+  "title": "LinkedIn MCP Server",
+  "description": "Typed, policy-enforced local MCP capabilities over LinkedIn's visible web UI.",
+  "repository": {
+    "url": "https://github.com/prakharagarwal-dev/linkedin-mcp-server",
+    "source": "github"
+  },
+  "websiteUrl": "https://github.com/prakharagarwal-dev/linkedin-mcp-server",
+  "version": "0.14.0",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org",
+      "identifier": "linkedin-mcp-local",
+      "version": "0.14.0",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "serve"
+        },
+        {
+          "type": "named",
+          "name": "--transport",
+          "value": "stdio"
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "LINKEDIN_MCP_LIVE_ENABLED",
+          "description": "Enable authorized access to visible LinkedIn web UI surfaces.",
+          "format": "boolean",
+          "default": "false"
+        }
+      ]
+    }
+  ]
+}

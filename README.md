@@ -1,7 +1,10 @@
 # LinkedIn MCP Server
 
+<!-- mcp-name: io.github.prakharagarwal-dev/linkedin-mcp-server -->
+
 [![CI](https://github.com/prakharagarwal-dev/linkedin-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/prakharagarwal-dev/linkedin-mcp-server/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/prakharagarwal-dev/linkedin-mcp-server/actions/workflows/codeql.yml/badge.svg)](https://github.com/prakharagarwal-dev/linkedin-mcp-server/actions/workflows/codeql.yml)
+[![PyPI](https://img.shields.io/pypi/v/linkedin-mcp-local.svg)](https://pypi.org/project/linkedin-mcp-local/)
 [![Python 3.12–3.13](https://img.shields.io/badge/Python-3.12%E2%80%933.13-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 
@@ -181,6 +184,13 @@ postconditions.
 Prerequisites are Python 3.12 or 3.13 and
 [`uv`](https://docs.astral.sh/uv/). Docker is not required.
 
+Run the published PyPI package without a permanent installation:
+
+```bash
+uvx --from linkedin-mcp-local linkedin-mcp doctor
+uvx --from linkedin-mcp-local linkedin-mcp setup
+```
+
 Clone and validate a source checkout:
 
 ```bash
@@ -201,7 +211,7 @@ The project builds as a normal wheel:
 
 ```bash
 uv build
-uvx --from ./dist/linkedin_mcp_server-0.14.0-py3-none-any.whl \
+uvx --from ./dist/linkedin_mcp_local-0.14.0-py3-none-any.whl \
   linkedin-mcp doctor
 ```
 
@@ -267,8 +277,26 @@ multiple local agents need simultaneous access.
 
 ### Codex configuration
 
-This source-checkout configuration does not depend on an activated virtual
-environment:
+Use the published package from any repository:
+
+```toml
+[mcp_servers.linkedin]
+command = "uvx"
+args = [
+  "--from",
+  "linkedin-mcp-local==0.14.0",
+  "linkedin-mcp",
+  "serve",
+  "--transport",
+  "stdio",
+]
+env = { LINKEDIN_MCP_LIVE_ENABLED = "true" }
+startup_timeout_sec = 30
+tool_timeout_sec = 900
+```
+
+For contributors, this source-checkout configuration does not depend on an
+activated virtual environment:
 
 ```toml
 [mcp_servers.linkedin]
@@ -415,6 +443,7 @@ See [Architecture](docs/ARCHITECTURE.md),
 [security design](docs/SECURITY.md),
 [testing and mock verification](docs/TESTING.md),
 [visible-feature matrix](docs/CAPABILITY_MATRIX.md),
+[publishing and package identifiers](docs/PUBLISHING.md),
 [contributing guide](CONTRIBUTING.md),
 [security policy](SECURITY.md), and
 [changelog](CHANGELOG.md).

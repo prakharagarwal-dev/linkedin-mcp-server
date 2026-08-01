@@ -1,0 +1,89 @@
+{
+  "manifest_version": "0.4",
+  "name": "linkedin-mcp-server",
+  "display_name": "LinkedIn MCP Server",
+  "version": "0.14.0",
+  "description": "Typed, policy-enforced local MCP capabilities over LinkedIn's visible web UI.",
+  "long_description": "A local Python MCP server for authorized LinkedIn jobs, people, companies, posts, invitations, connections, and messaging workflows. It uses one persistent Playwright browser profile and exposes only narrow typed capabilities. This is an unofficial project and is not affiliated with or endorsed by LinkedIn.",
+  "author": {
+    "name": "Prakhar Agarwal",
+    "email": "prakharagarwal3031@gmail.com",
+    "url": "https://github.com/prakharagarwal-dev"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prakharagarwal-dev/linkedin-mcp-server.git"
+  },
+  "homepage": "https://github.com/prakharagarwal-dev/linkedin-mcp-server",
+  "documentation": "https://github.com/prakharagarwal-dev/linkedin-mcp-server#readme",
+  "support": "https://github.com/prakharagarwal-dev/linkedin-mcp-server/issues",
+  "icon": "icon.png",
+  "server": {
+    "type": "uv",
+    "entry_point": "src/linkedin_mcp/__main__.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--frozen",
+        "--no-dev",
+        "--directory",
+        "${__dirname}",
+        "linkedin-mcp",
+        "serve",
+        "--transport",
+        "stdio"
+      ],
+      "env": {
+        "LINKEDIN_MCP_LIVE_ENABLED": "${user_config.live_enabled}",
+        "LINKEDIN_MCP_AUTO_LOGIN_ON_START": "${user_config.auto_login_on_start}",
+        "LINKEDIN_MCP_BROWSER_HEADLESS": "${user_config.browser_headless}"
+      }
+    }
+  },
+  "tools_generated": true,
+  "keywords": [
+    "linkedin",
+    "mcp",
+    "model-context-protocol",
+    "playwright",
+    "automation"
+  ],
+  "license": "Apache-2.0",
+  "privacy_policies": [
+    "https://www.linkedin.com/legal/privacy-policy"
+  ],
+  "compatibility": {
+    "platforms": [
+      "darwin",
+      "linux",
+      "win32"
+    ],
+    "runtimes": {
+      "python": ">=3.12 <3.14"
+    }
+  },
+  "user_config": {
+    "live_enabled": {
+      "type": "boolean",
+      "title": "Enable LinkedIn access",
+      "description": "Allow the server to open authorized visible LinkedIn web UI surfaces.",
+      "default": false,
+      "required": false
+    },
+    "auto_login_on_start": {
+      "type": "boolean",
+      "title": "Recover login on startup",
+      "description": "Open the persistent headed login flow when the saved session needs attention.",
+      "default": true,
+      "required": false
+    },
+    "browser_headless": {
+      "type": "boolean",
+      "title": "Use headless browser",
+      "description": "Run capability browsing headlessly after interactive login succeeds.",
+      "default": true,
+      "required": false
+    }
+  }
+}
