@@ -2,7 +2,7 @@
   "manifest_version": "0.4",
   "name": "linkedin-mcp-server",
   "display_name": "LinkedIn MCP Server",
-  "version": "0.14.2",
+  "version": "0.15.0",
   "description": "Typed, policy-enforced local MCP capabilities over LinkedIn's visible web UI.",
   "long_description": "A local Python MCP server for authorized LinkedIn jobs, people, companies, posts, invitations, connections, and messaging workflows. It uses one persistent Playwright browser profile and exposes only narrow typed capabilities. This is an unofficial project and is not affiliated with or endorsed by LinkedIn.",
   "author": {
@@ -35,7 +35,6 @@
         "stdio"
       ],
       "env": {
-        "LINKEDIN_MCP_LIVE_ENABLED": "${user_config.live_enabled}",
         "LINKEDIN_MCP_AUTO_LOGIN_ON_START": "${user_config.auto_login_on_start}",
         "LINKEDIN_MCP_BROWSER_HEADLESS": "${user_config.browser_headless}"
       }
@@ -65,13 +64,6 @@
     }
   },
   "user_config": {
-    "live_enabled": {
-      "type": "boolean",
-      "title": "Enable LinkedIn access",
-      "description": "Allow the server to open authorized visible LinkedIn web UI surfaces.",
-      "default": false,
-      "required": false
-    },
     "auto_login_on_start": {
       "type": "boolean",
       "title": "Recover login on startup",

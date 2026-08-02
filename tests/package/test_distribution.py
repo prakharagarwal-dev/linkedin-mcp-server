@@ -111,19 +111,14 @@ def test_registry_and_bundle_metadata_share_the_release_identity() -> None:
                 {"type": "positional", "value": "--transport"},
                 {"type": "positional", "value": "stdio"},
             ],
-            "environmentVariables": [
-                {
-                    "name": "LINKEDIN_MCP_LIVE_ENABLED",
-                    "description": "Enable authorized access to visible LinkedIn web UI surfaces.",
-                    "format": "boolean",
-                    "default": "false",
-                }
-            ],
         }
     ]
     assert bundle["manifest_version"] == "0.4"
     assert bundle["name"] == "linkedin-mcp-server"
     assert bundle["server"]["type"] == "uv"
+    assert "live_enabled" not in bundle["user_config"]
+    assert "LINKEDIN_MCP_LIVE_ENABLED" not in json.dumps(registry)
+    assert "LINKEDIN_MCP_LIVE_ENABLED" not in json.dumps(bundle)
     assert bundle["privacy_policies"] == [
         "https://github.com/prakharagarwal-dev/linkedin-mcp-server/blob/main/PRIVACY.md",
         "https://www.linkedin.com/legal/privacy-policy",

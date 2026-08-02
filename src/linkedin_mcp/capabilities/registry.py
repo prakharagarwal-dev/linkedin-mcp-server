@@ -26,8 +26,6 @@ class CapabilityDescriptor:
 
     def status(self, settings: Settings) -> CapabilityInfo:
         reasons: list[str] = []
-        if not settings.live_enabled:
-            reasons.append("live access is disabled")
         missing_surfaces = self.required_surfaces.difference(settings.allowed_surfaces)
         if missing_surfaces:
             values = ", ".join(sorted(surface.value for surface in missing_surfaces))

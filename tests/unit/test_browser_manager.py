@@ -20,7 +20,6 @@ from linkedin_mcp.errors import (
 
 def _live_settings(tmp_path: Path, *, profile_name: str = "profile") -> Settings:
     return Settings(
-        live_enabled=True,
         browser_profile_path=tmp_path / profile_name,
         browser_auto_install=False,
         auto_login_on_start=False,
@@ -458,12 +457,7 @@ async def test_browser_manager_reuses_one_context_with_a_fresh_page_per_operatio
 
 
 @pytest.mark.asyncio
-async def test_browser_manager_fails_closed_when_disabled_or_paused(tmp_path: Path) -> None:
-    disabled = BrowserManager(Settings())
-    with pytest.raises(AuthorizationDeniedError, match="disabled"):
-        async with disabled.page():
-            pass
-
+async def test_browser_manager_fails_closed_when_paused(tmp_path: Path) -> None:
     paused = BrowserManager(_live_settings(tmp_path, profile_name="paused"))
     paused.pause("operator review")
     with pytest.raises(AuthorizationDeniedError, match="operator review"):
@@ -592,9 +586,3 @@ async def test_interactive_login_rejects_a_session_lost_during_clean_reopen(
     assert login_context.closed is True
     assert verification_context.closed is True
     assert playwright.stopped is True
-
-
-@pytest.mark.asyncio
-async def test_interactive_login_requires_live_authorization() -> None:
-    with pytest.raises(AuthorizationDeniedError, match="LIVE_ENABLED"):
-        await login_interactively(Settings())

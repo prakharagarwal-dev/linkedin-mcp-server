@@ -104,7 +104,6 @@ class BrowserManager:
         self._paused = False
         self._pause_reason: str | None = None
         self._authentication = AuthenticationCoordinator(
-            enabled=settings.live_enabled,
             automatic=settings.auto_login_on_start,
             state_present=self.profile_present,
             reset_session=self._reset_for_authentication,
@@ -157,8 +156,6 @@ class BrowserManager:
         self._pause_reason = None
 
     async def _start(self, *, allow_paused: bool = False) -> BrowserContext:
-        if not self._settings.live_enabled:
-            raise AuthorizationDeniedError("Live LinkedIn browser access is disabled.")
         if self._paused and not allow_paused:
             raise AuthorizationDeniedError(
                 f"LinkedIn access is paused: {self._pause_reason or 'operator review required'}"
@@ -387,10 +384,6 @@ async def login_interactively(
 ) -> None:
     """Open a headed profile and prove its session survives a clean reopen."""
 
-    if not settings.live_enabled:
-        raise AuthorizationDeniedError(
-            "Set LINKEDIN_MCP_LIVE_ENABLED=true before creating a LinkedIn session."
-        )
     bootstrap = browser_bootstrap or BrowserRuntimeBootstrap(settings)
     await bootstrap.ensure_ready()
     settings.browser_profile_path.mkdir(mode=0o700, parents=True, exist_ok=True)

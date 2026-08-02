@@ -8,11 +8,11 @@
     "source": "github"
   },
   "websiteUrl": "https://github.com/prakharagarwal-dev/linkedin-mcp-server",
-  "version": "0.14.2",
+  "version": "0.15.0",
   "packages": [
     {
       "registryType": "oci",
-      "identifier": "ghcr.io/prakharagarwal-dev/linkedin-mcp-server:0.14.2",
+      "identifier": "ghcr.io/prakharagarwal-dev/linkedin-mcp-server:0.15.0",
       "transport": {
         "type": "stdio"
       },
@@ -28,14 +28,6 @@
         {
           "type": "positional",
           "value": "stdio"
-        }
-      ],
-      "environmentVariables": [
-        {
-          "name": "LINKEDIN_MCP_LIVE_ENABLED",
-          "description": "Enable authorized access to visible LinkedIn web UI surfaces.",
-          "format": "boolean",
-          "default": "false"
         }
       ]
     }

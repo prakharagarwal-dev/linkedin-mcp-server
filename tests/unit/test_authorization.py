@@ -12,7 +12,7 @@ from linkedin_mcp.policy import AuthorizationPolicy
 def test_authorization_policy_allows_only_a_fully_enabled_descriptor() -> None:
     descriptor = create_default_registry().get(CapabilityName.JOBS_SEARCH)
 
-    AuthorizationPolicy(Settings(live_enabled=True)).authorize(descriptor)
+    AuthorizationPolicy(Settings()).authorize(descriptor)
 
-    with pytest.raises(AuthorizationDeniedError, match="live access is disabled"):
-        AuthorizationPolicy(Settings()).authorize(descriptor)
+    with pytest.raises(AuthorizationDeniedError, match=r"linkedin\.jobs\.search"):
+        AuthorizationPolicy(Settings(allowed_scopes=frozenset())).authorize(descriptor)

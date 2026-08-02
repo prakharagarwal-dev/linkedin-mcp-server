@@ -55,7 +55,6 @@ async def test_doctor_reports_ready_browser_profile_and_process_local_state(
         staticmethod(lambda: _TARGETS),
     )
     settings = Settings(
-        live_enabled=True,
         browser_cache_path=cache_path,
         browser_profile_path=profile_path,
     )
@@ -70,7 +69,7 @@ async def test_doctor_reports_ready_browser_profile_and_process_local_state(
 
 
 @pytest.mark.asyncio
-async def test_doctor_requires_browser_and_profile_only_when_live_is_enabled(
+async def test_doctor_requires_browser_and_profile(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -82,23 +81,17 @@ async def test_doctor_requires_browser_and_profile_only_when_live_is_enabled(
         staticmethod(lambda: _TARGETS),
     )
     settings = Settings(
-        live_enabled=True,
         browser_cache_path=tmp_path / "missing-browser",
         browser_profile_path=tmp_path / "missing-profile",
     )
 
-    live_code = await cli._doctor(settings)  # pyright: ignore[reportPrivateUsage]
-    live_report = json.loads(capsys.readouterr().out)
-    disabled_code = await cli._doctor(  # pyright: ignore[reportPrivateUsage]
-        settings.model_copy(update={"live_enabled": False})
-    )
-    disabled_report = json.loads(capsys.readouterr().out)
+    exit_code = await cli._doctor(settings)  # pyright: ignore[reportPrivateUsage]
+    report = json.loads(capsys.readouterr().out)
 
-    assert live_code == 1
-    assert live_report["browser_setup"] == "not_started"
-    assert live_report["profile_present"] is False
-    assert disabled_code == 0
-    assert disabled_report["live_enabled"] is False
+    assert exit_code == 1
+    assert report["browser_setup"] == "not_started"
+    assert report["profile_present"] is False
+    assert "live_enabled" not in report
 
 
 @pytest.mark.asyncio

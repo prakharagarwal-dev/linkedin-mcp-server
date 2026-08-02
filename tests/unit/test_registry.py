@@ -9,17 +9,8 @@ from linkedin_mcp.domain.models import (
 )
 
 
-def test_registry_reports_disabled_live_capabilities() -> None:
-    registry = create_default_registry()
-
-    status = registry.get(CapabilityName.JOBS_SEARCH).status(Settings())
-
-    assert status.enabled is False
-    assert status.disabled_reason == "live access is disabled"
-
-
 def test_registry_reports_enabled_read_capabilities() -> None:
-    settings = Settings(live_enabled=True)
+    settings = Settings()
     registry = create_default_registry()
 
     assert registry.get(CapabilityName.JOBS_SEARCH).status(settings).enabled is True
@@ -36,7 +27,6 @@ def test_registry_reports_enabled_read_capabilities() -> None:
 
 def test_company_reads_require_explicit_search_and_profile_contracts() -> None:
     settings = Settings(
-        live_enabled=True,
         allowed_surfaces=frozenset(
             {
                 LinkedInSurface.COMPANY_SEARCH,
@@ -59,7 +49,6 @@ def test_company_reads_require_explicit_search_and_profile_contracts() -> None:
 
 def test_post_reads_require_each_exact_surface_and_scope() -> None:
     settings = Settings(
-        live_enabled=True,
         allowed_surfaces=frozenset(
             {
                 LinkedInSurface.CONTENT_SEARCH,
@@ -95,7 +84,6 @@ def test_post_reads_require_each_exact_surface_and_scope() -> None:
 
 def test_invitations_connections_and_messaging_have_independent_scopes() -> None:
     settings = Settings(
-        live_enabled=True,
         allowed_surfaces=frozenset(LinkedInSurface),
         allowed_scopes=frozenset(
             {
@@ -187,7 +175,6 @@ def test_invitations_connections_and_messaging_have_independent_scopes() -> None
 
 def test_personal_post_prepare_and_execute_require_independent_effect_authorization() -> None:
     base = Settings(
-        live_enabled=True,
         allowed_surfaces=frozenset({LinkedInSurface.POST_COMPOSER}),
         allowed_scopes=frozenset({"linkedin.posts.create"}),
         allowed_effects=frozenset({CapabilityEffect.PREPARE}),
