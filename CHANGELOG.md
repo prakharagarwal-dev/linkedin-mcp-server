@@ -6,6 +6,8 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-08-02
+
 ### Changed
 
 - Remove the redundant `LINKEDIN_MCP_LIVE_ENABLED` master switch. Starting the
@@ -57,7 +59,8 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   executable, Python import package, repository, and MCP server identity are
   unchanged.
 
-[Unreleased]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/compare/v0.14.2...HEAD
+[Unreleased]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases/tag/v0.15.0
 [0.14.2]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases/tag/v0.14.2
 [0.14.1]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases/tag/v0.14.1
 [0.14.0]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases/tag/v0.14.0
