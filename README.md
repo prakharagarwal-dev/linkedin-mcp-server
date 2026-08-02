@@ -25,7 +25,7 @@ schedulers, ranking, memory, and natural-language planning belong in clients
 that call this server. Agents never receive cookies, arbitrary browser control,
 generic navigation, JavaScript execution, or unrestricted network access.
 
-Version `0.14.1` has no database, migration, Docker-service, keyring, or
+Version `0.14.2` has no database, migration, Docker-service, keyring, or
 application-state dependency. It uses one local Playwright Chromium profile to
 preserve the LinkedIn login and keeps capability execution state only for the
 lifetime of one server process.
@@ -80,6 +80,29 @@ RabbitMQ, Redis, or another LinkedIn MCP implementation.
 The browser profile is sensitive authentication material. Its directory is
 created with owner-only permissions on supported POSIX systems. Never commit,
 copy, log, or share it.
+
+## Privacy Policy
+
+This is local software with no maintainer-operated backend, analytics,
+advertising, or telemetry. It processes visible LinkedIn content, operation
+evidence, approved write payloads, and explicitly referenced local assets only
+to serve the MCP client that invoked it. LinkedIn receives visible-UI requests
+and confirmed write content; the invoking MCP client receives tool results and
+may retain them under its own policy. The project does not sell personal data
+or transmit LinkedIn content, cookies, credentials, messages, or assets to the
+maintainer.
+
+Operation state is retained only in process memory. The local Chromium profile
+persists until the operator signs out or deletes it, and the configured asset
+directory remains user managed. Stop the server and remove those directories
+to delete persistent local data. Privacy questions can be filed in the public
+issue tracker without sensitive content or sent to
+`prakharagarwal3031@gmail.com`.
+
+The complete policy covers data collection, use, local storage, third-party
+sharing, retention, deletion, and contact details in [PRIVACY.md](PRIVACY.md).
+LinkedIn separately processes activity under the
+[LinkedIn Privacy Policy](https://www.linkedin.com/legal/privacy-policy).
 
 Because operation state is intentionally ephemeral:
 
@@ -211,7 +234,7 @@ The project builds as a normal wheel:
 
 ```bash
 uv build
-uvx --from ./dist/linkedin_mcp_local-0.14.1-py3-none-any.whl \
+uvx --from ./dist/linkedin_mcp_local-0.14.2-py3-none-any.whl \
   linkedin-mcp doctor
 ```
 
@@ -284,7 +307,7 @@ Use the published package from any repository:
 command = "uvx"
 args = [
   "--from",
-  "linkedin-mcp-local==0.14.1",
+  "linkedin-mcp-local==0.14.2",
   "linkedin-mcp",
   "serve",
   "--transport",
@@ -396,8 +419,8 @@ Pull the signed multi-architecture image, or build it locally. It has no
 companion database:
 
 ```bash
-docker pull ghcr.io/prakharagarwal-dev/linkedin-mcp-server:0.14.1
-docker build -t linkedin-mcp-server:0.14.1 .
+docker pull ghcr.io/prakharagarwal-dev/linkedin-mcp-server:0.14.2
+docker build -t linkedin-mcp-server:0.14.2 .
 ```
 
 It runs as UID/GID `10001`, includes Chromium, defaults to stdio, and stores the

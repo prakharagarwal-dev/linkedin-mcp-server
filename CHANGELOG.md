@@ -6,6 +6,16 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.14.2] - 2026-08-02
+
+### Added
+
+- Document the complete local data lifecycle, third-party sharing, retention,
+  deletion controls, and privacy contact path in the README and a standalone
+  privacy policy.
+- Advertise the project and LinkedIn privacy policies in the MCPB manifest and
+  the project privacy policy in PyPI metadata.
+
 ## [0.14.1] - 2026-08-01
 
 ### Fixed
@@ -40,6 +50,7 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   executable, Python import package, repository, and MCP server identity are
   unchanged.
 
-[Unreleased]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/compare/v0.14.1...HEAD
+[Unreleased]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/compare/v0.14.2...HEAD
+[0.14.2]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases/tag/v0.14.2
 [0.14.1]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases/tag/v0.14.1
 [0.14.0]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases/tag/v0.14.0

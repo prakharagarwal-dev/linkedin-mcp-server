@@ -34,6 +34,7 @@ PUBLIC_REPOSITORY_FILES = {
     "CODE_OF_CONDUCT.md",
     "CONTRIBUTING.md",
     "LICENSE",
+    "PRIVACY.md",
     "README.md",
     "SECURITY.md",
     "docs/PUBLISHING.md",
@@ -123,11 +124,24 @@ def test_registry_and_bundle_metadata_share_the_release_identity() -> None:
     assert bundle["manifest_version"] == "0.4"
     assert bundle["name"] == "linkedin-mcp-server"
     assert bundle["server"]["type"] == "uv"
-    assert bundle["privacy_policies"] == ["https://www.linkedin.com/legal/privacy-policy"]
-    assert (
-        "<!-- mcp-name: io.github.prakharagarwal-dev/linkedin-mcp-server -->"
-        in (ROOT / "README.md").read_text()
+    assert bundle["privacy_policies"] == [
+        "https://github.com/prakharagarwal-dev/linkedin-mcp-server/blob/main/PRIVACY.md",
+        "https://www.linkedin.com/legal/privacy-policy",
+    ]
+    readme = (ROOT / "README.md").read_text()
+    privacy = (ROOT / "PRIVACY.md").read_text()
+    assert "## Privacy Policy" in readme
+    assert all(
+        heading in privacy
+        for heading in (
+            "## Data the server processes",
+            "## How data is used and stored",
+            "## Third-party sharing",
+            "## Retention and deletion",
+            "## Contact",
+        )
     )
+    assert "<!-- mcp-name: io.github.prakharagarwal-dev/linkedin-mcp-server -->" in readme
 
 
 def test_synthetic_fixtures_contain_no_session_or_trace_artifacts() -> None:
