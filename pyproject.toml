@@ -1,7 +1,7 @@
 [project]
 name = "linkedin-mcp-local"
 version = "0.15.0"
-description = "Connect AI assistants to LinkedIn through the visible website."
+description = "A LinkedIn MCP server to find jobs, search people, research companies, manage your network, publish and engage with posts, and read or send messages."
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
 license = "Apache-2.0"

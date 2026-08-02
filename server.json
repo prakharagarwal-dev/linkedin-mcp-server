@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.prakharagarwal-dev/linkedin-mcp-server",
   "title": "LinkedIn MCP Server",
-  "description": "Typed, policy-enforced local MCP capabilities over LinkedIn's visible web UI.",
+  "description": "A LinkedIn MCP server to find jobs, search people, research companies, manage your network, publish and engage with posts, and read or send messages.",
   "repository": {
     "url": "https://github.com/prakharagarwal-dev/linkedin-mcp-server",
     "source": "github"

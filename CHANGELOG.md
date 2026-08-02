@@ -12,6 +12,10 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Use one clear, capability-first product description across the README,
+  package, registry, desktop bundle, and container metadata.
+- Move the Star and Sponsor calls to action into one focused README support
+  section instead of repeating them in the hero and footer.
 - Enable every currently implemented capability by default while preserving
   prepare/execute confirmation for actions that change LinkedIn; document
   optional read-only and Jobs-and-People restriction presets.
