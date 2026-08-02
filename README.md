@@ -8,76 +8,69 @@
 [![Python 3.12–3.13](https://img.shields.io/badge/Python-3.12%E2%80%933.13-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 
+> **Disclaimer:** LinkedIn is a registered trademark of LinkedIn Corporation
+> and its affiliates. LinkedIn MCP Server is an independent, unofficial project
+> and is not affiliated with, endorsed by, sponsored by, or associated with
+> LinkedIn Corporation or its affiliates.
+
 A LinkedIn MCP server to find jobs, search people, research companies, manage
 your network, publish and engage with posts, and read or send messages.
 
-> [!IMPORTANT]
-> This is an unofficial project and is not affiliated with or endorsed by
-> LinkedIn. LinkedIn interface changes can temporarily break features or prompt
-> security checkpoints. Use it only with accounts and activity you are
-> authorized to operate.
+## Features
 
-## What you can do
+| Area | Function | What it does |
+| --- | --- | --- |
+| **Jobs** | Search jobs | Search by keywords, location, distance, date, workplace, experience, employment type, company, industry, function, title, benefits, Easy Apply, verification, applicant count, network, and other visible filters. |
+|  | Read job details | Read the complete job description, company, application method, and visible hiring team. |
+| **People** | Search people | Search by keywords, connection degree, hiring status, location, current or past company, title, school, industry, services, language, connections, and followers. |
+|  | Read profiles | Read the complete visible profile or request selected sections such as About, experience, education, skills, projects, certifications, and recommendations. |
+| **Companies** | Search companies | Search by keywords, headquarters, industry, size, available jobs, and first-degree connections. |
+|  | Read company details | Read Overview and About information, including website, headquarters, size, type, founding year, and specialties. |
+| **Posts** | Search posts | Search by keywords, date, content type, author, company, relationship, mentions, author industry, and other visible filters. |
+|  | Read posts | Read complete content, media, links, mentions, hashtags, reactions, and engagement. |
+|  | Read discussions | Read paginated comments, replies, attachments, and reactions. |
+|  | Publish posts | Publish supported personal text, link, image, video, document, poll, celebration, event, hiring, and expert-request posts. |
+|  | Comment and reply | Add text, links, emoji, mentions, photos, or GIFs to posts and discussion threads. |
+|  | React | Add, change, or remove reactions on posts and comments. |
+| **Network** | List connections | Browse established first-degree connections with sorting and pagination. |
+|  | Search connections | Search existing connections using applicable People filters. |
+|  | List invitations | Browse received and sent invitations using LinkedIn's visible filters. |
+|  | Manage invitations | Send connection requests with optional notes and accept or ignore incoming requests. |
+| **Messaging** | Search messages | Search by recipient or message text using inbox categories and filters. |
+|  | Read conversations | Read message history, replies, edits, reactions, and attachments. |
+|  | Send messages | Send or reply in one-to-one conversations with text, links, emoji, files, images, and GIFs. |
 
-- Search current jobs with LinkedIn's visible filters and read complete job descriptions.
-- Search people and companies, then read exact visible profiles and company details.
-- Search and read posts, comments, replies, reactions, and media.
-- Create personal posts, comment, reply, and react after confirmation.
-- List and search connections, and send, accept, or ignore invitations.
-- Search messages, read one-to-one conversations, and send text or attachments.
-- Use it with Codex, Claude, Cursor, VS Code, Gemini, or any MCP client.
+Actions that change LinkedIn require confirmation before execution. Every
+capability is task-specific; the server does not expose unrestricted browser,
+click, navigation, JavaScript, or network access.
 
-See the [capability matrix](docs/CAPABILITY_MATRIX.md) for every supported
-filter, input, output, and visible postcondition.
+See the [capability matrix](docs/CAPABILITY_MATRIX.md) for exact filters,
+supported formats, inputs, outputs, limits, and unsupported features.
 
-## Getting started
+## Installation
 
-### Requirements
+<details open>
+<summary>VS Code and GitHub Copilot</summary>
 
-- macOS, Linux, or Windows
-- Python 3.12 or 3.13
-- [`uv`](https://docs.astral.sh/uv/getting-started/installation/)
-- a local MCP client and a LinkedIn account
+[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect?url=vscode%3Amcp%2Finstall%3F%257B%2522name%2522%253A%2522linkedin-mcp%2522%252C%2522command%2522%253A%2522uvx%2522%252C%2522args%2522%253A%255B%2522--from%2522%252C%2522linkedin-mcp-local%2522%252C%2522linkedin-mcp%2522%252C%2522serve%2522%252C%2522--transport%2522%252C%2522stdio%2522%255D%257D)
+[![Install in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install_Server-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect?url=vscode-insiders%3Amcp%2Finstall%3F%257B%2522name%2522%253A%2522linkedin-mcp%2522%252C%2522command%2522%253A%2522uvx%2522%252C%2522args%2522%253A%255B%2522--from%2522%252C%2522linkedin-mcp-local%2522%252C%2522linkedin-mcp%2522%252C%2522serve%2522%252C%2522--transport%2522%252C%2522stdio%2522%255D%257D)
 
-Claude Desktop users can use the packaged `.mcpb` extension instead of the
-standard `uvx` setup below.
-
-### Standard configuration
-
-This configuration works in most MCP clients:
+Or add this to `.vscode/mcp.json`:
 
 ```json
 {
-  "mcpServers": {
+  "servers": {
     "linkedin-mcp": {
       "command": "uvx",
-      "args": [
-        "--from",
-        "linkedin-mcp-local",
-        "linkedin-mcp",
-        "serve",
-        "--transport",
-        "stdio"
-      ]
+      "args": ["--from", "linkedin-mcp-local", "linkedin-mcp", "serve", "--transport", "stdio"]
     }
   }
 }
 ```
 
-Every current capability is available after installation. Before the server
-posts, messages, connects, comments, or reacts, your MCP client should show the
-exact action and ask you to confirm. You can optionally restrict capabilities
-in [Configuration](docs/CONFIGURATION.md).
+See the [VS Code MCP documentation](https://code.visualstudio.com/docs/agent-customization/mcp-servers).
 
-### One-click installs
-
-[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect?url=vscode%3Amcp%2Finstall%3F%257B%2522name%2522%253A%2522linkedin-mcp%2522%252C%2522command%2522%253A%2522uvx%2522%252C%2522args%2522%253A%255B%2522--from%2522%252C%2522linkedin-mcp-local%2522%252C%2522linkedin-mcp%2522%252C%2522serve%2522%252C%2522--transport%2522%252C%2522stdio%2522%255D%257D)
-[![Install in Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en/install-mcp?name=LinkedIn%20MCP&config=eyJjb21tYW5kIjoidXZ4IC0tZnJvbSBsaW5rZWRpbi1tY3AtbG9jYWwgbGlua2VkaW4tbWNwIHNlcnZlIC0tdHJhbnNwb3J0IHN0ZGlvIn0%3D)
-[![Add to Kiro](https://kiro.dev/images/add-to-kiro.svg)](https://kiro.dev/launch/mcp/add?name=linkedin-mcp&config=%7B%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22--from%22%2C%22linkedin-mcp-local%22%2C%22linkedin-mcp%22%2C%22serve%22%2C%22--transport%22%2C%22stdio%22%5D%7D)
-[![Add to LM Studio](https://files.lmstudio.ai/deeplink/mcp-install-light.svg)](https://lmstudio.ai/install-mcp?name=linkedin-mcp&config=eyJjb21tYW5kIjoidXZ4IiwiYXJncyI6WyItLWZyb20iLCJsaW5rZWRpbi1tY3AtbG9jYWwiLCJsaW5rZWRpbi1tY3AiLCJzZXJ2ZSIsIi0tdHJhbnNwb3J0Iiwic3RkaW8iXX0%3D)
-[![Claude Desktop MCPB](https://img.shields.io/badge/Claude_Desktop-Download_.mcpb-D97757?style=flat-square)](https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases/latest)
-
-### Client quick setup
+</details>
 
 <details>
 <summary>Codex and ChatGPT Desktop</summary>
@@ -114,38 +107,22 @@ Check it with `claude mcp list`. See the
 <details>
 <summary>Claude Desktop</summary>
 
-Download the `.mcpb` file from the
-[latest release](https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases/latest),
-then open **Settings → Extensions → Advanced settings → Install Extension**.
+[![Download for Claude Desktop](https://img.shields.io/badge/Claude_Desktop-Download_.mcpb-D97757?style=flat-square)](https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases/latest)
+
+Download the `.mcpb` file, then open **Settings → Extensions → Advanced
+settings → Install Extension**.
 See [Claude Desktop's extension documentation](https://support.claude.com/en/articles/10949351-getting-started-with-local-mcp-servers-on-claude-desktop).
-
-</details>
-
-<details>
-<summary>VS Code and GitHub Copilot</summary>
-
-Use the install button above, or add this to `.vscode/mcp.json`:
-
-```json
-{
-  "servers": {
-    "linkedin-mcp": {
-      "command": "uvx",
-      "args": ["--from", "linkedin-mcp-local", "linkedin-mcp", "serve", "--transport", "stdio"]
-    }
-  }
-}
-```
-
-See the [VS Code MCP documentation](https://code.visualstudio.com/docs/agent-customization/mcp-servers).
 
 </details>
 
 <details>
 <summary>Cursor</summary>
 
-Use the install button above. For manual setup, open **Cursor Settings → MCP →
-Add new MCP server** and use the standard configuration.
+[![Install in Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en/install-mcp?name=LinkedIn%20MCP&config=eyJjb21tYW5kIjoidXZ4IC0tZnJvbSBsaW5rZWRpbi1tY3AtbG9jYWwgbGlua2VkaW4tbWNwIHNlcnZlIC0tdHJhbnNwb3J0IHN0ZGlvIn0%3D)
+
+For manual setup, open **Cursor Settings → MCP →
+Add new MCP server**, set the command to `uvx`, and set the arguments to
+`--from linkedin-mcp-local linkedin-mcp serve --transport stdio`.
 See the [Cursor MCP documentation](https://docs.cursor.com/en/tools/mcp).
 
 </details>
@@ -153,8 +130,10 @@ See the [Cursor MCP documentation](https://docs.cursor.com/en/tools/mcp).
 <details>
 <summary>Gemini CLI</summary>
 
-Add the standard configuration under `mcpServers` in
-`~/.gemini/settings.json`, then run `gemini mcp list`.
+In `~/.gemini/settings.json`, add a local server named `linkedin-mcp` under
+`mcpServers` with command `uvx` and arguments
+`--from linkedin-mcp-local linkedin-mcp serve --transport stdio`, then run
+`gemini mcp list`.
 See the [Gemini CLI MCP documentation](https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md).
 
 </details>
@@ -162,8 +141,9 @@ See the [Gemini CLI MCP documentation](https://github.com/google-gemini/gemini-c
 <details>
 <summary>Windsurf</summary>
 
-Open **Settings → AI → Manage MCP Servers**, or add the standard configuration
-to `~/.codeium/windsurf/mcp_config.json`.
+Open **Settings → AI → Manage MCP Servers**, or add a local server named
+`linkedin-mcp` to `~/.codeium/windsurf/mcp_config.json` with command `uvx` and
+arguments `--from linkedin-mcp-local linkedin-mcp serve --transport stdio`.
 See the [Windsurf MCP documentation](https://docs.windsurf.com/windsurf/cascade/mcp).
 
 </details>
@@ -171,7 +151,9 @@ See the [Windsurf MCP documentation](https://docs.windsurf.com/windsurf/cascade/
 <details>
 <summary>Cline</summary>
 
-Open **MCP Servers → Configure**, then paste the standard configuration.
+Open **MCP Servers → Configure**, then add a local server named `linkedin-mcp`
+with command `uvx` and arguments
+`--from linkedin-mcp-local linkedin-mcp serve --transport stdio`.
 See the [Cline MCP documentation](https://docs.cline.bot/mcp/mcp-overview).
 
 </details>
@@ -179,8 +161,9 @@ See the [Cline MCP documentation](https://docs.cline.bot/mcp/mcp-overview).
 <details>
 <summary>Roo Code</summary>
 
-Open Roo Code's MCP settings and paste the standard configuration into the
-global file, or save it as `.roo/mcp.json` for one project.
+Open Roo Code's MCP settings and add a local server named `linkedin-mcp` to the
+global file or `.roo/mcp.json`, using command `uvx` and arguments
+`--from linkedin-mcp-local linkedin-mcp serve --transport stdio`.
 See the [Roo Code MCP documentation](https://docs.roocode.com/features/mcp/using-mcp-in-roo).
 
 </details>
@@ -188,8 +171,11 @@ See the [Roo Code MCP documentation](https://docs.roocode.com/features/mcp/using
 <details>
 <summary>Kiro</summary>
 
-Use the install button above, or paste the standard configuration into
-`~/.kiro/settings/mcp.json`.
+[![Add to Kiro](https://kiro.dev/images/add-to-kiro.svg)](https://kiro.dev/launch/mcp/add?name=linkedin-mcp&config=%7B%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22--from%22%2C%22linkedin-mcp-local%22%2C%22linkedin-mcp%22%2C%22serve%22%2C%22--transport%22%2C%22stdio%22%5D%7D)
+
+Or add a local server named `linkedin-mcp` to
+`~/.kiro/settings/mcp.json` with command `uvx` and arguments
+`--from linkedin-mcp-local linkedin-mcp serve --transport stdio`.
 See the [Kiro MCP documentation](https://kiro.dev/docs/mcp/configuration/).
 
 </details>
@@ -217,8 +203,11 @@ See the [Zed MCP documentation](https://zed.dev/docs/ai/mcp).
 <details>
 <summary>LM Studio</summary>
 
-Use the install button above, or open **Program → Install → Edit mcp.json** and
-paste the standard configuration.
+[![Add to LM Studio](https://files.lmstudio.ai/deeplink/mcp-install-light.svg)](https://lmstudio.ai/install-mcp?name=linkedin-mcp&config=eyJjb21tYW5kIjoidXZ4IiwiYXJncyI6WyItLWZyb20iLCJsaW5rZWRpbi1tY3AtbG9jYWwiLCJsaW5rZWRpbi1tY3AiLCJzZXJ2ZSIsIi0tdHJhbnNwb3J0Iiwic3RkaW8iXX0%3D)
+
+Or open **Program → Install → Edit mcp.json** and
+add a local server named `linkedin-mcp` with command `uvx` and arguments
+`--from linkedin-mcp-local linkedin-mcp serve --transport stdio`.
 See the [LM Studio MCP documentation](https://lmstudio.ai/docs/app/mcp).
 
 </details>
@@ -226,8 +215,11 @@ See the [LM Studio MCP documentation](https://lmstudio.ai/docs/app/mcp).
 <details>
 <summary>Goose</summary>
 
-Add a custom stdio extension with command `uvx` and the arguments from the
-standard configuration, or start one CLI session with:
+[![Install in Goose](https://block.github.io/goose/img/extension-install-dark.svg)](https://block.github.io/goose/extension?cmd=uvx&arg=--from&arg=linkedin-mcp-local&arg=linkedin-mcp&arg=serve&arg=--transport&arg=stdio&id=linkedin-mcp&name=LinkedIn%20MCP&description=Search%20LinkedIn%20jobs%2C%20people%2C%20companies%2C%20posts%2C%20connections%2C%20and%20messages)
+
+Or add a custom stdio extension with command `uvx` and arguments
+`--from linkedin-mcp-local linkedin-mcp serve --transport stdio`, or start one
+CLI session with:
 
 ```bash
 goose session --with-extension \
@@ -265,7 +257,8 @@ See the [OpenCode MCP documentation](https://opencode.ai/v2/docs/mcp-servers).
 <summary>JetBrains AI Assistant</summary>
 
 Open **Settings → Tools → AI Assistant → Model Context Protocol (MCP)**, click
-**Add**, and paste the standard configuration.
+**Add**, set the command to `uvx`, and set the arguments to
+`--from linkedin-mcp-local linkedin-mcp serve --transport stdio`.
 See the [JetBrains MCP documentation](https://www.jetbrains.com/help/ai-assistant/mcp.html).
 
 </details>
@@ -273,7 +266,9 @@ See the [JetBrains MCP documentation](https://www.jetbrains.com/help/ai-assistan
 <details>
 <summary>Continue</summary>
 
-Save the standard configuration as `.continue/mcpServers/linkedin-mcp.json`.
+Create `.continue/mcpServers/linkedin-mcp.json` with a local server named
+`linkedin-mcp`, command `uvx`, and arguments
+`--from linkedin-mcp-local linkedin-mcp serve --transport stdio`.
 See the [Continue MCP documentation](https://docs.continue.dev/customize/deep-dives/mcp).
 
 </details>
@@ -281,92 +276,74 @@ See the [Continue MCP documentation](https://docs.continue.dev/customize/deep-di
 <details>
 <summary>Warp</summary>
 
-Open **Settings → AI → Manage MCP Servers → Add** and paste the standard
-configuration.
+Open **Settings → AI → Manage MCP Servers → Add**, name the server
+`linkedin-mcp`, set the command to `uvx`, and set the arguments to
+`--from linkedin-mcp-local linkedin-mcp serve --transport stdio`.
 See the [Warp MCP documentation](https://docs.warp.dev/agent-platform/capabilities/mcp).
 
 </details>
 
-<details>
-<summary>Any other MCP client</summary>
+## Usage
 
-Configure a local stdio server with:
+### First-time LinkedIn login
 
-- command: `uvx`
-- arguments: `--from linkedin-mcp-local linkedin-mcp serve --transport stdio`
+After installation, restart your MCP client. The server opens LinkedIn in a
+browser window where you can sign in and complete MFA or any checkpoint. Your
+session is saved locally and reused across restarts.
 
-Do not combine stdio with shell wrappers that print extra text to stdout.
-
-</details>
-
-## First LinkedIn login
-
-1. Save the client configuration and restart the MCP client.
-2. On first start, the server installs its managed Chromium build and opens a
-   headed LinkedIn window.
-3. Complete LinkedIn login, MFA, or any checkpoint yourself. The browser
-   profile is then reused across restarts.
-4. Ask the client to check your LinkedIn session or try one of the prompts below.
-
-The server never asks for or stores your LinkedIn password. If the automatic
-window does not appear, run:
+If the window does not open, run:
 
 ```bash
 uvx --from linkedin-mcp-local linkedin-mcp login
-uvx --from linkedin-mcp-local linkedin-mcp doctor
 ```
 
-## Try it
+The server never asks for or stores your LinkedIn password.
 
-```text
-Find software engineering jobs posted this week in Bengaluru.
+### Try it
 
-Find engineering managers working at Stripe in India.
+Ask your MCP client naturally:
 
-Read the About and Experience sections from this LinkedIn profile: <profile URL>.
+**Find jobs**
 
-Show my received connection invitations without changing anything.
-```
+> Find remote software engineering jobs in India posted this week with Easy Apply.
 
-For actions that make changes:
+**Research people**
 
-```text
-Draft a connection invitation to <profile URL> with this note: <note>.
+> Find engineering managers at Stripe in India and show me their relevant experience.
 
-Prepare a LinkedIn message to <profile URL> saying: <message>.
-```
+**Research companies**
 
-The client should show the exact action and ask you to confirm before anything
-changes on LinkedIn.
+> Find fintech companies in Bengaluru with 51–200 employees and summarize each company.
 
-## Capabilities
+**Explore posts**
 
-| Domain | Available tools |
-| --- | --- |
-| Jobs | Search with current visible filters; read complete job details and JD |
-| People | Search with current visible filters; read selected or all profile sections |
-| Companies | Search companies; read exact Overview and About information |
-| Posts | Search, read, create, comment, reply, and react |
-| Network | List/search connections; list, send, accept, and ignore invitations |
-| Messaging | Search messages, read conversations, and send text or attachments |
+> Find recent LinkedIn posts about AI agents and summarize the most useful discussions.
 
-Each tool handles a specific LinkedIn task. The server does not give AI
-assistants unrestricted browser, click, navigation, JavaScript, or network
-access. See the
-[capability matrix](docs/CAPABILITY_MATRIX.md) for the complete contract.
+**Manage your network**
 
-## How it works
+> Show my latest received connection requests.
 
-```text
-Codex / Claude / another MCP client
-                  |
-            LinkedIn MCP tools
-                  |
-       one bounded local queue
-                  |
-      one persistent Playwright browser
-                  |
-        visible linkedin.com pages
+> Send a connection request to `<profile URL>` with the note `<note>`.
+
+**Send messages**
+
+> Send `<message>` to `<profile URL>`.
+
+Actions that change LinkedIn are shown for confirmation before they run.
+
+## Architecture
+
+```mermaid
+%%{init: {"flowchart": {"nodeSpacing": 55, "rankSpacing": 65}, "themeVariables": {"fontSize": "20px"}}}%%
+flowchart LR
+    A["MCP Client<br/>Codex · Claude · Cursor"] --> B["LinkedIn MCP Server"]
+    B --> C["Typed LinkedIn Tools"]
+    C --> D["Bounded Local Queue"]
+    D --> E["Single Playwright Worker"]
+    E -->|"Visible UI only"| F["LinkedIn"]
+
+    E <--> G["Persistent Browser Profile"]
+    B -. "Confirmation previews" .-> A
 ```
 
 Everything runs locally. There is no hosted backend, telemetry, database,
@@ -374,18 +351,6 @@ external queue, LangGraph runtime, or credential service. Browser cookies live
 only in the local Playwright profile; operation state lives only until the
 server process exits. Read the full [architecture](docs/ARCHITECTURE.md) and
 [privacy policy](PRIVACY.md).
-
-## Actions that make changes on LinkedIn
-
-Before posting, messaging, connecting, commenting, or reacting, the server:
-
-1. prepares the exact action without making the change;
-2. asks the MCP client to show you what will happen;
-3. performs the action once after confirmation; and
-4. checks the visible LinkedIn result.
-
-Do not configure your MCP client to approve these actions automatically. See
-the [security design](docs/SECURITY.md) for implementation details.
 
 ## Configuration
 
@@ -400,32 +365,6 @@ Common settings control:
 See [Configuration](docs/CONFIGURATION.md) for ready-made permission presets,
 every environment variable, local HTTP sharing, and the container image.
 
-## Troubleshooting
-
-```bash
-uvx --from linkedin-mcp-local linkedin-mcp setup
-uvx --from linkedin-mcp-local linkedin-mcp login
-uvx --from linkedin-mcp-local linkedin-mcp doctor
-```
-
-If a GUI client cannot find `uvx`, use the absolute path returned by
-`command -v uvx` (macOS/Linux) or `where.exe uvx` (Windows). Restart the client
-after changing MCP configuration. See [Troubleshooting](docs/TROUBLESHOOTING.md)
-for authentication, handshake, profile-lock, timeout, and permission errors.
-
-## Development
-
-```bash
-git clone https://github.com/prakharagarwal-dev/linkedin-mcp-server.git
-cd linkedin-mcp-server
-uv sync --frozen --all-groups
-uv run pytest
-```
-
-The default suite is fully offline and never contacts LinkedIn. Read
-[CONTRIBUTING.md](CONTRIBUTING.md) and [the testing guide](docs/TESTING.md)
-before submitting a change.
-
 ## Privacy Policy
 
 The server has no maintainer-operated backend, analytics, advertising, or
@@ -436,9 +375,14 @@ processing, storage, sharing, retention, and deletion details.
 
 ## Safety
 
+Use of this software is at your own risk. You are solely responsible for
+complying with [LinkedIn's User Agreement](https://www.linkedin.com/legal/user-agreement),
+applicable laws, and third-party rights. LinkedIn may limit or restrict accounts
+that use [prohibited automation](https://www.linkedin.com/help/linkedin/answer/a1341387/).
+The maintainers do not authorize spam, unauthorized data collection, privacy
+violations, or circumvention of access controls.
+
 - Use only accounts and activity you are authorized to operate.
-- Do not use the server for spam, deceptive activity, high-volume extraction,
-  or bypassing access controls.
 - The server pauses on authentication expiry, checkpoints, restriction pages,
   permission failures, and configuration errors.
 - It does not implement CAPTCHA bypass, proxy rotation, fingerprint spoofing,
