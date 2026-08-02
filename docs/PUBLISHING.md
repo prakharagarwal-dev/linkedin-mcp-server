@@ -17,8 +17,9 @@ repository to match the distribution.
 
 ## Release contract
 
-1. Update the version in `pyproject.toml`, `server.json`, and
-   `packaging/mcpb/manifest.json`, then regenerate `uv.lock`.
+1. Update the version in `pyproject.toml`, `server.json`,
+   `packaging/mcpb/manifest.json`, `Dockerfile`, `CITATION.cff`, and
+   `src/linkedin_mcp/__init__.py`, then regenerate `uv.lock`.
 2. Move the release notes from `Unreleased` to the matching version in
    `CHANGELOG.md`.
 3. Run the complete offline verification gate documented in `README.md`.

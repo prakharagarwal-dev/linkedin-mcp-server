@@ -15,6 +15,10 @@ PUBLIC_DESCRIPTION = (
     "A LinkedIn MCP server to find jobs, search people, research companies, "
     "manage your network, publish and engage with posts, and read or send messages."
 )
+REGISTRY_DESCRIPTION = (
+    "Find LinkedIn jobs and people, research companies, manage network, posts, "
+    "and messages with MCP."
+)
 FORBIDDEN_RUNTIME_DEPENDENCIES = {
     "alembic",
     "psycopg",
@@ -108,7 +112,8 @@ def test_registry_and_bundle_metadata_share_the_release_identity() -> None:
     assert registry["name"] == "io.github.prakharagarwal-dev/linkedin-mcp-server"
     assert registry["version"] == project["version"] == bundle["version"]
     assert project["description"] == PUBLIC_DESCRIPTION
-    assert registry["description"] == PUBLIC_DESCRIPTION
+    assert registry["description"] == REGISTRY_DESCRIPTION
+    assert len(registry["description"]) <= 100
     assert bundle["description"] == PUBLIC_DESCRIPTION
     assert bundle["long_description"].startswith(PUBLIC_DESCRIPTION)
     assert PUBLIC_DESCRIPTION in readme.replace("\n", " ")
