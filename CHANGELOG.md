@@ -6,14 +6,20 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-08-03
+
 ### Added
 
 - Add the native GitHub Sponsor button and a concise README sponsor request.
+- Add canonical Glama maintainer metadata so its repository-backed listing can
+  refresh from this release.
 
 ### Changed
 
 - Use one clear, capability-first product description across the README,
   package, registry, desktop bundle, and container metadata.
+- Use a faithful compact variant where a registry enforces a shorter metadata
+  limit.
 - Move the Star and Sponsor calls to action into one focused README support
   section instead of repeating them in the hero and footer.
 - Present a neutral trademark and non-affiliation disclaimer before the README
@@ -81,7 +87,8 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   executable, Python import package, repository, and MCP server identity are
   unchanged.
 
-[Unreleased]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/compare/v0.15.1...HEAD
+[0.15.1]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases/tag/v0.15.1
 [0.15.0]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases/tag/v0.15.0
 [0.14.2]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases/tag/v0.14.2
 [0.14.1]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases/tag/v0.14.1

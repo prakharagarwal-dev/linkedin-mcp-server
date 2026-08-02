@@ -3,7 +3,7 @@
 FROM mcr.microsoft.com/playwright/python:v1.61.0-noble@sha256:a9731514f24121d1dcd25d58d0a38146646d290a5998fd80d3e533e7b5e21c69
 
 ARG UV_VERSION=0.11.12
-ARG VERSION=0.15.0
+ARG VERSION=0.15.1
 
 LABEL org.opencontainers.image.title="LinkedIn MCP Server" \
     org.opencontainers.image.description="A LinkedIn MCP server to find jobs, search people, research companies, manage your network, publish and engage with posts, and read or send messages." \

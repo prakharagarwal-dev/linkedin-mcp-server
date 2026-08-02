@@ -2,17 +2,17 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.prakharagarwal-dev/linkedin-mcp-server",
   "title": "LinkedIn MCP Server",
-  "description": "A LinkedIn MCP server to find jobs, search people, research companies, manage your network, publish and engage with posts, and read or send messages.",
+  "description": "Find LinkedIn jobs and people, research companies, manage network, posts, and messages with MCP.",
   "repository": {
     "url": "https://github.com/prakharagarwal-dev/linkedin-mcp-server",
     "source": "github"
   },
   "websiteUrl": "https://github.com/prakharagarwal-dev/linkedin-mcp-server",
-  "version": "0.15.0",
+  "version": "0.15.1",
   "packages": [
     {
       "registryType": "oci",
-      "identifier": "ghcr.io/prakharagarwal-dev/linkedin-mcp-server:0.15.0",
+      "identifier": "ghcr.io/prakharagarwal-dev/linkedin-mcp-server:0.15.1",
       "transport": {
         "type": "stdio"
       },
