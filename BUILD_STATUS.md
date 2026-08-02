@@ -4,36 +4,38 @@ Updated: 2026-08-02
 
 ## Release verification
 
-- [v0.14.2](https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases/tag/v0.14.2)
-  is the current privacy-compliant public release. Its wheel, source archive,
-  and MCPB bundle are checksummed and carry GitHub build provenance
-  attestations. The MCPB SHA-256 is
-  28ecaee100131ba71e5a8dc24a3a5349e803b707f3682d2a0d8eeef9f2d6e1ca.
-- [Pull request 17](https://github.com/prakharagarwal-dev/linkedin-mcp-server/pull/17)
-  merged after Ruff, strict Pyright, package checks, CodeQL, and all 438
-  offline tests passed. A clean wheel installation passes
-  linkedin-mcp doctor, and the release MCPB passes the official validator.
-- The public v0.14.2 GHCR image is anonymously readable at digest
-  sha256:1fa86cfc9de7f7d858b560b67697f937a6c505efed217d766fc383d4083a7fd0.
+- [v0.15.0](https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases/tag/v0.15.0)
+  is the current public release. Its wheel, source archive, and MCPB bundle are
+  checksummed and carry GitHub build provenance attestations tied to merge
+  commit 78c57fb23d82b730afa70b8fb3de9abf158b1ae4. The MCPB SHA-256 is
+  869b31442c8207441c123f24161598904f00e138c95ca882250744940955eb72.
+- [Pull request 19](https://github.com/prakharagarwal-dev/linkedin-mcp-server/pull/19)
+  merged after Ruff, strict Pyright, package checks, CodeQL, and all 436
+  offline tests passed on Python 3.12 and 3.13. A clean wheel installation
+  passes `linkedin-mcp --help`, the release MCPB passes the official validator,
+  and the Official MCP Registry metadata passes publisher validation.
+- The public v0.15.0 GHCR image is anonymously readable at digest
+  sha256:7fda5591f9ef9c97a48c483c3478bbcc285ab5aaaf8c2a01c0f3806928f6a607.
   The release workflow built and attested its native linux/amd64 and
   linux/arm64 images.
 - The release and registry workflows completed successfully:
-  [artifacts, PyPI, and GHCR](https://github.com/prakharagarwal-dev/linkedin-mcp-server/actions/runs/30741687195)
-  and [Official MCP Registry publication](https://github.com/prakharagarwal-dev/linkedin-mcp-server/actions/runs/30741687188).
+  [artifacts, PyPI, and GHCR](https://github.com/prakharagarwal-dev/linkedin-mcp-server/actions/runs/30746557443)
+  and [Official MCP Registry publication](https://github.com/prakharagarwal-dev/linkedin-mcp-server/actions/runs/30746557059).
 
 ## Live distributions
 
 - GitHub repository and
-  [v0.14.2 release](https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases/tag/v0.14.2):
+  [v0.15.0 release](https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases/tag/v0.15.0):
   public, checksummed, and attested.
 - PyPI:
-  [linkedin-mcp-local 0.14.2](https://pypi.org/project/linkedin-mcp-local/0.14.2/)
+  [linkedin-mcp-local 0.15.0](https://pypi.org/project/linkedin-mcp-local/0.15.0/)
   is published through GitHub OIDC Trusted Publishing.
-- GHCR: ghcr.io/prakharagarwal-dev/linkedin-mcp-server:0.14.2 is public,
+- GHCR: ghcr.io/prakharagarwal-dev/linkedin-mcp-server:0.15.0 is public,
   multi-architecture, and attested.
 - Official MCP Registry:
-  [io.github.prakharagarwal-dev/linkedin-mcp-server 0.14.2](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.prakharagarwal-dev%2Flinkedin-mcp-server)
-  is active and points to the immutable 0.14.2 OCI package.
+  [io.github.prakharagarwal-dev/linkedin-mcp-server 0.15.0](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.prakharagarwal-dev%2Flinkedin-mcp-server)
+  is active, marked latest, and points to the immutable 0.15.0 OCI package
+  without the removed `LINKEDIN_MCP_LIVE_ENABLED` option.
 - [Glama](https://glama.ai/mcp/servers/prakharagarwal-dev/linkedin-mcp-server)
   has a public canonical listing linked to the intended GitHub repository.
 - [MCPRepository](https://mcprepository.com/prakharagarwal-dev/linkedin-mcp-server)
