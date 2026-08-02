@@ -6,7 +6,7 @@ ARG UV_VERSION=0.11.12
 ARG VERSION=0.15.0
 
 LABEL org.opencontainers.image.title="LinkedIn MCP Server" \
-    org.opencontainers.image.description="Typed, policy-enforced local MCP capabilities over LinkedIn's visible web UI" \
+    org.opencontainers.image.description="A LinkedIn MCP server to find jobs, search people, research companies, manage your network, publish and engage with posts, and read or send messages." \
     org.opencontainers.image.source="https://github.com/prakharagarwal-dev/linkedin-mcp-server" \
     org.opencontainers.image.url="https://github.com/prakharagarwal-dev/linkedin-mcp-server" \
     org.opencontainers.image.documentation="https://github.com/prakharagarwal-dev/linkedin-mcp-server#readme" \

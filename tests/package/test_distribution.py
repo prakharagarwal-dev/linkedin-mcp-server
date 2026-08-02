@@ -11,6 +11,10 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).parents[2]
+PUBLIC_DESCRIPTION = (
+    "A LinkedIn MCP server to find jobs, search people, research companies, "
+    "manage your network, publish and engage with posts, and read or send messages."
+)
 FORBIDDEN_RUNTIME_DEPENDENCIES = {
     "alembic",
     "psycopg",
@@ -98,9 +102,17 @@ def test_registry_and_bundle_metadata_share_the_release_identity() -> None:
     bundle = json.loads((ROOT / "packaging" / "mcpb" / "manifest.json").read_text())
     configuration = tomllib.loads((ROOT / "pyproject.toml").read_text())
     project = configuration["project"]
+    readme = (ROOT / "README.md").read_text()
+    dockerfile = (ROOT / "Dockerfile").read_text()
 
     assert registry["name"] == "io.github.prakharagarwal-dev/linkedin-mcp-server"
     assert registry["version"] == project["version"] == bundle["version"]
+    assert project["description"] == PUBLIC_DESCRIPTION
+    assert registry["description"] == PUBLIC_DESCRIPTION
+    assert bundle["description"] == PUBLIC_DESCRIPTION
+    assert bundle["long_description"].startswith(PUBLIC_DESCRIPTION)
+    assert PUBLIC_DESCRIPTION in readme.replace("\n", " ")
+    assert f'org.opencontainers.image.description="{PUBLIC_DESCRIPTION}"' in dockerfile
     assert registry["packages"] == [
         {
             "registryType": "oci",
@@ -123,7 +135,6 @@ def test_registry_and_bundle_metadata_share_the_release_identity() -> None:
         "https://github.com/prakharagarwal-dev/linkedin-mcp-server/blob/main/PRIVACY.md",
         "https://www.linkedin.com/legal/privacy-policy",
     ]
-    readme = (ROOT / "README.md").read_text()
     privacy = (ROOT / "PRIVACY.md").read_text()
     assert "## Privacy Policy" in readme
     assert all(

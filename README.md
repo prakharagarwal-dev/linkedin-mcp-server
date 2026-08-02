@@ -7,14 +7,9 @@
 [![PyPI](https://img.shields.io/pypi/v/linkedin-mcp-local.svg)](https://pypi.org/project/linkedin-mcp-local/)
 [![Python 3.12–3.13](https://img.shields.io/badge/Python-3.12%E2%80%933.13-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/prakharagarwal-dev/linkedin-mcp-server?style=social)](https://github.com/prakharagarwal-dev/linkedin-mcp-server/stargazers)
 
-A local MCP server that lets AI assistants search LinkedIn and perform supported
-LinkedIn actions through the visible website.
-
-> Like the project? [Star the repository](https://github.com/prakharagarwal-dev/linkedin-mcp-server) to help other MCP users find it.
-
-> If LinkedIn MCP saves you time, [sponsor its continued development](https://github.com/sponsors/prakharagarwal-dev).
+A LinkedIn MCP server to find jobs, search people, research companies, manage
+your network, publish and engage with posts, and read or send messages.
 
 > [!IMPORTANT]
 > This is an unofficial project and is not affiliated with or endorsed by
@@ -462,6 +457,13 @@ See [SECURITY.md](SECURITY.md) and [the security design](docs/SECURITY.md).
 - [Publishing](docs/PUBLISHING.md)
 - [Changelog](CHANGELOG.md)
 
+## Support the project
+
+If LinkedIn MCP Server is useful to you:
+
+- [Star the repository](https://github.com/prakharagarwal-dev/linkedin-mcp-server)
+- [Sponsor continued development](https://github.com/sponsors/prakharagarwal-dev)
+
 ## Let's connect
 
 Have feedback or an idea for LinkedIn MCP Server?
@@ -473,6 +475,3 @@ Have feedback or an idea for LinkedIn MCP Server?
 ## License
 
 Licensed under the [Apache License 2.0](LICENSE).
-
-If LinkedIn MCP Server is useful to you, please
-[⭐ star the repository](https://github.com/prakharagarwal-dev/linkedin-mcp-server).
