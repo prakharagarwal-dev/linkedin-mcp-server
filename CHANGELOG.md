@@ -8,6 +8,9 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Enable every currently implemented capability by default while preserving
+  prepare/execute confirmation for actions that change LinkedIn; document
+  optional read-only and Jobs-and-People restriction presets.
 - Rework the README into a concise onboarding path with one universal package
   configuration, one-click links and compact setup instructions for popular
   MCP clients, first-login prompts, and focused configuration and

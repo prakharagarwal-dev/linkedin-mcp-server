@@ -76,16 +76,18 @@ URLs.
 
 ## Authorization
 
-Runtime authorization is deny-by-default and requires:
+Runtime authorization requires:
 
 1. a registered capability;
 2. every required `ALLOWED_SURFACES` entry;
 3. every required `ALLOWED_SCOPES` entry;
 4. the required `ALLOWED_EFFECTS` entry.
 
-Read, prepare, and write effects are distinct. Default configuration permits
-only Jobs and People reads. Company, post, discussion, connection, messaging,
-and every write scope require explicit opt-in.
+Read, prepare, and write effects are distinct. The default allowlists contain
+every currently implemented capability so a normal installation works without
+additional permission configuration. Operators can replace those allowlists
+with a narrower set. Final write tools remain destructive MCP operations and
+still require an exact prepared action and client confirmation.
 
 The server constructs canonical targets from validated identifiers. It never
 accepts arbitrary URLs for LinkedIn navigation and never exposes a general

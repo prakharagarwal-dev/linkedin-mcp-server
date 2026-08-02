@@ -67,9 +67,10 @@ This configuration works in most MCP clients:
 }
 ```
 
-The default authorization enables read-only Jobs and People tools. Additional
-read domains and all account-changing tools require explicit local permission;
-copy a ready-made preset from [Configuration](docs/CONFIGURATION.md).
+Every current capability is available after installation. Before the server
+posts, messages, connects, comments, or reacts, your MCP client should show the
+exact action and ask you to confirm. You can optionally restrict capabilities
+in [Configuration](docs/CONFIGURATION.md).
 
 ### One-click installs
 
@@ -330,7 +331,7 @@ Read the About and Experience sections from this LinkedIn profile: <profile URL>
 Show my received connection invitations without changing anything.
 ```
 
-With the matching write permissions enabled:
+For actions that make changes:
 
 ```text
 Draft a connection invitation to <profile URL> with this note: <note>.
@@ -338,8 +339,8 @@ Draft a connection invitation to <profile URL> with this note: <note>.
 Prepare a LinkedIn message to <profile URL> saying: <message>.
 ```
 
-The client should show the exact target and payload for confirmation before an
-account-changing execute tool runs.
+The client should show the exact action and ask you to confirm before anything
+changes on LinkedIn.
 
 ## Capabilities
 
@@ -377,22 +378,17 @@ only in the local Playwright profile; operation state lives only until the
 server process exits. Read the full [architecture](docs/ARCHITECTURE.md) and
 [privacy policy](PRIVACY.md).
 
-## Account-changing actions
+## Actions that make changes on LinkedIn
 
-Writes use a strict two-step contract:
+Before posting, messaging, connecting, commenting, or reacting, the server:
 
-```text
-prepare exact target and payload
-  -> immutable approval preview
-  -> native MCP client confirmation
-  -> execute once
-  -> verify the visible LinkedIn result
-```
+1. prepares the exact action without making the change;
+2. asks the MCP client to show you what will happen;
+3. performs the action once after confirmation; and
+4. checks the visible LinkedIn result.
 
-The server separately requires the correct surfaces, scopes, and `prepare` /
-`write` effects. Client confirmation does not grant those permissions. Do not
-auto-approve execute tools. See [Configuration](docs/CONFIGURATION.md) and the
-[security design](docs/SECURITY.md).
+Do not configure your MCP client to approve these actions automatically. See
+the [security design](docs/SECURITY.md) for implementation details.
 
 ## Configuration
 

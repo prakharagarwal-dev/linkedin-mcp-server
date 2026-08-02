@@ -1,9 +1,10 @@
 # Configuration
 
 LinkedIn MCP Server is configured with environment variables using the
-`LINKEDIN_MCP_` prefix. The standard package configuration starts with a safe,
-read-only Jobs and People permission set; every additional LinkedIn domain and
-every account-changing effect is an explicit local opt-in.
+`LINKEDIN_MCP_` prefix. The standard package configuration enables every
+currently implemented capability. Actions that change LinkedIn still use the
+prepare, client-confirmation, and execute flow described in
+[Security](SECURITY.md).
 
 For `uvx` installations, put environment variables in the MCP client's server
 entry. A source checkout can also use an uncommitted `.env` file based on
@@ -23,26 +24,26 @@ Client approval annotations do not grant server permissions. Use
 `linkedin.capabilities.list` to see which installed tools are enabled and why
 another tool is disabled.
 
-## Default permissions
+## Default capabilities
 
-These defaults require no additional environment configuration:
+No permission environment variables are needed for a normal installation. The
+defaults cover every currently implemented surface and scope:
 
 ```text
-surfaces: job-search, job-detail, people-search, member-profile
-scopes:   linkedin.jobs.search, linkedin.jobs.read,
-          linkedin.people.search, linkedin.people.read
-effects:  read
+surfaces: all currently implemented LinkedIn surfaces
+scopes:   all currently implemented capability scopes
+effects:  read, prepare, write
 ```
 
-They enable `linkedin.jobs.search`, `linkedin.jobs.get`,
-`linkedin.people.search`, and `linkedin.people.get`.
+`linkedin.capabilities.list` therefore reports every installed capability as
+enabled. Execute tools remain destructive MCP operations and should always be
+confirmed by the user in the MCP client.
 
-## Ready-made permission presets
+## Optional restriction presets
 
-Add one of the following `env` objects inside the `linkedin-mcp` server entry
-in the standard MCP configuration.
+Only add one of these `env` objects when you want to restrict the local server.
 
-### All read capabilities
+### Read-only access
 
 ```json
 "env": {
@@ -52,24 +53,20 @@ in the standard MCP configuration.
 }
 ```
 
-### All currently implemented capabilities
-
-This enables account-changing tools as well as reads. Each write still uses a
-hash-locked prepare/execute flow and should receive native client confirmation.
-Do not configure the client to auto-approve execute tools.
+### Jobs and People only
 
 ```json
 "env": {
-  "LINKEDIN_MCP_ALLOWED_SURFACES": "[\"job-search\",\"job-detail\",\"people-search\",\"member-profile\",\"company-search\",\"company-profile\",\"company-about\",\"content-search\",\"post-detail\",\"post-discussion\",\"post-composer\",\"connections\",\"messaging\"]",
-  "LINKEDIN_MCP_ALLOWED_SCOPES": "[\"linkedin.jobs.search\",\"linkedin.jobs.read\",\"linkedin.people.search\",\"linkedin.people.read\",\"linkedin.companies.search\",\"linkedin.companies.read\",\"linkedin.posts.search\",\"linkedin.posts.read\",\"linkedin.posts.comments.read\",\"linkedin.posts.create\",\"linkedin.posts.comments.create\",\"linkedin.posts.reactions.set\",\"linkedin.invitations.read\",\"linkedin.connections.read\",\"linkedin.invitations.send\",\"linkedin.invitations.accept\",\"linkedin.invitations.ignore\",\"linkedin.messaging.read\",\"linkedin.messaging.send\"]",
-  "LINKEDIN_MCP_ALLOWED_EFFECTS": "[\"read\",\"prepare\",\"write\"]"
+  "LINKEDIN_MCP_ALLOWED_SURFACES": "[\"job-search\",\"job-detail\",\"people-search\",\"member-profile\"]",
+  "LINKEDIN_MCP_ALLOWED_SCOPES": "[\"linkedin.jobs.search\",\"linkedin.jobs.read\",\"linkedin.people.search\",\"linkedin.people.read\"]",
+  "LINKEDIN_MCP_ALLOWED_EFFECTS": "[\"read\"]"
 }
 ```
 
-Prefer a narrower custom subset when an agent needs only one additional
-domain. `linkedin.capabilities.list` returns each capability's exact surface,
-scope, and effect requirements. The [capability matrix](CAPABILITY_MATRIX.md)
-describes the corresponding visible feature contracts.
+You can also create a custom subset. `linkedin.capabilities.list` returns each
+capability's exact surface, scope, and effect requirements. The
+[capability matrix](CAPABILITY_MATRIX.md) describes the corresponding visible
+feature contracts.
 
 ## Settings reference
 
@@ -83,9 +80,9 @@ describes the corresponding visible feature contracts.
 | `AUTO_LOGIN_ON_START` | `true` | Validate or recover login after MCP initialization |
 | `ASSET_ROOT_PATH` | per-user application data | Only local files below this directory may be attached |
 | `ALLOWED_HOSTS` | exact LinkedIn hosts | Navigation hostname allowlist |
-| `ALLOWED_SURFACES` | Jobs and People reads | Authorized visible LinkedIn UI surfaces |
-| `ALLOWED_SCOPES` | Jobs and People reads | Authorized named capability scopes |
-| `ALLOWED_EFFECTS` | `read` | Authorized effect classes: `read`, `prepare`, `write` |
+| `ALLOWED_SURFACES` | all implemented surfaces | Authorized visible LinkedIn UI surfaces |
+| `ALLOWED_SCOPES` | all implemented scopes | Authorized named capability scopes |
+| `ALLOWED_EFFECTS` | `read`, `prepare`, `write` | Authorized effect classes |
 | `QUEUE_CAPACITY` | `100` | Maximum waiting process-local capability calls |
 | `MINIMUM_NAVIGATION_INTERVAL_SECONDS` | `2` | Minimum internal delay between navigations |
 | `JOB_SEARCH_MAX_PAGES_PER_CALL` | `100` | Private job-search traversal safety bound |

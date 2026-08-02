@@ -9,20 +9,16 @@ from linkedin_mcp.domain.models import (
 )
 
 
-def test_registry_reports_enabled_read_capabilities() -> None:
+def test_registry_enables_every_registered_capability_by_default() -> None:
     settings = Settings()
     registry = create_default_registry()
 
-    assert registry.get(CapabilityName.JOBS_SEARCH).status(settings).enabled is True
-    assert registry.get(CapabilityName.JOBS_GET).status(settings).enabled is True
-    assert registry.get(CapabilityName.PEOPLE_SEARCH).status(settings).enabled is True
-    assert registry.get(CapabilityName.PEOPLE_GET).status(settings).enabled is True
-    assert registry.get(CapabilityName.COMPANIES_SEARCH).status(settings).enabled is False
-    assert registry.get(CapabilityName.COMPANIES_GET).status(settings).enabled is False
-    assert registry.get(CapabilityName.INVITATIONS_LIST).status(settings).enabled is False
-    assert registry.get(CapabilityName.MESSAGING_MESSAGE_EXECUTE).status(settings).enabled is False
-
-    assert {descriptor.name for descriptor in registry.list()} == set(CapabilityName)
+    descriptors = registry.list()
+    assert {descriptor.name for descriptor in descriptors} == set(CapabilityName)
+    for descriptor in descriptors:
+        status = descriptor.status(settings)
+        assert status.enabled is True, status.disabled_reason
+        assert status.disabled_reason is None
 
 
 def test_company_reads_require_explicit_search_and_profile_contracts() -> None:
