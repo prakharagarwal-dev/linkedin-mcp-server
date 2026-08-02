@@ -14,6 +14,8 @@ LinkedIn actions through the visible website.
 
 > Like the project? [Star the repository](https://github.com/prakharagarwal-dev/linkedin-mcp-server) to help other MCP users find it.
 
+> If LinkedIn MCP saves you time, [sponsor its continued development](https://github.com/sponsors/prakharagarwal-dev).
+
 > [!IMPORTANT]
 > This is an unofficial project and is not affiliated with or endorsed by
 > LinkedIn. LinkedIn interface changes can temporarily break features or prompt

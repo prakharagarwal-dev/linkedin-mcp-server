@@ -6,6 +6,10 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Add the native GitHub Sponsor button and a concise README sponsor request.
+
 ### Changed
 
 - Enable every currently implemented capability by default while preserving
