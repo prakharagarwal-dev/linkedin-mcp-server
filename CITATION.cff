@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use LinkedIn MCP Server, please cite it as below."
+type: software
+title: "LinkedIn MCP Server"
+version: 0.15.0
+date-released: 2026-08-02
+authors:
+  - family-names: "Agarwal"
+    given-names: "Prakhar"
+repository-code: "https://github.com/prakharagarwal-dev/linkedin-mcp-server"
+url: "https://github.com/prakharagarwal-dev/linkedin-mcp-server"
+license: Apache-2.0
