@@ -16,13 +16,17 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   package, registry, desktop bundle, and container metadata.
 - Move the Star and Sponsor calls to action into one focused README support
   section instead of repeating them in the hero and footer.
+- Present a neutral trademark and non-affiliation disclaimer before the README
+  product description, and clarify user responsibility for platform terms,
+  account risk, applicable law, and third-party rights.
+- Replace the duplicated capability summaries with one grouped function-level
+  table covering every supported LinkedIn domain.
 - Enable every currently implemented capability by default while preserving
   prepare/execute confirmation for actions that change LinkedIn; document
   optional read-only and Jobs-and-People restriction presets.
-- Rework the README into a concise onboarding path with one universal package
-  configuration, one-click links and compact setup instructions for popular
-  MCP clients, first-login prompts, and focused configuration and
-  troubleshooting references.
+- Rework the README into a concise onboarding path with one-click installers,
+  self-contained client-specific instructions, concise first-login guidance,
+  example prompts, and focused supporting documentation.
 
 ## [0.15.0] - 2026-08-02
 
