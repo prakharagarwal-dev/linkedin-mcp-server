@@ -44,7 +44,6 @@ class Settings(BaseSettings):
     )
 
     account_id: str = Field(default="personal", min_length=1, max_length=200)
-    live_enabled: bool = False
     browser_profile_path: Path = Field(default_factory=_default_browser_profile_path)
     browser_cache_path: Path = Field(default_factory=_default_browser_cache_path)
     browser_auto_install: bool = True

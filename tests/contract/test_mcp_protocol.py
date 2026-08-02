@@ -914,7 +914,6 @@ class ProtocolNetwork:
 
 def _container() -> AppContainer:
     settings = Settings(
-        live_enabled=True,
         auto_login_on_start=False,
         browser_auto_install=False,
         browser_profile_path=ROOT / ".pytest_cache" / f"profile-{uuid.uuid4().hex}",
@@ -1541,9 +1540,15 @@ async def test_mcp_client_discovers_calls_and_reads_evidence() -> None:
                 assert read_tool.annotations is not None
                 assert read_tool.annotations.readOnlyHint is True
 
+            server_status = await session.call_tool("linkedin.server.status", {})
+            assert server_status.isError is False
+            assert server_status.structuredContent is not None
+            assert "live_enabled" not in server_status.structuredContent
+
             session_status = await session.call_tool("linkedin.session.status", {})
             assert session_status.isError is False
             assert session_status.structuredContent is not None
+            assert "live_enabled" not in session_status.structuredContent
             assert session_status.structuredContent["authentication_state"] == "login_required"
             assert session_status.structuredContent["automatic_login_enabled"] is False
             assert session_status.structuredContent["login_browser_open"] is False

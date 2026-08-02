@@ -216,7 +216,6 @@ def create_mcp_server(container: AppContainer) -> FastMCP[None]:
     async def _server_status() -> ServerStatusOutput:
         return ServerStatusOutput(
             version=__version__,
-            live_enabled=container.settings.live_enabled,
             transport=container.settings.transport,
         )
 
@@ -242,7 +241,6 @@ def create_mcp_server(container: AppContainer) -> FastMCP[None]:
     async def _session_status() -> SessionStatusOutput:
         return SessionStatusOutput(
             account_id=container.settings.account_id,
-            live_enabled=container.settings.live_enabled,
             profile_present=container.browser.profile_present(),
             browser_setup_state=container.browser.browser_setup_state,
             browser_started=container.browser.started,

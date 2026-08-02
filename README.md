@@ -210,7 +210,6 @@ Prerequisites are Python 3.12 or 3.13 and
 Run the published PyPI package without a permanent installation:
 
 ```bash
-uvx --from linkedin-mcp-local linkedin-mcp doctor
 uvx --from linkedin-mcp-local linkedin-mcp setup
 ```
 
@@ -220,11 +219,11 @@ Clone and validate a source checkout:
 git clone https://github.com/prakharagarwal-dev/linkedin-mcp-server.git
 cd linkedin-mcp-server
 uv sync --frozen --all-groups
-uv run linkedin-mcp doctor
+uv run linkedin-mcp setup
 ```
 
 Chromium installs automatically into the per-user application-data cache when
-live access is first enabled. To install it explicitly:
+the server first needs it. To install it explicitly:
 
 ```bash
 uv run linkedin-mcp setup
@@ -244,16 +243,18 @@ the shared user cache. A later wheel or `uvx` environment reuses that cache.
 
 ## First LinkedIn login
 
-Enable live access:
-
-```dotenv
-LINKEDIN_MCP_LIVE_ENABLED=true
-```
-
-Then either start the MCP server or run login explicitly:
+Either start the MCP server or run login explicitly from the published package:
 
 ```bash
-LINKEDIN_MCP_LIVE_ENABLED=true uv run linkedin-mcp login
+uvx --from linkedin-mcp-local linkedin-mcp login
+uvx --from linkedin-mcp-local linkedin-mcp doctor
+```
+
+From a source checkout, use:
+
+```bash
+uv run linkedin-mcp login
+uv run linkedin-mcp doctor
 ```
 
 The login command:
@@ -272,9 +273,9 @@ The server never asks for or stores a LinkedIn password itself. Later starts
 reuse and validate the same profile. Expired authentication can open the same
 human login flow. Restriction-shaped pages pause work for operator attention.
 
-With `LIVE_ENABLED=true` and `AUTO_LOGIN_ON_START=true`, Chromium setup and
-login run in background tasks, so the MCP handshake itself does not wait for a
-download or human interaction.
+With `AUTO_LOGIN_ON_START=true`, Chromium setup and login run in background
+tasks, so the MCP handshake itself does not wait for a download or human
+interaction.
 
 ## Run as an MCP server
 
@@ -313,7 +314,6 @@ args = [
   "--transport",
   "stdio",
 ]
-env = { LINKEDIN_MCP_LIVE_ENABLED = "true" }
 startup_timeout_sec = 30
 tool_timeout_sec = 900
 ```
@@ -333,7 +333,6 @@ args = [
   "--transport",
   "stdio",
 ]
-env = { LINKEDIN_MCP_LIVE_ENABLED = "true" }
 startup_timeout_sec = 30
 tool_timeout_sec = 900
 ```
@@ -383,7 +382,6 @@ All environment settings use the `LINKEDIN_MCP_` prefix.
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `ACCOUNT_ID` | `personal` | One configured LinkedIn account |
-| `LIVE_ENABLED` | `false` | Master switch for LinkedIn browser access |
 | `BROWSER_PROFILE_PATH` | per-user app data | Persistent LinkedIn Chromium profile |
 | `BROWSER_CACHE_PATH` | native Playwright cache | Managed Playwright browser cache |
 | `BROWSER_AUTO_INSTALL` | `true` | Install the matching Chromium revision when needed |
@@ -442,10 +440,8 @@ uv run pytest --cov=linkedin_mcp --cov-branch
 uv build
 ```
 
-The enforced branch-coverage floor is 85%; the public-release gate passes 434
-offline tests at 85.24%, with the executor, in-process operation store,
-capability registry, and MCP protocol layer at 96–98%. The repository contains
-no live LinkedIn tests.
+The enforced branch-coverage floor is 85%; the current gate contains 436
+offline tests. The repository contains no live LinkedIn tests.
 
 ## Safety boundary
 
@@ -453,7 +449,7 @@ There is no generic click, selector, navigation, JavaScript, browser, SQL, or
 network tool. The server uses only visible LinkedIn UI through official
 Playwright APIs and exact configured hosts.
 
-Live access pauses on authentication expiry, authwalls, checkpoints,
+LinkedIn access pauses on authentication expiry, authwalls, checkpoints,
 restriction-shaped pages, permission failures, and invalid configuration. The
 project does not implement CAPTCHA bypass, proxy rotation, fingerprint
 spoofing, credential harvesting, stealth plugins, or private LinkedIn

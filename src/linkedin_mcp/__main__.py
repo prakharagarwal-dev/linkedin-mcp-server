@@ -76,7 +76,6 @@ async def _doctor(settings: Settings) -> int:
         "automatic_login": settings.auto_login_on_start,
         "browser_setup": browser_state.value,
         "configuration": "valid",
-        "live_enabled": settings.live_enabled,
         "operation_state": "process_local",
         "profile_present": profile_present,
         "transport": settings.transport,
@@ -85,7 +84,7 @@ async def _doctor(settings: Settings) -> int:
         BrowserSetupState.DISABLED,
         BrowserSetupState.READY,
     }
-    return_code = 1 if settings.live_enabled and (not ready or not profile_present) else 0
+    return_code = 1 if not ready or not profile_present else 0
     print(json.dumps(report, indent=2, sort_keys=True))
     return return_code
 

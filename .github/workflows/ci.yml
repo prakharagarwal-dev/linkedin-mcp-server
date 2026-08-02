@@ -57,7 +57,6 @@ jobs:
       matrix:
         python-version: ["3.12", "3.13"]
     env:
-      LINKEDIN_MCP_LIVE_ENABLED: "false"
       LINKEDIN_MCP_AUTO_LOGIN_ON_START: "false"
     steps:
       - name: Check out repository

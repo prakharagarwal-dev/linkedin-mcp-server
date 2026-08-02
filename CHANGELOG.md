@@ -6,6 +6,13 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Remove the redundant `LINKEDIN_MCP_LIVE_ENABLED` master switch. Starting the
+  server now always permits browser authentication while registered
+  capabilities remain independently restricted by configured surfaces, scopes,
+  effects, authentication guards, and write confirmations.
+
 ## [0.14.2] - 2026-08-02
 
 ### Added

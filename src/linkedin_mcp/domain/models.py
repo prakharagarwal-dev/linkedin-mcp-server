@@ -530,7 +530,6 @@ class ConversationFilter(StrEnum):
 
 
 class SessionAuthenticationState(StrEnum):
-    DISABLED = "disabled"
     UNVERIFIED = "unverified"
     LOGIN_REQUIRED = "login_required"
     LOGIN_IN_PROGRESS = "login_in_progress"
@@ -3515,14 +3514,12 @@ class CapabilityListOutput(StrictModel):
 class ServerStatusOutput(StrictModel):
     name: Literal["linkedin-mcp-server"] = "linkedin-mcp-server"
     version: str
-    live_enabled: bool
     transport: Literal["stdio", "streamable-http"]
     operation_state: Literal["process_local"] = "process_local"
 
 
 class SessionStatusOutput(StrictModel):
     account_id: Identifier
-    live_enabled: bool
     profile_present: bool
     browser_setup_state: BrowserSetupState
     browser_started: bool

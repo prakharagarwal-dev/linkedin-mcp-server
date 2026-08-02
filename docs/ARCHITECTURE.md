@@ -93,11 +93,10 @@ The capability registry maps every public capability to:
 
 Authorization requires all of the following:
 
-1. live access is enabled;
-2. the exact capability is registered;
-3. every required surface is configured;
-4. every required scope is configured;
-5. the effect class is configured.
+1. the exact capability is registered;
+2. every required surface is configured;
+3. every required scope is configured;
+4. the effect class is configured.
 
 Enabling one capability does not grant generic access to related LinkedIn
 features.
@@ -235,7 +234,7 @@ writes cookies and preferences normally when the context closes.
 
 Startup behavior:
 
-1. schedule managed Chromium setup when live access is enabled;
+1. schedule managed Chromium setup when automatic installation is enabled;
 2. inspect whether the persistent profile contains browser data;
 3. silently validate an existing session;
 4. otherwise open one headed login context on that profile;

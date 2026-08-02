@@ -29,14 +29,6 @@
           "type": "positional",
           "value": "stdio"
         }
-      ],
-      "environmentVariables": [
-        {
-          "name": "LINKEDIN_MCP_LIVE_ENABLED",
-          "description": "Enable authorized access to visible LinkedIn web UI surfaces.",
-          "format": "boolean",
-          "default": "false"
-        }
       ]
     }
   ]

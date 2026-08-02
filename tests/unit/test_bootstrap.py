@@ -33,7 +33,6 @@ def isolate_playwright_browser_environment() -> Iterator[None]:
 
 def _settings(tmp_path: Path, *, auto_install: bool = True) -> Settings:
     return Settings(
-        live_enabled=True,
         browser_auto_install=auto_install,
         browser_cache_path=tmp_path / "browsers",
     )

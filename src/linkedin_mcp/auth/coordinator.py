@@ -27,14 +27,12 @@ class AuthenticationCoordinator:
     def __init__(
         self,
         *,
-        enabled: bool,
         automatic: bool,
         state_present: StatePresent,
         reset_session: AsyncStep,
         login: AsyncStep,
         validate: AsyncStep,
     ) -> None:
-        self._enabled = enabled
         self._automatic = automatic
         self._state_present = state_present
         self._reset_session = reset_session
@@ -43,9 +41,7 @@ class AuthenticationCoordinator:
         self._task: asyncio.Task[None] | None = None
         self._last_error: LinkedInMCPError | None = None
         self._status_message: str | None = None
-        if not enabled:
-            self._state = SessionAuthenticationState.DISABLED
-        elif state_present():
+        if state_present():
             self._state = SessionAuthenticationState.UNVERIFIED
         else:
             self._state = SessionAuthenticationState.LOGIN_REQUIRED
@@ -69,13 +65,13 @@ class AuthenticationCoordinator:
     def start(self) -> None:
         """Schedule startup validation/login without delaying MCP initialization."""
 
-        if self._enabled and self._automatic:
+        if self._automatic:
             self._schedule(force_login=False)
 
     async def ensure_ready(self) -> None:
         """Wait for an already scheduled automatic bootstrap before browser work."""
 
-        if not self._enabled or not self._automatic:
+        if not self._automatic:
             return
         if self._is_authenticated():
             return
@@ -95,8 +91,6 @@ class AuthenticationCoordinator:
     def request_reauthentication(self, reason: str) -> None:
         """Pause new work and open one headed reauthentication flow."""
 
-        if not self._enabled:
-            return
         self._state = SessionAuthenticationState.LOGIN_REQUIRED
         self._status_message = reason
         self._last_error = None

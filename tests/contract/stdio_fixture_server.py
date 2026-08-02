@@ -149,6 +149,8 @@ class UnusedPersonProfile:
 
 def main() -> None:
     settings = Settings(
+        auto_login_on_start=False,
+        browser_auto_install=False,
         runtime_lock_path=Path(".linkedin-mcp/stdio-fixture-runtime.lock"),
     )
     repository = MemoryRepository()

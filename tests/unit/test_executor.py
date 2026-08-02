@@ -1215,7 +1215,6 @@ def _execute_request(
 
 def _settings() -> Settings:
     return Settings(
-        live_enabled=True,
         minimum_navigation_interval_seconds=0,
         allowed_surfaces=frozenset(LinkedInSurface),
         allowed_scopes=frozenset(

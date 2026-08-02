@@ -78,11 +78,10 @@ URLs.
 
 Runtime authorization is deny-by-default and requires:
 
-1. `LIVE_ENABLED=true`;
-2. a registered capability;
-3. every required `ALLOWED_SURFACES` entry;
-4. every required `ALLOWED_SCOPES` entry;
-5. the required `ALLOWED_EFFECTS` entry.
+1. a registered capability;
+2. every required `ALLOWED_SURFACES` entry;
+3. every required `ALLOWED_SCOPES` entry;
+4. the required `ALLOWED_EFFECTS` entry.
 
 Read, prepare, and write effects are distinct. Default configuration permits
 only Jobs and People reads. Company, post, discussion, connection, messaging,

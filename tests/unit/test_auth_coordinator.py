@@ -30,7 +30,6 @@ async def test_first_run_opens_login_then_validates_without_blocking_start() -> 
         calls.append("validate")
 
     coordinator = AuthenticationCoordinator(
-        enabled=True,
         automatic=True,
         state_present=lambda: present,
         reset_session=reset,
@@ -59,7 +58,6 @@ async def test_existing_session_is_silently_validated_and_reused() -> None:
         calls.append(name)
 
     coordinator = AuthenticationCoordinator(
-        enabled=True,
         automatic=True,
         state_present=lambda: True,
         reset_session=lambda: record("reset"),
@@ -93,7 +91,6 @@ async def test_expired_saved_session_opens_reauthentication_once_then_revalidate
             raise AuthenticationRequiredError("The saved session expired.")
 
     coordinator = AuthenticationCoordinator(
-        enabled=True,
         automatic=True,
         state_present=lambda: True,
         reset_session=reset,
@@ -120,7 +117,6 @@ async def test_restriction_requires_attention_and_is_not_retried_as_login() -> N
         raise RestrictionDetectedError("LinkedIn returned a restriction-shaped page.")
 
     coordinator = AuthenticationCoordinator(
-        enabled=True,
         automatic=True,
         state_present=lambda: True,
         reset_session=login,
@@ -145,7 +141,6 @@ async def test_automatic_bootstrap_can_be_disabled_for_headless_deployments() ->
         called = True
 
     coordinator = AuthenticationCoordinator(
-        enabled=True,
         automatic=False,
         state_present=lambda: False,
         reset_session=unexpected,

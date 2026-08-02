@@ -71,7 +71,6 @@ def create_simulator_container(
 ) -> AppContainer:
     suffix = uuid.uuid4().hex
     settings = Settings(
-        live_enabled=True,
         auto_login_on_start=False,
         browser_auto_install=False,
         browser_profile_path=root / f"profile-{suffix}",

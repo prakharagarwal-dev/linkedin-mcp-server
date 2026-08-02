@@ -67,7 +67,7 @@ class BrowserRuntimeBootstrap:
     def start(self) -> None:
         """Schedule browser installation without delaying MCP initialization."""
 
-        if not self._settings.live_enabled or not self._settings.browser_auto_install:
+        if not self._settings.browser_auto_install:
             return
         current = self._task
         if current is not None:
