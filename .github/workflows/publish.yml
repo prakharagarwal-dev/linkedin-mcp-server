@@ -70,7 +70,7 @@ jobs:
         run: |
           mkdir -p .release/mcpb
           cp packaging/mcpb/manifest.json .release/mcpb/manifest.json
-          cp pyproject.toml uv.lock README.md LICENSE .release/mcpb/
+          cp pyproject.toml uv.lock README.md PRIVACY.md LICENSE .release/mcpb/
           git archive HEAD src | tar -x -C .release/mcpb
           cp assets/icon.png .release/mcpb/icon.png
           npx --yes @anthropic-ai/mcpb@2.1.2 validate .release/mcpb/manifest.json

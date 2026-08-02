@@ -2,7 +2,7 @@
   "manifest_version": "0.4",
   "name": "linkedin-mcp-server",
   "display_name": "LinkedIn MCP Server",
-  "version": "0.14.1",
+  "version": "0.14.2",
   "description": "Typed, policy-enforced local MCP capabilities over LinkedIn's visible web UI.",
   "long_description": "A local Python MCP server for authorized LinkedIn jobs, people, companies, posts, invitations, connections, and messaging workflows. It uses one persistent Playwright browser profile and exposes only narrow typed capabilities. This is an unofficial project and is not affiliated with or endorsed by LinkedIn.",
   "author": {
@@ -51,6 +51,7 @@
   ],
   "license": "Apache-2.0",
   "privacy_policies": [
+    "https://github.com/prakharagarwal-dev/linkedin-mcp-server/blob/main/PRIVACY.md",
     "https://www.linkedin.com/legal/privacy-policy"
   ],
   "compatibility": {
