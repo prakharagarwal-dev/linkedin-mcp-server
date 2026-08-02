@@ -46,8 +46,8 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - Initial public release of the standalone Python MCP server.
-- Typed jobs, people, companies, posts, invitations, connections, and messaging
-  capabilities over visible LinkedIn UI surfaces.
+- Jobs, people, companies, posts, invitations, connections, and messaging tools
+  that use LinkedIn's visible website.
 - Cursor pagination, one-worker queueing, internal pacing, immutable evidence,
   and process-local operation state.
 - Hash-locked prepare/execute contracts with scopes, idempotency, native client

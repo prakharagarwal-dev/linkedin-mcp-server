@@ -1,7 +1,7 @@
 [project]
 name = "linkedin-mcp-local"
 version = "0.15.0"
-description = "A typed, policy-enforced MCP server for authorized LinkedIn capabilities."
+description = "Connect AI assistants to LinkedIn through the visible website."
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
 license = "Apache-2.0"
@@ -9,7 +9,6 @@ license-files = ["LICENSE"]
 authors = [{ name = "Prakhar Agarwal", email = "prakharagarwal3031@gmail.com" }]
 keywords = ["linkedin", "mcp", "model-context-protocol", "playwright", "automation"]
 classifiers = [
-  "Development Status :: 4 - Beta",
   "Environment :: Console",
   "Intended Audience :: Developers",
   "License :: OSI Approved :: Apache Software License",
@@ -18,7 +17,6 @@ classifiers = [
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
-  "Typing :: Typed",
 ]
 dependencies = [
   "mcp[cli]>=1.27,<2",

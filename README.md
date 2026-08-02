@@ -9,17 +9,16 @@
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/prakharagarwal-dev/linkedin-mcp-server?style=social)](https://github.com/prakharagarwal-dev/linkedin-mcp-server/stargazers)
 
-A local Python MCP server that gives AI agents typed access to LinkedIn jobs,
-people, companies, posts, connections, invitations, and messaging through the
-visible LinkedIn website.
+A local MCP server that lets AI assistants search LinkedIn and perform supported
+LinkedIn actions through the visible website.
 
 > Like the project? [Star the repository](https://github.com/prakharagarwal-dev/linkedin-mcp-server) to help other MCP users find it.
 
 > [!IMPORTANT]
-> This is an unofficial beta project. It is not affiliated with or endorsed by
-> LinkedIn. Visible-UI automation can break when LinkedIn changes its interface
-> and may cause checkpoints or account restrictions. Use it only with accounts
-> and activity you are authorized to operate.
+> This is an unofficial project and is not affiliated with or endorsed by
+> LinkedIn. LinkedIn interface changes can temporarily break features or prompt
+> security checkpoints. Use it only with accounts and activity you are
+> authorized to operate.
 
 ## What you can do
 
@@ -29,7 +28,7 @@ visible LinkedIn website.
 - Create personal posts, comment, reply, and react after confirmation.
 - List and search connections, and send, accept, or ignore invitations.
 - Search messages, read one-to-one conversations, and send text or attachments.
-- Connect the same typed tools to Codex, Claude, Cursor, VS Code, Gemini, or any MCP client.
+- Use it with Codex, Claude, Cursor, VS Code, Gemini, or any MCP client.
 
 See the [capability matrix](docs/CAPABILITY_MATRIX.md) for every supported
 filter, input, output, and visible postcondition.
@@ -353,8 +352,9 @@ account-changing execute tool runs.
 | Network | List/search connections; list, send, accept, and ignore invitations |
 | Messaging | Search messages, read conversations, and send text or attachments |
 
-All tools are narrow and typed. The server does not expose arbitrary browser,
-click, navigation, JavaScript, or network tools. See the
+Each tool handles a specific LinkedIn task. The server does not give AI
+assistants unrestricted browser, click, navigation, JavaScript, or network
+access. See the
 [capability matrix](docs/CAPABILITY_MATRIX.md) for the complete contract.
 
 ## How it works
@@ -362,7 +362,7 @@ click, navigation, JavaScript, or network tools. See the
 ```text
 Codex / Claude / another MCP client
                   |
-             typed MCP tools
+            LinkedIn MCP tools
                   |
        one bounded local queue
                   |
