@@ -6,6 +6,13 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Rework the README into a concise onboarding path with one universal package
+  configuration, one-click links and compact setup instructions for popular
+  MCP clients, first-login prompts, and focused configuration and
+  troubleshooting references.
+
 ## [0.15.0] - 2026-08-02
 
 ### Changed

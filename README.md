@@ -7,464 +7,466 @@
 [![PyPI](https://img.shields.io/pypi/v/linkedin-mcp-local.svg)](https://pypi.org/project/linkedin-mcp-local/)
 [![Python 3.12–3.13](https://img.shields.io/badge/Python-3.12%E2%80%933.13-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/prakharagarwal-dev/linkedin-mcp-server?style=social)](https://github.com/prakharagarwal-dev/linkedin-mcp-server/stargazers)
 
-A standalone Python MCP server that exposes narrow, typed LinkedIn capabilities
-through the visible LinkedIn web UI.
+A local Python MCP server that gives AI agents typed access to LinkedIn jobs,
+people, companies, posts, connections, invitations, and messaging through the
+visible LinkedIn website.
+
+> Like the project? [Star the repository](https://github.com/prakharagarwal-dev/linkedin-mcp-server) to help other MCP users find it.
 
 > [!IMPORTANT]
-> This is an unofficial, beta project. It is not affiliated with, endorsed by,
-> or sponsored by LinkedIn. LinkedIn is a trademark of LinkedIn Corporation.
-> Visible-UI automation can stop working when LinkedIn changes its interface and
-> may cause checkpoints, restrictions, or other account consequences. You are
-> responsible for complying with applicable terms, laws, consent requirements,
-> and organizational policies. Do not use this project for spam, deceptive
-> activity, high-volume extraction, or bypassing access controls.
+> This is an unofficial beta project. It is not affiliated with or endorsed by
+> LinkedIn. Visible-UI automation can break when LinkedIn changes its interface
+> and may cause checkpoints or account restrictions. Use it only with accounts
+> and activity you are authorized to operate.
 
-This repository is the LinkedIn harness, not an agent runtime. LangGraph,
-schedulers, ranking, memory, and natural-language planning belong in clients
-that call this server. Agents never receive cookies, arbitrary browser control,
-generic navigation, JavaScript execution, or unrestricted network access.
+## What you can do
 
-Version `0.15.0` has no database, migration, Docker-service, keyring, or
-application-state dependency. It uses one local Playwright Chromium profile to
-preserve the LinkedIn login and keeps capability execution state only for the
-lifetime of one server process.
+- Search current jobs with LinkedIn's visible filters and read complete job descriptions.
+- Search people and companies, then read exact visible profiles and company details.
+- Search and read posts, comments, replies, reactions, and media.
+- Create personal posts, comment, reply, and react after confirmation.
+- List and search connections, and send, accept, or ignore invitations.
+- Search messages, read one-to-one conversations, and send text or attachments.
+- Connect the same typed tools to Codex, Claude, Cursor, VS Code, Gemini, or any MCP client.
 
-## Runtime model
+See the [capability matrix](docs/CAPABILITY_MATRIX.md) for every supported
+filter, input, output, and visible postcondition.
 
-```text
-LangGraph / Codex / another MCP client
-                  |
-          stdio or loopback HTTP
-                  |
-          typed MCP capabilities
-                  |
-      bounded asyncio.Queue (one worker)
-                  |
-     policy -> executor -> page objects
-                  |
-    one persistent Playwright context
-                  |
-       visible linkedin.com surfaces
+## Getting started
+
+### Requirements
+
+- macOS, Linux, or Windows
+- Python 3.12 or 3.13
+- [`uv`](https://docs.astral.sh/uv/getting-started/installation/)
+- a local MCP client and a LinkedIn account
+
+Claude Desktop users can use the packaged `.mcpb` extension instead of the
+standard `uvx` setup below.
+
+### Standard configuration
+
+This configuration works in most MCP clients:
+
+```json
+{
+  "mcpServers": {
+    "linkedin-mcp": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "linkedin-mcp-local",
+        "linkedin-mcp",
+        "serve",
+        "--transport",
+        "stdio"
+      ]
+    }
+  }
+}
 ```
 
-The server owns:
+The default authorization enables read-only Jobs and People tools. Additional
+read domains and all account-changing tools require explicit local permission;
+copy a ready-made preset from [Configuration](docs/CONFIGURATION.md).
 
-- official MCP Python SDK transport and typed Pydantic contracts;
-- one bounded in-process queue and one capability worker;
-- one account-scoped persistent Playwright Chromium context;
-- internal navigation pacing and per-operation safety bounds;
-- exact-host, surface, scope, and effect authorization;
-- visible page extraction and field-level evidence;
-- expiring, filter-bound continuation cursors for collection reads;
-- immutable prepare/confirm/execute envelopes for writes;
-- process-local request replay, evidence, action drafts, and idempotency.
+### One-click installs
 
-It has no dependency on LangGraph, Temporal, `startup-scanner`, PostgreSQL,
-RabbitMQ, Redis, or another LinkedIn MCP implementation.
+[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect?url=vscode%3Amcp%2Finstall%3F%257B%2522name%2522%253A%2522linkedin-mcp%2522%252C%2522command%2522%253A%2522uvx%2522%252C%2522args%2522%253A%255B%2522--from%2522%252C%2522linkedin-mcp-local%2522%252C%2522linkedin-mcp%2522%252C%2522serve%2522%252C%2522--transport%2522%252C%2522stdio%2522%255D%257D)
+[![Install in Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en/install-mcp?name=LinkedIn%20MCP&config=eyJjb21tYW5kIjoidXZ4IC0tZnJvbSBsaW5rZWRpbi1tY3AtbG9jYWwgbGlua2VkaW4tbWNwIHNlcnZlIC0tdHJhbnNwb3J0IHN0ZGlvIn0%3D)
+[![Add to Kiro](https://kiro.dev/images/add-to-kiro.svg)](https://kiro.dev/launch/mcp/add?name=linkedin-mcp&config=%7B%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22--from%22%2C%22linkedin-mcp-local%22%2C%22linkedin-mcp%22%2C%22serve%22%2C%22--transport%22%2C%22stdio%22%5D%7D)
+[![Add to LM Studio](https://files.lmstudio.ai/deeplink/mcp-install-light.svg)](https://lmstudio.ai/install-mcp?name=linkedin-mcp&config=eyJjb21tYW5kIjoidXZ4IiwiYXJncyI6WyItLWZyb20iLCJsaW5rZWRpbi1tY3AtbG9jYWwiLCJsaW5rZWRpbi1tY3AiLCJzZXJ2ZSIsIi0tdHJhbnNwb3J0Iiwic3RkaW8iXX0%3D)
+[![Claude Desktop MCPB](https://img.shields.io/badge/Claude_Desktop-Download_.mcpb-D97757?style=flat-square)](https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases/latest)
 
-## What survives a restart
+### Client quick setup
 
-| Data | Location | Lifetime |
-| --- | --- | --- |
-| LinkedIn cookies and browser preferences | local Chromium profile | across restarts |
-| Managed Chromium binaries | local Playwright browser cache | across package environments |
-| Explicit post/message assets | configured local asset directory | user managed |
-| Calls and request replay | memory | current process only |
-| Evidence resources | memory | current process only |
-| Action drafts and attempts | memory | current process only |
-| Execution idempotency keys | memory | current process only |
-| Queue and pacing history | memory | current process only |
-| Collection cursors, seen identities, and invitation snapshots | memory | current process only |
+<details>
+<summary>Codex and ChatGPT Desktop</summary>
 
-The browser profile is sensitive authentication material. Its directory is
-created with owner-only permissions on supported POSIX systems. Never commit,
-copy, log, or share it.
+Add this to `~/.codex/config.toml`:
 
-## Privacy Policy
+```toml
+[mcp_servers."linkedin-mcp"]
+command = "uvx"
+args = ["--from", "linkedin-mcp-local", "linkedin-mcp", "serve", "--transport", "stdio"]
+startup_timeout_sec = 60
+tool_timeout_sec = 900
+```
 
-This is local software with no maintainer-operated backend, analytics,
-advertising, or telemetry. It processes visible LinkedIn content, operation
-evidence, approved write payloads, and explicitly referenced local assets only
-to serve the MCP client that invoked it. LinkedIn receives visible-UI requests
-and confirmed write content; the invoking MCP client receives tool results and
-may retain them under its own policy. The project does not sell personal data
-or transmit LinkedIn content, cookies, credentials, messages, or assets to the
-maintainer.
+Codex CLI, the Codex IDE extension, and ChatGPT Desktop share this local
+configuration. Restart the client after saving it. See the
+[Codex MCP documentation](https://learn.chatgpt.com/docs/extend/mcp).
 
-Operation state is retained only in process memory. The local Chromium profile
-persists until the operator signs out or deletes it, and the configured asset
-directory remains user managed. Stop the server and remove those directories
-to delete persistent local data. Privacy questions can be filed in the public
-issue tracker without sensitive content or sent to
-`prakharagarwal3031@gmail.com`.
+</details>
 
-The complete policy covers data collection, use, local storage, third-party
-sharing, retention, deletion, and contact details in [PRIVACY.md](PRIVACY.md).
-LinkedIn separately processes activity under the
-[LinkedIn Privacy Policy](https://www.linkedin.com/legal/privacy-policy).
-
-Because operation state is intentionally ephemeral:
-
-- read retries deduplicate only while the same server process is alive;
-- `linkedin://sources/{source_id}` must be read before that process exits;
-- a prepare and its matching execute call must use the same process;
-- after a hard process interruption during a write, inspect LinkedIn's visible
-  state before preparing any new action. Never blindly retry the old execute
-  request.
-
-LangGraph should checkpoint workflow history, cross-run deduplication,
-notifications, rankings, and conversations outside this server.
-
-## MCP surface
-
-| MCP primitive | Purpose |
-| --- | --- |
-| `linkedin.server.status` | Non-secret runtime metadata |
-| `linkedin.capabilities.list` | Installed capabilities and policy status |
-| `linkedin.session.status` | Browser setup, profile, authentication, and pause state |
-| `linkedin.jobs.search` | Cursor-paged current Jobs search with optional keywords, Any time by default, and every current account-visible filter |
-| `linkedin.jobs.get` | Expanded JD, header metadata, application method, and hiring team for a numeric job ID |
-| `linkedin.people.search` | Bounded People search with every current account-visible filter |
-| `linkedin.people.get` | Selected or all visible member-profile sections |
-| `linkedin.companies.search` | Cursor-paged Company search with keywords and every current native filter: headquarters, industry, all eight size buckets, job listings, and first-degree connection presence |
-| `linkedin.companies.get` | Exact Company Overview plus About, including all visible structured About fields and field evidence |
-| `linkedin.posts.search` | Post search with every current visible filter, including live videos, followed authors, and Author Keywords |
-| `linkedin.posts.get` | Exact post read with fully expanded text, typed current media/link/poll variants, engagement and visibility, field evidence, completeness coverage, and bounded repost-original resolution |
-| `linkedin.posts.comments.list` | Top-level comments and nested replies |
-| `linkedin.posts.create.prepare` / `.execute` | Nine current personal composer modes: text/link, edited images, video, document, poll, celebration, event, existing-job hiring, and expert request; plus audience/group, comment control, brand partnership, eligible collaborators, and scheduling |
-| `linkedin.posts.comment.prepare` / `.execute` | Top-level comment or exact-thread reply with text/emoji/link, exact mentions, one photo, or one exact GIF |
-| `linkedin.posts.reaction.prepare` / `.execute` | Set, change, remove, or no-op any current post/comment reaction: Like, Celebrate, Support, Love, Insightful, or Funny |
-| `linkedin.invitations.list` | Exact sent view or deduplicated union of every current received invitation view |
-| `linkedin.connections.list` | Cursor-page and sort the existing first-degree connection inventory |
-| `linkedin.connections.search` | Search established first-degree connections with first-degree enforced by the server |
-| `linkedin.invitations.send.prepare` / `.execute` | Connection invitation with optional note |
-| `linkedin.invitations.accept.prepare` / `.execute` | Accept an exact received invitation |
-| `linkedin.invitations.ignore.prepare` / `.execute` | Ignore an exact received connection request |
-| `linkedin.messaging.search` | Cursor-paged recipient/message-keyword search across Focused, Other, Archived, or Spam with exactly one optional Jobs, Unread, Connections, InMail, or Starred filter |
-| `linkedin.messaging.conversation.get` | Bounded reverse-virtualized one-to-one history with incoming/outgoing messages, visible attachments, replies, edits, reactions, and explicit completeness |
-| `linkedin.messaging.message.prepare` / `.execute` | Exact-recipient text/emoji, current desktop image/file, exact KLIPY GIF, or exact-message reply with hash-locked confirmation and visible postconditions |
-| `linkedin://sources/{source_id}` | Evidence captured by the current process |
-
-Every operation accepts a caller-owned `context_id` and `request_id`. Direct
-detail reads do not require a prior search. The server constructs bounded,
-canonical LinkedIn targets from validated job IDs, profile slugs, company
-slugs, post references, comment references, and conversation references.
-
-### Collection pagination
-
-Every LinkedIn search or list tool accepts `page_size` (1–100) and an optional
-opaque `cursor`. Omit `cursor` for the first page, then copy
-`pagination.next_cursor` into the next call with a new `request_id`. A terminal
-page has `pagination.has_more=false`.
-
-Cursors are process-local, single-use, expire after 15 minutes by default, and
-are bound to the account, capability, and semantic filters that created them.
-Changing `page_size` between pages is allowed; changing the search target,
-query, sort, direction, or filters is rejected as `invalid_cursor`. The server
-rescans a bounded live prefix and removes stable identities already returned,
-so `consistency=live_deduplicated` prevents duplicates but does not claim a
-frozen LinkedIn snapshot. `truncated=true` means an internal safety or cursor
-state bound ended the scan and no further cursor is issued.
-
-`linkedin.invitations.list` uses a stronger contract. A single-filter call
-captures and exactly reconciles that view against LinkedIn's visible count.
-Received `all` is server-defined because the latest UI has no reliable All
-control: it reconciles Focused, Other, Verified, Mutual Connections, Your
-Company, and Your School separately, then deduplicates their stable invitation
-identities. Coverage reports the per-view counts, their membership sum, the
-overlap removed, and the exact unique snapshot count. Continuations slice that
-immutable process-local snapshot without reopening LinkedIn and report
-`consistency=captured_snapshot`. A quiet list, physical bottom, loader state,
-or end message can never substitute for count reconciliation.
-
-For asynchronously rendered feeds, the server compares raw visible card
-identities independently of parsing. A quiet polling window is not treated as
-the end of a list. Completion requires either an explicit visible empty/end
-state or, for LinkedIn member lists, three unchanged probes at the physical
-bottom of the visible scroll container with no loader or tail control. When
-LinkedIn exposes an exact count for another selected member collection, such
-as `N connections`, neither an early end message nor a stable bottom is
-accepted until that visible inventory has rendered. Invitation recommendations
-are excluded from the invitation snapshot and reported separately. Exhaustion
-of a private traversal bound returns an honest truncated result.
-
-The paginated tools are Jobs, People, Company, post, broad Connections, and
-message search; post comments; and invitation and first-degree connection
-lists. Exact single-resource reads remain non-cursor
-operations. Company-authored posts use `linkedin.posts.search` with
-`author_company_*` filters; company employees use `linkedin.people.search`
-with `current_company_*` filters.
-For transition compatibility, compatible non-v2 collection tools still accept
-the older `max_results` or `max_comments` aliases for `page_size`.
-
-See [the visible-feature matrix](docs/CAPABILITY_MATRIX.md) for exact filters,
-selectors, payloads, exclusions, capability versions, and visible
-postconditions.
-
-## Package and local setup
-
-Prerequisites are Python 3.12 or 3.13 and
-[`uv`](https://docs.astral.sh/uv/). Docker is not required.
-
-Run the published PyPI package without a permanent installation:
+<details>
+<summary>Claude Code</summary>
 
 ```bash
-uvx --from linkedin-mcp-local linkedin-mcp setup
+claude mcp add --scope user --transport stdio linkedin-mcp -- \
+  uvx --from linkedin-mcp-local linkedin-mcp serve --transport stdio
 ```
 
-Clone and validate a source checkout:
+Check it with `claude mcp list`. See the
+[Claude Code MCP documentation](https://code.claude.com/docs/en/mcp).
+
+</details>
+
+<details>
+<summary>Claude Desktop</summary>
+
+Download the `.mcpb` file from the
+[latest release](https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases/latest),
+then open **Settings → Extensions → Advanced settings → Install Extension**.
+See [Claude Desktop's extension documentation](https://support.claude.com/en/articles/10949351-getting-started-with-local-mcp-servers-on-claude-desktop).
+
+</details>
+
+<details>
+<summary>VS Code and GitHub Copilot</summary>
+
+Use the install button above, or add this to `.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "linkedin-mcp": {
+      "command": "uvx",
+      "args": ["--from", "linkedin-mcp-local", "linkedin-mcp", "serve", "--transport", "stdio"]
+    }
+  }
+}
+```
+
+See the [VS Code MCP documentation](https://code.visualstudio.com/docs/agent-customization/mcp-servers).
+
+</details>
+
+<details>
+<summary>Cursor</summary>
+
+Use the install button above. For manual setup, open **Cursor Settings → MCP →
+Add new MCP server** and use the standard configuration.
+See the [Cursor MCP documentation](https://docs.cursor.com/en/tools/mcp).
+
+</details>
+
+<details>
+<summary>Gemini CLI</summary>
+
+Add the standard configuration under `mcpServers` in
+`~/.gemini/settings.json`, then run `gemini mcp list`.
+See the [Gemini CLI MCP documentation](https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md).
+
+</details>
+
+<details>
+<summary>Windsurf</summary>
+
+Open **Settings → AI → Manage MCP Servers**, or add the standard configuration
+to `~/.codeium/windsurf/mcp_config.json`.
+See the [Windsurf MCP documentation](https://docs.windsurf.com/windsurf/cascade/mcp).
+
+</details>
+
+<details>
+<summary>Cline</summary>
+
+Open **MCP Servers → Configure**, then paste the standard configuration.
+See the [Cline MCP documentation](https://docs.cline.bot/mcp/mcp-overview).
+
+</details>
+
+<details>
+<summary>Roo Code</summary>
+
+Open Roo Code's MCP settings and paste the standard configuration into the
+global file, or save it as `.roo/mcp.json` for one project.
+See the [Roo Code MCP documentation](https://docs.roocode.com/features/mcp/using-mcp-in-roo).
+
+</details>
+
+<details>
+<summary>Kiro</summary>
+
+Use the install button above, or paste the standard configuration into
+`~/.kiro/settings/mcp.json`.
+See the [Kiro MCP documentation](https://kiro.dev/docs/mcp/configuration/).
+
+</details>
+
+<details>
+<summary>Zed</summary>
+
+Add this to Zed settings:
+
+```json
+{
+  "context_servers": {
+    "linkedin-mcp": {
+      "command": "uvx",
+      "args": ["--from", "linkedin-mcp-local", "linkedin-mcp", "serve", "--transport", "stdio"]
+    }
+  }
+}
+```
+
+See the [Zed MCP documentation](https://zed.dev/docs/ai/mcp).
+
+</details>
+
+<details>
+<summary>LM Studio</summary>
+
+Use the install button above, or open **Program → Install → Edit mcp.json** and
+paste the standard configuration.
+See the [LM Studio MCP documentation](https://lmstudio.ai/docs/app/mcp).
+
+</details>
+
+<details>
+<summary>Goose</summary>
+
+Add a custom stdio extension with command `uvx` and the arguments from the
+standard configuration, or start one CLI session with:
 
 ```bash
-git clone https://github.com/prakharagarwal-dev/linkedin-mcp-server.git
-cd linkedin-mcp-server
-uv sync --frozen --all-groups
-uv run linkedin-mcp setup
+goose session --with-extension \
+  "uvx --from linkedin-mcp-local linkedin-mcp serve --transport stdio"
 ```
 
-Chromium installs automatically into the per-user application-data cache when
-the server first needs it. To install it explicitly:
+See the [Goose documentation](https://block.github.io/goose/).
 
-```bash
-uv run linkedin-mcp setup
+</details>
+
+<details>
+<summary>OpenCode</summary>
+
+For OpenCode v2, add this to `opencode.json`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "servers": {
+      "linkedin-mcp": {
+        "type": "local",
+        "command": ["uvx", "--from", "linkedin-mcp-local", "linkedin-mcp", "serve", "--transport", "stdio"]
+      }
+    }
+  }
+}
 ```
 
-The project builds as a normal wheel:
+See the [OpenCode MCP documentation](https://opencode.ai/v2/docs/mcp-servers).
 
-```bash
-uv build
-uvx --from ./dist/linkedin_mcp_local-0.15.0-py3-none-any.whl \
-  linkedin-mcp doctor
-```
+</details>
 
-The wheel does not contain Chromium or a LinkedIn session. On first use, the
-installed CLI downloads the matching official Playwright Chromium revision to
-the shared user cache. A later wheel or `uvx` environment reuses that cache.
+<details>
+<summary>JetBrains AI Assistant</summary>
+
+Open **Settings → Tools → AI Assistant → Model Context Protocol (MCP)**, click
+**Add**, and paste the standard configuration.
+See the [JetBrains MCP documentation](https://www.jetbrains.com/help/ai-assistant/mcp.html).
+
+</details>
+
+<details>
+<summary>Continue</summary>
+
+Save the standard configuration as `.continue/mcpServers/linkedin-mcp.json`.
+See the [Continue MCP documentation](https://docs.continue.dev/customize/deep-dives/mcp).
+
+</details>
+
+<details>
+<summary>Warp</summary>
+
+Open **Settings → AI → Manage MCP Servers → Add** and paste the standard
+configuration.
+See the [Warp MCP documentation](https://docs.warp.dev/agent-platform/capabilities/mcp).
+
+</details>
+
+<details>
+<summary>Any other MCP client</summary>
+
+Configure a local stdio server with:
+
+- command: `uvx`
+- arguments: `--from linkedin-mcp-local linkedin-mcp serve --transport stdio`
+
+Do not combine stdio with shell wrappers that print extra text to stdout.
+
+</details>
 
 ## First LinkedIn login
 
-Either start the MCP server or run login explicitly from the published package:
+1. Save the client configuration and restart the MCP client.
+2. On first start, the server installs its managed Chromium build and opens a
+   headed LinkedIn window.
+3. Complete LinkedIn login, MFA, or any checkpoint yourself. The browser
+   profile is then reused across restarts.
+4. Ask the client to check your LinkedIn session or try one of the prompts below.
+
+The server never asks for or stores your LinkedIn password. If the automatic
+window does not appear, run:
 
 ```bash
 uvx --from linkedin-mcp-local linkedin-mcp login
 uvx --from linkedin-mcp-local linkedin-mcp doctor
 ```
 
-From a source checkout, use:
+## Try it
 
-```bash
-uv run linkedin-mcp login
-uv run linkedin-mcp doctor
+```text
+Find software engineering jobs posted this week in Bengaluru.
+
+Find engineering managers working at Stripe in India.
+
+Read the About and Experience sections from this LinkedIn profile: <profile URL>.
+
+Show my received connection invitations without changing anything.
 ```
 
-The login command:
+With the matching write permissions enabled:
 
-1. ensures the matching official Playwright Chromium revision is installed;
-2. opens a headed browser with the persistent LinkedIn MCP profile;
-3. selects LinkedIn's visible **Keep me signed in** control when available;
-4. waits for the user to complete LinkedIn login, MFA, or a checkpoint;
-5. requires a persistent LinkedIn session cookie and departure from login
-   surfaces;
-6. closes Chromium normally, then reopens the exact profile in the configured
-   headed or headless mode; and
-7. verifies the authenticated LinkedIn feed before reporting success.
+```text
+Draft a connection invitation to <profile URL> with this note: <note>.
 
-The server never asks for or stores a LinkedIn password itself. Later starts
-reuse and validate the same profile. Expired authentication can open the same
-human login flow. Restriction-shaped pages pause work for operator attention.
-
-With `AUTO_LOGIN_ON_START=true`, Chromium setup and login run in background
-tasks, so the MCP handshake itself does not wait for a download or human
-interaction.
-
-## Run as an MCP server
-
-For a local client, stdio is the smallest transport:
-
-```bash
-uv run linkedin-mcp serve --transport stdio
+Prepare a LinkedIn message to <profile URL> saying: <message>.
 ```
 
-For several local clients sharing one worker, browser, profile, and pacing
-state:
+The client should show the exact target and payload for confirmation before an
+account-changing execute tool runs.
 
-```bash
-uv run linkedin-mcp serve --transport streamable-http
+## Capabilities
+
+| Domain | Available tools |
+| --- | --- |
+| Jobs | Search with current visible filters; read complete job details and JD |
+| People | Search with current visible filters; read selected or all profile sections |
+| Companies | Search companies; read exact Overview and About information |
+| Posts | Search, read, create, comment, reply, and react |
+| Network | List/search connections; list, send, accept, and ignore invitations |
+| Messaging | Search messages, read conversations, and send text or attachments |
+
+All tools are narrow and typed. The server does not expose arbitrary browser,
+click, navigation, JavaScript, or network tools. See the
+[capability matrix](docs/CAPABILITY_MATRIX.md) for the complete contract.
+
+## How it works
+
+```text
+Codex / Claude / another MCP client
+                  |
+             typed MCP tools
+                  |
+       one bounded local queue
+                  |
+      one persistent Playwright browser
+                  |
+        visible linkedin.com pages
 ```
 
-The HTTP endpoint is `http://127.0.0.1:8000/mcp` by default. Non-loopback binds
-are rejected because this release does not implement HTTP authentication.
-
-One account lock prevents two server processes from concurrently owning the
-same configured runtime lock. Use one shared Streamable HTTP process if
-multiple local agents need simultaneous access.
-
-### Codex configuration
-
-Use the published package from any repository:
-
-```toml
-[mcp_servers.linkedin]
-command = "uvx"
-args = [
-  "--from",
-  "linkedin-mcp-local==0.15.0",
-  "linkedin-mcp",
-  "serve",
-  "--transport",
-  "stdio",
-]
-startup_timeout_sec = 30
-tool_timeout_sec = 900
-```
-
-For contributors, this source-checkout configuration does not depend on an
-activated virtual environment:
-
-```toml
-[mcp_servers.linkedin]
-command = "uv"
-args = [
-  "run",
-  "--project",
-  "/absolute/path/to/linkedin-mcp-server",
-  "linkedin-mcp",
-  "serve",
-  "--transport",
-  "stdio",
-]
-startup_timeout_sec = 30
-tool_timeout_sec = 900
-```
-
-An installed-wheel configuration can point `command` directly at the installed
-`linkedin-mcp` executable. Both forms reuse the same default browser profile
-and browser cache for the operating-system user.
+Everything runs locally. There is no hosted backend, telemetry, database,
+external queue, LangGraph runtime, or credential service. Browser cookies live
+only in the local Playwright profile; operation state lives only until the
+server process exits. Read the full [architecture](docs/ARCHITECTURE.md) and
+[privacy policy](PRIVACY.md).
 
 ## Account-changing actions
 
-Writes are separate from reads and use:
+Writes use a strict two-step contract:
 
 ```text
-prepare visible target and payload
-  -> action_id + payload_hash + exact approval_preview
-  -> MCP client displays native destructive-tool confirmation
-  -> execute validates the unchanged in-memory draft
-  -> browser performs one final action
-  -> visible postcondition is verified | failed | uncertain
+prepare exact target and payload
+  -> immutable approval preview
+  -> native MCP client confirmation
+  -> execute once
+  -> verify the visible LinkedIn result
 ```
 
-Prepare tools do not change LinkedIn. Execute tools are marked destructive and
-require the exact `action_id`, SHA-256 `payload_hash`, `approval_preview`, and a
-new execution `idempotency_key`. An annotation asks the MCP client to confirm;
-it does not grant a server scope or bypass runtime authorization.
-
-Connection invite preparation opens and validates LinkedIn's current
-confirmation dialog, including the visible `0/200` personalized-note counter,
-without invoking Send. Accept and ignore preparation resolve the exact member
-profile and require the current, paired `Accept … request to connect` and
-`Ignore … request to connect` controls. Their execute tools re-open that same
-profile immediately before the click and verify the terminal state on a fresh
-exact-profile read.
-
-Enable only the required surfaces, scopes, and effects. A trusted MCP client
-must prompt the user for each execute tool. If the user denies the client
-prompt, the client must not call the server.
-
-An execute call is never automatically retried after an `uncertain` result.
-With this database-free design, a hard process exit also erases the attempt
-record; visible LinkedIn state must be inspected before any follow-up.
+The server separately requires the correct surfaces, scopes, and `prepare` /
+`write` effects. Client confirmation does not grant those permissions. Do not
+auto-approve execute tools. See [Configuration](docs/CONFIGURATION.md) and the
+[security design](docs/SECURITY.md).
 
 ## Configuration
 
-All environment settings use the `LINKEDIN_MCP_` prefix.
+Common settings control:
 
-| Variable | Default | Meaning |
-| --- | --- | --- |
-| `ACCOUNT_ID` | `personal` | One configured LinkedIn account |
-| `BROWSER_PROFILE_PATH` | per-user app data | Persistent LinkedIn Chromium profile |
-| `BROWSER_CACHE_PATH` | native Playwright cache | Managed Playwright browser cache |
-| `BROWSER_AUTO_INSTALL` | `true` | Install the matching Chromium revision when needed |
-| `BROWSER_INSTALL_TIMEOUT_SECONDS` | `600` | Browser installation bound |
-| `AUTO_LOGIN_ON_START` | `true` | Validate/recover login in the background |
-| `ALLOWED_HOSTS` | exact LinkedIn hosts | Navigation allowlist |
-| `ALLOWED_SURFACES` | Jobs and People reads | Authorized LinkedIn UI surfaces |
-| `ALLOWED_SCOPES` | Jobs and People reads | Authorized named capabilities |
-| `ALLOWED_EFFECTS` | `read` | `read`, `prepare`, and/or `write` |
-| `QUEUE_CAPACITY` | `100` | Maximum waiting local capability calls |
-| `MINIMUM_NAVIGATION_INTERVAL_SECONDS` | `2` | Internal pacing interval |
-| `PAGINATION_CURSOR_TTL_SECONDS` | `900` | Lifetime of an idle continuation cursor |
-| `PAGINATION_MAX_ACTIVE_CURSORS` | `64` | Maximum process-local continuation states |
-| `PAGINATION_MAX_SEEN_ITEMS_PER_CURSOR` | `5000` | Stable-identity memory bound per scan |
-| `ACTION_DRAFT_TTL_SECONDS` | `86400` | Maximum in-process unexecuted draft age |
-| `ASSET_ROOT_PATH` | per-user app data | Allowed local files for posts/comments/messages |
-| `RUNTIME_LOCK_PATH` | per-user app data | Single-account process lock |
-| `BROWSER_HEADLESS` | `true` | Capability browser mode; login remains headed |
-| `BROWSER_TIMEOUT_SECONDS` | `20` | Browser operation timeout |
-| `LOGIN_TIMEOUT_SECONDS` | `900` | Human login bound |
-| `TRANSPORT` | `stdio` | `stdio` or `streamable-http` |
-| `HTTP_HOST` / `HTTP_PORT` | `127.0.0.1:8000` | Loopback HTTP listener |
+- enabled LinkedIn surfaces, capability scopes, and effect classes;
+- the persistent browser profile and headed/headless operation;
+- the local attachment directory;
+- internal pacing, queue capacity, and bounded collection traversal; and
+- stdio or loopback-only Streamable HTTP transport.
 
-Page and scroll traversal, member-profile section, comment-expansion,
-invitation, connection, and messaging safety bounds remain private server
-configuration. Callers control only the typed `page_size` and opaque `cursor`,
-not browser traversal or pacing. See [.env.example](.env.example) for every
-variable and read-only defaults.
+See [Configuration](docs/CONFIGURATION.md) for ready-made permission presets,
+every environment variable, local HTTP sharing, and the container image.
 
-## Container image
-
-Pull the signed multi-architecture image, or build it locally. It has no
-companion database:
+## Troubleshooting
 
 ```bash
-docker pull ghcr.io/prakharagarwal-dev/linkedin-mcp-server:0.15.0
-docker build -t linkedin-mcp-server:0.15.0 .
+uvx --from linkedin-mcp-local linkedin-mcp setup
+uvx --from linkedin-mcp-local linkedin-mcp login
+uvx --from linkedin-mcp-local linkedin-mcp doctor
 ```
 
-It runs as UID/GID `10001`, includes Chromium, defaults to stdio, and stores the
-persistent browser profile and user assets under `/data/linkedin-mcp`. Mount
-that directory intentionally. Automatic headed login is disabled in the image;
-create and mount a profile through an environment that can display Chromium.
+If a GUI client cannot find `uvx`, use the absolute path returned by
+`command -v uvx` (macOS/Linux) or `where.exe uvx` (Windows). Restart the client
+after changing MCP configuration. See [Troubleshooting](docs/TROUBLESHOOTING.md)
+for authentication, handshake, profile-lock, timeout, and permission errors.
 
-## Verification
-
-The default suite is the complete `mock_verified` acceptance gate. It blocks
-external network access and never contacts LinkedIn:
+## Development
 
 ```bash
-uv run ruff format --check .
-uv run ruff check .
-uv run pyright
+git clone https://github.com/prakharagarwal-dev/linkedin-mcp-server.git
+cd linkedin-mcp-server
+uv sync --frozen --all-groups
 uv run pytest
-uv run pytest --cov=linkedin_mcp --cov-branch
-uv build
 ```
 
-The enforced branch-coverage floor is 85%; the current gate contains 436
-offline tests. The repository contains no live LinkedIn tests.
+The default suite is fully offline and never contacts LinkedIn. Read
+[CONTRIBUTING.md](CONTRIBUTING.md) and [the testing guide](docs/TESTING.md)
+before submitting a change.
 
-## Safety boundary
+## Privacy Policy
 
-There is no generic click, selector, navigation, JavaScript, browser, SQL, or
-network tool. The server uses only visible LinkedIn UI through official
-Playwright APIs and exact configured hosts.
+The server has no maintainer-operated backend, analytics, advertising, or
+telemetry. LinkedIn receives normal visible-UI requests, and the invoking MCP
+client receives tool results under its own data policy; the project sends
+nothing to the maintainer. Read the complete [privacy policy](PRIVACY.md) for
+processing, storage, sharing, retention, and deletion details.
 
-LinkedIn access pauses on authentication expiry, authwalls, checkpoints,
-restriction-shaped pages, permission failures, and invalid configuration. The
-project does not implement CAPTCHA bypass, proxy rotation, fingerprint
-spoofing, credential harvesting, stealth plugins, or private LinkedIn
-endpoints.
+## Safety
 
-Company/Page publishing, auto-apply, referral semantics, groups, paid InMail,
-and other materially different effects require separate future typed
-contracts. Operators are responsible for using the server only with accounts
-and activity they are authorized to operate.
+- Use only accounts and activity you are authorized to operate.
+- Do not use the server for spam, deceptive activity, high-volume extraction,
+  or bypassing access controls.
+- The server pauses on authentication expiry, checkpoints, restriction pages,
+  permission failures, and configuration errors.
+- It does not implement CAPTCHA bypass, proxy rotation, fingerprint spoofing,
+  credential harvesting, stealth plugins, or private LinkedIn endpoints.
+- Never commit or share the persistent browser profile or local assets.
 
-See [Architecture](docs/ARCHITECTURE.md),
-[security design](docs/SECURITY.md),
-[testing and mock verification](docs/TESTING.md),
-[visible-feature matrix](docs/CAPABILITY_MATRIX.md),
-[publishing and package identifiers](docs/PUBLISHING.md),
-[contributing guide](CONTRIBUTING.md),
-[security policy](SECURITY.md), and
-[changelog](CHANGELOG.md).
+See [SECURITY.md](SECURITY.md) and [the security design](docs/SECURITY.md).
+
+## More documentation
+
+- [Configuration](docs/CONFIGURATION.md)
+- [Capability matrix](docs/CAPABILITY_MATRIX.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Testing](docs/TESTING.md)
+- [Collection verification](docs/COLLECTION_VERIFICATION_PROCESS.md)
+- [Publishing](docs/PUBLISHING.md)
+- [Changelog](CHANGELOG.md)
+
+## License
+
+Licensed under the [Apache License 2.0](LICENSE).
+
+If LinkedIn MCP Server is useful to you, please
+[⭐ star the repository](https://github.com/prakharagarwal-dev/linkedin-mcp-server).
