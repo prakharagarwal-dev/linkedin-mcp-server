@@ -462,6 +462,14 @@ See [SECURITY.md](SECURITY.md) and [the security design](docs/SECURITY.md).
 - [Publishing](docs/PUBLISHING.md)
 - [Changelog](CHANGELOG.md)
 
+## Let's connect
+
+Have feedback or an idea for LinkedIn MCP Server?
+
+- [Connect with me on LinkedIn](https://www.linkedin.com/in/prakhar-agarwal-byte/)
+- [Follow me on GitHub](https://github.com/prakharagarwal-dev)
+- [Report a bug or request a feature](https://github.com/prakharagarwal-dev/linkedin-mcp-server/issues)
+
 ## License
 
 Licensed under the [Apache License 2.0](LICENSE).
