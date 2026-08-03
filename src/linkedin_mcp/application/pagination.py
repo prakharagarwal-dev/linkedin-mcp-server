@@ -13,6 +13,7 @@ from datetime import UTC, datetime, timedelta
 
 from linkedin_mcp.domain.models import (
     CapabilityName,
+    InvitationListInput,
     PaginatedInput,
     PaginationMetadata,
 )
@@ -64,6 +65,8 @@ def request_binding(
         mode="json",
         exclude={"context_id", "request_id", "cursor", "page_size"},
     )
+    if isinstance(request, InvitationListInput):
+        value["invitation_filter"] = request.resolved_filter.value
     payload = json.dumps(
         {
             "capability": capability_name.value,

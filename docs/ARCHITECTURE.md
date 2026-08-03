@@ -16,7 +16,7 @@ account.
 │                                                                   │
 │ transport -> registry/policy -> asyncio.Queue -> executor         │
 │                                               │                   │
-│ operation store + cursor/snapshot managers    │                   │
+│ operation store + cursor manager              │                   │
 │                                               ▼                   │
 │                            typed LinkedIn page objects            │
 │                                               │                   │
@@ -142,13 +142,13 @@ Browser and page-object exceptions are projected as safe domain errors.
 Secrets, raw page dumps, subprocess output, and internal exception details are
 not sent to clients.
 
-Invitation listing is an intentional specialized path. For one selected view,
-the page object captures every item and reconciles it to that view's exact
-visible count. The synthetic Received `all` selection scans every current
-visible received view, reconciles each one independently, and deduplicates
-overlapping stable invitation identities into one exact union. The executor
-then stores the immutable snapshot in a dedicated bounded paginator;
-continuation calls slice it without browser access.
+Invitation listing follows the same cursor lifecycle. Its page object still
+preserves the stricter LinkedIn-specific inventory contract: one selected view
+must reconcile its exact advertised count before a terminal response, while
+the synthetic Received `all` selection must reconcile every current visible
+view and deduplicate overlapping invitation identities into one exact union.
+Earlier pages may stop at a bounded live prefix; a continuation revisits the
+visible UI and suppresses identities already returned by the scan.
 
 ### Process-local operation store
 
@@ -189,29 +189,17 @@ skips stable identities already emitted, and reads one unseen lookahead item.
 This is reported as `live_deduplicated`: it prevents duplicates within the scan
 but does not promise snapshot isolation while LinkedIn results change.
 
-### Invitation snapshot paginator
+### Invitation terminal reconciliation
 
-Invitation pagination is separate because every current invitation view
-exposes an exact count even though the latest received surface has no reliable
-All control. The first
-`linkedin.invitations.list` call:
-
-1. selects the exact Received or Sent view, or every current Received view for
-   the synthetic `all` filter;
-2. captures each selected view's current advertised count;
-3. accumulates typed invitations across lazy-loaded and virtualized windows;
-4. reconciles each view independently and excludes neighboring
-   recommendations;
-5. deduplicates identical stable identities across overlapping Received
-   views, failing closed if their visible data conflicts;
-6. records membership, overlap, and unique snapshot counts;
-7. creates one immutable process-local snapshot; and
-8. returns the requested first slice.
-
-Continuation tokens are random, opaque, single-use, account/direction/filter
-bound, and share one absolute expiry with the snapshot. Page size may change.
-Continuation calls perform no LinkedIn navigation. Final consumption, expiry,
-capacity eviction, or process shutdown deletes the snapshot state.
+Invitation reads use the general cursor manager but retain stronger terminal
+proof. A bounded request selects the exact Received or Sent view—or the current
+six-view Received union—captures advertised counts, accumulates typed cards
+across lazy-loaded or virtualized windows, excludes neighboring
+recommendations, and deduplicates stable identities. Reaching the requested
+live prefix returns `result_limit`; exhausting the private traversal bound
+returns `safety_bound`. Only a complete exact count, or an exact reconciled
+multi-view union, returns `visible_page_complete` and terminal
+`has_more=false` without truncation.
 
 ### Browser bootstrap
 

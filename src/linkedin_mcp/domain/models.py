@@ -2112,7 +2112,7 @@ class PaginationMetadata(StrictModel):
     next_cursor: PaginationCursor | None = None
     cursor_expires_at: datetime | None = None
     truncated: bool = False
-    consistency: Literal["live_deduplicated", "captured_snapshot"] = "live_deduplicated"
+    consistency: Literal["live_deduplicated"] = "live_deduplicated"
 
     @model_validator(mode="after")
     def validate_cursor_state(self) -> PaginationMetadata:
@@ -2828,7 +2828,7 @@ class InvitationListCoverage(StrictModel):
         int,
         Field(
             ge=0,
-            description="Exact stable identities in the deduplicated captured snapshot.",
+            description="Stable invitation identities observed in this bounded live traversal.",
         ),
     ]
     view_counts: dict[InvitationFilter, Annotated[int, Field(ge=0)]]
@@ -2844,24 +2844,21 @@ class InvitationListCoverage(StrictModel):
         int,
         Field(
             ge=0,
-            description="Repeated view memberships removed from the stable invitation union.",
+            description="Repeated view memberships observed and removed from the live union.",
         ),
     ]
-    snapshot_count: Annotated[int, Field(ge=0)]
-    returned_count: Annotated[int, Field(ge=0)]
+    result_count: Annotated[int, Field(ge=0)]
+    max_results: Annotated[int, Field(ge=1)]
     scroll_rounds: Annotated[int, Field(ge=0)]
     collection_attempts: Annotated[int, Field(ge=1, le=2)]
     neighboring_recommendation_count: Annotated[int, Field(ge=0)]
     invitation_type_counts: dict[InvitationType, Annotated[int, Field(ge=1)]]
     entity_type_counts: dict[InvitationEntityType, Annotated[int, Field(ge=1)]]
-    completion_reason: Literal[
-        "advertised_count_reconciled",
-        "visible_view_union_reconciled",
-    ] = "advertised_count_reconciled"
+    stop_reason: StopReason
     captured_at: datetime
 
     @model_validator(mode="after")
-    def validate_complete_snapshot(self) -> InvitationListCoverage:
+    def validate_live_traversal(self) -> InvitationListCoverage:
         expected_views: set[InvitationFilter]
         if self.direction is InvitationDirection.SENT:
             expected_views = {InvitationFilter.PEOPLE}
@@ -2875,28 +2872,39 @@ class InvitationListCoverage(StrictModel):
             raise ValueError("Invitation coverage must identify every visible view source URL")
         if sum(self.view_counts.values()) != self.view_membership_count:
             raise ValueError("Invitation view counts must equal the view-membership total")
-        if self.snapshot_count != self.unique_count:
-            raise ValueError("Invitation snapshots must reconcile the exact unique count")
-        if self.view_membership_count - self.snapshot_count != self.overlap_count:
-            raise ValueError("Invitation overlap must reconcile view memberships to the snapshot")
         if self.invitation_filter is InvitationFilter.ALL:
             if self.advertised_count is not None:
                 raise ValueError("Received All has no current LinkedIn advertised count")
-            if self.completion_reason != "visible_view_union_reconciled":
-                raise ValueError("Received All must identify visible-view union reconciliation")
         elif (
-            self.advertised_count != self.unique_count
-            or self.view_membership_count != self.unique_count
-            or self.overlap_count != 0
-            or self.completion_reason != "advertised_count_reconciled"
+            self.advertised_count != self.view_membership_count
+            or self.view_counts.get(self.invitation_filter) != self.advertised_count
         ):
-            raise ValueError("A single invitation view must reconcile its advertised count")
-        if sum(self.invitation_type_counts.values()) != self.snapshot_count:
-            raise ValueError("Invitation type counts must equal the snapshot count")
-        if sum(self.entity_type_counts.values()) != self.snapshot_count:
-            raise ValueError("Invitation entity counts must equal the snapshot count")
-        if self.returned_count > self.snapshot_count:
-            raise ValueError("Returned invitations cannot exceed the captured snapshot")
+            raise ValueError("A single invitation view must preserve its advertised count")
+        if self.unique_count + self.overlap_count > self.view_membership_count:
+            raise ValueError("Observed invitation memberships exceed the advertised inventory")
+        if sum(self.invitation_type_counts.values()) != self.unique_count:
+            raise ValueError("Invitation type counts must equal the observed unique count")
+        if sum(self.entity_type_counts.values()) != self.unique_count:
+            raise ValueError("Invitation entity counts must equal the observed unique count")
+        if self.result_count > self.unique_count or self.result_count > self.max_results:
+            raise ValueError("Returned invitations exceed this bounded traversal")
+        if self.stop_reason not in {
+            StopReason.RESULT_LIMIT,
+            StopReason.SAFETY_BOUND,
+            StopReason.VISIBLE_PAGE_COMPLETE,
+        }:
+            raise ValueError("Invitation traversal has an unsupported stop reason")
+        if self.stop_reason is StopReason.RESULT_LIMIT and self.unique_count < self.max_results:
+            raise ValueError("Invitation result-limit coverage did not reach its traversal limit")
+        if self.stop_reason is StopReason.VISIBLE_PAGE_COMPLETE:
+            if self.unique_count + self.overlap_count != self.view_membership_count:
+                raise ValueError("Completed invitation traversal must reconcile view memberships")
+            if self.invitation_filter is not InvitationFilter.ALL and (
+                self.unique_count != self.advertised_count or self.overlap_count != 0
+            ):
+                raise ValueError(
+                    "A completed single invitation view must reconcile its exact count"
+                )
         return self
 
 
@@ -2911,18 +2919,23 @@ class InvitationListOutput(StrictModel):
     replayed: bool = False
 
     @model_validator(mode="after")
-    def validate_snapshot_page(self) -> InvitationListOutput:
+    def validate_live_page(self) -> InvitationListOutput:
         returned = len(self.invitations)
-        if self.coverage.returned_count != returned or self.pagination.returned_count != returned:
+        if self.coverage.result_count != returned or self.pagination.returned_count != returned:
             raise ValueError("Invitation page counts must match the returned invitations")
-        if self.pagination.consistency != "captured_snapshot":
-            raise ValueError("Invitation pagination must identify captured-snapshot consistency")
-        if self.pagination.cumulative_count > self.coverage.snapshot_count:
-            raise ValueError("Invitation pagination exceeds the captured snapshot")
-        if self.pagination.has_more == (
-            self.pagination.cumulative_count >= self.coverage.snapshot_count
+        if self.pagination.consistency != "live_deduplicated":
+            raise ValueError("Invitation pagination must identify live-deduplicated consistency")
+        if self.pagination.has_more and self.coverage.stop_reason not in {
+            StopReason.RESULT_LIMIT,
+            StopReason.SAFETY_BOUND,
+        }:
+            raise ValueError("Invitation continuation requires an honest non-terminal stop reason")
+        if (
+            not self.pagination.has_more
+            and not self.pagination.truncated
+            and self.coverage.stop_reason is not StopReason.VISIBLE_PAGE_COMPLETE
         ):
-            raise ValueError("Invitation continuation state conflicts with the captured snapshot")
+            raise ValueError("A complete invitation scan requires reconciled terminal coverage")
         references = [item.invitation_ref for item in self.invitations]
         if len(references) != len(set(references)):
             raise ValueError("Invitation pages cannot contain duplicate references")

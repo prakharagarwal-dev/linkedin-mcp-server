@@ -545,7 +545,8 @@ class ProtocolNetwork:
         | tuple[tuple[ConnectionSummary, ...], ConnectionsListCoverage, str, str]
         | tuple[tuple[ConversationSummary, ...], ConversationSearchCoverage, str, str]
     ):
-        del result_limit, progress
+        del progress
+        limit = request.page_size if result_limit is None else result_limit
         captured_at = datetime.now(UTC)
         if isinstance(request, InvitationListInput):
             source_url = "https://www.linkedin.com/mynetwork/invitation-manager/"
@@ -606,18 +607,14 @@ class ProtocolNetwork:
                     ),
                     view_membership_count=1,
                     overlap_count=0,
-                    snapshot_count=1,
-                    returned_count=1,
+                    result_count=1,
+                    max_results=limit,
                     scroll_rounds=1,
                     collection_attempts=1,
                     neighboring_recommendation_count=0,
                     invitation_type_counts={InvitationType.CONNECTION_REQUEST: 1},
                     entity_type_counts={InvitationEntityType.PERSON: 1},
-                    completion_reason=(
-                        "visible_view_union_reconciled"
-                        if request.resolved_filter is InvitationFilter.ALL
-                        else "advertised_count_reconciled"
-                    ),
+                    stop_reason=StopReason.VISIBLE_PAGE_COMPLETE,
                     captured_at=captured_at,
                 ),
                 text,
@@ -1229,14 +1226,14 @@ async def test_mcp_client_discovers_calls_and_reads_evidence() -> None:
                 "view_source_urls",
                 "view_membership_count",
                 "overlap_count",
-                "snapshot_count",
-                "returned_count",
+                "result_count",
+                "max_results",
                 "scroll_rounds",
                 "collection_attempts",
                 "neighboring_recommendation_count",
                 "invitation_type_counts",
                 "entity_type_counts",
-                "completion_reason",
+                "stop_reason",
             }.issubset(invitation_coverage_properties)
             invitation_summary_properties = cast(
                 dict[str, object],
@@ -1848,12 +1845,13 @@ async def test_mcp_client_discovers_calls_and_reads_evidence() -> None:
             }
             assert invitations.structuredContent["coverage"]["view_membership_count"] == 1
             assert invitations.structuredContent["coverage"]["overlap_count"] == 0
-            assert invitations.structuredContent["coverage"]["snapshot_count"] == 1
+            assert invitations.structuredContent["coverage"]["result_count"] == 1
+            assert invitations.structuredContent["coverage"]["max_results"] == 25
             assert (
-                invitations.structuredContent["coverage"]["completion_reason"]
-                == "advertised_count_reconciled"
+                invitations.structuredContent["coverage"]["stop_reason"] == "visible_page_complete"
             )
             assert invitations.structuredContent["pagination"]["has_more"] is False
+            assert invitations.structuredContent["pagination"]["consistency"] == "live_deduplicated"
             assert inbox.structuredContent["coverage"]["category"] == "other"
             assert inbox.structuredContent["coverage"]["filter"] == "jobs"
             assert connections.structuredContent["connections"][0]["name"] == "Jane Doe"

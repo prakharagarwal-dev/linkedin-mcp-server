@@ -184,7 +184,7 @@ MOCK_VERIFICATION: dict[str, ToolVerification] = {
         "read",
         _READ,
         "tests/unit/test_invitation_pages.py",
-        "tests/unit/test_invitation_snapshots.py",
+        "tests/unit/test_pagination.py",
         "tests/unit/test_executor.py",
         "tests/contract/test_mcp_protocol.py",
         "tests/workflows/test_mock_workflows.py",

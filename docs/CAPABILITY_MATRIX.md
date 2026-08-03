@@ -1,6 +1,6 @@
 # LinkedIn Visible-Feature Matrix
 
-**Matrix version:** `2026-07-30.1`
+**Matrix version:** `2026-08-03.1`
 
 This matrix records the visible LinkedIn controls and outputs inspected for the
 configured authorized member account. It is evidence for capability acceptance,
@@ -39,7 +39,7 @@ do not upgrade this classification.
 | Post discussion | `linkedin.posts.comments.list` `1.1.1` | Ordering, cursor-paged top-level comments, delayed expansion, replies, media, and source retrieval | `mock_verified` |
 | Personal post publishing | `linkedin.posts.create.*` `2.0.0` | Nine current personal composer modes, exact nested options, immutable previews, tamper rejection, execution, and replay | `mock_verified` + prepare-only live acceptance |
 | Post/comment engagement | `linkedin.posts.comment.*` and `linkedin.posts.reaction.*` `2.0.0` | Current comment/reply text, photo and GIF controls, native discussion aliases, all six reactions, tamper rejection, execution, and replay | `mock_verified` + prepare-only live acceptance |
-| Invitations | List `3.0.0`; send, accept, and ignore `1.0.0` | Latest-layout-only received/sent extraction; exact per-view count reconciliation; immutable snapshot cursors; and the complete currently implemented invitation lifecycle under one namespace, with scoped hash-locked writes and exact-profile postconditions | `mock_verified` + read-only/prepare-only live acceptance |
+| Invitations | List `4.0.0`; send, accept, and ignore `1.0.0` | Latest-layout-only received/sent extraction; bounded live cursor traversal; exact terminal per-view count reconciliation; and the complete currently implemented invitation lifecycle under one namespace, with scoped hash-locked writes and exact-profile postconditions | `mock_verified` + read-only/prepare-only live acceptance |
 | Connections | List `2.0.0`; search `2.0.0` | Separate sorted inventory and filtered search of established first-degree connections; the server always binds search to first degree and rejects non-first-degree results | `mock_verified` + read-only live acceptance |
 | Messaging | Search, conversation get, message prepare, and execute `2.0.0` | Current recipient/message search criteria and mutually exclusive filters; cursor paging; reverse-virtualized history; exact recipients/replies; current text, file, and KLIPY GIF preparation; reply-aware same-surface postconditions; tamper rejection; and replay | `mock_verified` + read/prepare-only live acceptance |
 
@@ -54,17 +54,17 @@ browser-traversal safety limits. The compatibility names `max_results` and
 `max_comments` remain accepted during the transition but are not the canonical
 domain-model fields.
 
-Ten collection families report `live_deduplicated` and rescan a bounded live
-prefix for continuations. `linkedin.invitations.list` instead reports
-`captured_snapshot`: its initial request captures and exactly reconciles the
-entire selected invitation inventory, while every cursor page is an in-memory
-slice of that same immutable snapshot and performs no browser navigation.
+Every collection family reports `live_deduplicated` and rescans a bounded live
+prefix for continuations. Cursor state stores stable identities already
+returned, not captured LinkedIn content. A continuation skips those identities
+and returns the next unseen page plus terminal or truncation metadata.
 
 Collection completion is evidence-driven: raw visible identities detect
-appended and same-count virtualized progress; polling idleness alone never
-sets `has_more=false`. Only a visible empty/end state completes a quiet
-collection. Exhausting the private traversal bound reports truncation rather
-than silently advertising a complete list.
+appended and same-count virtualized progress, and polling idleness alone never
+sets `has_more=false`. Count-backed invitation views complete only after exact
+reconciliation; collectors without an exact count require independent visible
+terminal evidence. Exhausting a private traversal bound reports truncation
+rather than silently advertising a complete list.
 
 ## `linkedin.people.get` `1.1.1`
 
@@ -269,7 +269,7 @@ limit as an enumeration guarantee.
 | Group, event, and newsletter invitations | `supported` | Typed entity URL/slug/name and invitation family |
 | Newly introduced invitation surfaces | `supported` | Loss-preserving `other` entity/type with exact visible evidence |
 | Invitation completion | `supported` | Single views reconcile their exact advertised count; `all` reconciles every view, then reports membership, overlap, and unique union counts; idle, bottom, loader, and end copy never prove completion |
-| Invitation pagination | `supported` | One full immutable snapshot, opaque single-use cursors, changing page size, absolute expiry, and no continuation browser reads |
+| Invitation pagination | `supported` | Opaque filter-bound single-use cursors rescan a bounded live prefix, suppress already returned invitation identities, permit page-size changes, refresh expiry on continuation, and claim terminal completion only after exact selected-view reconciliation |
 | Neighboring recommendations | `supported` | Excluded from invitations and counted separately |
 | Current first-degree connections | `supported` | `linkedin.connections.list` cursor-pages the visible inventory without mixing search semantics |
 | Recently added/first name/last name order | `supported` | Typed visible sorting |
