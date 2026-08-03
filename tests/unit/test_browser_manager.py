@@ -8,12 +8,21 @@ from typing import Any, cast
 import pytest
 
 import linkedin_mcp.browser.manager as manager_module
-from linkedin_mcp.browser import BrowserManager, BrowserRuntimeBootstrap, login_interactively
+from linkedin_mcp.browser import (
+    BrowserManager,
+    BrowserRuntimeBootstrap,
+    login_interactively,
+    logout_interactively,
+)
+from linkedin_mcp.browser.profile import BrowserProfileManager, BrowserProfileStatus
 from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import (
     AuthenticationRequiredError,
     AuthorizationDeniedError,
+    BrowserUnavailableError,
+    ConfigurationError,
     InvalidTargetError,
+    ParserDriftError,
     RestrictionDetectedError,
 )
 
@@ -26,6 +35,24 @@ def _live_settings(tmp_path: Path, *, profile_name: str = "profile") -> Settings
         minimum_navigation_interval_seconds=0,
         browser_timeout_seconds=5,
     )
+
+
+def _mark_profile_initialized(settings: Settings) -> None:
+    settings.browser_profile_path.mkdir(parents=True, exist_ok=True)
+    (settings.browser_profile_path / "Preferences").write_text("{}", encoding="utf-8")
+
+
+class FakeBrowserProfileManager:
+    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
+
+    def inspect(self) -> BrowserProfileStatus:
+        path = self.settings.browser_profile_path
+        initialized = path.is_dir() and any(path.iterdir())
+        return BrowserProfileStatus(path=path, exists=path.is_dir(), initialized=initialized)
+
+    async def ensure_created(self) -> None:
+        _mark_profile_initialized(self.settings)
 
 
 class FakeRuntimePage:
@@ -245,6 +272,117 @@ class FakeLoginStarter:
         return self.playwright
 
 
+class FakeLogoutControl:
+    def __init__(self, *, visible: bool = True, on_click: Any | None = None) -> None:
+        self.visible = visible
+        self.on_click = on_click
+        self.clicked = False
+
+    async def is_visible(self) -> bool:
+        return self.visible
+
+    async def click(self) -> None:
+        self.clicked = True
+        if self.on_click is not None:
+            self.on_click()
+
+
+class FakeLogoutControls:
+    def __init__(self, controls: list[FakeLogoutControl]) -> None:
+        self.controls = controls
+
+    async def count(self) -> int:
+        return len(self.controls)
+
+    def nth(self, index: int) -> FakeLogoutControl:
+        return self.controls[index]
+
+
+class FakeLogoutPage:
+    def __init__(
+        self,
+        *,
+        destination: str,
+        account_controls: list[FakeLogoutControl] | None = None,
+        sign_out_controls: list[FakeLogoutControl] | None = None,
+    ) -> None:
+        self.url = "about:blank"
+        self.destination = destination
+        self.account_controls = account_controls or []
+        self.sign_out_controls = sign_out_controls or []
+        self.visited_urls: list[str] = []
+
+    async def goto(self, url: str, *, wait_until: str) -> None:
+        assert wait_until == "domcontentloaded"
+        self.visited_urls.append(url)
+        self.url = self.destination
+
+    def get_by_role(self, role: str, *, name: object) -> FakeLogoutControls:
+        del name
+        if role == "button":
+            return FakeLogoutControls(self.account_controls)
+        if role == "link":
+            return FakeLogoutControls(self.sign_out_controls)
+        raise AssertionError(f"Unexpected role: {role}")
+
+    async def wait_for_timeout(self, _: float) -> None:
+        return
+
+
+class FakeLogoutContext:
+    def __init__(self, page: FakeLogoutPage, *, cookies: list[dict[str, object]]) -> None:
+        self.pages = [page]
+        self.cookies_result = cookies
+        self.closed = False
+
+    def set_default_timeout(self, _: float) -> None:
+        return
+
+    def set_default_navigation_timeout(self, _: float) -> None:
+        return
+
+    async def new_page(self) -> FakeLogoutPage:
+        return self.pages[0]
+
+    async def cookies(self, _: str) -> list[dict[str, object]]:
+        return self.cookies_result
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+class FakeLogoutChromium:
+    def __init__(self, contexts: list[FakeLogoutContext]) -> None:
+        self.contexts = contexts
+        self.launches: list[tuple[str, bool]] = []
+
+    async def launch_persistent_context(
+        self,
+        *,
+        user_data_dir: str,
+        headless: bool,
+    ) -> FakeLogoutContext:
+        self.launches.append((user_data_dir, headless))
+        return self.contexts[len(self.launches) - 1]
+
+
+class FakeLogoutPlaywright:
+    def __init__(self, contexts: list[FakeLogoutContext]) -> None:
+        self.chromium = FakeLogoutChromium(contexts)
+        self.stopped = False
+
+    async def stop(self) -> None:
+        self.stopped = True
+
+
+class FakeLogoutStarter:
+    def __init__(self, playwright: FakeLogoutPlaywright) -> None:
+        self.playwright = playwright
+
+    async def start(self) -> FakeLogoutPlaywright:
+        return self.playwright
+
+
 def _fake_li_at(*, persistent: bool) -> dict[str, object]:
     return {
         "name": "li_at",
@@ -270,11 +408,7 @@ async def test_automatic_first_run_login_validates_and_reuses_one_persistent_con
     ) -> None:
         nonlocal login_calls
         login_calls += 1
-        login_settings.browser_profile_path.mkdir(parents=True)
-        (login_settings.browser_profile_path / "Preferences").write_text(
-            "{}",
-            encoding="utf-8",
-        )
+        assert login_settings.browser_profile_path.is_dir()
 
     def fake_async_playwright() -> FakeRuntimeStarter:
         return FakeRuntimeStarter(playwright)
@@ -285,7 +419,11 @@ async def test_automatic_first_run_login_validates_and_reuses_one_persistent_con
     monkeypatch.setattr(manager_module, "async_playwright", cast(Any, fake_async_playwright))
     monkeypatch.setattr(manager_module, "assert_safe_linkedin_page", safe_page)
 
-    manager = BrowserManager(settings, login_runner=fake_login)
+    manager = BrowserManager(
+        settings,
+        browser_profile=cast(BrowserProfileManager, FakeBrowserProfileManager(settings)),
+        login_runner=fake_login,
+    )
     manager.start_session_bootstrap()
 
     async with manager.page() as capability_page:
@@ -475,6 +613,7 @@ async def test_interactive_login_uses_and_preserves_the_local_profile(
     settings = _live_settings(tmp_path, profile_name="interactive").model_copy(
         update={"browser_headless": verification_headless}
     )
+    _mark_profile_initialized(settings)
     login_page = FakeLoginPage(
         remember_me_present=True,
         remember_me_checked=False,
@@ -522,6 +661,7 @@ async def test_interactive_login_rejects_a_transient_session_cookie(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = _live_settings(tmp_path, profile_name="transient")
+    _mark_profile_initialized(settings)
     login_page = FakeLoginPage()
     login_context = FakeLoginContext(
         login_page,
@@ -554,6 +694,7 @@ async def test_interactive_login_rejects_a_session_lost_during_clean_reopen(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = _live_settings(tmp_path, profile_name="lost-on-reopen")
+    _mark_profile_initialized(settings)
     login_context = FakeLoginContext(
         FakeLoginPage(),
         cookies=[_fake_li_at(persistent=True)],
@@ -584,5 +725,160 @@ async def test_interactive_login_rejects_a_session_lost_during_clean_reopen(
         (str(settings.browser_profile_path), True),
     ]
     assert login_context.closed is True
+    assert verification_context.closed is True
+    assert playwright.stopped is True
+
+
+@pytest.mark.asyncio
+async def test_interactive_login_requires_an_explicitly_created_profile(tmp_path: Path) -> None:
+    settings = _live_settings(tmp_path, profile_name="missing-for-login")
+
+    with pytest.raises(ConfigurationError, match="profile create"):
+        await login_interactively(settings)
+
+
+@pytest.mark.asyncio
+async def test_interactive_logout_uses_visible_controls_and_survives_clean_reopen(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = _live_settings(tmp_path, profile_name="logout")
+    _mark_profile_initialized(settings)
+    first_context: FakeLogoutContext
+
+    def clear_session() -> None:
+        first_context.cookies_result = []
+
+    account_menu = FakeLogoutControl()
+    sign_out = FakeLogoutControl(on_click=clear_session)
+    first_page = FakeLogoutPage(
+        destination="https://www.linkedin.com/feed/",
+        account_controls=[account_menu],
+        sign_out_controls=[sign_out],
+    )
+    first_context = FakeLogoutContext(first_page, cookies=[_fake_li_at(persistent=True)])
+    verification_page = FakeLogoutPage(destination="https://www.linkedin.com/login")
+    verification_context = FakeLogoutContext(verification_page, cookies=[])
+    playwright = FakeLogoutPlaywright([first_context, verification_context])
+
+    async def safe_page(_: object, __: tuple[str, ...]) -> None:
+        return
+
+    async def no_sleep(_: float) -> None:
+        return
+
+    monkeypatch.setattr(
+        manager_module,
+        "async_playwright",
+        cast(Any, lambda: FakeLogoutStarter(playwright)),
+    )
+    monkeypatch.setattr(manager_module, "assert_safe_linkedin_page", safe_page)
+    monkeypatch.setattr(manager_module.asyncio, "sleep", no_sleep)
+
+    assert await logout_interactively(settings) is True
+    assert account_menu.clicked is True
+    assert sign_out.clicked is True
+    assert playwright.chromium.launches == [
+        (str(settings.browser_profile_path), False),
+        (str(settings.browser_profile_path), True),
+    ]
+    assert first_context.closed is True
+    assert verification_context.closed is True
+    assert playwright.stopped is True
+
+
+@pytest.mark.asyncio
+async def test_interactive_logout_is_idempotent_when_already_logged_out(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = _live_settings(tmp_path, profile_name="already-logged-out")
+    _mark_profile_initialized(settings)
+    context = FakeLogoutContext(
+        FakeLogoutPage(destination="https://www.linkedin.com/login"),
+        cookies=[],
+    )
+    playwright = FakeLogoutPlaywright([context])
+    monkeypatch.setattr(
+        manager_module,
+        "async_playwright",
+        cast(Any, lambda: FakeLogoutStarter(playwright)),
+    )
+
+    assert await logout_interactively(settings) is False
+    assert len(playwright.chromium.launches) == 1
+    assert context.closed is True
+    assert playwright.stopped is True
+
+
+@pytest.mark.asyncio
+async def test_interactive_logout_fails_closed_when_visible_account_menu_is_missing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = _live_settings(tmp_path, profile_name="logout-drift")
+    _mark_profile_initialized(settings)
+    page = FakeLogoutPage(destination="https://www.linkedin.com/feed/")
+    context = FakeLogoutContext(page, cookies=[_fake_li_at(persistent=True)])
+    playwright = FakeLogoutPlaywright([context])
+
+    async def safe_page(_: object, __: tuple[str, ...]) -> None:
+        return
+
+    monkeypatch.setattr(
+        manager_module,
+        "async_playwright",
+        cast(Any, lambda: FakeLogoutStarter(playwright)),
+    )
+    monkeypatch.setattr(manager_module, "assert_safe_linkedin_page", safe_page)
+
+    with pytest.raises(ParserDriftError, match="account menu"):
+        await logout_interactively(settings)
+
+    assert context.closed is True
+    assert playwright.stopped is True
+
+
+@pytest.mark.asyncio
+async def test_interactive_logout_rejects_session_that_survives_clean_reopen(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = _live_settings(tmp_path, profile_name="logout-reopen-failure")
+    _mark_profile_initialized(settings)
+    first_context: FakeLogoutContext
+
+    def clear_session() -> None:
+        first_context.cookies_result = []
+
+    first_page = FakeLogoutPage(
+        destination="https://www.linkedin.com/feed/",
+        account_controls=[FakeLogoutControl()],
+        sign_out_controls=[FakeLogoutControl(on_click=clear_session)],
+    )
+    first_context = FakeLogoutContext(first_page, cookies=[_fake_li_at(persistent=True)])
+    verification_context = FakeLogoutContext(
+        FakeLogoutPage(destination="https://www.linkedin.com/feed/"),
+        cookies=[_fake_li_at(persistent=True)],
+    )
+    playwright = FakeLogoutPlaywright([first_context, verification_context])
+
+    async def safe_page(_: object, __: tuple[str, ...]) -> None:
+        return
+
+    async def no_sleep(_: float) -> None:
+        return
+
+    monkeypatch.setattr(
+        manager_module,
+        "async_playwright",
+        cast(Any, lambda: FakeLogoutStarter(playwright)),
+    )
+    monkeypatch.setattr(manager_module, "assert_safe_linkedin_page", safe_page)
+    monkeypatch.setattr(manager_module.asyncio, "sleep", no_sleep)
+
+    with pytest.raises(BrowserUnavailableError, match="clean browser restart"):
+        await logout_interactively(settings)
+
     assert verification_context.closed is True
     assert playwright.stopped is True

@@ -288,16 +288,38 @@ See the [Warp MCP documentation](https://docs.warp.dev/agent-platform/capabiliti
 ### First-time LinkedIn login
 
 After installation, restart your MCP client. The server opens LinkedIn in a
-browser window where you can sign in and complete MFA or any checkpoint. Your
-session is saved locally and reused across restarts.
+browser window where you can sign in and complete MFA or any checkpoint. On
+this first use it creates its own persistent Chromium profile automatically.
+Your session is saved in that profile and reused across restarts.
 
-If the window does not open, run:
+If you have not started the server yet and want to log in manually, create the
+dedicated profile first:
 
 ```bash
+uvx --from linkedin-mcp-local linkedin-mcp profile create
 uvx --from linkedin-mcp-local linkedin-mcp login
 ```
 
 The server never asks for or stores your LinkedIn password.
+
+### Local session controls
+
+Use these commands without locating PIDs or deleting lock files manually:
+
+```bash
+# Show or gracefully stop the process that owns this account
+uvx --from linkedin-mcp-local linkedin-mcp status
+uvx --from linkedin-mcp-local linkedin-mcp stop
+
+# Inspect the dedicated Chromium profile or sign out visibly
+uvx --from linkedin-mcp-local linkedin-mcp profile status
+uvx --from linkedin-mcp-local linkedin-mcp logout
+```
+
+For a clean profile, run `linkedin-mcp profile reset`. The command asks for
+confirmation, archives the old profile, and creates a replacement. See
+[Configuration](docs/CONFIGURATION.md#browser-profile-and-linkedin-session)
+for the complete lifecycle.
 
 ### Try it
 

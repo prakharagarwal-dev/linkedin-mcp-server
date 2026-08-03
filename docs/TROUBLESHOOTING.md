@@ -5,11 +5,13 @@ Start with the package's non-secret diagnostics:
 ```bash
 uvx --from linkedin-mcp-local linkedin-mcp setup
 uvx --from linkedin-mcp-local linkedin-mcp doctor
+uvx --from linkedin-mcp-local linkedin-mcp status
 ```
 
 `setup` ensures the matching Playwright Chromium revision is installed.
-`doctor` reports package, browser, profile, authentication, pause, and lock
-readiness without exposing cookies or credentials.
+`doctor` reports browser, profile, configuration, and runtime readiness without
+exposing cookies or credentials. `status` identifies the exact local process
+that currently owns the configured account lock.
 
 ## The MCP server does not start
 
@@ -40,11 +42,19 @@ its MCP configuration.
 
 ## LinkedIn authentication is required
 
-Run the persistent-profile login flow:
+Stop any server that owns the profile, inspect or create the dedicated profile,
+then run the LinkedIn-only login flow:
 
 ```bash
+uvx --from linkedin-mcp-local linkedin-mcp stop
+uvx --from linkedin-mcp-local linkedin-mcp profile status
+uvx --from linkedin-mcp-local linkedin-mcp profile create
 uvx --from linkedin-mcp-local linkedin-mcp login
 ```
+
+`stop` is idempotent, and `profile create` does nothing when an initialized
+profile already exists. `login` intentionally refuses to create a missing
+profile.
 
 Complete login, MFA, or checkpoints only in the opened LinkedIn browser. The
 server never needs the password. A successful login is verified through a
@@ -55,13 +65,39 @@ manually. The server intentionally pauses and does not bypass those pages.
 
 ## Another process owns the browser profile
 
-Only one server process may own one account profile. Close the other MCP client
-or stop its LinkedIn MCP process before retrying. If several clients must use
-the account simultaneously, run one loopback Streamable HTTP server and connect
-each client to `http://127.0.0.1:8000/mcp`.
+Only one local process may own one account profile. You do not need to find or
+kill its PID manually:
+
+```bash
+uvx --from linkedin-mcp-local linkedin-mcp status
+uvx --from linkedin-mcp-local linkedin-mcp stop
+```
+
+`stop` addresses only the process currently holding the configured lock, asks
+it to shut down gracefully, and waits for release. It does not use `SIGKILL`.
+If the timeout expires, the active bounded LinkedIn operation is still being
+allowed to finish; run `status` again rather than deleting the lock.
+
+If several clients must use the account simultaneously, run one loopback
+Streamable HTTP server and connect each client to
+`http://127.0.0.1:8000/mcp`.
 
 Do not delete the runtime lock while a server or browser process is still
 running.
+
+## The dedicated browser profile is damaged
+
+First stop its owner. Then reset the exact configured profile:
+
+```bash
+uvx --from linkedin-mcp-local linkedin-mcp stop
+uvx --from linkedin-mcp-local linkedin-mcp profile reset
+uvx --from linkedin-mcp-local linkedin-mcp login
+```
+
+Reset archives the old directory before creating a replacement and rolls back
+if replacement creation fails. The reported `*.backup-*` directory remains
+sensitive and is not deleted automatically.
 
 ## A tool is installed but disabled
 

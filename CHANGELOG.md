@@ -6,6 +6,24 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Add `status` and `stop` commands with non-secret exact-owner metadata,
+  graceful queue draining, and safe lock release.
+- Add explicit `profile create`, `profile status`, and recoverable
+  `profile reset` commands while preserving automatic first-run profile
+  creation during normal server startup.
+- Add LinkedIn-only `login` and visible, clean-reopen-verified `logout`
+  commands protected by the same account lock as the server.
+
+### Changed
+
+- Make lock conflicts actionable without manual PID discovery or lock-file
+  deletion, and document browser-profile archive retention.
+- Keep the Streamable HTTP container, lock, queue, pacing, cursors, drafts, and
+  other process-local state alive for the full listener lifetime instead of
+  recreating them around individual HTTP requests.
+
 ## [0.15.1] - 2026-08-03
 
 ### Added
