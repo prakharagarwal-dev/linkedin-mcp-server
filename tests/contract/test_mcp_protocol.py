@@ -1134,6 +1134,7 @@ async def test_mcp_client_discovers_calls_and_reads_evidence() -> None:
             content_schema = post_prepare_tool.inputSchema["properties"]["content"]
             assert "oneOf" in content_schema
             assert len(content_schema["oneOf"]) == 9
+            assert content_schema["description"].endswith("use mode, not kind.")
             assert execute_fields == set(post_execute_tool.inputSchema["properties"])
             comment_prepare_tool = next(
                 tool for tool in tools.tools if tool.name == "linkedin.posts.comment.prepare"

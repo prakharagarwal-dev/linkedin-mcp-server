@@ -9,6 +9,7 @@ from typing import cast
 
 import pytest
 from playwright.async_api import Locator, Page, Route, async_playwright
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl, ValidationError
 
 from linkedin_mcp.assets import LocalAssetStore
@@ -56,8 +57,10 @@ COMPOSER_HTML = (FIXTURES / "personal-post-composer.html").read_text()
 
 
 class PublishingFixtureBrowser:
-    def __init__(self, page: Page) -> None:
+    def __init__(self, page: Page, *, composer_delay_ms: int = 0) -> None:
         self._page = page
+        self._composer_delay_ms = composer_delay_ms
+        self.fail_next_settings_click = False
 
     @asynccontextmanager
     async def page(self) -> AsyncGenerator[Page]:
@@ -69,9 +72,17 @@ class PublishingFixtureBrowser:
 
         await page.route(url, fulfill, times=1)
         await page.goto(url)
+        await page.evaluate(
+            "delay => { window.__linkedinMcpComposerDelayMs = delay; }",
+            self._composer_delay_ms,
+        )
 
     async def click_visible_control(self, page: Page, control: Locator) -> None:
         del page
+        label = await control.get_attribute("aria-label") or ""
+        if self.fail_next_settings_click and label.startswith("Post settings"):
+            self.fail_next_settings_click = False
+            raise PlaywrightTimeoutError("fixture pre-submit timeout")
         await control.click()
 
 
@@ -101,6 +112,34 @@ async def _prepared_draft(
         created_at=now,
         expires_at=now + timedelta(hours=1),
     )
+
+
+@pytest.mark.timeout(15)
+async def test_prepare_waits_through_the_current_visible_composer_loader(
+    tmp_path: Path,
+) -> None:
+    request = PostCreatePrepareInput(
+        context_id="publishing-context",
+        request_id="prepare-delayed-composer",
+        content=TextPostContent(text="A delayed fixture composer."),
+    )
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        page = await browser.new_page()
+        adapter = PostPublishingPage(
+            cast(
+                BrowserManager,
+                PublishingFixtureBrowser(page, composer_delay_ms=3_500),
+            ),
+            LocalAssetStore(tmp_path),
+        )
+        try:
+            capture = await adapter.prepare_post(request)
+        finally:
+            await browser.close()
+
+    assert capture.target.actor_profile_slug == "current-member"
+    assert capture.current_state.startswith("personal_post_composer_ready:text")
 
 
 @pytest.mark.timeout(30)
@@ -144,6 +183,35 @@ async def test_personal_text_post_prepare_and_execute_verify_new_stable_post(
     assert result.performed is True
     assert result.final_state.startswith("post_published:activity:")
     assert "A precise fixture post with @Alex." in result.captured_text
+
+
+@pytest.mark.timeout(30)
+async def test_pre_submit_timeout_is_a_verified_failure_not_an_uncertain_publish(
+    tmp_path: Path,
+) -> None:
+    request = PostCreatePrepareInput(
+        context_id="publishing-context",
+        request_id="prepare-pre-submit-timeout",
+        content=TextPostContent(text="A fixture post that is never submitted."),
+    )
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        page = await browser.new_page()
+        fixture_browser = PublishingFixtureBrowser(page)
+        adapter = PostPublishingPage(
+            cast(BrowserManager, fixture_browser),
+            LocalAssetStore(tmp_path),
+        )
+        try:
+            draft = await _prepared_draft(adapter, request)
+            fixture_browser.fail_next_settings_click = True
+            result = await adapter.execute_post(draft)
+        finally:
+            await browser.close()
+
+    assert result.outcome is ActionOutcome.FAILED
+    assert result.performed is False
+    assert result.final_state == "post_not_submitted"
 
 
 @pytest.mark.timeout(40)

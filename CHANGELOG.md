@@ -6,6 +6,16 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Wait through LinkedIn's visible post-composer loader, avoid clicking disabled
+  Save and Done controls when settings are unchanged, and report failures before
+  the final Post control as not submitted instead of uncertain.
+- Preserve exact immutable evidence for dynamically changing Posts search cards
+  instead of failing after a valid visible result was parsed.
+- Clarify in the public post-creation schema that `content.mode`, not `kind`, is
+  the required discriminator.
+
 ### Added
 
 - Add one shared local runtime that accepts simultaneous stdio and loopback

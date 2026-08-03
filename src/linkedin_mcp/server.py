@@ -712,7 +712,7 @@ def create_mcp_server(
             "tags, video with thumbnail/captions, document, poll, celebration, event, existing-"
             "job hiring, and expert-request content. Exact audience/group, comment control, "
             "brand partnership, eligible collaborators, mentions, local asset hashes, and "
-            "optional schedule are captured. "
+            "optional schedule are captured. The content discriminator is mode, not kind. "
             "This tool never publishes and never publishes as a company Page."
         ),
         annotations=linkedin_prepare,

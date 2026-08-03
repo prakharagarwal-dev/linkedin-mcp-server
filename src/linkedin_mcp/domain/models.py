@@ -1464,7 +1464,12 @@ PostCreateContent = Annotated[
     | EventPostContent
     | HiringPostContent
     | ExpertRequestPostContent,
-    Field(discriminator="mode"),
+    Field(
+        discriminator="mode",
+        description=(
+            "Typed post content discriminated by the required mode field; use mode, not kind."
+        ),
+    ),
 ]
 
 
