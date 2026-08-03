@@ -320,6 +320,7 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "pyrate-limiter" },
     { name = "structlog" },
+    { name = "uvicorn" },
 ]
 
 [package.dev-dependencies]
@@ -344,6 +345,7 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.10,<3" },
     { name = "pyrate-limiter", specifier = ">=4.4,<5" },
     { name = "structlog", specifier = ">=25,<26" },
+    { name = "uvicorn", specifier = ">=0.35,<1" },
 ]
 
 [package.metadata.requires-dev]

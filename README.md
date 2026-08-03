@@ -358,21 +358,21 @@ Actions that change LinkedIn are shown for confirmation before they run.
 ```mermaid
 %%{init: {"flowchart": {"nodeSpacing": 55, "rankSpacing": 65}, "themeVariables": {"fontSize": "20px"}}}%%
 flowchart LR
-    A["MCP Client<br/>Codex · Claude · Cursor"] --> B["LinkedIn MCP Server"]
-    B --> C["Typed LinkedIn Tools"]
-    C --> D["Bounded Local Queue"]
-    D --> E["Single Playwright Worker"]
+    A["MCP Clients<br/>Codex · Claude · Cursor"] --> B["stdio bridges or<br/>loopback HTTP"]
+    B --> C["Shared Local Runtime<br/>Typed LinkedIn Tools"]
+    C --> D["Fair Per-Client Queue"]
+    D --> E["One Atomic Browser Operation<br/>Fresh Page · Global Pacing"]
     E -->|"Visible UI only"| F["LinkedIn"]
-
-    E <--> G["Persistent Browser Profile"]
-    B -. "Confirmation previews" .-> A
+    E <--> G["One Chromium Context<br/>Persistent Profile"]
+    C -. "Confirmation previews" .-> A
 ```
 
 Everything runs locally. There is no hosted backend, telemetry, database,
 external queue, LangGraph runtime, or credential service. Browser cookies live
-only in the local Playwright profile; operation state lives only until the
-server process exits. Read the full [architecture](docs/ARCHITECTURE.md) and
-[privacy policy](PRIVACY.md).
+only in the local Playwright profile. The first client starts one shared local
+runtime; later clients attach to it, and fair scheduling gives each client a
+turn between complete tool calls. Operation state lasts only for that runtime.
+Read the full [architecture](docs/ARCHITECTURE.md) and [privacy policy](PRIVACY.md).
 
 ## Configuration
 

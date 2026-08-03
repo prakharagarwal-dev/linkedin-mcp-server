@@ -10,8 +10,8 @@ uvx --from linkedin-mcp-local linkedin-mcp status
 
 `setup` ensures the matching Playwright Chromium revision is installed.
 `doctor` reports browser, profile, configuration, and runtime readiness without
-exposing cookies or credentials. `status` identifies the exact local process
-that currently owns the configured account lock.
+exposing cookies or credentials. `status` identifies the exact shared runtime
+and reports safe health, client, queue, and active-operation metadata.
 
 ## The MCP server does not start
 
@@ -63,24 +63,30 @@ clean browser restart before the command exits.
 If LinkedIn shows a checkpoint, restriction, or security review, resolve it
 manually. The server intentionally pauses and does not bypass those pages.
 
-## Another process owns the browser profile
+## A runtime or maintenance command owns the browser profile
 
-Only one local process may own one account profile. You do not need to find or
-kill its PID manually:
+Multiple normal MCP clients automatically attach to one shared runtime, so
+opening a second client should not produce a profile-lock error. The ownership
+lock still prevents a second runtime or a login/profile maintenance command
+from opening the same Chromium profile. You do not need to find or kill its PID
+manually:
 
 ```bash
 uvx --from linkedin-mcp-local linkedin-mcp status
 uvx --from linkedin-mcp-local linkedin-mcp stop
 ```
 
-`stop` addresses only the process currently holding the configured lock, asks
-it to shut down gracefully, and waits for release. It does not use `SIGKILL`.
-If the timeout expires, the active bounded LinkedIn operation is still being
-allowed to finish; run `status` again rather than deleting the lock.
+`stop` addresses only the elected process currently holding the configured
+lock, asks it to shut down gracefully, and waits for release. It does not use
+`SIGKILL`. If the timeout expires, an active bounded LinkedIn write may still
+be reaching its terminal verification; run `status` again rather than deleting
+the lock.
 
-If several clients must use the account simultaneously, run one loopback
-Streamable HTTP server and connect each client to
-`http://127.0.0.1:8000/mcp`.
+If a normal client still reports a competing owner, check that every client is
+using the same current package version and effective `LINKEDIN_MCP_` runtime
+settings. A configuration-fingerprint error identifies this mismatch without
+exposing the values. A background startup failure is recorded in `runtime.log`
+beside the configured runtime lock.
 
 Do not delete the runtime lock while a server or browser process is still
 running.
@@ -115,8 +121,10 @@ Collection tools return pagination and completeness metadata. Continue with
 `pagination.next_cursor` when present. A `truncated` or parser-drift result is
 an honest incomplete result, not a successful end of the LinkedIn collection.
 
-Cursors are process-local, single-use, filter-bound, and expire after an idle
-period. Start a new scan after a restart, cursor expiry, or filter change.
+Cursors are runtime-local, single-use, client-session-bound, and filter-bound.
+They expire before reservation, but a valid cursor reserved for a queued call
+survives that queue wait. Continue from the same MCP client session; start a
+new scan after reconnecting, runtime restart, cursor expiry, or filter change.
 
 ## A write result is uncertain
 

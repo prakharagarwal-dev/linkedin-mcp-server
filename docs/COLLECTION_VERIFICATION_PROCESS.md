@@ -166,8 +166,8 @@ Verification proceeds from narrowest to broadest:
    and cumulative live traversal targets across cursor pages.
 5. Official MCP client tests for schemas and structured output.
 6. Cursor workflow tests proving disjoint identities, cumulative counts,
-   filter binding, single-use cursors, terminal metadata, and honest
-   truncation.
+   client/account/filter binding, pre-queue reservation, single-use cursors,
+   same-request replay, terminal metadata, and honest truncation.
 7. Semantic simulator workflows using production page objects.
 8. The complete offline verification suite and package build.
 

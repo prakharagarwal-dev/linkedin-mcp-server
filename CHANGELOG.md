@@ -8,6 +8,17 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Add one shared local runtime that accepts simultaneous stdio and loopback
+  Streamable HTTP clients while retaining one Chromium context, account
+  profile, pacing history, and browser worker.
+- Add fair per-client scheduling, opaque MCP-session identity, shared-runtime
+  health and queue status, and transparent stdio bridges that automatically
+  elect or attach to the healthy owner.
+- Bind attachment to the same account, package version, and SHA-256 effective
+  runtime-configuration fingerprint so conflicting client policies fail safely.
+- Add multi-client protocol coverage for concurrent startup, transport
+  forwarding, client disconnects, request and draft isolation, cursor
+  ownership, cancellation, and account-global write idempotency.
 - Add `status` and `stop` commands with non-secret exact-owner metadata,
   graceful queue draining, and safe lock release.
 - Add explicit `profile create`, `profile status`, and recoverable
@@ -18,6 +29,14 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Scope request replay, in-flight coalescing, prepared actions, and pagination
+  cursors to the originating MCP session. Reserve continuation cursors before
+  queue waiting so pacing and fair scheduling cannot expire or double-consume
+  them.
+- Keep each browser-backed tool call atomic, use a fresh temporary Page for the
+  call, and schedule clients only between calls. Active writes continue to a
+  terminal result after client cancellation; abandoned queued work and active
+  reads can be cancelled safely.
 - Replace invitation-only immutable snapshot pagination with the shared live,
   deduplicated cursor contract. `linkedin.invitations.list` `4.0.0` now rescans
   bounded visible prefixes and retains exact count reconciliation for terminal

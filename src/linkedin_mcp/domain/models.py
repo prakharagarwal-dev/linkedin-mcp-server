@@ -3529,6 +3529,13 @@ class ServerStatusOutput(StrictModel):
     version: str
     transport: Literal["stdio", "streamable-http"]
     operation_state: Literal["process_local"] = "process_local"
+    runtime_model: Literal["shared_local"] = "shared_local"
+    connected_clients: Annotated[int, Field(ge=0)] = 0
+    queue_depth: Annotated[int, Field(ge=0)] = 0
+    queued_clients: Annotated[int, Field(ge=0)] = 0
+    active_browser_operation: bool = False
+    active_capability: CapabilityName | None = None
+    accepting_calls: bool = True
 
 
 class SessionStatusOutput(StrictModel):

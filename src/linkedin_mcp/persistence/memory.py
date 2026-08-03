@@ -35,6 +35,7 @@ from linkedin_mcp.persistence.contracts import (
 class _Call:
     call_id: str
     account_id: str
+    client_id: str
     input_fingerprint: str
     status: CallStatus = CallStatus.STARTED
     output: dict[str, object] | None = None
@@ -45,6 +46,7 @@ class _Call:
 @dataclass(slots=True)
 class _Action:
     account_id: str
+    client_id: str
     draft: ActionDraft
 
 
@@ -52,6 +54,7 @@ class _Action:
 class _Attempt:
     attempt_id: str
     account_id: str
+    client_id: str
     action_id: str
     idempotency_key: str
     status: AttemptStatus
@@ -65,17 +68,39 @@ class MemoryRepository(Repository):
 
     def __init__(self) -> None:
         self._lock = asyncio.Lock()
-        self._calls_by_key: dict[tuple[str, CapabilityName, str], _Call] = {}
+        self._calls_by_key: dict[tuple[str, str, CapabilityName, str], _Call] = {}
         self._calls_by_id: dict[str, _Call] = {}
         self._sources: dict[tuple[str, str], CapturedSource] = {}
         self._actions: dict[str, _Action] = {}
-        self._attempts_by_key: dict[str, _Attempt] = {}
+        self._attempts_by_key: dict[tuple[str, str], _Attempt] = {}
         self._attempts_by_id: dict[str, _Attempt] = {}
+
+    async def find_call(
+        self,
+        *,
+        account_id: str,
+        client_id: str = "direct-local-client",
+        request_id: str,
+        capability_name: CapabilityName,
+    ) -> CallStart | None:
+        async with self._lock:
+            existing = self._calls_by_key.get((account_id, client_id, capability_name, request_id))
+            if existing is None:
+                return None
+            return CallStart(
+                call_id=existing.call_id,
+                created=False,
+                status=existing.status,
+                output=existing.output,
+                error_code=existing.error_code,
+                error_message=existing.error_message,
+            )
 
     async def begin_call(
         self,
         *,
         account_id: str,
+        client_id: str = "direct-local-client",
         context_id: str,
         request_id: str,
         capability_name: CapabilityName,
@@ -83,7 +108,7 @@ class MemoryRepository(Repository):
         input_value: dict[str, object],
     ) -> CallStart:
         del context_id, input_value
-        key = (account_id, capability_name, request_id)
+        key = (account_id, client_id, capability_name, request_id)
         async with self._lock:
             existing = self._calls_by_key.get(key)
             if existing is not None:
@@ -102,6 +127,7 @@ class MemoryRepository(Repository):
             call = _Call(
                 call_id=str(uuid.uuid4()),
                 account_id=account_id,
+                client_id=client_id,
                 input_fingerprint=input_fingerprint,
             )
             self._calls_by_key[key] = call
@@ -133,6 +159,7 @@ class MemoryRepository(Repository):
                 raise IdempotencyConflictError("The action ID already belongs to another draft.")
             self._actions[draft.action_id] = _Action(
                 account_id=call.account_id,
+                client_id=call.client_id,
                 draft=draft,
             )
             self._complete_call(call, output, sources)
@@ -164,10 +191,16 @@ class MemoryRepository(Repository):
     async def get_source(self, *, account_id: str, source_id: str) -> CapturedSource | None:
         return self._sources.get((account_id, source_id))
 
-    async def get_action(self, *, account_id: str, action_id: str) -> ActionDraft | None:
+    async def get_action(
+        self,
+        *,
+        account_id: str,
+        client_id: str = "direct-local-client",
+        action_id: str,
+    ) -> ActionDraft | None:
         async with self._lock:
             action = self._actions.get(action_id)
-            if action is None or action.account_id != account_id:
+            if action is None or action.account_id != account_id or action.client_id != client_id:
                 return None
             return self._expire_action(action)
 
@@ -175,6 +208,7 @@ class MemoryRepository(Repository):
         self,
         *,
         account_id: str,
+        client_id: str = "direct-local-client",
         action_id: str,
         expected_action_type: ActionType,
         expected_payload_hash: str,
@@ -183,13 +217,14 @@ class MemoryRepository(Repository):
     ) -> ActionAttemptStart:
         now = datetime.now(UTC)
         async with self._lock:
-            existing = self._attempts_by_key.get(idempotency_key)
+            action = self._required_action(account_id, client_id, action_id)
+            attempt_key = (account_id, idempotency_key)
+            existing = self._attempts_by_key.get(attempt_key)
             if existing is not None:
-                if existing.account_id != account_id or existing.action_id != action_id:
+                if existing.action_id != action_id:
                     raise IdempotencyConflictError(
                         "The execution idempotency key belongs to a different action."
                     )
-                action = self._required_action(account_id, action_id)
                 if action.draft.action_type is not expected_action_type:
                     raise InvalidTargetError("The action type does not match this execute tool.")
                 self._validate_confirmation(
@@ -209,7 +244,6 @@ class MemoryRepository(Repository):
                     sources=existing.sources,
                 )
 
-            action = self._required_action(account_id, action_id)
             draft = self._expire_action(action, now=now)
             if draft.status is ActionStatus.EXPIRED:
                 raise AuthorizationDeniedError("The action draft has expired.")
@@ -227,12 +261,13 @@ class MemoryRepository(Repository):
             attempt = _Attempt(
                 attempt_id=str(uuid.uuid4()),
                 account_id=account_id,
+                client_id=client_id,
                 action_id=action_id,
                 idempotency_key=idempotency_key,
                 status=AttemptStatus.EXECUTING,
                 started_at=now,
             )
-            self._attempts_by_key[idempotency_key] = attempt
+            self._attempts_by_key[attempt_key] = attempt
             self._attempts_by_id[attempt.attempt_id] = attempt
             action.draft = draft.model_copy(update={"status": ActionStatus.EXECUTING})
             return ActionAttemptStart(
@@ -247,6 +282,7 @@ class MemoryRepository(Repository):
         self,
         *,
         account_id: str,
+        client_id: str = "direct-local-client",
         context_id: str,
         attempt_id: str,
         outcome: ActionOutcome,
@@ -256,14 +292,18 @@ class MemoryRepository(Repository):
         del context_id
         async with self._lock:
             attempt = self._attempts_by_id.get(attempt_id)
-            if attempt is None or attempt.account_id != account_id:
+            if (
+                attempt is None
+                or attempt.account_id != account_id
+                or attempt.client_id != client_id
+            ):
                 raise InvalidTargetError("The action attempt does not exist for this account.")
             expected_status = AttemptStatus(outcome.value)
             if attempt.status is not AttemptStatus.EXECUTING:
                 if attempt.status is expected_status and attempt.result == result:
                     return
                 raise IdempotencyConflictError("The action attempt is already terminal.")
-            action = self._required_action(account_id, attempt.action_id)
+            action = self._required_action(account_id, client_id, attempt.action_id)
             attempt.status = expected_status
             attempt.result = result
             attempt.sources = sources
@@ -271,10 +311,10 @@ class MemoryRepository(Repository):
                 self._sources[(account_id, source.source_id)] = source
             action.draft = action.draft.model_copy(update={"status": ActionStatus(outcome.value)})
 
-    def _required_action(self, account_id: str, action_id: str) -> _Action:
+    def _required_action(self, account_id: str, client_id: str, action_id: str) -> _Action:
         action = self._actions.get(action_id)
-        if action is None or action.account_id != account_id:
-            raise InvalidTargetError("The action draft does not exist for this account.")
+        if action is None or action.account_id != account_id or action.client_id != client_id:
+            raise InvalidTargetError("The action draft does not exist for this client and account.")
         return action
 
     @staticmethod

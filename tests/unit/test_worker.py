@@ -9,7 +9,12 @@ from typing import cast
 import pytest
 from pydantic import HttpUrl
 
-from linkedin_mcp.application import CapabilityRunner, CapabilityWorker
+from linkedin_mcp.application import (
+    CapabilityRunner,
+    CapabilityWorker,
+    PaginationManager,
+    bind_client_execution,
+)
 from linkedin_mcp.domain.models import (
     ActionDraft,
     ActionExecuteInput,
@@ -20,6 +25,7 @@ from linkedin_mcp.domain.models import (
     ActionStatus,
     ActionTarget,
     ActionType,
+    CapabilityName,
     CommentCreatePayload,
     CompanyGetInput,
     CompanyGetOutput,
@@ -450,12 +456,44 @@ class BlockingRunner:
         )
 
 
+class BlockingExecuteRunner(BlockingRunner):
+    def __init__(self) -> None:
+        super().__init__()
+        self.write_started = asyncio.Event()
+        self.write_release = asyncio.Event()
+        self.write_completed = asyncio.Event()
+        self.write_calls = 0
+
+    async def execute_post_comment(
+        self,
+        request: ActionExecuteInput,
+    ) -> ActionExecuteOutput:
+        self.write_calls += 1
+        self.write_started.set()
+        await self.write_release.wait()
+        self.write_completed.set()
+        return _engagement_execute_output(
+            request,
+            action_type=ActionType.COMMENT_CREATE,
+            final_state="comment_published",
+        )
+
+
 async def _wait_for_queue_depth(worker: CapabilityWorker, depth: int) -> None:
     for _ in range(100):
         if worker.queue_depth == depth:
             return
         await asyncio.sleep(0)
     raise AssertionError(f"The worker queue did not reach depth {depth}.")
+
+
+async def _search_as(
+    worker: CapabilityWorker,
+    client_id: str,
+    request: JobSearchInput,
+) -> JobSearchOutput:
+    with bind_client_execution(client_id):
+        return await worker.search_jobs(request)
 
 
 @pytest.mark.asyncio
@@ -497,6 +535,60 @@ async def test_worker_serializes_fifo_and_coalesces_identical_inflight_calls() -
     assert second_output.request_id == "request-2"
     assert runner.search_queries == ["python", "rust"]
     assert worker.running is False
+
+
+@pytest.mark.asyncio
+async def test_worker_round_robins_clients_while_preserving_each_client_order() -> None:
+    runner = BlockingRunner()
+    worker = CapabilityWorker(cast(CapabilityRunner, runner), queue_capacity=10)
+    await worker.start()
+
+    def request(name: str) -> JobSearchInput:
+        return JobSearchInput(
+            context_id="fairness",
+            request_id=name,
+            query=name,
+        )
+
+    calls = [asyncio.create_task(_search_as(worker, "client-a", request("a-1")))]
+    await runner.started.wait()
+    calls.extend(
+        (
+            asyncio.create_task(_search_as(worker, "client-a", request("a-2"))),
+            asyncio.create_task(_search_as(worker, "client-a", request("a-3"))),
+            asyncio.create_task(_search_as(worker, "client-b", request("b-1"))),
+        )
+    )
+    await _wait_for_queue_depth(worker, 3)
+
+    runner.release.set()
+    await asyncio.gather(*calls)
+    await worker.close()
+
+    assert runner.search_queries == ["a-1", "b-1", "a-2", "a-3"]
+
+
+@pytest.mark.asyncio
+async def test_worker_namespaces_equal_request_ids_by_client() -> None:
+    runner = BlockingRunner()
+    worker = CapabilityWorker(cast(CapabilityRunner, runner), queue_capacity=10)
+    await worker.start()
+    first = JobSearchInput(
+        context_id="client-isolation",
+        request_id="same-request",
+        query="python",
+    )
+    second = first.model_copy(update={"query": "rust"})
+
+    first_call = asyncio.create_task(_search_as(worker, "client-a", first))
+    await runner.started.wait()
+    second_call = asyncio.create_task(_search_as(worker, "client-b", second))
+    await _wait_for_queue_depth(worker, 1)
+    runner.release.set()
+    await asyncio.gather(first_call, second_call)
+    await worker.close()
+
+    assert runner.search_queries == ["python", "rust"]
 
 
 @pytest.mark.asyncio
@@ -785,6 +877,185 @@ async def test_cancelled_caller_does_not_duplicate_already_queued_work() -> None
     assert first_result.request_id == "request-first"
     assert retry_result.request_id == "request-queued"
     assert runner.search_queries == ["first", "queued"]
+
+
+@pytest.mark.asyncio
+async def test_last_cancelled_waiter_removes_queued_read_before_execution() -> None:
+    runner = BlockingRunner()
+    worker = CapabilityWorker(cast(CapabilityRunner, runner), queue_capacity=2)
+    await worker.start()
+    active = asyncio.create_task(
+        worker.search_jobs(
+            JobSearchInput(
+                context_id="cancellation",
+                request_id="active",
+                query="active",
+            )
+        )
+    )
+    await runner.started.wait()
+    queued = asyncio.create_task(
+        worker.search_jobs(
+            JobSearchInput(
+                context_id="cancellation",
+                request_id="queued",
+                query="must-not-run",
+            )
+        )
+    )
+    await _wait_for_queue_depth(worker, 1)
+
+    queued.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await queued
+    await _wait_for_queue_depth(worker, 0)
+    runner.release.set()
+    await active
+    await worker.close()
+
+    assert runner.search_queries == ["active"]
+
+
+@pytest.mark.asyncio
+async def test_active_read_cancellation_releases_the_single_execution_lane() -> None:
+    runner = BlockingRunner()
+    worker = CapabilityWorker(cast(CapabilityRunner, runner), queue_capacity=2)
+    await worker.start()
+    first = asyncio.create_task(
+        worker.search_jobs(
+            JobSearchInput(
+                context_id="active-cancel",
+                request_id="first",
+                query="first",
+            )
+        )
+    )
+    await runner.started.wait()
+
+    first.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await first
+    second = await asyncio.wait_for(
+        worker.search_jobs(
+            JobSearchInput(
+                context_id="active-cancel",
+                request_id="second",
+                query="second",
+            )
+        ),
+        timeout=1,
+    )
+    await worker.close()
+
+    assert second.request_id == "second"
+    assert runner.search_queries == ["first", "second"]
+
+
+@pytest.mark.asyncio
+async def test_active_execute_survives_caller_cancellation_until_terminal_result() -> None:
+    runner = BlockingExecuteRunner()
+    worker = CapabilityWorker(cast(CapabilityRunner, runner), queue_capacity=2)
+    await worker.start()
+    prepared = _engagement_prepare_output(
+        PostCommentPrepareInput(
+            context_id="write-cancel",
+            request_id="prepare",
+            post_ref="activity:7312345678901234567",
+            text="Exact comment",
+        )
+    )
+    request = ActionExecuteInput(
+        context_id="write-cancel",
+        request_id="execute",
+        action_id=prepared.draft.action_id,
+        payload_hash=prepared.draft.payload_hash,
+        approval_preview=prepared.approval_preview,
+        idempotency_key="write-cancel-action",
+    )
+
+    caller = asyncio.create_task(worker.execute_post_comment(request))
+    await runner.write_started.wait()
+    caller.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await caller
+    assert runner.write_completed.is_set() is False
+
+    runner.write_release.set()
+    await asyncio.wait_for(runner.write_completed.wait(), timeout=1)
+    await worker.close()
+
+    assert runner.write_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_cursor_is_reserved_before_waiting_and_survives_queue_delay() -> None:
+    now = [datetime(2026, 8, 4, tzinfo=UTC)]
+    pagination = PaginationManager(
+        ttl_seconds=60,
+        max_active_cursors=10,
+        max_seen_items_per_cursor=100,
+        clock=lambda: now[0],
+    )
+    seed = JobSearchInput(
+        context_id="cursor-queue",
+        request_id="seed",
+        query="cursor-query",
+        page_size=1,
+    )
+    seed_lease = await pagination.acquire(
+        account_id="personal",
+        client_id="cursor-client",
+        capability_name=CapabilityName.JOBS_SEARCH,
+        request=seed,
+    )
+    metadata = await pagination.advance(
+        seed_lease,
+        page_size=1,
+        returned_keys=("job-1",),
+        provider_has_more=True,
+    )
+    assert metadata.next_cursor is not None
+
+    runner = BlockingRunner()
+    worker = CapabilityWorker(
+        cast(CapabilityRunner, runner),
+        queue_capacity=2,
+        pagination=pagination,
+        account_id="personal",
+    )
+    await worker.start()
+    blocker = asyncio.create_task(
+        _search_as(
+            worker,
+            "blocker-client",
+            JobSearchInput(
+                context_id="cursor-queue",
+                request_id="blocker",
+                query="blocker",
+            ),
+        )
+    )
+    await runner.started.wait()
+    continuation = asyncio.create_task(
+        _search_as(
+            worker,
+            "cursor-client",
+            seed.model_copy(
+                update={
+                    "request_id": "continuation",
+                    "cursor": metadata.next_cursor,
+                }
+            ),
+        )
+    )
+    await _wait_for_queue_depth(worker, 1)
+    now[0] += timedelta(minutes=5)
+
+    runner.release.set()
+    _, continuation_result = await asyncio.gather(blocker, continuation)
+    await worker.close()
+
+    assert continuation_result.request_id == "continuation"
 
 
 def _invalid_output_invocations() -> tuple[Callable[[CapabilityWorker], Awaitable[object]], ...]:

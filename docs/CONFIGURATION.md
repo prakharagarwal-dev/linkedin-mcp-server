@@ -98,7 +98,8 @@ feature contracts.
 | `PAGINATION_MAX_ACTIVE_CURSORS` | `64` | Maximum active cursor states |
 | `PAGINATION_MAX_SEEN_ITEMS_PER_CURSOR` | `5000` | Stable identities retained by one live scan |
 | `ACTION_DRAFT_TTL_SECONDS` | `86400` | Maximum age of an unexecuted in-process draft |
-| `RUNTIME_LOCK_PATH` | per-user application data | Single-account process lock file |
+| `RUNTIME_LOCK_PATH` | per-user application data | Shared-runtime election and owner metadata file |
+| `RUNTIME_START_TIMEOUT_SECONDS` | `30` | Maximum wait for the elected shared runtime to become healthy |
 | `BROWSER_HEADLESS` | `true` | Capability browsing mode; human login remains headed |
 | `BROWSER_TIMEOUT_SECONDS` | `20` | Default browser-operation bound |
 | `LOGIN_TIMEOUT_SECONDS` | `900` | Maximum time for human login or checkpoint handling |
@@ -149,11 +150,12 @@ replacement. If replacement creation fails, the old profile is restored. The
 backup still contains sensitive browser data and remains until you delete it.
 
 `profile status`, `status`, and `doctor` expose only non-secret local state and
-do not open LinkedIn. `status` identifies the exact process holding the account
-lock. `stop` sends that owner a graceful termination request and waits for lock
-release; it never force-kills a process. During clean shutdown the server
-rejects new and queued calls, lets the one active call finish, closes Chromium,
-and releases the lock.
+do not open LinkedIn. `status` identifies the shared runtime and reports its
+health, attached client count, queue depth, and current browser operation.
+`stop` sends that exact owner a graceful termination request and waits for lock
+release; it never force-kills a process. During clean shutdown the runtime
+rejects new and queued calls, lets an active write reach a terminal result,
+closes Chromium, and releases the lock.
 
 Profile-changing and LinkedIn authentication commands hold the same account
 lock as `serve`, preventing a server from starting halfway through them. Give
@@ -170,34 +172,45 @@ execute call must reference the same unchanged file.
 
 ### Stdio
 
-Use stdio for one local MCP client:
+Use the normal stdio command in every local MCP client:
 
 ```bash
 uvx --from linkedin-mcp-local linkedin-mcp serve --transport stdio
 ```
 
-The MCP client owns the process lifecycle. The server must keep stdout reserved
-for MCP protocol messages. `linkedin-mcp stop` is available when a client no
-longer exposes a usable way to terminate the process it started.
+Each client starts a lightweight stdio bridge. The first bridge elects and
+starts one background runtime on the configured loopback host and port; later
+bridges attach to that same runtime. Closing one client closes only its bridge,
+so other clients and queued work continue. Use `linkedin-mcp status` and
+`linkedin-mcp stop` to inspect or end the shared runtime.
+
+The bridge keeps stdout reserved for MCP protocol messages. All clients that
+share an account must use the same effective runtime settings. The lock stores
+only a SHA-256 configuration fingerprint, so a later client fails safely
+instead of silently inheriting different profiles, permissions, browser
+behavior, pacing, or transport settings.
 
 ### Loopback Streamable HTTP
 
-Use one shared local process when several clients need the same worker, browser
-profile, and pacing state:
+Start the same shared runtime explicitly when a client connects directly over
+Streamable HTTP:
 
 ```bash
 uvx --from linkedin-mcp-local linkedin-mcp serve --transport streamable-http
 ```
 
-The default endpoint is `http://127.0.0.1:8000/mcp`. Non-loopback binds are
-rejected because the server does not implement HTTP authentication.
+The default endpoint is `http://127.0.0.1:8000/mcp`. Stdio bridges also use
+this endpoint internally. Non-loopback binds are rejected because the server
+does not implement HTTP authentication.
 
 ## Process-local state
 
 Calls, evidence, request replay, action drafts, attempts, idempotency keys,
-queue state, and continuation cursors exist only in memory. A restart clears
-them. The persistent browser profile, managed browser cache, and explicitly
-selected local assets survive.
+queue state, and continuation cursors exist only in shared-runtime memory. A
+runtime restart clears them; disconnecting one client does not. Request replay,
+cursors, and prepared actions belong to the MCP session that created them,
+while execution idempotency keys remain account-wide. The persistent browser
+profile, managed browser cache, and explicitly selected local assets survive.
 
 After a hard interruption during a write, inspect LinkedIn's visible state
 before preparing another action. Never blindly retry an old execute request.

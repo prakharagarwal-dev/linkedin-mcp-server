@@ -8,7 +8,7 @@ import os
 import signal
 import time
 from contextlib import suppress
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TextIO, cast
@@ -27,6 +27,9 @@ class AccountRuntimeOwner:
     command: str | None = None
     transport: str | None = None
     started_at: str | None = None
+    endpoint: str | None = None
+    version: str | None = None
+    configuration_fingerprint: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,7 +41,7 @@ class AccountRuntimeStatus:
 
 
 class AccountProcessLock:
-    """Prevent two local MCP processes from controlling one browser session."""
+    """Elect one shared browser-runtime owner for a configured LinkedIn account."""
 
     def __init__(
         self,
@@ -47,13 +50,18 @@ class AccountProcessLock:
         account_id: str | None = None,
         command: str | None = None,
         transport: str | None = None,
+        version: str | None = None,
+        configuration_fingerprint: str | None = None,
     ) -> None:
         self._path = path
         self._account_id = account_id
         self._command = command
         self._transport = transport
+        self._version = version
+        self._configuration_fingerprint = configuration_fingerprint
         self._instance_id = str(uuid4())
         self._handle: TextIO | None = None
+        self._owner: AccountRuntimeOwner | None = None
 
     @property
     def acquired(self) -> bool:
@@ -76,7 +84,8 @@ class AccountProcessLock:
             if status.owner is not None:
                 owner_suffix = f" (PID {status.owner.pid})"
             raise ConfigurationError(
-                "Another local LinkedIn MCP process already owns this account runtime"
+                "Another local LinkedIn runtime or profile-maintenance command already owns "
+                "this account"
                 f"{owner_suffix}. Run `linkedin-mcp status`, then `linkedin-mcp stop` "
                 "to release it."
             ) from error
@@ -92,21 +101,46 @@ class AccountProcessLock:
             command=self._command,
             transport=self._transport,
             started_at=datetime.now(UTC).isoformat(),
+            version=self._version,
+            configuration_fingerprint=self._configuration_fingerprint,
         )
-        handle.write(json.dumps(asdict(owner), sort_keys=True))
-        handle.write("\n")
-        handle.flush()
         self._handle = handle
+        self._owner = owner
+        self._write_owner(owner)
+
+    def publish_endpoint(self, endpoint: str) -> AccountRuntimeOwner:
+        """Publish the healthy loopback endpoint while retaining lock ownership."""
+
+        if not endpoint.startswith(("http://127.0.0.1:", "http://[::1]:", "http://localhost:")):
+            raise ValueError("The shared runtime endpoint must use an explicit loopback host.")
+        owner = self._owner
+        if self._handle is None or owner is None:
+            raise RuntimeError("The account runtime lock is not owned by this process.")
+        owner = replace(owner, endpoint=endpoint)
+        self._owner = owner
+        self._write_owner(owner)
+        return owner
 
     def release(self) -> None:
         handle = self._handle
         self._handle = None
+        self._owner = None
         if handle is None:
             return
         try:
             fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
         finally:
             handle.close()
+
+    def _write_owner(self, owner: AccountRuntimeOwner) -> None:
+        handle = self._handle
+        if handle is None:
+            raise RuntimeError("The account runtime lock is not owned by this process.")
+        handle.seek(0)
+        handle.truncate()
+        handle.write(json.dumps(asdict(owner), sort_keys=True))
+        handle.write("\n")
+        handle.flush()
 
 
 def inspect_account_runtime(path: Path) -> AccountRuntimeStatus:
@@ -210,6 +244,9 @@ def _parse_owner(value: str) -> AccountRuntimeOwner | None:
         command=_optional_string(payload.get("command")),
         transport=_optional_string(payload.get("transport")),
         started_at=_optional_string(payload.get("started_at")),
+        endpoint=_optional_string(payload.get("endpoint")),
+        version=_optional_string(payload.get("version")),
+        configuration_fingerprint=_optional_string(payload.get("configuration_fingerprint")),
     )
 
 

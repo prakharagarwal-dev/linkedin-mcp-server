@@ -13,6 +13,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from linkedin_mcp import __version__
+from linkedin_mcp.application import bind_client_execution
 from linkedin_mcp.application.executor import safe_capability_error
 from linkedin_mcp.container import AppContainer
 from linkedin_mcp.domain.identifiers import PROFILE_SLUG_PATTERN
@@ -169,11 +170,12 @@ def create_mcp_server(
             "execute tool with action_id, payload_hash, and approval_preview copied exactly from "
             "prepare so the MCP client can show native user confirmation. Never infer approval "
             "from chat, alter a preview, or call execute after denial. Use only registered typed "
-            "LinkedIn capabilities. Evidence and prepared actions exist only for this server "
-            "process; evidence is at linkedin://sources/{source_id}."
+            "LinkedIn capabilities. Cursors and prepared actions belong to the MCP session that "
+            "created them. Operation state exists only for this server process; evidence is at "
+            "linkedin://sources/{source_id}."
         ),
         json_response=True,
-        stateless_http=True,
+        stateless_http=False,
         host=container.settings.http_host,
         port=container.settings.http_port,
         log_level=container.settings.log_level,
@@ -223,6 +225,12 @@ def create_mcp_server(
         return ServerStatusOutput(
             version=__version__,
             transport=container.settings.transport,
+            connected_clients=container.clients.connected_count,
+            queue_depth=container.worker.queue_depth,
+            queued_clients=container.worker.queued_clients,
+            active_browser_operation=container.worker.active,
+            active_capability=container.worker.active_capability,
+            accepting_calls=container.worker.accepting,
         )
 
     @mcp.tool(
@@ -1553,4 +1561,20 @@ def create_mcp_server(
         _captured_source,
     )
     del registered_handlers
+    _install_client_execution_scope(mcp, container)
     return mcp
+
+
+def _install_client_execution_scope(mcp: FastMCP[None], container: AppContainer) -> None:
+    """Bind every protocol request to an opaque identity owned by its MCP session."""
+
+    low_level = mcp._mcp_server  # pyright: ignore[reportPrivateUsage]
+    for request_type, handler in tuple(low_level.request_handlers.items()):
+
+        async def scoped(request: Any, *, _handler: Any = handler) -> Any:
+            session = low_level.request_context.session
+            client_id = container.clients.resolve(session)
+            with bind_client_execution(client_id):
+                return await _handler(request)
+
+        low_level.request_handlers[request_type] = scoped

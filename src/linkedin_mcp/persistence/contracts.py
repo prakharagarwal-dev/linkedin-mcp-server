@@ -52,10 +52,20 @@ class ActionAttemptStart:
 
 
 class Repository(Protocol):
+    async def find_call(
+        self,
+        *,
+        account_id: str,
+        client_id: str = "direct-local-client",
+        request_id: str,
+        capability_name: CapabilityName,
+    ) -> CallStart | None: ...
+
     async def begin_call(
         self,
         *,
         account_id: str,
+        client_id: str = "direct-local-client",
         context_id: str,
         request_id: str,
         capability_name: CapabilityName,
@@ -90,12 +100,19 @@ class Repository(Protocol):
 
     async def get_source(self, *, account_id: str, source_id: str) -> CapturedSource | None: ...
 
-    async def get_action(self, *, account_id: str, action_id: str) -> ActionDraft | None: ...
+    async def get_action(
+        self,
+        *,
+        account_id: str,
+        client_id: str = "direct-local-client",
+        action_id: str,
+    ) -> ActionDraft | None: ...
 
     async def begin_action_attempt(
         self,
         *,
         account_id: str,
+        client_id: str = "direct-local-client",
         action_id: str,
         expected_action_type: ActionType,
         expected_payload_hash: str,
@@ -107,6 +124,7 @@ class Repository(Protocol):
         self,
         *,
         account_id: str,
+        client_id: str = "direct-local-client",
         context_id: str,
         attempt_id: str,
         outcome: ActionOutcome,
