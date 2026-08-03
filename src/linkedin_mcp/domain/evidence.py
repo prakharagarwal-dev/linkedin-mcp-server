@@ -262,8 +262,8 @@ def source_from_invitation_list(
     invitations: tuple[InvitationSummary, ...],
     coverage: InvitationListCoverage,
 ) -> CapturedSource:
-    if coverage.returned_count != len(invitations):
-        raise ParserDriftError("Invitation coverage conflicts with the returned snapshot page.")
+    if coverage.result_count != len(invitations):
+        raise ParserDriftError("Invitation coverage conflicts with the returned live page.")
     allowed_evidence_urls = {str(url).rstrip("/") for url in coverage.view_source_urls.values()}
     for invitation in invitations:
         if (

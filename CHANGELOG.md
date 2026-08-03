@@ -18,6 +18,10 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Replace invitation-only immutable snapshot pagination with the shared live,
+  deduplicated cursor contract. `linkedin.invitations.list` `4.0.0` now rescans
+  bounded visible prefixes and retains exact count reconciliation for terminal
+  completion.
 - Make lock conflicts actionable without manual PID discovery or lock-file
   deletion, and document browser-profile archive retention.
 - Keep the Streamable HTTP container, lock, queue, pacing, cursors, drafts, and

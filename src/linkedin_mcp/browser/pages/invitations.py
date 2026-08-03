@@ -27,6 +27,7 @@ from linkedin_mcp.domain.models import (
     InvitationListInput,
     InvitationSummary,
     InvitationType,
+    StopReason,
 )
 from linkedin_mcp.errors import BrowserUnavailableError, ParserDriftError
 
@@ -1208,29 +1209,29 @@ async def _unique_load_more(page: Page) -> Locator | None:
 
 
 class InvitationListPage:
-    """Capture one exact, immutable invitation snapshot from the current UI."""
+    """Collect one bounded live invitation prefix from the current UI."""
 
     def __init__(
         self,
         browser: BrowserManager,
         *,
         max_scroll_rounds: int,
-        max_snapshot_items: int = _MAX_RAW_CARDS,
     ) -> None:
         if max_scroll_rounds < 1:
             raise ValueError("Invitation collection requires a positive scroll bound.")
-        if max_snapshot_items < 1 or max_snapshot_items > _MAX_RAW_CARDS:
-            raise ValueError("Invitation snapshot bound must be between 1 and 5,000.")
         self._browser = browser
         self._max_scroll_rounds = max_scroll_rounds
-        self._max_snapshot_items = max_snapshot_items
 
     async def collect(
         self,
         request: InvitationListInput,
         *,
+        result_limit: int | None = None,
         progress: InvitationProgressReporter | None = None,
     ) -> tuple[tuple[InvitationSummary, ...], InvitationListCoverage, str, str]:
+        limit = request.page_size if result_limit is None else result_limit
+        if limit < 1:
+            raise ValueError("Invitation collection requires a positive result limit.")
         navigation_url = _NAVIGATION_URLS[request.direction]
         for attempt_index in range(2):
             try:
@@ -1238,6 +1239,7 @@ class InvitationListPage:
                     request,
                     navigation_url=navigation_url,
                     attempt_index=attempt_index,
+                    result_limit=limit,
                     progress=progress,
                 )
             except _CollectionChanged:
@@ -1254,6 +1256,7 @@ class InvitationListPage:
         *,
         navigation_url: str,
         attempt_index: int,
+        result_limit: int,
         progress: InvitationProgressReporter | None,
     ) -> tuple[tuple[InvitationSummary, ...], InvitationListCoverage, str, str]:
         selected = request.resolved_filter
@@ -1267,6 +1270,9 @@ class InvitationListPage:
         view_source_urls: dict[InvitationFilter, str] = {}
         recommendations: set[str] = set()
         scroll_rounds = 0
+        observed_view_memberships = 0
+        completed_views = 0
+        stop_reason = StopReason.VISIBLE_PAGE_COMPLETE
         async with self._browser.page() as page:
             await self._browser.navigate(page, navigation_url)
             mains = page.locator("main")
@@ -1281,13 +1287,8 @@ class InvitationListPage:
                     request.direction,
                     invitation_filter,
                 )
+                view_source_urls[invitation_filter] = page.url
             view_membership_count = sum(inventory.count for inventory in inventories.values())
-            if any(
-                inventory.count > self._max_snapshot_items for inventory in inventories.values()
-            ):
-                raise ParserDriftError(
-                    "A visible invitation view exceeds the configured snapshot bound."
-                )
             if progress is not None:
                 await progress(
                     0,
@@ -1296,7 +1297,7 @@ class InvitationListPage:
                 )
 
             progress_offset = 0
-            for invitation_filter in views:
+            for view_index, invitation_filter in enumerate(views):
                 inventory = await _select_visible_view(
                     page,
                     self._browser,
@@ -1307,11 +1308,18 @@ class InvitationListPage:
                 if inventory != expected:
                     raise _CollectionChanged
                 view_source_urls[invitation_filter] = page.url
-                view_items, view_recommendations, view_rounds = await self._collect_view(
+                (
+                    view_items,
+                    view_recommendations,
+                    view_rounds,
+                    view_stop_reason,
+                ) = await self._collect_view(
                     page,
                     direction=request.direction,
                     inventory=expected,
                     source_url=page.url,
+                    prior_invitation_refs=frozenset(captured),
+                    result_limit=result_limit,
                     progress=progress,
                     progress_offset=progress_offset,
                     progress_total=view_membership_count,
@@ -1325,14 +1333,17 @@ class InvitationListPage:
                             "LinkedIn's current visible views."
                         )
                     captured.setdefault(invitation_ref, item)
-                    if len(captured) > self._max_snapshot_items:
-                        raise ParserDriftError(
-                            "The deduplicated invitation union exceeds the configured "
-                            "snapshot bound."
-                        )
                 recommendations.update(view_recommendations)
+                observed_view_memberships += len(view_items)
                 scroll_rounds += view_rounds
                 progress_offset += expected.count
+                if view_stop_reason is not StopReason.VISIBLE_PAGE_COMPLETE:
+                    stop_reason = view_stop_reason
+                    break
+                completed_views += 1
+                if len(captured) >= result_limit and view_index + 1 < len(views):
+                    stop_reason = StopReason.RESULT_LIMIT
+                    break
 
             for invitation_filter, expected in inventories.items():
                 current = await _select_visible_view(
@@ -1344,11 +1355,8 @@ class InvitationListPage:
                 if current != expected:
                     raise _CollectionChanged
 
-            if selected is not InvitationFilter.ALL and len(captured) != view_membership_count:
-                raise BrowserUnavailableError(
-                    "LinkedIn did not render every advertised invitation within the safety bound "
-                    f"({len(captured)} of {view_membership_count})."
-                )
+            if completed_views == len(views):
+                stop_reason = StopReason.VISIBLE_PAGE_COMPLETE
             captured_at = datetime.now(UTC)
             invitations = tuple(
                 item.invitation.public(
@@ -1368,7 +1376,9 @@ class InvitationListPage:
             coverage = InvitationListCoverage(
                 direction=request.direction,
                 invitation_filter=selected,
-                advertised_count=(None if selected is InvitationFilter.ALL else len(invitations)),
+                advertised_count=(
+                    None if selected is InvitationFilter.ALL else inventories[selected].count
+                ),
                 unique_count=len(invitations),
                 view_counts={
                     invitation_filter: inventory.count
@@ -1379,19 +1389,15 @@ class InvitationListPage:
                     for invitation_filter, source_url in view_source_urls.items()
                 },
                 view_membership_count=view_membership_count,
-                overlap_count=view_membership_count - len(invitations),
-                snapshot_count=len(invitations),
-                returned_count=len(invitations),
+                overlap_count=observed_view_memberships - len(invitations),
+                result_count=len(invitations),
+                max_results=result_limit,
                 scroll_rounds=scroll_rounds,
                 collection_attempts=attempt_index + 1,
                 neighboring_recommendation_count=len(recommendations),
                 invitation_type_counts=type_counts,
                 entity_type_counts=entity_counts,
-                completion_reason=(
-                    "visible_view_union_reconciled"
-                    if selected is InvitationFilter.ALL
-                    else "advertised_count_reconciled"
-                ),
+                stop_reason=stop_reason,
                 captured_at=captured_at,
             )
             advertised_label = "\n".join(inventory.label for inventory in inventories.values())
@@ -1407,11 +1413,13 @@ class InvitationListPage:
         direction: InvitationDirection,
         inventory: _VisibleInventory,
         source_url: str,
+        prior_invitation_refs: frozenset[str],
+        result_limit: int,
         progress: InvitationProgressReporter | None,
         progress_offset: int,
         progress_total: int,
         max_scroll_rounds: int,
-    ) -> tuple[dict[str, _CapturedInvitation], set[str], int]:
+    ) -> tuple[dict[str, _CapturedInvitation], set[str], int, StopReason]:
         parsed: dict[str, _CapturedInvitation] = {}
         recommendations: set[str] = set()
         scroll_rounds = 0
@@ -1459,8 +1467,30 @@ class InvitationListPage:
                     progress_total,
                     (f"Parsed {progress_offset + len(parsed)} of {progress_total} invitations"),
                 )
+            observed_refs = prior_invitation_refs.union(parsed)
+            if len(observed_refs) >= result_limit:
+                bounded: dict[str, _CapturedInvitation] = {}
+                bounded_refs = set(prior_invitation_refs)
+                for invitation_ref, invitation in parsed.items():
+                    bounded[invitation_ref] = invitation
+                    bounded_refs.add(invitation_ref)
+                    if len(bounded_refs) >= result_limit:
+                        break
+                if len(parsed) == inventory.count and len(bounded) == len(parsed):
+                    return (
+                        bounded,
+                        recommendations,
+                        scroll_rounds,
+                        StopReason.VISIBLE_PAGE_COMPLETE,
+                    )
+                return bounded, recommendations, scroll_rounds, StopReason.RESULT_LIMIT
             if len(parsed) == inventory.count:
-                return parsed, recommendations, scroll_rounds
+                return (
+                    parsed,
+                    recommendations,
+                    scroll_rounds,
+                    StopReason.VISIBLE_PAGE_COMPLETE,
+                )
             if round_index >= max_scroll_rounds:
                 break
 
@@ -1489,8 +1519,4 @@ class InvitationListPage:
                 delay_ms=_SETTLE_DELAY_MS,
             )
 
-        raise BrowserUnavailableError(
-            "LinkedIn did not render every advertised invitation in the selected "
-            f"{inventory.invitation_filter.value} view within the safety bound "
-            f"({len(parsed)} of {inventory.count})."
-        )
+        return parsed, recommendations, scroll_rounds, StopReason.SAFETY_BOUND

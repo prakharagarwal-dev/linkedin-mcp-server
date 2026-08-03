@@ -34,14 +34,14 @@ recommendations, advertisements, navigation cards, and other neighboring
 collections must be counted and reported separately.
 
 A capability that claims every visible entity type, such as
-`linkedin.invitations.list` `3.0.0`, cannot use “unsupported card” as a normal
+`linkedin.invitations.list` `4.0.0`, cannot use “unsupported card” as a normal
 escape hatch: every valid invitation must become a typed result, including a
 loss-preserving `other` result for a newly introduced surface.
 
 During cursor pagination, individual pages need not equal the full inventory.
-The invariant applies to the cumulative terminal scan or captured snapshot.
-Earlier pages must retain disjoint stable identities, and terminal metadata
-may claim completion only after reconciliation succeeds.
+The invariant applies to the cumulative terminal scan. Earlier pages must
+retain disjoint stable identities, and terminal metadata may claim completion
+only after a fresh bounded traversal reconciles the selected inventory.
 
 When LinkedIn exposes no unambiguous inventory, completion requires independent
 terminal evidence. The absence of a count must never be replaced with a guessed
@@ -163,7 +163,7 @@ Verification proceeds from narrowest to broadest:
 2. Real Playwright page-object tests against semantic fixtures.
 3. Convergence, queue, pacing, cancellation, and safety-bound tests.
 4. Executor tests for coverage, completion reasons, evidence, error mapping,
-   and—where applicable—proof that cursor pages do not revisit the provider.
+   and cumulative live traversal targets across cursor pages.
 5. Official MCP client tests for schemas and structured output.
 6. Cursor workflow tests proving disjoint identities, cumulative counts,
    filter binding, single-use cursors, terminal metadata, and honest

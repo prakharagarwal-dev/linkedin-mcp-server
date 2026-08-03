@@ -128,13 +128,14 @@ and valid trailing-hyphen profile slugs. Invitation-specific fixtures add
 every supported entity type, every current filter, Received/Sent root
 differences, zero inventory, recommendations, count mismatch, one count-change
 restart, repeated count change, identity ambiguity, duplicate identity, old
-layout rejection, snapshot bounds, exact-count-only completion, six-view union
+layout rejection, live result bounds, exact-count-only completion, six-view union
 deduplication, and cross-view conflict rejection.
 
-Invitation cursor tests cover 0, 1, 25, 26, 100, 101, and 180 items; disjoint
-page union; page-size changes; account/direction/filter binding; reservation,
-abort, and single use; absolute and in-use expiry; capacity eviction; process
-restart invalidation; and continuation without a second page-provider call.
+Invitation cursor tests cover bounded live prefixes, disjoint page identities,
+page-size changes, canonical direction/filter binding, provider revisits,
+cumulative traversal targets, terminal exact reconciliation, honest safety
+bounds, reservation, abort, single use, capacity eviction, and process-restart
+invalidation.
 
 ## Coverage ownership
 

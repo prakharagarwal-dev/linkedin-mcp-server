@@ -95,10 +95,6 @@ def create_production_container(settings: Settings) -> AppContainer:
     invitation_list = InvitationListPage(
         browser,
         max_scroll_rounds=settings.invitations_max_scroll_rounds_per_call,
-        max_snapshot_items=min(
-            5_000,
-            settings.pagination_max_seen_items_per_cursor,
-        ),
     )
     asset_store = LocalAssetStore(settings.asset_root_path)
     conversation_search = ConversationSearchPage(

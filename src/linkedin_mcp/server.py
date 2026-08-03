@@ -946,12 +946,12 @@ def create_mcp_server(
         name="linkedin.invitations.list",
         title="List LinkedIn Invitations",
         description=(
-            "Capture the complete current received or sent invitation inventory once, including "
-            "a deduplicated union of LinkedIn's current Focused, Other, Verified, Mutual "
-            "Connections, Your Company, and Your School received views when invitation_filter "
-            "is all. Every source view reconciles its own visible count before the server returns "
-            "an immutable cursor page containing each visible invitation entity type, context, "
-            "note, time, available action, and field evidence."
+            "Read one live cursor page from the current received or sent invitation inventory, "
+            "including the deduplicated union of LinkedIn's current Focused, Other, Verified, "
+            "Mutual Connections, Your Company, and Your School received views when "
+            "invitation_filter is all. Continuations rescan a bounded live prefix, suppress "
+            "stable identities already returned, and claim completion only after the selected "
+            "visible counts reconcile."
         ),
         annotations=linkedin_read,
     )

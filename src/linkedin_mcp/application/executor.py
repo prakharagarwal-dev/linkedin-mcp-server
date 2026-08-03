@@ -10,11 +10,6 @@ from typing import Protocol
 
 import structlog
 
-from linkedin_mcp.application.invitation_snapshots import (
-    InvitationSnapshot,
-    InvitationSnapshotLease,
-    InvitationSnapshotPaginator,
-)
 from linkedin_mcp.application.pagination import (
     PaginationLease,
     PaginationManager,
@@ -252,6 +247,7 @@ class InvitationListProvider(Protocol):
         self,
         request: InvitationListInput,
         *,
+        result_limit: int | None = None,
         progress: ProgressReporter | None = None,
     ) -> tuple[
         tuple[InvitationSummary, ...],
@@ -378,7 +374,6 @@ class CapabilityExecutor:
         conversation_search: ConversationSearchProvider,
         conversation: ConversationProvider,
         pagination: PaginationManager | None = None,
-        invitation_snapshots: InvitationSnapshotPaginator | None = None,
     ) -> None:
         self._settings = settings
         self._registry = registry
@@ -404,19 +399,10 @@ class CapabilityExecutor:
             max_active_cursors=settings.pagination_max_active_cursors,
             max_seen_items_per_cursor=settings.pagination_max_seen_items_per_cursor,
         )
-        self._invitation_snapshots = invitation_snapshots or InvitationSnapshotPaginator(
-            ttl_seconds=settings.pagination_cursor_ttl_seconds,
-            max_active_cursors=settings.pagination_max_active_cursors,
-            max_snapshot_items=min(
-                5_000,
-                settings.pagination_max_seen_items_per_cursor,
-            ),
-        )
         self._authorization = AuthorizationPolicy(settings)
 
     async def close(self) -> None:
         await self._pagination.close()
-        await self._invitation_snapshots.close()
 
     async def search_jobs(self, request: JobSearchInput) -> JobSearchOutput:
         descriptor = self._registry.get(CapabilityName.JOBS_SEARCH)
@@ -1027,74 +1013,58 @@ class CapabilityExecutor:
         replay = self._replayed_output(call, InvitationListOutput)
         if replay is not None:
             return replay
-        lease: InvitationSnapshotLease | None = None
-        initial_snapshot: InvitationSnapshot | None = None
+        lease: PaginationLease | None = None
         try:
-            if request.cursor is None:
-                if progress is not None:
-                    await progress(0, 1, "Opening the selected LinkedIn invitation view")
-                (
-                    invitations,
-                    coverage,
-                    captured_text,
-                    source_url,
-                ) = await self._invitation_list.collect(
-                    request,
-                    progress=progress,
-                )
-                advertised_label = captured_text.split("\n\n", maxsplit=1)[0].strip()
-                initial_snapshot = InvitationSnapshot(
-                    invitations=invitations,
-                    coverage=coverage,
-                    advertised_label=advertised_label,
-                    source_url=source_url,
-                )
-                page_items = invitations[: request.page_size]
-            else:
-                if progress is not None:
-                    await progress(0, 1, "Reading the captured invitation snapshot")
-                lease = await self._invitation_snapshots.acquire(
-                    account_id=self._settings.account_id,
-                    request=request,
-                )
-                snapshot = lease.snapshot
-                page_items = self._invitation_snapshots.page(
-                    lease,
-                    page_size=request.page_size,
-                )
-                coverage = snapshot.coverage
-                source_url = snapshot.source_url
-                advertised_label = snapshot.advertised_label
-                if progress is not None:
-                    await progress(1, 1, "Captured invitation page is ready")
-
-            page_coverage = coverage.model_copy(update={"returned_count": len(page_items)})
-            page_text = "\n\n".join((advertised_label, *(item.visible_text for item in page_items)))
+            lease = await self._pagination.acquire(
+                account_id=self._settings.account_id,
+                capability_name=descriptor.name,
+                request=request,
+            )
+            invitations, coverage, captured_text, source_url = await self._invitation_list.collect(
+                request,
+                result_limit=self._pagination.traversal_limit(lease, request.page_size),
+                progress=progress,
+            )
+            page = select_page(
+                invitations,
+                key=lambda invitation: invitation.invitation_ref,
+                seen_keys=lease.seen_keys,
+                page_size=self._pagination.page_capacity(lease, request.page_size),
+            )
+            provider_has_more = page.has_lookahead or coverage.stop_reason in {
+                StopReason.RESULT_LIMIT,
+                StopReason.SAFETY_BOUND,
+            }
+            page_stop_reason = (
+                StopReason.RESULT_LIMIT
+                if page.has_lookahead or coverage.stop_reason is StopReason.RESULT_LIMIT
+                else coverage.stop_reason
+            )
+            page_coverage = coverage.model_copy(
+                update={
+                    "result_count": len(page.items),
+                    "max_results": request.page_size,
+                    "stop_reason": page_stop_reason,
+                }
+            )
+            advertised_label = captured_text.split("\n\n", maxsplit=1)[0].strip()
+            page_text = "\n\n".join((advertised_label, *(item.visible_text for item in page.items)))
             source = source_from_invitation_list(
                 source_url=source_url,
                 captured_text=page_text,
-                invitations=page_items,
+                invitations=page.items,
                 coverage=page_coverage,
             )
-            if lease is None:
-                assert initial_snapshot is not None
-                issued_items, pagination = await self._invitation_snapshots.start(
-                    account_id=self._settings.account_id,
-                    request=request,
-                    snapshot=initial_snapshot,
-                )
-                if issued_items != page_items:
-                    raise RuntimeError("Invitation snapshot pagination changed the first page.")
-            else:
-                pagination = await self._invitation_snapshots.advance(
-                    lease,
-                    page_size=request.page_size,
-                    returned_count=len(page_items),
-                )
+            pagination = await self._pagination.advance(
+                lease,
+                page_size=request.page_size,
+                returned_keys=page.keys,
+                provider_has_more=provider_has_more,
+            )
             output = InvitationListOutput(
                 context_id=request.context_id,
                 request_id=request.request_id,
-                invitations=page_items,
+                invitations=page.items,
                 coverage=page_coverage,
                 pagination=pagination,
                 sources=(source.reference(),),
@@ -1116,7 +1086,7 @@ class CapabilityExecutor:
             raise
         finally:
             if lease is not None:
-                await self._invitation_snapshots.abort(lease)
+                await self._pagination.abort(lease)
 
     async def list_connections(self, request: ConnectionsListInput) -> ConnectionsListOutput:
         descriptor = self._registry.get(CapabilityName.CONNECTIONS_LIST)
