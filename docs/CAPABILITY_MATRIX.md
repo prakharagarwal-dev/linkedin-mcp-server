@@ -204,7 +204,7 @@ browser access during execution.
 | GIF picker | `supported` | Exact Search for GIFs/KLIPY query and one unique result image alt label |
 | Like, Celebrate, Support, Love, Insightful, Funny | `supported` | Typed reaction states for both posts and comments |
 | Remove reaction | `supported` | Explicit `none`; never inferred from a repeated click |
-| Set/change/no-op | `supported` | Existing and desired state are both captured, natively confirmed, and revalidated |
+| Set/change/no-op | `supported` | Existing and desired state are both captured, passed through the client approval policy, and revalidated |
 | Comment/reply verification | `supported` | Exactly one new stable reference must match actor and parent; text and GIF label match exactly, while a photo additionally requires the prepared file hash and visible photo type |
 | Reaction verification | `supported` | Final visible reaction must equal the confirmed desired state |
 | Comment as a LinkedIn Page | `outside_named_capability` | Different actor and authorization contract; personal actor is mandatory |
@@ -276,9 +276,9 @@ limit as an enumeration guarantee.
 | Established-connection search | `supported` | `linkedin.connections.search` follows the visible Search with filters entry, always submits the first-degree filter, exposes every applicable non-degree People filter, and rejects any result not visibly marked first-degree |
 | Broad People discovery | `supported` | `linkedin.people.search` owns first-, second-, and third-plus-degree discovery and exposes the explicit connection-degree filter |
 | Search pagination | `supported` | Opaque filter-bound cursor rescans a bounded People-search prefix and suppresses already returned profile identities |
-| Invite with optional note | `supported` | Preparation binds LinkedIn's current `Invite {name} to connect` button to the exact profile, waits for asynchronous action hydration, and validates both current dialogs plus exact note/counter/actionability without sending. After the hash-locked, natively confirmed Send click, execution performs exactly one fresh exact-profile check: visible Pending is verified success and visible Connect is verified LinkedIn failure. An unreadable, identity-mismatched, or otherwise ambiguous fresh profile is uncertain. No toast parsing, post-click polling, or Sent-list reconciliation is part of this capability. |
-| Accept invitation | `supported` | Exact member-profile request controls, hash-locked native confirmation, and fresh-profile first-degree postcondition |
-| Ignore incoming invitation | `supported` | Separate `linkedin.invitations.ignore.prepare/execute` action with its own scope, paired exact-profile controls, hash-locked native confirmation, and fresh-profile removal-without-connection postcondition |
+| Invite with optional note | `supported` | Preparation binds LinkedIn's current `Invite {name} to connect` button to the exact profile, waits for asynchronous action hydration, and validates both current dialogs plus exact note/counter/actionability without sending. After the hash-locked, client-authorized Send click, execution performs exactly one fresh exact-profile check: visible Pending is verified success and Connect is verified LinkedIn failure. An unreadable, identity-mismatched, or otherwise ambiguous fresh profile is uncertain. No toast parsing, post-click polling, or Sent-list reconciliation is part of this capability. |
+| Accept invitation | `supported` | Exact member-profile request controls, hash-locked client approval policy, and fresh-profile first-degree postcondition |
+| Ignore incoming invitation | `supported` | Separate `linkedin.invitations.ignore.prepare/execute` action with its own scope, paired exact-profile controls, hash-locked client approval policy, and fresh-profile removal-without-connection postcondition |
 | Report incoming invitation | `outside_named_capability` | Distinct moderation target and effect |
 | Withdraw sent invitation | `outside_named_capability` | Distinct destructive effect |
 | Reply to invitation message | `outside_named_capability` | Distinct pre-connection messaging target and effect |
@@ -335,8 +335,9 @@ current first-party help documentation:
 M11-M17 completed the opt-in installed-stdio inventory on 2026-07-24 under the
 legacy local-approval design. All read and preparation outputs used readable
 immutable source resources, and the audit performed zero LinkedIn writes.
-Version `0.4.0` replaces that gate with native MCP client confirmation: every
-execute schema carries the canonical human-readable preview, and fixture,
-repository, and protocol tests reject altered hashes or previews before an
-action attempt. Live smoke tests remain non-mutating by intentionally altering
-the preview.
+Version `0.4.0` replaced that gate with MCP client approval: every execute
+schema carries the canonical human-readable preview, and fixture, repository,
+and protocol tests reject altered hashes or previews before an action attempt.
+Current clients may use interactive confirmation or an explicit durable
+per-tool approval. Live smoke tests remain non-mutating by intentionally
+altering the preview.

@@ -9,16 +9,16 @@ uses its own bridge and stateful MCP session, but all attach to that runtime.
 Trust is split between:
 
 - the operator, who configures allowed hosts, surfaces, scopes, and effects;
-- the MCP client, which decides whether to show and approve a destructive tool
-  call;
+- the MCP client, which applies the operator's configured approval policy to
+  each account-changing tool call;
 - the server, which validates capability authorization and exact prepared
   action data;
 - LinkedIn's visible web UI, which supplies identity, current state, data, and
   postconditions.
 
-A client confirmation does not grant a LinkedIn scope. A server scope does not
-prove that a client displayed confirmation. Both boundaries are required for
-account-changing actions.
+A client approval policy does not grant a LinkedIn scope. A server scope does
+not prove that a client prompted the user or held an explicit durable per-tool
+approval. Both boundaries are required for account-changing actions.
 
 The server has no database or application-secret service. Capability calls,
 evidence, action drafts, attempts, and idempotency live only in process memory.
@@ -102,7 +102,9 @@ Read, prepare, and write effects are distinct. The default allowlists contain
 every currently implemented capability so a normal installation works without
 additional permission configuration. Operators can replace those allowlists
 with a narrower set. Final write tools remain destructive MCP operations and
-still require an exact prepared action and client confirmation.
+still require an exact prepared action. Their annotations request interactive
+confirmation by default, while an explicit durable per-tool client policy may
+authorize unattended execution.
 
 The server constructs canonical targets from validated identifiers. It never
 accepts arbitrary URLs for LinkedIn navigation and never exposes a general
@@ -206,14 +208,15 @@ Execute:
 - requires a visible postcondition;
 - records `verified`, `failed`, or `uncertain` while the process remains alive.
 
-MCP annotations request native client confirmation but cannot attest that a
-specific user approved a call. Writes should use stdio or an equivalently
-trusted local client that always asks the user before invoking destructive
-execute tools.
+MCP annotations request interactive client confirmation by default but cannot
+attest how a specific call was approved. Writes should use stdio or an
+equivalently trusted local client that enforces the operator's configured tool
+approval policy. That policy may prompt interactively or explicitly pre-approve
+one named execute tool for unattended operation.
 
-No execute capability interprets conversational text such as “yes” as server
-authorization. The client either invokes the exact execute tool after its
-approval boundary or it does not invoke it.
+No execute capability interprets conversational text such as “yes” as a durable
+approval policy or server authorization. The client either invokes the exact
+execute tool after its configured approval boundary or it does not invoke it.
 
 ## Evidence and client-visible data
 

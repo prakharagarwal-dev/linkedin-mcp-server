@@ -62,7 +62,7 @@ The test-only simulator lives under `tests/simulator/`:
 - `scenario.py` maps supported LinkedIn URL surfaces to versioned fixtures;
 - `browser.py` runs official Playwright Chromium and fulfills document
   requests locally;
-- `providers.py` applies confirmed writes to typed simulator state;
+- `providers.py` applies client-authorized writes to typed simulator state;
 - `harness.py` composes the production executor, repository, worker, and
   policy around those providers; and
 - `mcp.py` connects the official MCP client to that container.
@@ -173,9 +173,9 @@ The former one-off live-acceptance runners have been removed. The repository
 contains no executable live LinkedIn test scripts, and `pytest` remains fully
 offline and network-blocked.
 
-When current-UI validation is needed, use a confirmation-capable MCP client
-with the minimum required effects, scopes, and surfaces. Convert only the
-sanitized behavior into offline fixtures; never retain live identities,
+When current-UI validation is needed, use a trusted MCP client with an explicit
+approval policy and the minimum required effects, scopes, and surfaces. Convert
+only the sanitized behavior into offline fixtures; never retain live identities,
 content, raw DOM, traces, cookies, or browser state. Fixture manifests record
 only sanitized provenance and the UI behaviors represented by each fixture.
 

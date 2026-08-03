@@ -112,8 +112,25 @@ scopes, or effects. Add only the required values to the MCP server's `env`
 configuration, then restart the client. Ready-made presets are in
 [Configuration](CONFIGURATION.md).
 
-Native client confirmation never grants a missing server scope. Conversely,
-granting a server scope does not mean a client should auto-approve a write.
+Client approval never grants a missing server scope. Conversely, granting a
+server scope does not pre-approve a write in the MCP client.
+
+## A scheduled action stops for confirmation
+
+Account-changing execute tools request interactive confirmation by default, and
+an unattended run cannot answer that prompt. Explicitly pre-approve only the
+required execute tool in the MCP client's durable configuration. For example,
+Codex recurring post publishing uses:
+
+```toml
+[mcp_servers."linkedin-mcp".tools."linkedin.posts.create.execute"]
+approval_mode = "approve"
+```
+
+Restart Codex after changing the configuration. Do not use a chat message as a
+persistent approval and do not approve the entire server unless all LinkedIn
+writes are intentionally unattended. Server scopes, immutable drafts, hashes,
+idempotency, visible revalidation, and postcondition checks remain mandatory.
 
 ## A collection stops at a safety bound
 

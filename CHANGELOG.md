@@ -29,6 +29,12 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Delegate interactive versus unattended write approval to each MCP client's
+  durable per-tool policy while keeping destructive execute annotations as the
+  confirmation-requesting default.
+- Document exact-tool Codex pre-approval for recurring post publishing without
+  weakening server scopes, immutable previews, idempotency, revalidation, or
+  postcondition checks.
 - Scope request replay, in-flight coalescing, prepared actions, and pagination
   cursors to the originating MCP session. Reserve continuation cursors before
   queue waiting so pacing and fair scheduling cannot expire or double-consume
