@@ -107,14 +107,16 @@ Overview-plus-About read. They contain synthetic identities and text only.
 
 The Posts fixtures under `tests/fixtures/linkedin/posts/latest/` are
 `mock_verified` from authenticated visible search and detail surfaces
-inspected on 2026-07-30. Detail variants preserve current exact-menu identity,
-body expansion, typed media/link/document/poll structures, engagement
-controls, and bounded repost-original behavior. They contain no live post,
-author, raw DOM, authentication state, trace, or account data.
+inspected on 2026-08-04. Search variants preserve dynamic card-text evidence;
+detail variants preserve current exact-menu identity, body expansion, typed
+media/link/document/poll structures, engagement controls, and bounded
+repost-original behavior. They contain no live post, author, raw DOM,
+authentication state, trace, or account data.
 
 The sanitized `personal-post-composer.html` and `post-engagement.html`
 fixtures are also `mock_verified` from the authenticated visible UI inspected
-on 2026-07-30. They preserve all nine personal composer modes, nested
+on 2026-08-04. They preserve the bounded composer loader, disabled Save and
+Done controls for unchanged settings, all nine personal composer modes, nested
 image/video/document/poll/celebration/event/hiring/expert controls, settings,
 the current comment photo/GIF controls, native UGC discussion aliases, and the
 six current reactions. Discovery uploaded synthetic files into draft-only
@@ -178,6 +180,14 @@ approval policy and the minimum required effects, scopes, and surfaces. Convert
 only the sanitized behavior into offline fixtures; never retain live identities,
 content, raw DOM, traces, cookies, or browser state. Fixture manifests record
 only sanitized provenance and the UI behaviors represented by each fixture.
+
+### Aggregate live-acceptance ledger
+
+- 2026-08-04: a prepare-only personal-composer replay observed a bounded
+  loading dialog, restored the exact personal composer, traversed unchanged
+  audience/comment settings through their enabled Back controls, and did not
+  invoke Post. A one-page read-only Posts search returned six typed cards; all
+  six exact card snapshots reconciled with the immutable captured source.
 
 ## Test groups
 

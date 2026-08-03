@@ -1,6 +1,6 @@
 {
   "provenance": "mock_verified",
-  "verified_at": "2026-07-30",
+  "verified_at": "2026-08-04",
   "source_surfaces": [
     "visible LinkedIn Posts search",
     "visible LinkedIn Posts All filters panel",
@@ -47,6 +47,8 @@
       "Add collaborators",
       "Schedule post"
     ],
+    "composer_loader": "a bounded visible loading dialog may precede the named composer",
+    "unchanged_settings": "Save and Done stay disabled; Back returns to the composer",
     "company_page_publishing": false
   },
   "engagement_contract": {
@@ -149,5 +151,5 @@
     "detail-repost.html",
     "detail-repost-original.html"
   ],
-  "notes": "Synthetic identities and text preserve only current accessibility, section-scoped typeahead, submitted-parameter, result-card, stable-reference, pagination, post-detail expansion, media, poll, engagement, and repost behavior observed through the authenticated visible UI. LinkedIn's current Content type control is single-choice; Images submits photos, Job posts submits jobs, and Live videos submits liveVideos. No live identity, content, raw DOM, cookie, credential, or browser state is retained."
+  "notes": "Synthetic identities and text preserve only current accessibility, section-scoped typeahead, submitted-parameter, result-card, stable-reference, dynamic card-text evidence, pagination, post-detail expansion, media, poll, engagement, composer-loading, unchanged-settings, and repost behavior observed through the authenticated visible UI. LinkedIn's current Content type control is single-choice; Images submits photos, Job posts submits jobs, and Live videos submits liveVideos. No live identity, content, raw DOM, cookie, credential, or browser state is retained."
 }

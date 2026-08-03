@@ -159,7 +159,7 @@ def test_post_fixture_manifest_locks_current_visible_filter_surface() -> None:
     )
 
     assert manifest["provenance"] == "mock_verified"
-    assert manifest["verified_at"] == "2026-07-30"
+    assert manifest["verified_at"] == "2026-08-04"
     assert manifest["contains_live_data"] is False
     assert manifest["filter_sections"] == [
         "Sort by",
@@ -373,6 +373,7 @@ async def test_post_search_resolves_all_named_facets_and_extracts_stable_results
     assert coverage.pages_visited == 1
     assert coverage.stop_reason is StopReason.RESULT_LIMIT
     assert posts[0].visible_text in captured_text
+    assert "--- exact visible post-card snapshots ---" in captured_text
     assert source_url == fixture_browser.navigations[-1]
     assert len(fixture_browser.navigations) == 2
 
