@@ -44,11 +44,11 @@ policy.
 ## Third-party sharing
 
 The server communicates with LinkedIn only through the visible web UI. LinkedIn
-receives the same page requests and, for a confirmed write, the same content
-that a user would submit in the web interface. Tool results and evidence are
-returned to the MCP client that invoked the server. Local assets are sent to
-LinkedIn only when you execute the specifically prepared action that references
-them.
+receives the same page requests and, for a client-authorized write, the same
+content that a user would submit in the web interface. Tool results and
+evidence are returned to the MCP client that invoked the server. Local assets
+are sent to LinkedIn only when the specifically prepared action that references
+them is executed.
 
 The project does not sell personal data or send LinkedIn content, cookies,
 credentials, messages, or local assets to the maintainer, advertisers, data

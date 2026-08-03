@@ -135,6 +135,12 @@ LegacyPageSizeArgument = Annotated[
     ),
 ]
 
+EXECUTE_APPROVAL_POLICY_DESCRIPTION = (
+    "Account-changing action. Invoke only when the MCP client's configured approval policy "
+    "authorizes this exact execute tool. Interactive confirmation is the safe default; an "
+    "explicit durable per-tool approval may authorize unattended execution. "
+)
+
 
 async def _tool_result[ResultT](awaitable: Awaitable[ResultT]) -> ResultT:
     try:
@@ -166,12 +172,14 @@ def create_mcp_server(
     mcp: FastMCP[None] = FastMCP(
         "linkedin-mcp-server",
         instructions=(
-            "Prepare every account-changing action first. Then call the matching destructive "
-            "execute tool with action_id, payload_hash, and approval_preview copied exactly from "
-            "prepare so the MCP client can show native user confirmation. Never infer approval "
-            "from chat, alter a preview, or call execute after denial. Use only registered typed "
-            "LinkedIn capabilities. Cursors and prepared actions belong to the MCP session that "
-            "created them. Operation state exists only for this server process; evidence is at "
+            "Prepare every account-changing action first. Then call the matching execute tool "
+            "with action_id, payload_hash, and approval_preview copied exactly from prepare. The "
+            "MCP client controls whether an execute tool uses interactive confirmation or an "
+            "explicit durable per-tool approval; interactive confirmation is the safe default. "
+            "Never treat chat text as a durable client approval policy, alter a preview, or call "
+            "execute after an interactive denial. Use only registered typed LinkedIn "
+            "capabilities. Cursors and prepared actions belong to the MCP session that created "
+            "them. Operation state exists only for this server process; evidence is at "
             "linkedin://sources/{source_id}."
         ),
         json_response=True,
@@ -747,11 +755,10 @@ def create_mcp_server(
         name="linkedin.posts.create.execute",
         title="Publish or Schedule Prepared Personal LinkedIn Post",
         description=(
-            "Destructive account action. Codex must show native user confirmation using the "
-            "supplied approval_preview before invoking this tool. Publish or schedule exactly "
-            "one immutable personal-post draft after the server verifies the exact preview, "
-            "payload and asset hashes, actor, expiry, options, and global idempotency key. "
-            "An interrupted final action is never retried automatically."
+            f"{EXECUTE_APPROVAL_POLICY_DESCRIPTION}Publish or schedule exactly one immutable "
+            "personal-post draft after the server verifies the exact preview, payload and asset "
+            "hashes, actor, expiry, options, and global idempotency key. An interrupted final "
+            "action is never retried automatically."
         ),
         annotations=linkedin_write,
     )
@@ -764,7 +771,7 @@ def create_mcp_server(
         idempotency_key: IdentifierArgument,
         ctx: Context[Any, Any, Any],
     ) -> ActionExecuteOutput:
-        await ctx.report_progress(0, 100, "Validating confirmed personal-post action")
+        await ctx.report_progress(0, 100, "Validating authorized personal-post action")
         result = await _tool_result(
             container.worker.execute_post_create(
                 ActionExecuteInput(
@@ -835,10 +842,9 @@ def create_mcp_server(
         name="linkedin.posts.comment.execute",
         title="Publish Prepared LinkedIn Comment or Reply",
         description=(
-            "Destructive account action. Codex must show native user confirmation using the "
-            "supplied approval_preview before invoking this tool. Submit exactly one immutable "
-            "personal-member comment or reply after the server verifies the preview, actor, "
-            "target author, exact parent, payload, local asset hash, expiry, and idempotency."
+            f"{EXECUTE_APPROVAL_POLICY_DESCRIPTION}Submit exactly one immutable personal-member "
+            "comment or reply after the server verifies the preview, actor, target author, exact "
+            "parent, payload, local asset hash, expiry, and idempotency."
         ),
         annotations=linkedin_write,
     )
@@ -851,7 +857,7 @@ def create_mcp_server(
         idempotency_key: IdentifierArgument,
         ctx: Context[Any, Any, Any],
     ) -> ActionExecuteOutput:
-        await ctx.report_progress(0, 100, "Validating confirmed LinkedIn comment action")
+        await ctx.report_progress(0, 100, "Validating authorized LinkedIn comment action")
         result = await _tool_result(
             container.worker.execute_post_comment(
                 ActionExecuteInput(
@@ -918,10 +924,9 @@ def create_mcp_server(
         name="linkedin.posts.reaction.execute",
         title="Apply Prepared LinkedIn Post or Comment Reaction",
         description=(
-            "Destructive account action. Codex must show native user confirmation using the "
-            "supplied approval_preview before invoking this tool. Set, change, remove, or safely "
-            "no-op one prepared exact reaction state after the server verifies the preview, "
-            "actor, target author, prior state, expiry, and idempotency."
+            f"{EXECUTE_APPROVAL_POLICY_DESCRIPTION}Set, change, remove, or safely no-op one "
+            "prepared exact reaction state after the server verifies the preview, actor, target "
+            "author, prior state, expiry, and idempotency."
         ),
         annotations=linkedin_write,
     )
@@ -934,7 +939,7 @@ def create_mcp_server(
         idempotency_key: IdentifierArgument,
         ctx: Context[Any, Any, Any],
     ) -> ActionExecuteOutput:
-        await ctx.report_progress(0, 100, "Validating confirmed LinkedIn reaction action")
+        await ctx.report_progress(0, 100, "Validating authorized LinkedIn reaction action")
         result = await _tool_result(
             container.worker.execute_post_reaction(
                 ActionExecuteInput(
@@ -1095,7 +1100,7 @@ def create_mcp_server(
         description=(
             "Inspect one exact visible profile and create an immutable invitation draft. "
             "This does not send the invitation. An optional personalized note is limited "
-            "to 200 characters and returned with the exact native-approval preview."
+            "to 200 characters and returned with the exact client-approval preview."
         ),
         annotations=linkedin_prepare,
     )
@@ -1131,13 +1136,12 @@ def create_mcp_server(
         name="linkedin.invitations.send.execute",
         title="Send Prepared LinkedIn Connection Invitation",
         description=(
-            "Destructive account action. Codex must show native user confirmation using the "
-            "supplied approval_preview before invoking this tool. Send exactly one immutable "
-            "invitation draft after the server verifies the exact preview, payload hash, draft "
-            "expiry, idempotency key, target identity, and actionable Send control. After the "
-            "click, one fresh exact-profile read is the complete postcondition: Pending is "
-            "verified success and Connect is verified LinkedIn failure. An unreadable or "
-            "ambiguous fresh profile remains uncertain."
+            f"{EXECUTE_APPROVAL_POLICY_DESCRIPTION}Send exactly one immutable invitation draft "
+            "after the server verifies the exact preview, payload hash, draft expiry, idempotency "
+            "key, target identity, and actionable Send control. After the click, one fresh exact-"
+            "profile read is the complete postcondition: Pending is verified success and Connect "
+            "is verified LinkedIn failure. An unreadable or ambiguous fresh profile remains "
+            "uncertain."
         ),
         annotations=linkedin_write,
     )
@@ -1150,7 +1154,7 @@ def create_mcp_server(
         idempotency_key: IdentifierArgument,
         ctx: Context[Any, Any, Any],
     ) -> ActionExecuteOutput:
-        await ctx.report_progress(0, 100, "Validating confirmed invitation action")
+        await ctx.report_progress(0, 100, "Validating authorized invitation action")
         result = await _tool_result(
             container.worker.execute_invitation_send(
                 ActionExecuteInput(
@@ -1205,12 +1209,10 @@ def create_mcp_server(
         name="linkedin.invitations.accept.execute",
         title="Accept Prepared LinkedIn Connection Invitation",
         description=(
-            "Destructive account action. Codex must show native user confirmation using the "
-            "supplied approval_preview before invoking this tool. Accept exactly one immutable "
-            "incoming-request draft after the server verifies the preview, payload hash, draft "
-            "expiry, idempotency, exact profile identity, and current request controls; then "
-            "verify those controls are absent and the exact profile visibly shows a first-degree "
-            "connection."
+            f"{EXECUTE_APPROVAL_POLICY_DESCRIPTION}Accept exactly one immutable incoming-request "
+            "draft after the server verifies the preview, payload hash, draft expiry, "
+            "idempotency, exact profile identity, and current request controls; then verify those "
+            "controls are absent and the exact profile visibly shows a first-degree connection."
         ),
         annotations=linkedin_write,
     )
@@ -1223,7 +1225,7 @@ def create_mcp_server(
         idempotency_key: IdentifierArgument,
         ctx: Context[Any, Any, Any],
     ) -> ActionExecuteOutput:
-        await ctx.report_progress(0, 100, "Validating confirmed acceptance action")
+        await ctx.report_progress(0, 100, "Validating authorized acceptance action")
         result = await _tool_result(
             container.worker.execute_invitation_accept(
                 ActionExecuteInput(
@@ -1278,11 +1280,10 @@ def create_mcp_server(
         name="linkedin.invitations.ignore.execute",
         title="Ignore Prepared LinkedIn Connection Request",
         description=(
-            "Destructive account action. Codex must show native user confirmation using the "
-            "supplied approval_preview before invoking this tool. Ignore exactly one immutable "
-            "incoming-request draft after the server verifies the preview, payload hash, draft "
-            "expiry, idempotency, exact profile identity, and current request controls; then "
-            "verify those controls are absent on a fresh exact-profile read."
+            f"{EXECUTE_APPROVAL_POLICY_DESCRIPTION}Ignore exactly one immutable incoming-request "
+            "draft after the server verifies the preview, payload hash, draft expiry, "
+            "idempotency, exact profile identity, and current request controls; then verify those "
+            "controls are absent on a fresh exact-profile read."
         ),
         annotations=linkedin_write,
     )
@@ -1295,7 +1296,7 @@ def create_mcp_server(
         idempotency_key: IdentifierArgument,
         ctx: Context[Any, Any, Any],
     ) -> ActionExecuteOutput:
-        await ctx.report_progress(0, 100, "Validating confirmed ignore action")
+        await ctx.report_progress(0, 100, "Validating authorized ignore action")
         result = await _tool_result(
             container.worker.execute_invitation_ignore(
                 ActionExecuteInput(
@@ -1474,12 +1475,10 @@ def create_mcp_server(
         name="linkedin.messaging.message.execute",
         title="Send Prepared LinkedIn Message",
         description=(
-            "Destructive account action. Codex must show native user confirmation using the "
-            "supplied approval_preview before invoking this tool. Send exactly one immutable "
-            "text/file message or immediate-send GIF, optionally as an exact visible reply, "
-            "after the server verifies the preview, payload and asset hashes, draft expiry, "
-            "recipient, idempotency, and exact visible outgoing postcondition in the same "
-            "conversation surface."
+            f"{EXECUTE_APPROVAL_POLICY_DESCRIPTION}Send exactly one immutable text/file message "
+            "or immediate-send GIF, optionally as an exact visible reply, after the server "
+            "verifies the preview, payload and asset hashes, draft expiry, recipient, idempotency, "
+            "and exact visible outgoing postcondition in the same conversation surface."
         ),
         annotations=linkedin_write,
     )
@@ -1492,7 +1491,7 @@ def create_mcp_server(
         idempotency_key: IdentifierArgument,
         ctx: Context[Any, Any, Any],
     ) -> ActionExecuteOutput:
-        await ctx.report_progress(0, 100, "Validating confirmed message action")
+        await ctx.report_progress(0, 100, "Validating authorized message action")
         result = await _tool_result(
             container.worker.execute_message(
                 ActionExecuteInput(

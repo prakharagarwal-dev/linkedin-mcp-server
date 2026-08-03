@@ -40,9 +40,10 @@ your network, publish and engage with posts, and read or send messages.
 |  | Read conversations | Read message history, replies, edits, reactions, and attachments. |
 |  | Send messages | Send or reply in one-to-one conversations with text, links, emoji, files, images, and GIFs. |
 
-Actions that change LinkedIn require confirmation before execution. Every
-capability is task-specific; the server does not expose unrestricted browser,
-click, navigation, JavaScript, or network access.
+Actions that change LinkedIn use an immutable prepare-and-execute flow and
+request confirmation by default. Every capability is task-specific; the server
+does not expose unrestricted browser, click, navigation, JavaScript, or network
+access.
 
 See the [capability matrix](docs/CAPABILITY_MATRIX.md) for exact filters,
 supported formats, inputs, outputs, limits, and unsupported features.
@@ -83,6 +84,7 @@ command = "uvx"
 args = ["--from", "linkedin-mcp-local", "linkedin-mcp", "serve", "--transport", "stdio"]
 startup_timeout_sec = 60
 tool_timeout_sec = 900
+default_tools_approval_mode = "auto"
 ```
 
 Codex CLI, the Codex IDE extension, and ChatGPT Desktop share this local
@@ -351,7 +353,23 @@ Ask your MCP client naturally:
 
 > Send `<message>` to `<profile URL>`.
 
-Actions that change LinkedIn are shown for confirmation before they run.
+### Approval modes
+
+Account-changing execute tools request confirmation by default. Approval is a
+setting of the MCP client, not something an agent can grant itself. To let a
+Codex scheduled task publish posts unattended while every other LinkedIn action
+keeps its default behavior, add this explicit per-tool approval:
+
+```toml
+[mcp_servers."linkedin-mcp".tools."linkedin.posts.create.execute"]
+approval_mode = "approve"
+```
+
+Restart Codex after changing its configuration. The post still goes through the
+same immutable draft, scope, payload-hash, idempotency, identity, and visible
+postcondition checks. Avoid approving the entire server when only one action is
+needed. See [Configuration](docs/CONFIGURATION.md#client-approval-policy) for
+the full policy model.
 
 ## Architecture
 
@@ -379,6 +397,7 @@ Read the full [architecture](docs/ARCHITECTURE.md) and [privacy policy](PRIVACY.
 Common settings control:
 
 - enabled LinkedIn surfaces, capability scopes, and effect classes;
+- client-side interactive or explicit per-tool approval behavior;
 - the persistent browser profile and headed/headless operation;
 - the local attachment directory;
 - internal pacing, queue capacity, and bounded collection traversal; and

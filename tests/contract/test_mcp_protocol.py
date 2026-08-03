@@ -1018,6 +1018,13 @@ async def test_mcp_client_discovers_calls_and_reads_evidence() -> None:
             initialized = await session.initialize()
             assert initialized.serverInfo.name == "linkedin-mcp-server"
             assert initialized.serverInfo.version == __version__
+            assert initialized.instructions is not None
+            assert "explicit durable per-tool approval" in initialized.instructions
+            assert "interactive confirmation is the safe default" in initialized.instructions
+            assert "Never treat chat text as a durable client approval policy" in (
+                initialized.instructions
+            )
+            assert "native user confirmation" not in initialized.instructions
 
             tools = await session.list_tools()
             names = {tool.name for tool in tools.tools}
@@ -1196,6 +1203,10 @@ async def test_mcp_client_discovers_calls_and_reads_evidence() -> None:
                 assert execute_tool.annotations.readOnlyHint is False
                 assert execute_tool.annotations.destructiveHint is True
                 assert execute_tool.annotations.idempotentHint is True
+                assert execute_tool.description is not None
+                assert "configured approval policy" in execute_tool.description
+                assert "explicit durable per-tool approval" in execute_tool.description
+                assert "native user confirmation" not in execute_tool.description
                 assert execute_fields == set(execute_tool.inputSchema["properties"])
             conversation_tool = next(
                 tool for tool in tools.tools if tool.name == "linkedin.messaging.conversation.get"

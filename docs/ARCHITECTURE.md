@@ -70,8 +70,9 @@ scopes request replay, in-flight coalescing, cursor ownership, progress, and
 prepared actions.
 
 Tool annotations describe read, prepare, and destructive execution behavior.
-They help a native MCP client decide when to ask the user for confirmation but
-do not authorize a scope on the server.
+They request confirmation for execute tools by default, but the MCP client's
+durable per-tool policy may explicitly pre-approve selected tools. Neither mode
+authorizes a scope on the server.
 
 ### Domain contracts
 
@@ -379,15 +380,18 @@ require the exact current paired request controls. This keeps action identity
 independent of LinkedIn's current invitation bucket and prevents a broad list
 scan from selecting the wrong member.
 
-### Client confirmation
+### Client approval policy
 
-The matching execute tool is marked destructive. A trusted MCP client should
-display its arguments and ask the user before sending the tool call. Denial
-means the execute call never reaches this server.
+The matching execute tool is marked destructive, which requests interactive
+confirmation by default. A trusted MCP client may instead apply an explicit
+durable pre-approval for that exact named tool when the operator wants
+unattended execution. An interactive denial, a rejected unattended call, or a
+missing approval means the execute call never reaches this server.
 
-The server treats an arriving execute call as the client's confirmed request,
-but it still independently checks scopes, effects, draft identity, hash,
-preview, expiry, account, action type, idempotency, and current visible target.
+The server treats an arriving execute call as authorized by the client's
+configured policy, but it still independently checks scopes, effects, draft
+identity, hash, preview, expiry, account, action type, idempotency, and current
+visible target. It neither receives nor stores the client's approval mode.
 
 ### Execute
 
@@ -417,7 +421,8 @@ LangGraph connects as an MCP client. A graph typically:
 5. ranks or deduplicates in graph state;
 6. checkpoints graph state in the application's own checkpointer;
 7. calls a prepare tool when it wants to propose a write;
-8. passes the exact execute call through native user confirmation;
+8. passes the exact execute call through the configured MCP client approval
+   policy;
 9. continues based on the verified result or later read observations.
 
 The LangGraph checkpointer is independent of the MCP server. It may use

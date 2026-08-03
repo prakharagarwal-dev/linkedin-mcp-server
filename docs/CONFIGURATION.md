@@ -3,7 +3,7 @@
 LinkedIn MCP Server is configured with environment variables using the
 `LINKEDIN_MCP_` prefix. The standard package configuration enables every
 currently implemented capability. Actions that change LinkedIn still use the
-prepare, client-confirmation, and execute flow described in
+prepare, client-approval-policy, and execute flow described in
 [Security](SECURITY.md).
 
 For `uvx` installations, put environment variables in the MCP client's server
@@ -20,7 +20,7 @@ A capability is enabled only when all four checks pass:
 3. every required named scope is allowed; and
 4. its `read`, `prepare`, or `write` effect is allowed.
 
-Client approval annotations do not grant server permissions. Use
+Client approval settings and tool annotations do not grant server permissions. Use
 `linkedin.capabilities.list` to see which installed tools are enabled and why
 another tool is disabled.
 
@@ -36,8 +36,54 @@ effects:  read, prepare, write
 ```
 
 `linkedin.capabilities.list` therefore reports every installed capability as
-enabled. Execute tools remain destructive MCP operations and should always be
-confirmed by the user in the MCP client.
+enabled. Execute tools remain destructive MCP operations and request interactive
+confirmation by default. A user may explicitly pre-approve an individual
+execute tool in the MCP client without changing server scopes or safeguards.
+
+## Client approval policy
+
+Tool availability and tool approval are separate:
+
+- server surfaces, scopes, and effects decide whether a capability is available;
+- MCP tool annotations request confirmation for account-changing execute tools;
+- the MCP client's durable configuration decides whether to prompt, reject, or
+  pre-approve a particular tool; and
+- an agent cannot broaden either the server authorization or client approval
+  policy through chat or tool arguments.
+
+Interactive confirmation is the safe default. Prepare tools may inspect and
+return an immutable draft but never perform the final LinkedIn action. Execute
+tools remain hash-locked, idempotent, and visibly revalidated regardless of the
+client's approval mode.
+
+Codex installations can make the default explicit:
+
+```toml
+[mcp_servers."linkedin-mcp"]
+default_tools_approval_mode = "auto"
+```
+
+Codex accepts these server-wide or per-tool modes:
+
+| Mode | Behavior |
+| --- | --- |
+| `auto` | Use each tool's annotations; this is the recommended default. |
+| `prompt` | Ask before every configured tool call. |
+| `writes` | Ask for tools not marked read-only. |
+| `approve` | Treat the configured server or exact tool as pre-approved. |
+
+For an unattended recurring publisher, pre-approve only post execution:
+
+```toml
+[mcp_servers."linkedin-mcp".tools."linkedin.posts.create.execute"]
+approval_mode = "approve"
+```
+
+The scheduled run still calls `linkedin.posts.create.prepare` first and copies
+its exact `action_id`, `payload_hash`, and `approval_preview` into execute. Do
+not set the whole server to `approve` unless every available LinkedIn action is
+intentionally authorized for unattended use. Other MCP clients may expose the
+same choice through their own tool-permission interface.
 
 ## Optional restriction presets
 

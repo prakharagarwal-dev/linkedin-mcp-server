@@ -10,9 +10,11 @@
   accounts, one local process, one browser worker, and internal navigation timing.
 - Do not expose generic browser, JavaScript, network, click, or navigation tools.
 - Read and account-changing capabilities are separate. Write operations require
-  server-enforced scopes, immutable hash-locked previews, idempotency, and native
-  MCP client confirmation. Annotations request confirmation but never grant a
-  LinkedIn scope or bypass server authorization.
+  server-enforced scopes, immutable hash-locked previews, idempotency, and an MCP
+  client approval policy. Execute annotations request interactive confirmation by
+  default; explicit durable per-tool client configuration may authorize unattended
+  execution. Approval policy never grants a LinkedIn scope or bypasses server
+  authorization.
 
 ## Access and secrets
 
@@ -31,7 +33,7 @@
 - Use an in-process `asyncio.Queue` for local capability execution and
   process-local memory for calls, observations, evidence, idempotency, action
   drafts, and action attempts. The browser profile is the only server-owned
-  authentication persistence. Native client approvals are not stored as
+  authentication persistence. Client approval choices are not stored as
   server authorization records. Do not add a database or external work queue.
 - Keep MCP transport wiring, policy, operation-state storage, browser mechanics, page
   extraction, and domain contracts in separate modules.
