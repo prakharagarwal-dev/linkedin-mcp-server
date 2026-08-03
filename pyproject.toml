@@ -28,6 +28,7 @@ dependencies = [
   "pydantic>=2.12,<3",
   "pydantic-settings>=2.10,<3",
   "structlog>=25,<26",
+  "uvicorn>=0.35,<1",
 ]
 
 [project.urls]

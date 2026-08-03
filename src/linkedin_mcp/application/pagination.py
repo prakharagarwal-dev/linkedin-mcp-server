@@ -20,11 +20,13 @@ from linkedin_mcp.domain.models import (
 from linkedin_mcp.errors import InvalidCursorError
 
 Clock = Callable[[], datetime]
+DEFAULT_CLIENT_ID = "direct-local-client"
 
 
 @dataclass(slots=True)
 class _CursorState:
     account_id: str
+    client_id: str
     capability_name: CapabilityName
     binding: str
     scan_id: str
@@ -37,6 +39,7 @@ class _CursorState:
 class PaginationLease:
     lease_id: str
     account_id: str
+    client_id: str
     capability_name: CapabilityName
     binding: str
     scan_id: str
@@ -133,6 +136,7 @@ class PaginationManager:
         self,
         *,
         account_id: str,
+        client_id: str = DEFAULT_CLIENT_ID,
         capability_name: CapabilityName,
         request: PaginatedInput,
     ) -> PaginationLease:
@@ -145,6 +149,7 @@ class PaginationManager:
                 lease = PaginationLease(
                     lease_id=lease_id,
                     account_id=account_id,
+                    client_id=client_id,
                     capability_name=capability_name,
                     binding=binding,
                     scan_id=str(uuid.uuid4()),
@@ -165,11 +170,13 @@ class PaginationManager:
                 raise InvalidCursorError("The pagination cursor has expired.")
             if (
                 state.account_id != account_id
+                or state.client_id != client_id
                 or state.capability_name is not capability_name
                 or state.binding != binding
             ):
                 raise InvalidCursorError(
-                    "The pagination cursor does not match this account, capability, or filter set."
+                    "The pagination cursor does not match this client, account, capability, "
+                    "or filter set."
                 )
             if state.reserved_by is not None:
                 raise InvalidCursorError("The pagination cursor is already in use.")
@@ -177,6 +184,7 @@ class PaginationManager:
             lease = PaginationLease(
                 lease_id=lease_id,
                 account_id=account_id,
+                client_id=client_id,
                 capability_name=capability_name,
                 binding=binding,
                 scan_id=state.scan_id,
@@ -237,6 +245,7 @@ class PaginationManager:
                 expires_at = self._clock() + self._ttl
                 self._states[next_cursor] = _CursorState(
                     account_id=lease.account_id,
+                    client_id=lease.client_id,
                     capability_name=lease.capability_name,
                     binding=lease.binding,
                     scan_id=lease.scan_id,

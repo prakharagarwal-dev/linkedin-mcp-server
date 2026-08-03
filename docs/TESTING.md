@@ -17,6 +17,9 @@ of done.
   and idempotency coverage;
 - cursor lifecycle, filter binding, single-use continuation, expiry, capacity,
   stable-identity deduplication, and terminal truncation coverage;
+- multi-client runtime election, fair scheduling, same-client FIFO ordering,
+  session-scoped replay/cursors/drafts, account-global write idempotency,
+  disconnect survival, cancellation, and graceful stop coverage;
 - shared raw-DOM convergence coverage proving that timed idleness is not
   completion and that progress is parsed before a simultaneously rendered end
   marker;
@@ -35,7 +38,7 @@ not be described as `live_verified` based only on this suite.
 official MCP test client
   -> production FastMCP tools and resources
   -> production policy and process-local operation store
-  -> production asyncio.Queue and one worker
+  -> production fair asyncio scheduler and one worker
   -> production executor
   -> stateful typed simulator providers
 
@@ -180,8 +183,8 @@ only sanitized provenance and the UI behaviors represented by each fixture.
 
 | Group | Responsibility |
 | --- | --- |
-| `tests/unit/` | Models, URLs, policy, repository, queue, pacing, cursor state, browser lifecycle, page objects |
-| `tests/contract/` | MCP discovery, schemas, annotations, evidence, write conformance, transports |
+| `tests/unit/` | Models, URLs, policy, client identity, fair queue, repository, pacing, cursor state, cancellation, browser lifecycle, page objects |
+| `tests/contract/` | MCP discovery, schemas, annotations, evidence, write conformance, stateful sessions, stdio proxying, shared-runtime election, and transports |
 | `tests/simulator/` | Typed state, synthetic site, faults, real Playwright routing |
 | `tests/workflows/` | Multi-page job scan, job/referral, connection/message, and post-engagement journeys |
 | `tests/package/` | Wheel contents, entry point, forbidden dependencies, secret/profile exclusion |

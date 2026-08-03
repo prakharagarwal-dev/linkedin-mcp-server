@@ -65,9 +65,11 @@ async def _store_draft(
     draft: ActionDraft,
     *,
     request_id: str,
+    client_id: str = "direct-local-client",
 ) -> None:
     call = await repository.begin_call(
         account_id="personal",
+        client_id=client_id,
         context_id="context-1",
         request_id=request_id,
         capability_name=CapabilityName.INVITATION_SEND_PREPARE,
@@ -126,6 +128,12 @@ async def test_completed_call_is_replayed_without_a_second_execution() -> None:
     assert replay.created is False
     assert replay.status is CallStatus.COMPLETED
     assert replay.output == {"status": "completed"}
+    found = await repository.find_call(
+        account_id="personal",
+        request_id="request-1",
+        capability_name=CapabilityName.JOBS_SEARCH,
+    )
+    assert found == replay
     assert await repository.get_source(account_id="personal", source_id=source.source_id) == source
 
 
@@ -184,6 +192,84 @@ async def test_request_id_reuse_with_different_input_is_rejected() -> None:
             capability_name=CapabilityName.JOBS_SEARCH,
             input_fingerprint="b" * 64,
             input_value={"query": "rust"},
+        )
+
+
+@pytest.mark.asyncio
+async def test_request_replay_and_action_drafts_are_isolated_by_mcp_client() -> None:
+    repository = MemoryRepository()
+    first = await repository.begin_call(
+        account_id="personal",
+        client_id="client-a",
+        context_id="context-1",
+        request_id="shared-request",
+        capability_name=CapabilityName.JOBS_SEARCH,
+        input_fingerprint="a" * 64,
+        input_value={"query": "python"},
+    )
+    second = await repository.begin_call(
+        account_id="personal",
+        client_id="client-b",
+        context_id="context-2",
+        request_id="shared-request",
+        capability_name=CapabilityName.JOBS_SEARCH,
+        input_fingerprint="b" * 64,
+        input_value={"query": "rust"},
+    )
+    assert first.created is True
+    assert second.created is True
+    assert first.call_id != second.call_id
+
+    draft = _draft()
+    await _store_draft(
+        repository,
+        draft,
+        request_id="client-a-draft",
+        client_id="client-a",
+    )
+    assert (
+        await repository.get_action(
+            account_id="personal",
+            client_id="client-b",
+            action_id=draft.action_id,
+        )
+        is None
+    )
+    with pytest.raises(InvalidTargetError, match="client and account"):
+        await repository.begin_action_attempt(
+            account_id="personal",
+            client_id="client-b",
+            action_id=draft.action_id,
+            expected_action_type=ActionType.INVITATION_SEND,
+            **_confirmation(draft),
+            idempotency_key="cross-client-action",
+        )
+
+
+@pytest.mark.asyncio
+async def test_write_idempotency_keys_remain_account_global_across_clients() -> None:
+    repository = MemoryRepository()
+    first = _draft()
+    second = _draft()
+    await _store_draft(repository, first, request_id="draft-a", client_id="client-a")
+    await _store_draft(repository, second, request_id="draft-b", client_id="client-b")
+
+    await repository.begin_action_attempt(
+        account_id="personal",
+        client_id="client-a",
+        action_id=first.action_id,
+        expected_action_type=ActionType.INVITATION_SEND,
+        **_confirmation(first),
+        idempotency_key="account-global-key",
+    )
+    with pytest.raises(IdempotencyConflictError, match="different action"):
+        await repository.begin_action_attempt(
+            account_id="personal",
+            client_id="client-b",
+            action_id=second.action_id,
+            expected_action_type=ActionType.INVITATION_SEND,
+            **_confirmation(second),
+            idempotency_key="account-global-key",
         )
 
 

@@ -2,8 +2,9 @@
 
 ## Trust boundaries
 
-The server is intended for one authorized LinkedIn account, one local process,
-one browser worker, and trusted local MCP clients.
+The server is intended for one authorized LinkedIn account, one shared local
+runtime, one browser worker, and trusted local MCP clients. Each stdio client
+uses its own bridge and stateful MCP session, but all attach to that runtime.
 
 Trust is split between:
 
@@ -30,10 +31,11 @@ application-data directory and is created owner-only on supported POSIX
 systems.
 
 Normal `serve` startup creates this dedicated profile automatically when it is
-missing. Explicit `profile create`, `login`, `logout`, and `profile reset`
-commands acquire the same account lock as the server, so two processes cannot
-operate the profile concurrently. The project does not import or adopt an
-existing general-purpose Chrome profile.
+missing. The first client elects one runtime; subsequent clients attach instead
+of opening the profile again. Explicit `profile create`, `login`, `logout`, and
+`profile reset` commands acquire the same ownership lock, so maintenance and
+the runtime cannot operate the profile concurrently. The project does not
+import or adopt an existing general-purpose Chrome profile.
 
 The profile can contain:
 
@@ -114,7 +116,7 @@ API.
 The browser layer enforces:
 
 - exact configured LinkedIn hosts;
-- one configured account and one process lock;
+- one configured account and one elected runtime owner;
 - one persistent context and serialized operations;
 - internal navigation pacing;
 - private traversal, scrolling, detail, and expansion bounds behind typed
@@ -122,11 +124,15 @@ The browser layer enforces:
 - authentication, authwall, checkpoint, permission, and restriction guards;
 - accessible, user-facing locators where available.
 
-The account lock contains only non-secret owner metadata. `status` reads it
-without opening the browser. `stop` verifies the same owner before sending a
+The runtime lock contains only non-secret owner, version, and loopback endpoint
+metadata. Normal clients attach through that endpoint; the lock is not a
+per-client exclusion gate. It also stores a SHA-256 fingerprint of the
+effective non-secret runtime configuration so clients with conflicting policy
+cannot silently attach. `status` reads it without opening the browser and also
+queries safe queue health. `stop` verifies the same owner before sending a
 graceful termination signal and never force-kills it. Clean shutdown rejects
-queued work, finishes the single active operation, closes local resources, and
-then releases the lock.
+queued work, lets an active write reach a terminal result, closes local
+resources, and then releases the lock.
 
 The project does not implement:
 
@@ -141,13 +147,18 @@ The project does not implement:
 
 ## In-process queue and state
 
-One bounded `asyncio.Queue` supplies backpressure and one worker serializes
-capability execution. Queue entries and pacing history are not durable.
+One bounded fair scheduler backed by `asyncio.Queue` supplies backpressure and
+one worker serializes capability execution. Each MCP session has a FIFO lane;
+the worker round-robins lanes between atomic calls. It never interrupts one
+browser call to serve another. Queue entries and pacing history are not
+durable.
 
 The process-local operation store retains request replay, evidence, action
-drafts, attempts, and idempotency only while the process is alive. This limits
-local data retention and removes database credentials and services, but it
-also narrows safety guarantees across hard restarts:
+drafts, attempts, and idempotency only while the shared runtime is alive.
+Request replay and drafts are scoped to the internal MCP-session identity;
+write idempotency keys remain account-global. This limits local data retention
+and removes database credentials and services, but it also narrows safety
+guarantees across hard restarts:
 
 - request IDs do not deduplicate after restart;
 - evidence resources disappear after restart;
@@ -155,10 +166,11 @@ also narrows safety guarantees across hard restarts:
 - execution reservations and uncertain outcomes disappear after restart.
 
 Collection cursors are also process-local authentication-adjacent state. They
-contain no cookies, URLs, or captured content, only random tokens plus hashed
-semantic bindings and stable identities. They are single-use, expire, have
-global/per-scan memory bounds, and never authorize a capability or broaden its
-configured account, surface, scope, or effect.
+contain no cookies, URLs, or captured content, only random tokens plus a client,
+account, capability, hashed semantic binding, and stable identities. They are
+reserved before queue waiting, single-use, expiring, and bounded. They never
+authorize a capability or broaden its configured account, surface, scope, or
+effect.
 
 Therefore, a write interrupted by a hard process exit must never be blindly
 retried. The caller must inspect the visible LinkedIn target, determine whether
@@ -179,6 +191,7 @@ Prepare:
 - constructs a canonical SHA-256 payload hash;
 - creates a human-readable exact approval preview;
 - records an expiring immutable draft in process memory;
+- binds that draft to the originating MCP session;
 - performs no final LinkedIn account change.
 
 Execute:
@@ -214,9 +227,9 @@ Each captured source includes:
 - field-level quotes where the contract requires them.
 
 Evidence objects are immutable after insertion, but available only through the
-same live process at `linkedin://sources/{source_id}`. Clients that need durable
+same live runtime at `linkedin://sources/{source_id}`. Clients that need durable
 audit records must copy the required structured data into their own authorized
-store before process exit.
+store before runtime exit.
 
 Logs contain operational metadata and safe error categories. They must not
 contain cookies, credentials, browser-profile contents, raw environment
@@ -238,8 +251,9 @@ stdio is the recommended local transport.
 
 Streamable HTTP is restricted to `127.0.0.1`, `::1`, or `localhost`. This
 release has no HTTP authentication and must not be exposed on a LAN or public
-interface. Multiple clients connected to one loopback server share the same
-account, queue, browser context, pacing, and in-process action store.
+interface. Stdio bridges and direct HTTP clients share the same account,
+browser context, pacing, and fair queue, but request IDs, cursors, and prepared
+actions remain isolated by their server-assigned MCP-session identities.
 
 ## Reporting a vulnerability
 

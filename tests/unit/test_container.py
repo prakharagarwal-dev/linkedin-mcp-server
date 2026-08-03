@@ -78,10 +78,13 @@ def test_account_process_lock_publishes_non_secret_runtime_metadata(tmp_path: Pa
         account_id="personal",
         command="serve",
         transport="stdio",
+        version="0.16.0",
+        configuration_fingerprint="f" * 64,
     )
 
     lock.acquire()
     try:
+        lock.publish_endpoint("http://127.0.0.1:8000/mcp")
         status = inspect_account_runtime(path)
         payload = json.loads(path.read_text(encoding="utf-8"))
 
@@ -91,6 +94,9 @@ def test_account_process_lock_publishes_non_secret_runtime_metadata(tmp_path: Pa
         assert status.owner.account_id == "personal"
         assert status.owner.command == "serve"
         assert status.owner.transport == "stdio"
+        assert status.owner.endpoint == "http://127.0.0.1:8000/mcp"
+        assert status.owner.version == "0.16.0"
+        assert status.owner.configuration_fingerprint == "f" * 64
         assert status.owner.instance_id
         assert status.owner.started_at
         assert payload["pid"] == os.getpid()

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
+from pydantic import ValidationError
 
 import linkedin_mcp.__main__ as cli
 from linkedin_mcp.application import (
@@ -265,7 +266,8 @@ async def test_profile_commands_report_create_status_and_recoverable_reset(
     assert reset["reset"] is True
 
 
-def test_runtime_status_and_stop_report_exact_owner(
+@pytest.mark.asyncio
+async def test_runtime_status_and_stop_report_exact_owner(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -275,9 +277,11 @@ def test_runtime_status_and_stop_report_exact_owner(
         pid=4321,
         instance_id="instance-1",
         account_id="personal",
-        command="serve",
-        transport="stdio",
+        command="_runtime",
+        transport="shared-loopback",
         started_at="2026-08-03T10:00:00+00:00",
+        endpoint="http://127.0.0.1:8000/mcp",
+        version="0.16.0",
     )
     inspections = 0
 
@@ -295,23 +299,44 @@ def test_runtime_status_and_stop_report_exact_owner(
     monkeypatch.setattr(cli, "inspect_account_runtime", fake_inspect)
     monkeypatch.setattr(cli, "stop_account_runtime", fake_stop)
 
-    cli._status(settings)  # pyright: ignore[reportPrivateUsage]
+    async def fake_runtime_status(_: str) -> dict[str, object]:
+        return {
+            "connected_clients": 2,
+            "queue_depth": 3,
+            "queued_clients": 2,
+            "active_browser_operation": True,
+            "active_capability": "linkedin.jobs.search",
+            "accepting_calls": True,
+        }
+
+    monkeypatch.setattr(cli, "read_shared_runtime_status", fake_runtime_status)
+
+    await cli._status(settings)  # pyright: ignore[reportPrivateUsage]
     status = json.loads(capsys.readouterr().out)
     cli._stop(settings, timeout_seconds=12.5)  # pyright: ignore[reportPrivateUsage]
     stopped = json.loads(capsys.readouterr().out)
 
     assert status == {
         "account_id": "personal",
-        "command": "serve",
+        "accepting_calls": True,
+        "active_browser_operation": True,
+        "active_capability": "linkedin.jobs.search",
+        "command": "_runtime",
+        "connected_clients": 2,
+        "endpoint": "http://127.0.0.1:8000/mcp",
+        "healthy": True,
         "lock_path": str(settings.runtime_lock_path),
         "pid": 4321,
+        "queue_depth": 3,
+        "queued_clients": 2,
         "running": True,
         "started_at": "2026-08-03T10:00:00+00:00",
-        "transport": "stdio",
+        "transport": "shared-loopback",
+        "version": "0.16.0",
     }
     assert stopped == {
         "account_id": "personal",
-        "command": "serve",
+        "command": "_runtime",
         "pid": 4321,
         "status": "stopped",
         "stopped": True,
@@ -399,74 +424,58 @@ async def test_owned_cli_operation_cleans_up_before_releasing_lock_on_stop_signa
 
 
 @pytest.mark.asyncio
-async def test_stdio_signal_quiesces_before_server_cancellation(
+async def test_stdio_serve_attaches_proxy_to_shared_runtime(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    events: list[str] = []
+    events: list[tuple[str, str | None]] = []
 
-    class FakeServer:
-        async def run_stdio_async(self) -> None:
-            events.append("server-started")
-            try:
-                await asyncio.Event().wait()
-            finally:
-                events.append("server-stopped")
+    async def fake_ensure(_: Settings) -> str:
+        events.append(("runtime-ready", None))
+        return "http://127.0.0.1:8123/mcp"
 
-    class FakeContainer:
-        async def quiesce(self) -> None:
-            events.append("quiesced")
+    async def fake_proxy(endpoint: str) -> None:
+        events.append(("proxy-running", endpoint))
 
-    async def immediate_signal() -> signal.Signals:
-        await asyncio.sleep(0)
-        return signal.SIGTERM
+    monkeypatch.setattr(cli, "ensure_shared_runtime", fake_ensure)
+    monkeypatch.setattr(cli, "run_stdio_proxy", fake_proxy)
 
-    monkeypatch.setattr(cli, "_wait_for_stop_signal", immediate_signal)
+    await cli._serve(Settings(transport="stdio"))  # pyright: ignore[reportPrivateUsage]
 
-    await cli._serve_stdio(  # pyright: ignore[reportPrivateUsage]
-        cast(Any, FakeServer()),
-        cast(Any, FakeContainer()),
-    )
-
-    assert events == ["server-started", "quiesced", "server-stopped"]
+    assert events == [
+        ("runtime-ready", None),
+        ("proxy-running", "http://127.0.0.1:8123/mcp"),
+    ]
 
 
 @pytest.mark.asyncio
-async def test_streamable_http_owns_one_container_for_listener_lifetime(
+async def test_streamable_http_starts_shared_runtime_when_no_owner_exists(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     events: list[str] = []
-    lifecycle_flags: list[bool] = []
 
-    class FakeContainer:
-        async def start(self) -> None:
-            events.append("container-started")
+    def fake_inspect(_: Path) -> AccountRuntimeStatus:
+        return AccountRuntimeStatus(running=False)
 
-        async def close(self) -> None:
-            events.append("container-closed")
+    async def fake_runtime(_: Settings) -> None:
+        events.append("runtime-running")
 
-    class FakeServer:
-        async def run_streamable_http_async(self) -> None:
-            events.append("http-running")
-
-    container = FakeContainer()
-
-    def fake_container_factory(_: Settings) -> object:
-        return container
-
-    def fake_server_factory(
-        _: object,
-        *,
-        manage_container_lifecycle: bool = True,
-    ) -> object:
-        lifecycle_flags.append(manage_container_lifecycle)
-        return FakeServer()
-
-    monkeypatch.setattr(cli, "create_production_container", cast(Any, fake_container_factory))
-    monkeypatch.setattr(cli, "create_mcp_server", cast(Any, fake_server_factory))
+    monkeypatch.setattr(cli, "inspect_account_runtime", fake_inspect)
+    monkeypatch.setattr(cli, "run_shared_runtime", fake_runtime)
 
     await cli._serve(  # pyright: ignore[reportPrivateUsage]
-        Settings(transport="streamable-http")
+        Settings(
+            transport="streamable-http",
+            runtime_lock_path=tmp_path / "runtime.lock",
+        )
     )
 
-    assert lifecycle_flags == [False]
-    assert events == ["container-started", "http-running", "container-closed"]
+    assert events == ["runtime-running"]
+
+
+@pytest.mark.asyncio
+async def test_hidden_runtime_revalidates_loopback_transport() -> None:
+    settings = Settings(transport="stdio", http_host="0.0.0.0")
+
+    with pytest.raises(ValidationError, match="restricted to loopback"):
+        await cli._run_internal_runtime(settings)  # pyright: ignore[reportPrivateUsage]

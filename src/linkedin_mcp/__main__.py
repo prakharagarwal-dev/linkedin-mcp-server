@@ -8,17 +8,23 @@ import json
 import signal
 import sys
 from collections.abc import Awaitable, Callable, Generator
-from contextlib import contextmanager, suppress
+from contextlib import contextmanager
 from typing import cast
 
 import anyio
-from mcp.server.fastmcp import FastMCP
 from pydantic import ValidationError
 
 from linkedin_mcp.application import (
     AccountProcessLock,
     inspect_account_runtime,
     stop_account_runtime,
+)
+from linkedin_mcp.application.proxy import run_stdio_proxy
+from linkedin_mcp.application.shared_runtime import (
+    ensure_shared_runtime,
+    read_shared_runtime_status,
+    run_shared_runtime,
+    wait_for_shared_runtime,
 )
 from linkedin_mcp.browser import (
     BrowserProfileManager,
@@ -27,11 +33,9 @@ from linkedin_mcp.browser import (
     logout_interactively,
 )
 from linkedin_mcp.config import Settings
-from linkedin_mcp.container import AppContainer, create_production_container
 from linkedin_mcp.domain.models import BrowserSetupState
 from linkedin_mcp.errors import LinkedInMCPError
 from linkedin_mcp.observability import configure_logging
-from linkedin_mcp.server import create_mcp_server
 
 
 def parser() -> argparse.ArgumentParser:
@@ -69,6 +73,7 @@ def parser() -> argparse.ArgumentParser:
         default=30.0,
         help="Seconds to wait for graceful shutdown (default: 30)",
     )
+    commands.add_parser("_runtime", help=argparse.SUPPRESS)
     return root
 
 
@@ -287,11 +292,26 @@ def _runtime_report(settings: Settings) -> dict[str, object]:
         "running": status.running,
         "started_at": owner.started_at if owner else None,
         "transport": owner.transport if owner else None,
+        "endpoint": owner.endpoint if owner else None,
+        "version": owner.version if owner else None,
     }
 
 
-def _status(settings: Settings) -> None:
-    print(json.dumps(_runtime_report(settings), indent=2, sort_keys=True))
+async def _status(settings: Settings) -> None:
+    report = _runtime_report(settings)
+    endpoint = report["endpoint"]
+    runtime_status = (
+        await read_shared_runtime_status(endpoint) if isinstance(endpoint, str) else None
+    )
+    report["healthy"] = runtime_status is not None
+    if runtime_status is not None:
+        report["connected_clients"] = runtime_status.get("connected_clients")
+        report["queue_depth"] = runtime_status.get("queue_depth")
+        report["queued_clients"] = runtime_status.get("queued_clients")
+        report["active_browser_operation"] = runtime_status.get("active_browser_operation")
+        report["active_capability"] = runtime_status.get("active_capability")
+        report["accepting_calls"] = runtime_status.get("accepting_calls")
+    print(json.dumps(report, indent=2, sort_keys=True))
 
 
 def _stop(settings: Settings, *, timeout_seconds: float) -> None:
@@ -325,44 +345,39 @@ async def _wait_for_stop_signal() -> signal.Signals:
     raise RuntimeError("The signal receiver closed unexpectedly.")
 
 
-async def _serve_stdio(server: FastMCP[None], container: AppContainer) -> None:
-    server_task = asyncio.create_task(server.run_stdio_async())
-    signal_task = asyncio.create_task(_wait_for_stop_signal())
-    done, _ = await asyncio.wait(
-        (server_task, signal_task),
-        return_when=asyncio.FIRST_COMPLETED,
-    )
-    if server_task in done:
-        signal_task.cancel()
-        with suppress(asyncio.CancelledError):
-            await signal_task
-        await server_task
+async def _serve(settings: Settings) -> None:
+    if settings.transport == "stdio":
+        endpoint = await ensure_shared_runtime(settings)
+        await run_stdio_proxy(endpoint)
         return
 
-    await signal_task
+    status = inspect_account_runtime(settings.runtime_lock_path)
+    if status.running:
+        endpoint = await wait_for_shared_runtime(settings)
+        print(f"LinkedIn MCP shared runtime already available at {endpoint}", file=sys.stderr)
+        return
+
     try:
-        await container.quiesce()
-    finally:
-        server_task.cancel()
-        with suppress(asyncio.CancelledError):
-            await server_task
+        await run_shared_runtime(settings)
+    except LinkedInMCPError:
+        status = inspect_account_runtime(settings.runtime_lock_path)
+        if not status.running:
+            raise
+        endpoint = await wait_for_shared_runtime(settings)
+        print(f"LinkedIn MCP shared runtime already available at {endpoint}", file=sys.stderr)
 
 
-async def _serve(settings: Settings) -> None:
-    container = create_production_container(settings)
-    if settings.transport == "stdio":
-        server = create_mcp_server(container)
-        await _serve_stdio(server, container)
-    else:
-        server = create_mcp_server(
-            container,
-            manage_container_lifecycle=False,
-        )
-        await container.start()
-        try:
-            await server.run_streamable_http_async()
-        finally:
-            await container.close()
+async def _run_internal_runtime(settings: Settings) -> None:
+    runtime_values = settings.model_dump()
+    runtime_values["transport"] = "streamable-http"
+    runtime_settings = Settings.model_validate(runtime_values)
+    try:
+        await run_shared_runtime(runtime_settings)
+    except LinkedInMCPError:
+        status = inspect_account_runtime(runtime_settings.runtime_lock_path)
+        if not status.running:
+            raise
+        await wait_for_shared_runtime(runtime_settings)
 
 
 def main() -> None:
@@ -394,13 +409,16 @@ def main() -> None:
         if arguments.command == "doctor":
             raise SystemExit(asyncio.run(_doctor(settings)))
         if arguments.command == "status":
-            _status(settings)
+            asyncio.run(_status(settings))
             return
         if arguments.command == "stop":
             _stop(settings, timeout_seconds=cast(float, arguments.timeout))
             return
         if arguments.command == "serve":
             asyncio.run(_serve(settings))
+            return
+        if arguments.command == "_runtime":
+            asyncio.run(_run_internal_runtime(settings))
             return
         raise RuntimeError("Unknown command")
     except (LinkedInMCPError, ValidationError, ValueError, RuntimeError) as error:

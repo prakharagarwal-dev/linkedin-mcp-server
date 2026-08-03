@@ -8,6 +8,12 @@ from contextlib import suppress
 from dataclasses import dataclass
 from typing import Protocol
 
+from linkedin_mcp.application.client_context import (
+    bind_client_execution,
+    current_client_id,
+)
+from linkedin_mcp.application.pagination import PaginationLease, PaginationManager
+from linkedin_mcp.application.scheduler import FairClientScheduler, SchedulerClosedError
 from linkedin_mcp.domain.evidence import canonical_input_fingerprint
 from linkedin_mcp.domain.models import (
     ActionExecuteInput,
@@ -36,6 +42,7 @@ from linkedin_mcp.domain.models import (
     JobSearchInput,
     JobSearchOutput,
     MessagePrepareInput,
+    PaginatedInput,
     PeopleGetInput,
     PeopleGetOutput,
     PeopleSearchInput,
@@ -54,6 +61,7 @@ from linkedin_mcp.errors import (
     BrowserUnavailableError,
     IdempotencyConflictError,
 )
+from linkedin_mcp.persistence.contracts import CallStart
 
 CapabilityRequest = (
     JobSearchInput
@@ -97,8 +105,19 @@ CapabilityOutput = (
     | ActionPrepareOutput
     | ActionExecuteOutput
 )
-WorkKey = tuple[CapabilityName, str]
+WorkKey = tuple[str, CapabilityName, str]
 ProgressReporter = Callable[[int, int, str], Awaitable[None]]
+
+
+class CallLookup(Protocol):
+    async def __call__(
+        self,
+        *,
+        account_id: str,
+        client_id: str,
+        request_id: str,
+        capability_name: CapabilityName,
+    ) -> CallStart | None: ...
 
 
 class CapabilityRunner(Protocol):
@@ -214,20 +233,22 @@ class CapabilityRunner(Protocol):
 @dataclass(slots=True)
 class _WorkItem:
     key: WorkKey
+    client_id: str
     capability_name: CapabilityName
     request: CapabilityRequest
     future: asyncio.Future[CapabilityOutput]
     progress: ProgressReporter | None = None
+    pagination_lease: PaginationLease | None = None
+    cancel_requested: bool = False
+    enqueue_task: asyncio.Task[None] | None = None
 
 
 @dataclass(slots=True)
 class _InFlight:
     fingerprint: str
     future: asyncio.Future[CapabilityOutput]
-
-
-class _EnqueuedCallerCancelled(asyncio.CancelledError):
-    """Signal that caller cancellation occurred after queue ownership transferred."""
+    item: _WorkItem
+    waiters: int = 1
 
 
 def _observe_future(future: asyncio.Future[CapabilityOutput]) -> None:
@@ -236,19 +257,51 @@ def _observe_future(future: asyncio.Future[CapabilityOutput]) -> None:
     future.exception()
 
 
+_EXECUTE_CAPABILITIES = frozenset(
+    {
+        CapabilityName.INVITATION_SEND_EXECUTE,
+        CapabilityName.INVITATION_ACCEPT_EXECUTE,
+        CapabilityName.INVITATION_IGNORE_EXECUTE,
+        CapabilityName.MESSAGING_MESSAGE_EXECUTE,
+        CapabilityName.POSTS_CREATE_EXECUTE,
+        CapabilityName.POST_COMMENT_EXECUTE,
+        CapabilityName.POST_REACTION_EXECUTE,
+    }
+)
+
+
+def _is_execute_capability(capability_name: CapabilityName) -> bool:
+    return capability_name in _EXECUTE_CAPABILITIES
+
+
 class CapabilityWorker:
     """Serialize every browser-backed capability through one local worker."""
 
-    def __init__(self, runner: CapabilityRunner, *, queue_capacity: int) -> None:
+    def __init__(
+        self,
+        runner: CapabilityRunner,
+        *,
+        queue_capacity: int,
+        pagination: PaginationManager | None = None,
+        account_id: str = "personal",
+        call_lookup: CallLookup | None = None,
+    ) -> None:
         self._runner = runner
-        self._queue: asyncio.Queue[_WorkItem] = asyncio.Queue(maxsize=queue_capacity)
+        self._scheduler: FairClientScheduler[str, _WorkItem] = FairClientScheduler(
+            capacity=queue_capacity
+        )
+        self._pagination = pagination
+        self._account_id = account_id
+        self._call_lookup = call_lookup
         self._inflight: dict[WorkKey, _InFlight] = {}
         self._inflight_lock = asyncio.Lock()
-        self._shutdown = asyncio.Event()
-        self._pending_puts: set[asyncio.Task[None]] = set()
+        self._enqueue_tasks: set[asyncio.Task[None]] = set()
         self._task: asyncio.Task[None] | None = None
         self._accepting = False
+        self._closing = False
         self._active = False
+        self._active_item: _WorkItem | None = None
+        self._active_task: asyncio.Task[CapabilityOutput] | None = None
         self._idle = asyncio.Event()
         self._idle.set()
 
@@ -258,13 +311,30 @@ class CapabilityWorker:
 
     @property
     def queue_depth(self) -> int:
-        return self._queue.qsize()
+        return self._scheduler.qsize
+
+    @property
+    def queued_clients(self) -> int:
+        return self._scheduler.client_count
+
+    @property
+    def accepting(self) -> bool:
+        return self._accepting
+
+    @property
+    def active(self) -> bool:
+        return self._active
+
+    @property
+    def active_capability(self) -> CapabilityName | None:
+        item = self._active_item
+        return item.capability_name if item is not None else None
 
     async def start(self) -> None:
         if self.running:
             return
-        self._shutdown.clear()
         self._accepting = True
+        self._closing = False
         self._idle.set()
         self._task = asyncio.create_task(
             self._run(),
@@ -507,7 +577,8 @@ class CapabilityWorker:
         if not self._accepting or not self.running:
             raise BrowserUnavailableError("The local LinkedIn worker is not running.")
 
-        key = (capability_name, request.request_id)
+        client_id = current_client_id()
+        key = (client_id, capability_name, request.request_id)
         fingerprint = canonical_input_fingerprint(request)
         item: _WorkItem | None = None
         async with self._inflight_lock:
@@ -519,85 +590,164 @@ class CapabilityWorker:
                     raise IdempotencyConflictError(
                         "The request ID is already queued with different arguments."
                     )
+                existing.waiters += 1
                 future = existing.future
             else:
+                pagination_lease = await self._reserve_pagination(
+                    client_id=client_id,
+                    capability_name=capability_name,
+                    request=request,
+                )
                 future = asyncio.get_running_loop().create_future()
                 future.add_done_callback(_observe_future)
-                self._inflight[key] = _InFlight(
-                    fingerprint=fingerprint,
-                    future=future,
-                )
                 item = _WorkItem(
                     key=key,
+                    client_id=client_id,
                     capability_name=capability_name,
                     request=request,
                     future=future,
                     progress=progress,
+                    pagination_lease=pagination_lease,
+                )
+                self._inflight[key] = _InFlight(
+                    fingerprint=fingerprint,
+                    future=future,
+                    item=item,
                 )
 
         if item is not None:
-            try:
-                await self._enqueue_or_shutdown(item)
-            except _EnqueuedCallerCancelled:
-                raise asyncio.CancelledError from None
-            except asyncio.CancelledError:
-                await self._remove_unqueued(item)
-                if not future.done():
-                    future.cancel()
-                raise
-            except Exception as error:
-                await self._remove_unqueued(item)
-                if not future.done():
-                    future.set_exception(error)
-                raise
+            enqueue_task = asyncio.create_task(
+                self._enqueue(item),
+                name=f"linkedin-enqueue:{item.capability_name.value}",
+            )
+            item.enqueue_task = enqueue_task
+            self._enqueue_tasks.add(enqueue_task)
+            enqueue_task.add_done_callback(self._enqueue_tasks.discard)
 
-        return await asyncio.shield(future)
-
-    async def _enqueue_or_shutdown(self, item: _WorkItem) -> None:
-        put_task = asyncio.create_task(self._queue.put(item))
-        self._pending_puts.add(put_task)
-        shutdown_task = asyncio.create_task(self._shutdown.wait())
         try:
-            try:
-                done, _ = await asyncio.wait(
-                    (put_task, shutdown_task),
-                    return_when=asyncio.FIRST_COMPLETED,
+            return await asyncio.shield(future)
+        except asyncio.CancelledError:
+            await self._release_cancelled_waiter(key, future)
+            raise
+
+    async def _enqueue(self, item: _WorkItem) -> None:
+        try:
+            await self._scheduler.put(item.client_id, item)
+        except SchedulerClosedError:
+            await self._remove_unqueued(item)
+            if not item.future.done():
+                item.future.set_exception(
+                    BrowserUnavailableError("The local LinkedIn worker is shutting down.")
                 )
-            except asyncio.CancelledError as error:
-                if put_task.done() and not put_task.cancelled() and put_task.exception() is None:
-                    raise _EnqueuedCallerCancelled from error
-                raise
-            if shutdown_task in done:
-                put_task.cancel()
-                with suppress(asyncio.CancelledError):
-                    await put_task
-                raise BrowserUnavailableError("The local LinkedIn worker is shutting down.")
-            await put_task
-        finally:
-            self._pending_puts.discard(put_task)
-            shutdown_task.cancel()
-            with suppress(asyncio.CancelledError):
-                await shutdown_task
+        except asyncio.CancelledError:
+            await self._remove_unqueued(item)
+            if not item.future.done():
+                item.future.cancel()
+            raise
+        except Exception as error:
+            await self._remove_unqueued(item)
+            if not item.future.done():
+                item.future.set_exception(error)
+
+    async def _reserve_pagination(
+        self,
+        *,
+        client_id: str,
+        capability_name: CapabilityName,
+        request: CapabilityRequest,
+    ) -> PaginationLease | None:
+        if self._pagination is None or not isinstance(request, PaginatedInput):
+            return None
+        if self._call_lookup is not None:
+            recorded = await self._call_lookup(
+                account_id=self._account_id,
+                client_id=client_id,
+                request_id=request.request_id,
+                capability_name=capability_name,
+            )
+            if recorded is not None:
+                return None
+        return await self._pagination.acquire(
+            account_id=self._account_id,
+            client_id=client_id,
+            capability_name=capability_name,
+            request=request,
+        )
 
     async def _remove_unqueued(self, item: _WorkItem) -> None:
         async with self._inflight_lock:
             current = self._inflight.get(item.key)
             if current is not None and current.future is item.future:
                 self._inflight.pop(item.key, None)
+        await self._abort_pagination(item)
+
+    async def _release_cancelled_waiter(
+        self,
+        key: WorkKey,
+        future: asyncio.Future[CapabilityOutput],
+    ) -> None:
+        item: _WorkItem
+        active_task: asyncio.Task[CapabilityOutput] | None = None
+        async with self._inflight_lock:
+            inflight = self._inflight.get(key)
+            if inflight is None or inflight.future is not future:
+                return
+            inflight.waiters -= 1
+            if inflight.waiters > 0:
+                return
+            item = inflight.item
+            item.cancel_requested = True
+            if self._active_item is item:
+                if not _is_execute_capability(item.capability_name):
+                    active_task = self._active_task
+            else:
+                removed = await self._scheduler.remove(item.client_id, item)
+                if removed:
+                    self._inflight.pop(key, None)
+                    if not future.done():
+                        future.cancel()
+                elif item.enqueue_task is not None and not item.enqueue_task.done():
+                    item.enqueue_task.cancel()
+        if active_task is not None:
+            active_task.cancel()
+        elif future.cancelled():
+            await self._abort_pagination(item)
 
     async def _run(self) -> None:
         while True:
-            item = await self._queue.get()
-            self._active = True
-            self._idle.clear()
             try:
-                output = await self._execute(item)
+                item = await self._scheduler.get()
+            except SchedulerClosedError:
+                self._idle.set()
+                return
+
+            operation = asyncio.create_task(
+                self._execute_bound(item),
+                name=f"linkedin-capability:{item.capability_name.value}",
+            )
+            async with self._inflight_lock:
+                self._active = True
+                self._active_item = item
+                self._active_task = operation
+                self._idle.clear()
+                inflight = self._inflight.get(item.key)
+                no_waiters = inflight is None or inflight.waiters == 0
+                if (
+                    item.cancel_requested
+                    and no_waiters
+                    and not _is_execute_capability(item.capability_name)
+                ):
+                    operation.cancel()
+            try:
+                output = await operation
             except asyncio.CancelledError:
                 if not item.future.done():
-                    item.future.set_exception(
-                        BrowserUnavailableError("The local LinkedIn worker was interrupted.")
-                    )
-                raise
+                    if self._closing:
+                        item.future.set_exception(
+                            BrowserUnavailableError("The local LinkedIn worker was interrupted.")
+                        )
+                    else:
+                        item.future.cancel()
             except Exception as error:
                 if not item.future.done():
                     item.future.set_exception(error)
@@ -609,10 +759,23 @@ class CapabilityWorker:
                     current = self._inflight.get(item.key)
                     if current is not None and current.future is item.future:
                         self._inflight.pop(item.key, None)
-                self._queue.task_done()
+                    self._active_item = None
+                    self._active_task = None
                 self._active = False
-                if self._queue.empty():
+                await self._abort_pagination(item)
+                if self._scheduler.qsize == 0:
                     self._idle.set()
+
+    async def _execute_bound(self, item: _WorkItem) -> CapabilityOutput:
+        with bind_client_execution(
+            item.client_id,
+            pagination_lease=item.pagination_lease,
+        ):
+            return await self._execute(item)
+
+    async def _abort_pagination(self, item: _WorkItem) -> None:
+        if self._pagination is not None and item.pagination_lease is not None:
+            await self._pagination.abort(item.pagination_lease)
 
     async def _execute(self, item: _WorkItem) -> CapabilityOutput:
         if item.capability_name is CapabilityName.JOBS_SEARCH:
@@ -736,34 +899,30 @@ class CapabilityWorker:
         """Reject queued work and wait for the one active operation to finish."""
 
         self._accepting = False
-        self._shutdown.set()
-        pending_puts = tuple(self._pending_puts)
-        for put_task in pending_puts:
-            put_task.cancel()
-        if pending_puts:
-            await asyncio.gather(*pending_puts, return_exceptions=True)
-
-        shutdown_error = BrowserUnavailableError("The local LinkedIn worker is shutting down.")
-        while True:
-            try:
-                item = self._queue.get_nowait()
-            except asyncio.QueueEmpty:
-                break
-            if not item.future.done():
-                item.future.set_exception(shutdown_error)
-            self._queue.task_done()
+        queued = await self._scheduler.close()
+        await self._finish_enqueue_tasks()
+        await self._reject_queued(queued)
         if not self._active:
             self._idle.set()
         await self._idle.wait()
 
     async def close(self) -> None:
         self._accepting = False
-        self._shutdown.set()
-        pending_puts = tuple(self._pending_puts)
-        for put_task in pending_puts:
-            put_task.cancel()
-        if pending_puts:
-            await asyncio.gather(*pending_puts, return_exceptions=True)
+        self._closing = True
+        queued = await self._scheduler.close()
+        await self._finish_enqueue_tasks()
+        await self._reject_queued(queued)
+
+        active_task = self._active_task
+        active_item = self._active_item
+        if (
+            active_task is not None
+            and active_item is not None
+            and not _is_execute_capability(active_item.capability_name)
+        ):
+            active_task.cancel()
+        if active_item is not None and _is_execute_capability(active_item.capability_name):
+            await self._idle.wait()
 
         task = self._task
         self._task = None
@@ -772,18 +931,29 @@ class CapabilityWorker:
             with suppress(asyncio.CancelledError):
                 await task
 
-        shutdown_error = BrowserUnavailableError("The local LinkedIn worker is shutting down.")
-        while True:
-            try:
-                item = self._queue.get_nowait()
-            except asyncio.QueueEmpty:
-                break
-            if not item.future.done():
-                item.future.set_exception(shutdown_error)
-            self._queue.task_done()
-
         async with self._inflight_lock:
             for inflight in self._inflight.values():
                 if not inflight.future.done():
-                    inflight.future.set_exception(shutdown_error)
+                    inflight.future.set_exception(
+                        BrowserUnavailableError("The local LinkedIn worker is shutting down.")
+                    )
             self._inflight.clear()
+
+    async def _reject_queued(self, queued: tuple[_WorkItem, ...]) -> None:
+        if not queued:
+            return
+        shutdown_error = BrowserUnavailableError("The local LinkedIn worker is shutting down.")
+        async with self._inflight_lock:
+            for item in queued:
+                current = self._inflight.get(item.key)
+                if current is not None and current.future is item.future:
+                    self._inflight.pop(item.key, None)
+                if not item.future.done():
+                    item.future.set_exception(shutdown_error)
+        for item in queued:
+            await self._abort_pagination(item)
+
+    async def _finish_enqueue_tasks(self) -> None:
+        tasks = tuple(self._enqueue_tasks)
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
