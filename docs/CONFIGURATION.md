@@ -110,24 +110,54 @@ feature contracts.
 Callers control typed `page_size` and opaque cursors. Browser traversal,
 collection reconciliation, and pacing remain server-controlled safety policy.
 
-## Browser profile and login
+## Browser profile and LinkedIn session
 
 The browser profile is the server's only authentication persistence. It stores
 normal Chromium cookies and preferences and must be treated as sensitive. The
 server does not receive or store a LinkedIn password.
 
+Normal first use remains automatic: `serve` installs Chromium when needed,
+creates the dedicated profile when missing, opens LinkedIn for login, and then
+reuses that same profile on later starts. The MCP handshake remains responsive
+while setup and authentication run in the background.
+
+The explicit lifecycle commands are:
+
 ```bash
 uvx --from linkedin-mcp-local linkedin-mcp setup
+uvx --from linkedin-mcp-local linkedin-mcp profile create
+uvx --from linkedin-mcp-local linkedin-mcp profile status
+uvx --from linkedin-mcp-local linkedin-mcp profile reset
 uvx --from linkedin-mcp-local linkedin-mcp login
+uvx --from linkedin-mcp-local linkedin-mcp logout
 uvx --from linkedin-mcp-local linkedin-mcp doctor
+uvx --from linkedin-mcp-local linkedin-mcp status
+uvx --from linkedin-mcp-local linkedin-mcp stop
 ```
 
-`login` opens a headed browser, waits for the operator to complete login, MFA,
-or a checkpoint, closes Chromium normally, and verifies that the same profile
-survives a clean restart. Later headed or headless server starts reuse it.
+`profile create` is idempotent and initializes only the configured dedicated
+profile. `login` never creates a profile: it opens LinkedIn in an existing
+profile, waits for the operator to complete login, MFA, or a checkpoint, closes
+Chromium normally, and verifies that the same session survives a clean restart.
+`logout` uses LinkedIn's visible **Me → Sign Out** controls and verifies the
+signed-out state through another clean restart.
 
-One account lock prevents two server processes from owning the same profile.
-Give separate accounts distinct profile and lock paths.
+`profile reset` is a recoverable destructive operation. It requires typing
+`RESET` in an interactive terminal or passing `--yes`, renames the exact
+configured profile to a sibling `*.backup-*` directory, and creates a clean
+replacement. If replacement creation fails, the old profile is restored. The
+backup still contains sensitive browser data and remains until you delete it.
+
+`profile status`, `status`, and `doctor` expose only non-secret local state and
+do not open LinkedIn. `status` identifies the exact process holding the account
+lock. `stop` sends that owner a graceful termination request and waits for lock
+release; it never force-kills a process. During clean shutdown the server
+rejects new and queued calls, lets the one active call finish, closes Chromium,
+and releases the lock.
+
+Profile-changing and LinkedIn authentication commands hold the same account
+lock as `serve`, preventing a server from starting halfway through them. Give
+separate accounts distinct profile and lock paths.
 
 ## Local assets
 
@@ -147,7 +177,8 @@ uvx --from linkedin-mcp-local linkedin-mcp serve --transport stdio
 ```
 
 The MCP client owns the process lifecycle. The server must keep stdout reserved
-for MCP protocol messages.
+for MCP protocol messages. `linkedin-mcp stop` is available when a client no
+longer exposes a usable way to terminate the process it started.
 
 ### Loopback Streamable HTTP
 

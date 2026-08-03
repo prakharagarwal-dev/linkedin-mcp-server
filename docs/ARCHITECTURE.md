@@ -31,6 +31,7 @@ Persistent local filesystem:
   browser cache ─ matching Playwright Chromium revision
   browser profile ─ LinkedIn cookies and normal Chromium preferences
   asset root ─ explicitly selected user files
+  runtime lock ─ non-secret PID, instance, command, transport, and start time
 ```
 
 The server does not contain an agent, LLM, LangGraph graph, ranking algorithm,
@@ -46,9 +47,15 @@ tool and evidence resource.
 
 - stdio is the default local transport;
 - Streamable HTTP is restricted to loopback;
-- MCP initialization starts the application lifespan;
+- MCP initialization starts the stdio application lifespan, while HTTP
+  listener startup begins the shared HTTP lifespan;
 - browser installation and authentication bootstrap run as background tasks,
   keeping initialization responsive.
+
+For stdio, the one MCP session owns the container lifecycle. For Streamable
+HTTP, the listener owns it: request-level MCP lifespans are intentionally
+no-ops, while one container, account lock, queue, browser, pacing history,
+cursors, drafts, and idempotency state remain alive until the listener exits.
 
 Tool annotations describe read, prepare, and destructive execution behavior.
 They help a native MCP client decide when to ask the user for confirmation but
@@ -109,6 +116,14 @@ configured account. Queue backpressure is internal; callers simply wait for
 their response.
 
 The queue is not durable. A process exit discards pending calls.
+
+Every profile- or browser-owning process uses the same non-blocking account
+lock. `status` inspects its owner metadata without starting Chromium. `stop`
+rechecks that exact ownership, sends `SIGTERM`, and waits for lock release. On a
+clean shutdown the worker stops accepting calls, fails queued calls, allows the
+single active call to reach a terminal result, closes process-local stores and
+Chromium, and finally releases the lock. The CLI never escalates to a force
+kill, so a timeout means the bounded active operation is still draining.
 
 ### Executor
 
@@ -234,21 +249,28 @@ writes cookies and preferences normally when the context closes.
 
 Startup behavior:
 
-1. schedule managed Chromium setup when automatic installation is enabled;
-2. inspect whether the persistent profile contains browser data;
-3. silently validate an existing session;
-4. otherwise open one headed login context on that profile;
-5. select LinkedIn's visible **Keep me signed in** control when available;
-6. wait for the user to finish LinkedIn login/checkpoint work;
-7. require a persistent LinkedIn session cookie and departure from interactive
+1. acquire the configured account lock and publish non-secret owner metadata;
+2. schedule managed Chromium setup when automatic installation is enabled;
+3. initialize the dedicated persistent profile when it is missing;
+4. silently validate an existing session when profile data is already present;
+5. otherwise open one headed LinkedIn login context on that profile;
+6. select LinkedIn's visible **Keep me signed in** control when available;
+7. wait for the user to finish LinkedIn login/checkpoint work;
+8. require a persistent LinkedIn session cookie and departure from interactive
    auth surfaces;
-8. close the login context normally and reopen the exact profile in the
+9. close the login context normally and reopen the exact profile in the
    configured headed or headless mode;
-9. navigate to the authenticated feed and apply the normal safety guard; and
-10. only then report login success and start the normal runtime context.
+10. navigate to the authenticated feed and apply the normal safety guard; and
+11. only then report login success and start the normal runtime context.
 
-The MCP handshake does not wait for steps 3–10. A capability that requires the
+The MCP handshake does not wait for steps 2–11. A capability that requires the
 browser waits for the background authentication task.
+
+The same profile manager backs explicit `profile create`, `profile status`, and
+recoverable `profile reset` commands. Manual `login` operates only on an
+initialized profile. Manual `logout` follows LinkedIn's visible account menu
+and Sign Out control, then proves the session remains absent after a clean
+profile reopen. No command imports or adopts a user's general Chrome profile.
 
 For each capability operation, the manager creates a fresh Page within the one
 persistent context and closes that Page afterwards. The context itself is

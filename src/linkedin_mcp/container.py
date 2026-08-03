@@ -58,20 +58,30 @@ class AppContainer:
         self._started = True
 
     async def close(self) -> None:
-        self._started = False
         try:
-            await self.worker.close()
+            if self._started:
+                await self.worker.quiesce()
         finally:
+            self._started = False
             try:
-                await self.executor.close()
+                await self.worker.close()
             finally:
                 try:
-                    await self.browser.close()
+                    await self.executor.close()
                 finally:
                     try:
-                        await self.repository.close()
+                        await self.browser.close()
                     finally:
-                        self.process_lock.release()
+                        try:
+                            await self.repository.close()
+                        finally:
+                            self.process_lock.release()
+
+    async def quiesce(self) -> None:
+        """Stop accepting queued calls and let the active call reach a terminal result."""
+
+        if self._started:
+            await self.worker.quiesce()
 
 
 def create_production_container(settings: Settings) -> AppContainer:
@@ -153,5 +163,10 @@ def create_production_container(settings: Settings) -> AppContainer:
         browser=browser,
         executor=executor,
         worker=worker,
-        process_lock=AccountProcessLock(settings.runtime_lock_path),
+        process_lock=AccountProcessLock(
+            settings.runtime_lock_path,
+            account_id=settings.account_id,
+            command="serve",
+            transport=settings.transport,
+        ),
     )

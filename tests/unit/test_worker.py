@@ -708,6 +708,51 @@ async def test_worker_shutdown_unblocks_a_submitter_waiting_on_a_full_queue() ->
 
 
 @pytest.mark.asyncio
+async def test_worker_quiesce_rejects_queued_work_but_finishes_active_operation() -> None:
+    runner = BlockingRunner()
+    worker = CapabilityWorker(cast(CapabilityRunner, runner), queue_capacity=2)
+    await worker.start()
+    first_request = JobSearchInput(
+        context_id="graceful-stop",
+        request_id="active",
+        query="active",
+    )
+    queued_request = JobSearchInput(
+        context_id="graceful-stop",
+        request_id="queued",
+        query="queued",
+    )
+
+    active = asyncio.create_task(worker.search_jobs(first_request))
+    await runner.started.wait()
+    queued = asyncio.create_task(worker.search_jobs(queued_request))
+    await _wait_for_queue_depth(worker, 1)
+
+    quiescing = asyncio.create_task(worker.quiesce())
+    await _wait_for_queue_depth(worker, 0)
+    assert quiescing.done() is False
+    with pytest.raises(BrowserUnavailableError, match="not running"):
+        await worker.search_jobs(
+            JobSearchInput(
+                context_id="graceful-stop",
+                request_id="new",
+                query="new",
+            )
+        )
+
+    runner.release.set()
+    active_result = await active
+    with pytest.raises(BrowserUnavailableError, match="shutting down"):
+        await queued
+    await quiescing
+    await worker.close()
+
+    assert active_result.request_id == "active"
+    assert runner.search_queries == ["active"]
+    assert worker.running is False
+
+
+@pytest.mark.asyncio
 async def test_cancelled_caller_does_not_duplicate_already_queued_work() -> None:
     runner = BlockingRunner()
     worker = CapabilityWorker(cast(CapabilityRunner, runner), queue_capacity=2)

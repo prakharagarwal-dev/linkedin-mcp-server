@@ -29,6 +29,12 @@ profile defaults to the operating system's per-user `linkedin-mcp`
 application-data directory and is created owner-only on supported POSIX
 systems.
 
+Normal `serve` startup creates this dedicated profile automatically when it is
+missing. Explicit `profile create`, `login`, `logout`, and `profile reset`
+commands acquire the same account lock as the server, so two processes cannot
+operate the profile concurrently. The project does not import or adopt an
+existing general-purpose Chrome profile.
+
 The profile can contain:
 
 - LinkedIn session cookies;
@@ -43,7 +49,8 @@ Treat the entire profile as a credential:
 - never share it with another user or account;
 - restrict backup access;
 - mount it intentionally in a container;
-- remove it when revoking the local session is required.
+- remove it and any `*.backup-*` or `*.failed-*` sibling when revoking all
+  retained local browser data is required.
 
 The server does not request, read, log, or persist a LinkedIn password. Login
 occurs directly on LinkedIn in a headed browser. Completion requires a visible
@@ -56,6 +63,12 @@ Existing sessions are validated through a normal visible LinkedIn page. An
 expired login may open a headed reauthentication flow. Restriction-shaped
 pages pause work for operator attention rather than being treated as an
 ordinary login.
+
+Explicit logout uses LinkedIn's visible account menu and Sign Out link, waits
+for the session cookie to disappear, closes Chromium, and verifies the
+signed-out state after a clean reopen. Profile reset first archives the exact
+configured directory and restores it if replacement creation fails; that
+archive remains credential-sensitive until the operator deletes it.
 
 ## Managed Chromium
 
@@ -108,6 +121,12 @@ The browser layer enforces:
   `page_size` and opaque cursor contracts;
 - authentication, authwall, checkpoint, permission, and restriction guards;
 - accessible, user-facing locators where available.
+
+The account lock contains only non-secret owner metadata. `status` reads it
+without opening the browser. `stop` verifies the same owner before sending a
+graceful termination signal and never force-kills it. Clean shutdown rejects
+queued work, finishes the single active operation, closes local resources, and
+then releases the lock.
 
 The project does not implement:
 

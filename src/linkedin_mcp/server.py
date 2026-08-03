@@ -147,14 +147,20 @@ def _effective_page_size(page_size: int, legacy_page_size: int | None) -> int:
     return legacy_page_size if legacy_page_size is not None else page_size
 
 
-def create_mcp_server(container: AppContainer) -> FastMCP[None]:
+def create_mcp_server(
+    container: AppContainer,
+    *,
+    manage_container_lifecycle: bool = True,
+) -> FastMCP[None]:
     @asynccontextmanager
     async def lifespan(_: FastMCP[None]) -> AsyncGenerator[None]:
-        await container.start()
+        if manage_container_lifecycle:
+            await container.start()
         try:
             yield None
         finally:
-            await container.close()
+            if manage_container_lifecycle:
+                await container.close()
 
     mcp: FastMCP[None] = FastMCP(
         "linkedin-mcp-server",

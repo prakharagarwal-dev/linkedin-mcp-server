@@ -19,6 +19,7 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
+  "anyio>=4.5,<5",
   "mcp[cli]>=1.27,<2",
   "platformdirs>=4,<5",
   "playwright>=1.54,<2",

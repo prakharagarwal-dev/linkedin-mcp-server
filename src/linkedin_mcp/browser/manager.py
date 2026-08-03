@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-import os
+import re
 import time
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
@@ -18,11 +18,15 @@ from playwright.async_api import (
     Playwright,
     async_playwright,
 )
+from playwright.async_api import (
+    TimeoutError as PlaywrightTimeoutError,
+)
 
 from linkedin_mcp.auth import AuthenticationCoordinator
 from linkedin_mcp.browser.bootstrap import BrowserRuntimeBootstrap
 from linkedin_mcp.browser.guard import assert_safe_linkedin_page
 from linkedin_mcp.browser.pacing import NavigationPacer
+from linkedin_mcp.browser.profile import BrowserProfileManager
 from linkedin_mcp.config import Settings
 from linkedin_mcp.domain.models import BrowserSetupState, SessionAuthenticationState
 from linkedin_mcp.errors import (
@@ -30,6 +34,7 @@ from linkedin_mcp.errors import (
     AuthorizationDeniedError,
     BrowserUnavailableError,
     LinkedInMCPError,
+    ParserDriftError,
     RestrictionDetectedError,
 )
 from linkedin_mcp.policy import validate_linkedin_url
@@ -47,6 +52,7 @@ _DURABLE_LOGIN_REOPEN_MESSAGE = (
     "LinkedIn login did not survive a clean browser restart. Keep "
     "'Keep me signed in' enabled and sign in again."
 )
+_LOGOUT_VERIFICATION_MESSAGE = "LinkedIn logout did not survive a clean browser restart."
 
 
 def _persistent_linkedin_session(cookies: list[Cookie]) -> bool:
@@ -88,10 +94,15 @@ class BrowserManager:
         settings: Settings,
         *,
         browser_bootstrap: BrowserRuntimeBootstrap | None = None,
+        browser_profile: BrowserProfileManager | None = None,
         login_runner: LoginRunner | None = None,
     ) -> None:
         self._settings = settings
         self._browser_bootstrap = browser_bootstrap or BrowserRuntimeBootstrap(settings)
+        self._browser_profile = browser_profile or BrowserProfileManager(
+            settings,
+            self._browser_bootstrap,
+        )
         self._login_runner = login_runner
         self._playwright: Playwright | None = None
         self._context: BrowserContext | None = None
@@ -140,8 +151,7 @@ class BrowserManager:
         return self._browser_bootstrap.state
 
     def profile_present(self) -> bool:
-        profile = self._settings.browser_profile_path
-        return profile.is_dir() and any(profile.iterdir())
+        return self._browser_profile.inspect().initialized
 
     def start_session_bootstrap(self) -> None:
         self._browser_bootstrap.start()
@@ -169,7 +179,7 @@ class BrowserManager:
                 return self._context
             await self._close_browser(persist_state=False)
             await self._browser_bootstrap.ensure_ready()
-            self._prepare_profile_directory()
+            await self._browser_profile.ensure_created()
             try:
                 self._playwright = await async_playwright().start()
                 self._context = await self._playwright.chromium.launch_persistent_context(
@@ -316,6 +326,7 @@ class BrowserManager:
     async def _login_for_authentication(self) -> None:
         runner = self._login_runner or login_interactively
         try:
+            await self._browser_profile.ensure_created()
             await runner(self._settings, self._browser_bootstrap)
         except LinkedInMCPError as error:
             if error.pause_required:
@@ -371,12 +382,6 @@ class BrowserManager:
         if playwright is not None:
             await playwright.stop()
 
-    def _prepare_profile_directory(self) -> None:
-        profile = self._settings.browser_profile_path
-        profile.mkdir(mode=0o700, parents=True, exist_ok=True)
-        if os.name != "nt":
-            profile.chmod(0o700)
-
 
 async def login_interactively(
     settings: Settings,
@@ -385,10 +390,8 @@ async def login_interactively(
     """Open a headed profile and prove its session survives a clean reopen."""
 
     bootstrap = browser_bootstrap or BrowserRuntimeBootstrap(settings)
+    BrowserProfileManager(settings, bootstrap).require_initialized()
     await bootstrap.ensure_ready()
-    settings.browser_profile_path.mkdir(mode=0o700, parents=True, exist_ok=True)
-    if os.name != "nt":
-        settings.browser_profile_path.chmod(0o700)
     playwright: Playwright | None = None
     context: BrowserContext | None = None
     try:
@@ -463,3 +466,119 @@ async def login_interactively(
             await context.close()
         if playwright is not None:
             await playwright.stop()
+
+
+async def logout_interactively(
+    settings: Settings,
+    browser_bootstrap: BrowserRuntimeBootstrap | None = None,
+) -> bool:
+    """Use LinkedIn's visible sign-out control and verify the persistent session ended."""
+
+    bootstrap = browser_bootstrap or BrowserRuntimeBootstrap(settings)
+    BrowserProfileManager(settings, bootstrap).require_initialized()
+    await bootstrap.ensure_ready()
+    pacer = NavigationPacer(
+        account_id=settings.account_id,
+        interval_seconds=settings.minimum_navigation_interval_seconds,
+    )
+    playwright: Playwright | None = None
+    context: BrowserContext | None = None
+    try:
+        playwright = await async_playwright().start()
+        context = await playwright.chromium.launch_persistent_context(
+            user_data_dir=str(settings.browser_profile_path),
+            headless=False,
+        )
+        context.set_default_timeout(settings.browser_timeout_seconds * 1_000)
+        context.set_default_navigation_timeout(settings.browser_timeout_seconds * 1_000)
+        page = context.pages[0] if context.pages else await context.new_page()
+        await pacer.wait()
+        await page.goto(_SESSION_VALIDATION_URL, wait_until="domcontentloaded")
+        cookies = await context.cookies("https://www.linkedin.com")
+        has_session_cookie = any(cookie.get("name") == "li_at" for cookie in cookies)
+        if not has_session_cookie and _is_logged_out_surface(page.url):
+            return False
+        await assert_safe_linkedin_page(page, settings.allowed_hosts)
+
+        account_menu = await _unique_visible_control(
+            page.get_by_role(
+                "button",
+                name=re.compile(r"^Me(?:\b|$)", re.IGNORECASE),
+            ),
+            missing_message="LinkedIn's visible account menu was unavailable for logout.",
+            ambiguous_message="LinkedIn exposed multiple visible account menus for logout.",
+        )
+        await pacer.wait()
+        await account_menu.click()
+        sign_out = await _unique_visible_control(
+            page.get_by_role(
+                "link",
+                name=re.compile(r"^Sign\s+Out$", re.IGNORECASE),
+            ),
+            missing_message="LinkedIn's visible Sign Out control was unavailable.",
+            ambiguous_message="LinkedIn exposed multiple visible Sign Out controls.",
+        )
+        await pacer.wait()
+        await sign_out.click()
+        for _ in range(40):
+            cookies = await context.cookies("https://www.linkedin.com")
+            if not any(cookie.get("name") == "li_at" for cookie in cookies):
+                break
+            await page.wait_for_timeout(250)
+        else:
+            raise BrowserUnavailableError("LinkedIn did not clear the persistent login session.")
+
+        await context.close()
+        context = None
+        await asyncio.sleep(_PROFILE_REOPEN_DELAY_SECONDS)
+        context = await playwright.chromium.launch_persistent_context(
+            user_data_dir=str(settings.browser_profile_path),
+            headless=settings.browser_headless,
+        )
+        context.set_default_timeout(settings.browser_timeout_seconds * 1_000)
+        context.set_default_navigation_timeout(settings.browser_timeout_seconds * 1_000)
+        verification_page = await context.new_page()
+        await pacer.wait()
+        await verification_page.goto(_SESSION_VALIDATION_URL, wait_until="domcontentloaded")
+        cookies = await context.cookies("https://www.linkedin.com")
+        if any(cookie.get("name") == "li_at" for cookie in cookies):
+            raise BrowserUnavailableError(_LOGOUT_VERIFICATION_MESSAGE)
+        if not _is_logged_out_surface(verification_page.url):
+            raise BrowserUnavailableError(_LOGOUT_VERIFICATION_MESSAGE)
+        logger.info("linkedin_persistent_logout_verified")
+        return True
+    except LinkedInMCPError:
+        raise
+    except PlaywrightTimeoutError as error:
+        raise BrowserUnavailableError("The interactive LinkedIn logout timed out.") from error
+    except Exception as error:
+        raise BrowserUnavailableError("The interactive LinkedIn logout browser failed.") from error
+    finally:
+        pacer.close()
+        if context is not None:
+            await context.close()
+        if playwright is not None:
+            await playwright.stop()
+
+
+def _is_logged_out_surface(url: str) -> bool:
+    path = urlsplit(url).path.casefold()
+    return any(marker in path for marker in ("/login", "/uas/login", "/authwall"))
+
+
+async def _unique_visible_control(
+    controls: Locator,
+    *,
+    missing_message: str,
+    ambiguous_message: str,
+) -> Locator:
+    visible: list[Locator] = []
+    for index in range(await controls.count()):
+        candidate = controls.nth(index)
+        if await candidate.is_visible():
+            visible.append(candidate)
+    if not visible:
+        raise ParserDriftError(missing_message)
+    if len(visible) != 1:
+        raise ParserDriftError(ambiguous_message)
+    return visible[0]

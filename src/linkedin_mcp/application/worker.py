@@ -248,6 +248,9 @@ class CapabilityWorker:
         self._pending_puts: set[asyncio.Task[None]] = set()
         self._task: asyncio.Task[None] | None = None
         self._accepting = False
+        self._active = False
+        self._idle = asyncio.Event()
+        self._idle.set()
 
     @property
     def running(self) -> bool:
@@ -262,6 +265,7 @@ class CapabilityWorker:
             return
         self._shutdown.clear()
         self._accepting = True
+        self._idle.set()
         self._task = asyncio.create_task(
             self._run(),
             name="linkedin-capability-worker",
@@ -584,6 +588,8 @@ class CapabilityWorker:
     async def _run(self) -> None:
         while True:
             item = await self._queue.get()
+            self._active = True
+            self._idle.clear()
             try:
                 output = await self._execute(item)
             except asyncio.CancelledError:
@@ -604,6 +610,9 @@ class CapabilityWorker:
                     if current is not None and current.future is item.future:
                         self._inflight.pop(item.key, None)
                 self._queue.task_done()
+                self._active = False
+                if self._queue.empty():
+                    self._idle.set()
 
     async def _execute(self, item: _WorkItem) -> CapabilityOutput:
         if item.capability_name is CapabilityName.JOBS_SEARCH:
@@ -722,6 +731,30 @@ class CapabilityWorker:
                 raise RuntimeError("The queued reaction execution has an invalid type.")
             return await self._runner.execute_post_reaction(item.request)
         raise RuntimeError(f"Unsupported queued capability: {item.capability_name.value}")
+
+    async def quiesce(self) -> None:
+        """Reject queued work and wait for the one active operation to finish."""
+
+        self._accepting = False
+        self._shutdown.set()
+        pending_puts = tuple(self._pending_puts)
+        for put_task in pending_puts:
+            put_task.cancel()
+        if pending_puts:
+            await asyncio.gather(*pending_puts, return_exceptions=True)
+
+        shutdown_error = BrowserUnavailableError("The local LinkedIn worker is shutting down.")
+        while True:
+            try:
+                item = self._queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+            if not item.future.done():
+                item.future.set_exception(shutdown_error)
+            self._queue.task_done()
+        if not self._active:
+            self._idle.set()
+        await self._idle.wait()
 
     async def close(self) -> None:
         self._accepting = False
