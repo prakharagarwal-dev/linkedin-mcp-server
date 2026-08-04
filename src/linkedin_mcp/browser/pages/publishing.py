@@ -254,6 +254,9 @@ class PostPublishingPage:
             try:
                 await self._browser.click_visible_control(page, final_control)
             except Exception:
+                confirmation = await self._visible_publish_confirmation(page)
+                if confirmation is not None:
+                    return await self._confirmation_result(page, confirmation)
                 return await self._result(
                     page,
                     ActionOutcome.UNCERTAIN,
@@ -283,6 +286,9 @@ class PostPublishingPage:
                 )
 
             for _ in range(32):
+                confirmation = await self._visible_publish_confirmation(page)
+                if confirmation is not None:
+                    return await self._confirmation_result(page, confirmation)
                 current_refs = await self._matching_post_refs(page, marker)
                 created = tuple(ref for ref in current_refs if ref not in before_refs)
                 if len(created) == 1:
@@ -303,6 +309,71 @@ class PostPublishingPage:
                 "post_outcome_unknown",
                 "No single newly visible post matched the confirmed payload within the bound.",
             )
+
+    @staticmethod
+    async def _visible_publish_confirmation(
+        page: Page,
+    ) -> tuple[ActionOutcome, bool, str, str, str | None] | None:
+        candidates = page.get_by_role("alert").or_(page.get_by_role("status"))
+        for index in range(await candidates.count()):
+            candidate = candidates.nth(index)
+            if not await candidate.is_visible():
+                continue
+            text = " ".join((await candidate.inner_text()).split())
+            if re.search(r"\bpost successful\b|\bpost published\b", text, re.I):
+                source_url: str | None = None
+                post_ref: str | None = None
+                view_post = candidate.get_by_role(
+                    "link",
+                    name=re.compile(r"^view post$", re.I),
+                )
+                visible_links = [
+                    view_post.nth(link_index)
+                    for link_index in range(await view_post.count())
+                    if await view_post.nth(link_index).is_visible()
+                ]
+                if len(visible_links) == 1:
+                    href = await visible_links[0].get_attribute("href")
+                    if href:
+                        source_url = urljoin(page.url, href)
+                        post_ref = post_reference_from_value(source_url)
+                final_state = f"post_published:{post_ref}" if post_ref else "post_published"
+                return (
+                    ActionOutcome.VERIFIED,
+                    True,
+                    final_state,
+                    "LinkedIn visibly confirmed the exact post was published.",
+                    source_url,
+                )
+            if re.search(
+                r"(?:sorry|couldn['\u2019]?t|unable|failed).{0,80}(?:publish|post)"
+                r"|(?:publish|post).{0,80}(?:failed|not sent|not published)",
+                text,
+                re.I,
+            ):
+                return (
+                    ActionOutcome.FAILED,
+                    False,
+                    "post_not_published",
+                    "LinkedIn visibly reported that the post was not published.",
+                    None,
+                )
+        return None
+
+    @staticmethod
+    async def _confirmation_result(
+        page: Page,
+        confirmation: tuple[ActionOutcome, bool, str, str, str | None],
+    ) -> ActionPageResult:
+        outcome, performed, final_state, detail, source_url = confirmation
+        return await PostPublishingPage._result(
+            page,
+            outcome,
+            performed,
+            final_state,
+            detail,
+            source_url=source_url,
+        )
 
     async def _open_composer(self, page: Page) -> tuple[Locator, str, str]:
         start = await _unique_visible(

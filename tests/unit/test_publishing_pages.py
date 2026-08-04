@@ -61,6 +61,8 @@ class PublishingFixtureBrowser:
         self._page = page
         self._composer_delay_ms = composer_delay_ms
         self.fail_next_settings_click = False
+        self.fail_after_post_click = False
+        self.publish_outcome = "success"
 
     @asynccontextmanager
     async def page(self) -> AsyncGenerator[Page]:
@@ -73,8 +75,14 @@ class PublishingFixtureBrowser:
         await page.route(url, fulfill, times=1)
         await page.goto(url)
         await page.evaluate(
-            "delay => { window.__linkedinMcpComposerDelayMs = delay; }",
-            self._composer_delay_ms,
+            "values => {"
+            " window.__linkedinMcpComposerDelayMs = values.delay;"
+            " window.__linkedinMcpPublishOutcome = values.publishOutcome;"
+            " }",
+            {
+                "delay": self._composer_delay_ms,
+                "publishOutcome": self.publish_outcome,
+            },
         )
 
     async def click_visible_control(self, page: Page, control: Locator) -> None:
@@ -84,6 +92,9 @@ class PublishingFixtureBrowser:
             self.fail_next_settings_click = False
             raise PlaywrightTimeoutError("fixture pre-submit timeout")
         await control.click()
+        if self.fail_after_post_click and label == "Post":
+            self.fail_after_post_click = False
+            raise PlaywrightTimeoutError("fixture post-click timeout")
 
 
 async def _prepared_draft(
@@ -212,6 +223,64 @@ async def test_pre_submit_timeout_is_a_verified_failure_not_an_uncertain_publish
     assert result.outcome is ActionOutcome.FAILED
     assert result.performed is False
     assert result.final_state == "post_not_submitted"
+
+
+@pytest.mark.timeout(30)
+async def test_visible_success_alert_verifies_publish_after_post_click_timeout(
+    tmp_path: Path,
+) -> None:
+    request = PostCreatePrepareInput(
+        context_id="publishing-context",
+        request_id="prepare-post-click-timeout",
+        content=TextPostContent(text="A visibly confirmed fixture post."),
+    )
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        page = await browser.new_page()
+        fixture_browser = PublishingFixtureBrowser(page)
+        adapter = PostPublishingPage(
+            cast(BrowserManager, fixture_browser),
+            LocalAssetStore(tmp_path),
+        )
+        try:
+            draft = await _prepared_draft(adapter, request)
+            fixture_browser.fail_after_post_click = True
+            result = await adapter.execute_post(draft)
+        finally:
+            await browser.close()
+
+    assert result.outcome is ActionOutcome.VERIFIED
+    assert result.performed is True
+    assert result.final_state.startswith("post_published:activity:")
+
+
+@pytest.mark.timeout(30)
+async def test_visible_failure_alert_returns_verified_non_publish(
+    tmp_path: Path,
+) -> None:
+    request = PostCreatePrepareInput(
+        context_id="publishing-context",
+        request_id="prepare-visible-publish-failure",
+        content=TextPostContent(text="A fixture post that LinkedIn rejects."),
+    )
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        page = await browser.new_page()
+        fixture_browser = PublishingFixtureBrowser(page)
+        adapter = PostPublishingPage(
+            cast(BrowserManager, fixture_browser),
+            LocalAssetStore(tmp_path),
+        )
+        try:
+            draft = await _prepared_draft(adapter, request)
+            fixture_browser.publish_outcome = "failure"
+            result = await adapter.execute_post(draft)
+        finally:
+            await browser.close()
+
+    assert result.outcome is ActionOutcome.FAILED
+    assert result.performed is False
+    assert result.final_state == "post_not_published"
 
 
 @pytest.mark.timeout(40)

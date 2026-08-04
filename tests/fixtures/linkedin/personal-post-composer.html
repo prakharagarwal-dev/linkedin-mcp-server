@@ -13,7 +13,7 @@
       <h1>Home</h1>
       <button type="button" aria-label="Start a post">Start a post</button>
       <section id="feed" aria-label="Feed"></section>
-      <div id="toast" role="status"></div>
+      <div id="toast" role="alert"></div>
     </main>
 
     <section role="dialog" aria-label="Loading" id="composer-loader" hidden>
@@ -555,6 +555,12 @@
       linkPreview.querySelector("button").onclick = () => hide(linkPreview);
 
       composer.querySelector('button[aria-label="Post"]').onclick = () => {
+        if (window.__linkedinMcpPublishOutcome === "failure") {
+          hide(composer);
+          document.querySelector("#toast").innerText =
+            "Sorry, your post was not published. Please try again.";
+          return;
+        }
         if (scheduled) {
           hide(composer);
           document.querySelector("#toast").innerText = "Post scheduled";
@@ -575,7 +581,8 @@
         article.innerText = `Current Member\n${marker}`;
         document.querySelector("#feed").prepend(article);
         hide(composer);
-        document.querySelector("#toast").innerText = "Post successful";
+        document.querySelector("#toast").innerHTML =
+          `Post successful. <a href="/feed/update/urn:li:activity:${sequence}/">View post</a>`;
       };
     </script>
   </body>
