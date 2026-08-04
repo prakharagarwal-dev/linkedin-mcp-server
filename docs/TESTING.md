@@ -128,8 +128,11 @@ remain covered separately. No live identity or profile text is retained.
 
 The Posts fixtures under `tests/fixtures/linkedin/posts/latest/` are
 `mock_verified` from authenticated visible search and detail surfaces
-inspected on 2026-08-04. Search variants preserve dynamic card-text evidence;
-detail variants preserve current exact-menu identity, body expansion, typed
+inspected through 2026-08-05. Search variants preserve current compact author
+headers, trailing-bullet edited ages, pointer-intercepted expansion controls,
+numeric engagement buttons, content-card classification, virtualized prefix
+inventory, dynamic card-text evidence, and cursor behavior. Detail variants
+preserve current exact-menu identity, body expansion, typed
 media/link/document/poll structures, engagement controls, and bounded
 repost-original behavior. They contain no live post, author, raw DOM,
 authentication state, trace, or account data.
@@ -238,6 +241,14 @@ only sanitized provenance and the UI behaviors represented by each fixture.
   verified against their bounded semantic collection container, while
   recommendation rails remained outside the member result. No account state
   changed.
+
+- 2026-08-05: Posts search returned two disjoint three-result cursor pages from
+  a cumulative live rescan. Current cards retained exact author headline and
+  relationship degree, simple and edited trailing-bullet ages, fully expanded
+  text, numeric reaction/comment/repost counts, and article/job/text content
+  types without misclassifying author avatars. Exact Post detail readback
+  independently matched one result's stable identity, full text, attachment,
+  engagement, and evidence. No account state changed.
 
 - 2026-08-04: a prepare-only personal-composer replay observed a bounded
   loading dialog, restored the exact personal composer, traversed unchanged

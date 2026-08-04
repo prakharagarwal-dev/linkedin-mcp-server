@@ -186,6 +186,11 @@ def test_post_fixture_manifest_locks_current_visible_filter_surface() -> None:
         "1st connections",
         "People you follow",
     ]
+    search_contract = cast(dict[str, object], manifest["search_card_contract"])
+    assert "compact region" in cast(str, search_contract["header"])
+    assert "keyboard activation" in cast(str, search_contract["body"])
+    assert "Reaction button state" in cast(str, search_contract["engagement"])
+    assert "exclude author avatars" in cast(str, search_contract["content_type"])
     detail_contract = cast(dict[str, object], manifest["detail_contract"])
     assert detail_contract["stable_reference_action"] == "Copy link to post"
     assert detail_contract["body"] == '[data-testid="expandable-text-box"]'
@@ -366,14 +371,18 @@ async def test_post_search_resolves_all_named_facets_and_extracts_stable_results
     assert len(posts) == 1
     assert posts[0].post_ref == POST_REF
     assert posts[0].author.profile_slug == "jane-doe"
+    assert posts[0].author.headline == "Staff Engineer at Acme Cloud"
+    assert posts[0].author.relationship_text == "1st"
+    assert posts[0].posted_at_text == "2h • Edited •"
     assert posts[0].text is not None and "#python" in posts[0].text
-    assert posts[0].reaction_count_text == "12 reactions"
-    assert posts[0].comment_count_text == "3 comments"
-    assert posts[0].repost_count_text == "1 repost"
+    assert "… more" not in posts[0].text
+    assert posts[0].content_type is PostContentType.TEXT
+    assert posts[0].reaction_count_text == "12"
+    assert posts[0].comment_count_text == "3"
+    assert posts[0].repost_count_text == "1"
     assert coverage.pages_visited == 1
     assert coverage.stop_reason is StopReason.RESULT_LIMIT
     assert posts[0].visible_text in captured_text
-    assert "--- exact visible post-card snapshots ---" in captured_text
     assert source_url == fixture_browser.navigations[-1]
     assert len(fixture_browser.navigations) == 2
 
@@ -393,6 +402,35 @@ async def test_post_search_resolves_all_named_facets_and_extracts_stable_results
     assert source.source_type.value == "linkedin_post_search"
 
 
+@pytest.mark.timeout(30)
+async def test_post_search_inventories_virtualized_prefix_before_expanding_cards() -> None:
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        page = await browser.new_page()
+        fixture_browser = PostFixtureBrowser(page)
+        collector = PostSearchPage(cast(BrowserManager, fixture_browser), max_pages=1)
+        try:
+            posts, coverage, captured_text, _ = await collector.collect(
+                PostSearchInput(
+                    context_id="context-1",
+                    request_id="post-virtualized-prefix",
+                    query="reliability",
+                    page_size=2,
+                ),
+                result_limit=2,
+            )
+        finally:
+            await browser.close()
+
+    assert [post.post_ref for post in posts] == [
+        POST_REF,
+        "activity:7312345678901234999",
+    ]
+    assert [post.author.name for post in posts] == ["Jane Doe", "Acme Cloud"]
+    assert coverage.stop_reason is StopReason.RESULT_LIMIT
+    assert all(post.visible_text in captured_text for post in posts)
+
+
 @pytest.mark.timeout(20)
 async def test_post_search_waits_for_async_initial_results() -> None:
     html = """
@@ -402,9 +440,16 @@ async def test_post_search_waits_for_async_initial_results() -> None:
       <div id="results"></div>
       <template id="late-result">
         <article data-post-urn="urn:li:activity:7312345678901234777">
-          <a href="/in/late-author-/">Late Author</a>
-          <time>1h</time>
-          <p data-post-text>Late-rendered reliability post.</p>
+          <div>
+            <a href="/in/late-author-/">Late Author</a>
+            <p>Reliability Engineer</p>
+            <p>1h •</p>
+            <button aria-label="Open control menu for post by Late Author"></button>
+          </div>
+          <p data-testid="expandable-text-box">Late-rendered reliability post.</p>
+          <button aria-label="Reaction button state: no reaction"></button>
+          <button aria-label="Comment"></button>
+          <button aria-label="Repost"></button>
         </article>
       </template>
     </main>
