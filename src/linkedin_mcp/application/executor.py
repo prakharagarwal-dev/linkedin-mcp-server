@@ -1357,7 +1357,6 @@ class CapabilityExecutor:
             assets = await self._post_engagement.prepare_comment_assets(request)
             return CommentCreatePayload(
                 post_ref=request.post_ref,
-                parent_comment_ref=request.parent_comment_ref,
                 text=request.text,
                 mentions=request.mentions,
                 attachment=request.attachment,
@@ -1381,7 +1380,6 @@ class CapabilityExecutor:
                 raise RuntimeError("Reaction preparation captured no visible reaction state.")
             return ReactionSetPayload(
                 post_ref=request.post_ref,
-                comment_ref=request.comment_ref,
                 existing_reaction=capture.existing_reaction,
                 desired_reaction=request.desired_reaction,
             )

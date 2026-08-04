@@ -2612,6 +2612,12 @@ async def post_summary_from_region(region: Locator) -> PostSummary | None:
     return await _post_summary_from_region(region)
 
 
+async def post_author_from_region(region: Locator) -> PostAuthor:
+    """Parse the exact visible author header without parsing post engagement."""
+
+    return (await _post_header_fields(region)).author
+
+
 async def region_for_post(page: Page, post_ref: str) -> Locator:
     """Resolve one exact visible post region by its stable reference."""
 

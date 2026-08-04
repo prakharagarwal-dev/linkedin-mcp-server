@@ -6,6 +6,17 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Remove account-changing threaded comment replies from
+  `linkedin.posts.comment.prepare` and `linkedin.posts.comment.execute`. These
+  tools now create top-level post comments only; read-only discussion results
+  continue to include visible replies and their exact parent references.
+- Limit `linkedin.posts.reaction.prepare` and
+  `linkedin.posts.reaction.execute` to exact posts. Comment reaction counts
+  remain available through read-only post discussions, but setting reactions
+  on comments is no longer exposed.
+
 ### Fixed
 
 - Parse current Post-search cards through the same exact header, content, and
@@ -30,12 +41,9 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   primary publication postcondition, preserve that confirmation across a
   post-click browser timeout, and classify a visible publishing rejection as a
   verified failure.
-- Bind LinkedIn's delayed focusable comment-reaction control through its
-  accessible state icon, wait boundedly for the surface, and distinguish a
-  missing pre-click control from an uncertain post-click outcome.
-- Support the current external generic Reply composer, flat visually indented
-  reply ancestry, and `See previous replies` expansion without weakening exact
-  comment and parent-reference binding.
+- Read flat visually indented reply ancestry and expand the current
+  `See previous replies` control without weakening exact parent-reference
+  binding.
 - Parse the current hiring-team card when its only visible profile link contains
   the member name, connection degree, headline, and role as separate lines.
 

@@ -38,7 +38,7 @@ do not upgrade this classification.
 | Post detail | `linkedin.posts.get` `2.0.0` | Exact activity/share/UGC identity, fully expanded text, scoped links/mentions/hashtags, current text/image/video/live-video/document/link/article/newsletter/event/job/poll variants, viewer reaction and engagement, visibility/header metadata, immutable field evidence, bounded completeness coverage, and two-page repost-original resolution | `mock_verified` + read-only live acceptance |
 | Post discussion | `linkedin.posts.comments.list` `1.1.1` | Ordering, cursor-paged top-level comments, delayed expansion including the current `See previous replies` control, flat visually indented parent binding, replies, media, and source retrieval | `mock_verified` + read-only live acceptance |
 | Personal post publishing | `linkedin.posts.create.*` `2.0.0` | Nine current personal composer modes, bounded loader settling, unchanged disabled-setting handling, visible publish-success/rejection postconditions, exact nested options, immutable previews, tamper rejection, execution, and replay | `mock_verified` |
-| Post/comment engagement | `linkedin.posts.comment.*` and `linkedin.posts.reaction.*` `2.0.0` | Current comment/reply text, external generic reply composer, photo and GIF controls, native discussion aliases, delayed accessible comment-reaction controls, all six reactions, tamper rejection, execution, and replay | `mock_verified` + live mutation/readback acceptance |
+| Post engagement | Comment `3.0.0`; reaction `3.0.0` | Current top-level comment text, photo and GIF controls, all six post reactions, tamper rejection, execution, and replay | `mock_verified` + live mutation/readback acceptance |
 | Invitations | List `4.0.0`; send, accept, and ignore `1.0.0` | Latest-layout-only received/sent extraction; bounded live cursor traversal; exact terminal per-view count reconciliation; and the complete currently implemented invitation lifecycle under one namespace, with scoped hash-locked writes and exact-profile postconditions | `mock_verified` + read-only/prepare-only live acceptance |
 | Connections | List `2.0.0`; search `2.0.0` | Separate sorted inventory and filtered search of established first-degree connections; the server always binds search to first degree and rejects non-first-degree results | `mock_verified` + read-only live acceptance |
 | Messaging | Search, conversation get, message prepare, and execute `2.0.0` | Current recipient/message search criteria and mutually exclusive filters; cursor paging; reverse-virtualized history; exact recipients/replies; current text, file, and KLIPY GIF preparation; reply-aware same-surface postconditions; tamper rejection; and replay | `mock_verified` + read/prepare-only live acceptance |
@@ -157,10 +157,10 @@ constructed only from visible post URNs/URLs.
 | Relevant/recent comment order | `supported` | `most_relevant` or `most_recent` |
 | Top-level comments and nested replies | `supported` | Stable comment refs with exact parent binding |
 | Comment author, body, time, edit, counts | `supported` | Exact visible observation fields |
-| Photo/GIF-only comments and replies | `supported` | Optional text plus typed attachment kind, accessible label, visible resource URL when present, and exact accessibility evidence |
+| Photo/GIF-only comments and replies | `supported` | Read-only discussion output retains optional text plus typed attachment kind, accessible label, visible resource URL when present, and exact accessibility evidence |
 | Bounded comment/reply expansion | `supported` | Private expansion bound and explicit visible/returned/truncated coverage |
 | Hidden posts, comments, or private endpoints | `outside_named_capability` | No inference or private endpoint access |
-| Publishing, comments, replies, or reactions | `outside_named_capability` | Separate M15/M16 write contracts; no read scope grants mutation |
+| Publishing, top-level comments, or reactions | `outside_named_capability` | Separate write contracts; no read scope grants mutation. Threaded reply creation is not exposed. |
 
 ## Personal publishing `2.0.0`
 
@@ -193,21 +193,22 @@ browser access during execution.
 | Repost/share of an existing post | `outside_named_capability` | Requires an exact source-post target and its own mutation contract |
 | Company/Page publishing | `outside_named_capability` | Permanently excluded from this personal-actor capability |
 
-## Personal comments, replies, and reactions `2.0.0`
+## Personal comments and post reactions `3.0.0`
 
 | Visible engagement feature | Status | Typed behavior and evidence |
 | --- | --- | --- |
 | Top-level text/link/emoji comment | `supported` | Exact text through one visible comment composer |
-| Reply to a comment | `supported` | Explicit stable parent comment reference, exact thread binding including the current flat visually indented layout, one exact Reply-only composer form, and runtime-verified activity-URL to native UGC-discussion mapping |
 | Member/Page mention | `supported` | Exact token plus exact visible identity resolution |
 | Photo | `supported` | One hash-locked GIF/JPEG/JPG/PNG/WebP upload through the current Share photo chooser |
 | GIF picker | `supported` | Exact Search for GIFs/KLIPY query and one unique result image alt label |
-| Like, Celebrate, Support, Love, Insightful, Funny | `supported` | Typed reaction states for both posts and comments |
+| Like, Celebrate, Support, Love, Insightful, Funny | `supported` | Typed reaction states for exact posts |
 | Remove reaction | `supported` | Explicit `none`; never inferred from a repeated click |
 | Set/change/no-op | `supported` | Existing and desired state are both captured, passed through the client approval policy, and revalidated |
-| Comment/reply verification | `supported` | Exactly one new stable reference must match actor and parent; text and GIF label match exactly, while a photo additionally requires the prepared file hash and visible photo type |
-| Reaction verification | `supported` | The bounded accessible reaction surface must load before preparation/execution; final visible state must equal the confirmed desired state, while a missing pre-click control is a verified non-mutation rather than an uncertain action |
+| Comment verification | `supported` | Exactly one new top-level stable reference must match the actor and post; text and GIF label match exactly, while a photo additionally requires the prepared file hash and visible photo type |
+| Reaction verification | `supported` | The bounded accessible post-reaction surface must load before preparation/execution; final visible state must equal the confirmed desired state, while a missing pre-click control is a verified non-mutation rather than an uncertain action |
 | Comment as a LinkedIn Page | `outside_named_capability` | Different actor and authorization contract; personal actor is mandatory |
+| Reply to a comment | `outside_named_capability` | Threaded reply creation is not exposed; visible replies remain available through `linkedin.posts.comments.list` |
+| React to a comment | `outside_named_capability` | Comment reaction changes are not exposed; visible aggregate reaction counts remain readable |
 | Edit/delete/pin/report/repost a comment | `outside_named_capability` | Materially different effects requiring separate scopes and payloads |
 
 ## M17 Jobs parity audit

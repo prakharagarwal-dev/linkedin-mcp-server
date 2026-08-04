@@ -1007,21 +1007,11 @@ class FakePostEngagement:
                             "https://www.linkedin.com/feed/update/"
                             "urn:li:activity:7312345678901234567/"
                         ),
-                        "comment_ref": request.parent_comment_ref,
-                        "content_author_name": (
-                            "Alex Ray" if request.parent_comment_ref else "Jane Doe"
-                        ),
-                        "content_author_url": HttpUrl(
-                            "https://www.linkedin.com/in/"
-                            f"{'alex-ray' if request.parent_comment_ref else 'jane-doe'}/"
-                        ),
+                        "content_author_name": "Jane Doe",
+                        "content_author_url": HttpUrl("https://www.linkedin.com/in/jane-doe/"),
                     }
                 ),
-                "current_state": (
-                    "reply_composer_ready"
-                    if request.parent_comment_ref
-                    else "comment_composer_ready"
-                ),
+                "current_state": "comment_composer_ready",
             }
         )
 
@@ -1034,21 +1024,25 @@ class FakePostEngagement:
         self,
         request: PostReactionPrepareInput,
     ) -> ActionPreparationCapture:
-        capture = await self.prepare_comment(
-            PostCommentPrepareInput(
-                context_id=request.context_id,
-                request_id=request.request_id,
-                post_ref=request.post_ref,
-                parent_comment_ref=request.comment_ref,
-                text="typed preparation placeholder",
-            )
-        )
+        capture = _action_capture("current-member")
         return capture.model_copy(
             update={
-                "current_state": "reaction_ready",
-                "existing_reaction": (
-                    ReactionState.LIKE if request.comment_ref else ReactionState.NONE
+                "target": capture.target.model_copy(
+                    update={
+                        "actor_profile_slug": "current-member",
+                        "actor_profile_url": HttpUrl("https://www.linkedin.com/in/current-member/"),
+                        "actor_display_name": "Current Member",
+                        "post_ref": request.post_ref,
+                        "post_url": HttpUrl(
+                            "https://www.linkedin.com/feed/update/"
+                            "urn:li:activity:7312345678901234567/"
+                        ),
+                        "content_author_name": "Jane Doe",
+                        "content_author_url": HttpUrl("https://www.linkedin.com/in/jane-doe/"),
+                    }
                 ),
+                "current_state": "reaction_ready",
+                "existing_reaction": ReactionState.NONE,
             }
         )
 
@@ -2095,7 +2089,7 @@ async def test_personal_post_prepare_confirmation_and_execution_are_hash_locked(
 
 
 @pytest.mark.asyncio
-async def test_comment_reply_and_reaction_actions_use_typed_confirmation_lifecycle() -> None:
+async def test_comment_and_reaction_actions_use_typed_confirmation_lifecycle() -> None:
     repository = MemoryRepository()
     engagement = FakePostEngagement()
     executor = _executor(
@@ -2108,14 +2102,12 @@ async def test_comment_reply_and_reaction_actions_use_typed_confirmation_lifecyc
         context_id="engagement-context",
         request_id="comment-prepare-1",
         post_ref="activity:7312345678901234567",
-        parent_comment_ref="comment:activity:7312345678901234567:111",
-        text="Exact confirmed reply.",
+        text="Exact confirmed comment.",
     )
     reaction_request = PostReactionPrepareInput(
         context_id="engagement-context",
         request_id="reaction-prepare-1",
         post_ref="activity:7312345678901234567",
-        comment_ref="comment:activity:7312345678901234567:111",
         desired_reaction=ReactionState.LOVE,
     )
 
@@ -2124,12 +2116,11 @@ async def test_comment_reply_and_reaction_actions_use_typed_confirmation_lifecyc
 
     assert comment.draft.action_type is ActionType.COMMENT_CREATE
     assert isinstance(comment.draft.payload, CommentCreatePayload)
-    assert comment.draft.payload.parent_comment_ref == comment_request.parent_comment_ref
-    assert comment.draft.target.comment_ref == comment_request.parent_comment_ref
-    assert comment.draft.target.content_author_name == "Alex Ray"
+    assert comment.draft.target.post_ref == comment_request.post_ref
+    assert comment.draft.target.content_author_name == "Jane Doe"
     assert reaction.draft.action_type is ActionType.REACTION_SET
     assert isinstance(reaction.draft.payload, ReactionSetPayload)
-    assert reaction.draft.payload.existing_reaction is ReactionState.LIKE
+    assert reaction.draft.payload.existing_reaction is ReactionState.NONE
     assert reaction.draft.payload.desired_reaction is ReactionState.LOVE
     assert comment.draft.payload_hash != reaction.draft.payload_hash
     assert engagement.asset_preparations == 1

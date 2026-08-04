@@ -142,17 +142,17 @@ current visible `Post successful. View post` alert contract and a visible
 publishing-rejection state observed on 2026-08-05; the synthetic fixture never
 contains the live post or account identity.
 
-The sanitized `personal-post-composer.html`, `post-engagement.html`, and
-`comment-reaction-current.html` fixtures are also `mock_verified` from the
+The sanitized `personal-post-composer.html` and `post-engagement.html` fixtures
+are also `mock_verified` from the
 authenticated visible UI inspected through 2026-08-05. They preserve the
 bounded composer loader, disabled Save and
 Done controls for unchanged settings, all nine personal composer modes, nested
 image/video/document/poll/celebration/event/hiring/expert controls, settings,
-the current comment photo/GIF controls, native UGC discussion aliases, the
-generic externally rendered reply editor, flat visually indented replies,
-`See previous replies`, delayed focusable comment-reaction controls, and the six
-current reactions. Initial discovery uploaded synthetic files into draft-only
-editors without invoking an account-changing control.
+the current top-level comment photo/GIF controls, native UGC discussion aliases,
+flat visually indented read-only replies, `See previous replies`, and the six
+current post reactions. Initial
+discovery uploaded synthetic files into draft-only editors without invoking an
+account-changing control.
 
 Recorded and sanitized fixtures can be introduced later without changing the
 scenario or workflow contracts. Raw traces, HAR files, cookies, browser
@@ -222,13 +222,20 @@ only sanitized provenance and the UI behaviors represented by each fixture.
   card with separately typed name, degree, headline, and role. No account state
   changed.
 
-- 2026-08-05: the authorized Test Bot published one bounded validation post,
+- 2026-08-05: before the threaded-reply and comment-reaction mutation contracts
+  were removed, the authorized Test Bot published one bounded validation post,
   added one root comment and three exact threaded replies, set and read back a
-  post reaction, and set and read back `Celebrate` on the root comment. The
-  final comment-reaction replay waited for LinkedIn's delayed accessible state
-  icon, bound its unique focusable control to the exact comment, reported a
-  verified mutation, and a separate preparation observed `existing_reaction:
-  celebrate`. No duplicate post or blind action retry was performed.
+  post reaction, and set and read back `Celebrate` on the root comment. No
+  duplicate post or blind action retry was performed.
+
+- 2026-08-05: account-changing threaded comment replies were removed from the
+  public schema. Offline contract tests reject the former
+  `parent_comment_ref` input, while discussion fixtures continue to verify
+  read-only reply ancestry and expansion.
+
+- 2026-08-05: comment-targeted reaction changes were removed from the public
+  schema. Offline contract tests reject the former `comment_ref` reaction
+  target while preserving read-only comment reaction-count observations.
 
 - 2026-08-05: a full member-profile replay traversed one overview and seven
   discovered detail pages. It excluded the self-only guidance destination,

@@ -123,7 +123,6 @@ def _engagement_prepare_output(
         action_type = ActionType.COMMENT_CREATE
         payload = CommentCreatePayload(
             post_ref=request.post_ref,
-            parent_comment_ref=request.parent_comment_ref,
             text=request.text,
             mentions=request.mentions,
             attachment=request.attachment,
@@ -132,7 +131,6 @@ def _engagement_prepare_output(
         action_type = ActionType.REACTION_SET
         payload = ReactionSetPayload(
             post_ref=request.post_ref,
-            comment_ref=request.comment_ref,
             existing_reaction=ReactionState.NONE,
             desired_reaction=request.desired_reaction,
         )
@@ -147,11 +145,6 @@ def _engagement_prepare_output(
             post_ref=request.post_ref,
             post_url=HttpUrl(
                 "https://www.linkedin.com/feed/update/urn:li:activity:7312345678901234567/"
-            ),
-            comment_ref=(
-                request.parent_comment_ref
-                if isinstance(request, PostCommentPrepareInput)
-                else request.comment_ref
             ),
         ),
         payload=payload,

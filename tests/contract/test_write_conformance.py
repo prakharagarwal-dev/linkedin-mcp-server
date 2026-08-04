@@ -36,23 +36,21 @@ WRITE_CASES = (
         expected_action_type="post_create",
     ),
     WriteCase(
-        case_id="comment-reply",
+        case_id="comment",
         prepare_tool="linkedin.posts.comment.prepare",
         execute_tool="linkedin.posts.comment.execute",
         prepare_args={
             "post_ref": "activity:7312345678901234567",
-            "parent_comment_ref": "comment:activity:7312345678901234567:111",
-            "text": "Hash-locked synthetic reply.",
+            "text": "Hash-locked synthetic comment.",
         },
         expected_action_type="comment_create",
     ),
     WriteCase(
-        case_id="comment-reaction",
+        case_id="post-reaction",
         prepare_tool="linkedin.posts.reaction.prepare",
         execute_tool="linkedin.posts.reaction.execute",
         prepare_args={
             "post_ref": "activity:7312345678901234567",
-            "comment_ref": "comment:activity:7312345678901234567:111",
             "desired_reaction": "funny",
         },
         expected_action_type="reaction_set",

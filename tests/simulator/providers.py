@@ -139,10 +139,8 @@ class StatefulProtocolNetwork(ProtocolNetwork):
         comment = self.state.create_comment(
             payload.post_ref,
             text,
-            parent_comment_ref=payload.parent_comment_ref,
         )
-        prefix = "reply_published" if payload.parent_comment_ref else "comment_published"
-        return self._result(f"{prefix}:{comment.comment_ref}")
+        return self._result(f"comment_published:{comment.comment_ref}")
 
     async def execute_reaction(self, draft: ActionDraft) -> ActionPageResult:
         payload = draft.payload
@@ -151,6 +149,5 @@ class StatefulProtocolNetwork(ProtocolNetwork):
         self.state.set_reaction(
             payload.post_ref,
             payload.desired_reaction,
-            comment_ref=payload.comment_ref,
         )
         return self._result(f"reaction_set:{payload.desired_reaction.value}")

@@ -18,10 +18,6 @@
         display: block;
       }
 
-      [data-generated-reply] {
-        box-sizing: border-box;
-        padding-left: 40px;
-      }
     </style>
   </head>
   <body>
@@ -44,11 +40,17 @@
         id="target-post"
         data-post-urn="urn:li:activity:7312345678901234567"
       >
-        <a href="/in/jane-doe/">
-          Jane Doe
-          <span class="author-headline">Staff Engineer at Acme Cloud</span>
-        </a>
-        <time>2h</time>
+        <header>
+          <a href="/in/jane-doe/">
+            Jane Doe
+          </a>
+          <div>Staff Engineer at Acme Cloud</div>
+          <div>2h</div>
+          <button
+            type="button"
+            aria-label="Open control menu for post by Jane Doe"
+          ></button>
+        </header>
         <p data-post-text>A deterministic fixture post about reliable systems.</p>
 
         <div class="reaction-group" data-reaction-group>
@@ -110,58 +112,7 @@
           <p data-comment-text>Helpful breakdown.</p>
           <time>1h</time>
 
-          <div class="reaction-group" data-reaction-group>
-            <div
-              role="button"
-              tabindex="0"
-              data-view-name="comment-reaction-button"
-              data-fixture-reaction="like"
-            >
-              <svg role="img" aria-label="Reaction button state: like"></svg>
-              <span data-reaction-label>Like</span>
-            </div>
-            <div class="reaction-options" aria-label="Comment reaction choices">
-              <button type="button" data-reaction-option data-reaction="like">Like</button>
-              <button type="button" data-reaction-option data-reaction="celebrate">
-                Celebrate
-              </button>
-              <button type="button" data-reaction-option data-reaction="support">
-                Support
-              </button>
-              <button type="button" data-reaction-option data-reaction="love">Love</button>
-              <button type="button" data-reaction-option data-reaction="insightful">
-                Insightful
-              </button>
-              <button type="button" data-reaction-option data-reaction="funny">Funny</button>
-            </div>
-          </div>
-
-          <button type="button" aria-label="Reply" data-open-reply>Reply</button>
         </article>
-
-          <div
-            id="reply-composer"
-            data-comment-composer
-            data-parent-comment="urn:li:comment:(ugcPost:7312345678901234566,111)"
-            hidden
-          >
-            <label>
-              Write a reply
-              <textarea
-                aria-label="Text editor for creating comment"
-                maxlength="3000"
-              ></textarea>
-            </label>
-            <button type="button" aria-label="Show Emoji Picker">Emoji</button>
-            <button type="button" aria-label="Share photo" data-photo-control>Photo</button>
-            <button type="button" aria-label="Open GIF picker" data-gif-control>GIF</button>
-            <input
-              type="file"
-              accept="image/gif,image/jpeg,image/jpg,image/png,image/webp"
-              hidden
-            />
-            <button type="button" data-submit-comment>Reply</button>
-          </div>
         </div>
       </section>
     </main>
@@ -190,30 +141,23 @@
 
       function setReaction(group, value) {
         const control = group.querySelector(
-          "[data-reaction-control], [data-view-name='comment-reaction-button']"
+          "[data-reaction-control]"
         );
         const label = value === "none"
           ? "Like"
           : value.charAt(0).toUpperCase() + value.slice(1);
-        if (control.dataset.viewName === "comment-reaction-button") {
-          control.dataset.fixtureReaction = value;
-          control.querySelector("[data-reaction-label]").textContent = label;
-          control.querySelector("[aria-label^='Reaction button state:']")
-            .setAttribute("aria-label", `Reaction button state: ${value === "none" ? "no reaction" : value}`);
-        } else {
-          control.dataset.currentReaction = value;
-          control.setAttribute("aria-pressed", value === "none" ? "false" : "true");
-          control.setAttribute("aria-label", label);
-          control.textContent = label;
-        }
+        control.dataset.currentReaction = value;
+        control.setAttribute("aria-pressed", value === "none" ? "false" : "true");
+        control.setAttribute("aria-label", label);
+        control.textContent = label;
       }
 
       document.querySelectorAll("[data-reaction-group]").forEach((group) => {
         const control = group.querySelector(
-          "[data-reaction-control], [data-view-name='comment-reaction-button']"
+          "[data-reaction-control]"
         );
         control.addEventListener("click", () => {
-          const current = control.dataset.currentReaction || control.dataset.fixtureReaction;
+          const current = control.dataset.currentReaction;
           if (current !== "none") {
             setReaction(group, "none");
           }
@@ -248,7 +192,6 @@
           const commentId = String(nextCommentId++);
           comment.dataset.commentUrn =
             `urn:li:comment:(ugcPost:7312345678901234566,${commentId})`;
-          if (composer.dataset.parentComment) comment.dataset.generatedReply = "";
           const author = document.createElement("a");
           author.href = "/in/current-member/";
           author.textContent = "Current Member";
@@ -275,17 +218,8 @@
             comment.append(attachment);
           }
           comment.append(time);
-          const destination = composer.dataset.parentComment
-            ? document.querySelector("[data-comment-thread]")
-            : document.querySelector("#discussion");
-          destination.append(comment);
+          document.querySelector("#discussion").append(comment);
         });
-      });
-
-      document.querySelector("[data-open-reply]").addEventListener("click", () => {
-        const composer = document.querySelector("#reply-composer");
-        composer.hidden = false;
-        composer.querySelector("textarea").focus();
       });
 
       document.querySelectorAll("#mention-suggestions a").forEach((option) => {

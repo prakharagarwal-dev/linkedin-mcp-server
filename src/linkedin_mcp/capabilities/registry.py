@@ -213,7 +213,7 @@ def create_default_registry() -> CapabilityRegistry:
             ),
             CapabilityDescriptor(
                 name=CapabilityName.POST_COMMENT_PREPARE,
-                version="2.0.0",
+                version="3.0.0",
                 effect=CapabilityEffect.PREPARE,
                 input_model=PostCommentPrepareInput,
                 output_model=ActionPrepareOutput,
@@ -224,7 +224,7 @@ def create_default_registry() -> CapabilityRegistry:
             ),
             CapabilityDescriptor(
                 name=CapabilityName.POST_COMMENT_EXECUTE,
-                version="2.0.0",
+                version="3.0.0",
                 effect=CapabilityEffect.WRITE,
                 input_model=ActionExecuteInput,
                 output_model=ActionExecuteOutput,
@@ -235,7 +235,7 @@ def create_default_registry() -> CapabilityRegistry:
             ),
             CapabilityDescriptor(
                 name=CapabilityName.POST_REACTION_PREPARE,
-                version="2.0.0",
+                version="3.0.0",
                 effect=CapabilityEffect.PREPARE,
                 input_model=PostReactionPrepareInput,
                 output_model=ActionPrepareOutput,
@@ -246,7 +246,7 @@ def create_default_registry() -> CapabilityRegistry:
             ),
             CapabilityDescriptor(
                 name=CapabilityName.POST_REACTION_EXECUTE,
-                version="2.0.0",
+                version="3.0.0",
                 effect=CapabilityEffect.WRITE,
                 input_model=ActionExecuteInput,
                 output_model=ActionExecuteOutput,
