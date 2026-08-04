@@ -68,7 +68,9 @@
       "Funny"
     ],
     "discussion_alias_behavior": "activity post URLs may expose native ugc-post comment references",
-    "reply_expansion": "See previous replies"
+    "reply_expansion": "See previous replies",
+    "current_thread_layout_fixture": "comments-flat-threads.html",
+    "current_thread_layout": "root comments and replies are sibling regions; visible reply indentation binds each reply to the nearest preceding root"
   },
   "filter_sections": [
     "Sort by",
