@@ -1,6 +1,6 @@
 # LinkedIn Visible-Feature Matrix
 
-**Matrix version:** `2026-08-05.4`
+**Matrix version:** `2026-08-05.5`
 
 This matrix records the visible LinkedIn controls and outputs inspected for the
 configured authorized member account. It is evidence for capability acceptance,
@@ -156,7 +156,7 @@ constructed only from visible post URNs/URLs.
 | Reaction, comment, and repost counts | `supported` | Human-readable visible count text, not inferred numbers |
 | Relevant/recent comment order | `supported` | `most_relevant` or `most_recent` |
 | Top-level comments and nested replies | `supported` | Stable comment refs with exact parent binding |
-| Comment author, body, time, edit, counts | `supported` | Exact visible observation fields |
+| Comment author, body, time, edit, counts | `supported` | Exact visible observation fields; the current post-author badge is classified as UI metadata rather than the actor headline |
 | Photo/GIF-only comments and replies | `supported` | Read-only discussion output retains optional text plus typed attachment kind, accessible label, visible resource URL when present, and exact accessibility evidence |
 | Bounded comment/reply expansion | `supported` | Private expansion bound and explicit visible/returned/truncated coverage |
 | Hidden posts, comments, or private endpoints | `outside_named_capability` | No inference or private endpoint access |

@@ -44,7 +44,8 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Bind each flat visually indented reply to its nearest preceding root comment,
   including discussions with multiple roots in either sort order, and expand
   the current `See previous replies` control without weakening exact
-  parent-reference binding.
+  parent-reference binding. Keep the current comment-card `Author` badge out of
+  the actor headline and retain the following visible headline instead.
 - Parse the current hiring-team card when its only visible profile link contains
   the member name, connection degree, headline, and role as separate lines.
 
