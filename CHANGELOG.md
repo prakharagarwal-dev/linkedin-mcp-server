@@ -6,15 +6,7 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Fixed
-
-- Wait through LinkedIn's visible post-composer loader, avoid clicking disabled
-  Save and Done controls when settings are unchanged, and report failures before
-  the final Post control as not submitted instead of uncertain.
-- Preserve exact immutable evidence for dynamically changing Posts search cards
-  instead of failing after a valid visible result was parsed.
-- Clarify in the public post-creation schema that `content.mode`, not `kind`, is
-  the required discriminator.
+## [0.16.0] - 2026-08-04
 
 ### Added
 
@@ -36,6 +28,9 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   creation during normal server startup.
 - Add LinkedIn-only `login` and visible, clean-reopen-verified `logout`
   commands protected by the same account lock as the server.
+- Add the native GitHub Sponsor button and a concise README sponsor request.
+- Add canonical Glama maintainer metadata so its repository-backed listing can
+  refresh from this release.
 
 ### Changed
 
@@ -62,17 +57,6 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Keep the Streamable HTTP container, lock, queue, pacing, cursors, drafts, and
   other process-local state alive for the full listener lifetime instead of
   recreating them around individual HTTP requests.
-
-## [0.15.1] - 2026-08-03
-
-### Added
-
-- Add the native GitHub Sponsor button and a concise README sponsor request.
-- Add canonical Glama maintainer metadata so its repository-backed listing can
-  refresh from this release.
-
-### Changed
-
 - Use one clear, capability-first product description across the README,
   package, registry, desktop bundle, and container metadata.
 - Use a faithful compact variant where a registry enforces a shorter metadata
@@ -90,6 +74,16 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Rework the README into a concise onboarding path with one-click installers,
   self-contained client-specific instructions, concise first-login guidance,
   example prompts, and focused supporting documentation.
+
+### Fixed
+
+- Wait through LinkedIn's visible post-composer loader, avoid clicking disabled
+  Save and Done controls when settings are unchanged, and report failures before
+  the final Post control as not submitted instead of uncertain.
+- Preserve exact immutable evidence for dynamically changing Posts search cards
+  instead of failing after a valid visible result was parsed.
+- Clarify in the public post-creation schema that `content.mode`, not `kind`, is
+  the required discriminator.
 
 ## [0.15.0] - 2026-08-02
 
@@ -144,8 +138,8 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   executable, Python import package, repository, and MCP server identity are
   unchanged.
 
-[Unreleased]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/compare/v0.15.1...HEAD
-[0.15.1]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases/tag/v0.15.1
+[Unreleased]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases/tag/v0.15.0
 [0.14.2]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases/tag/v0.14.2
 [0.14.1]: https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases/tag/v0.14.1
