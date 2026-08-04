@@ -1,6 +1,6 @@
 # LinkedIn Visible-Feature Matrix
 
-**Matrix version:** `2026-08-05.1`
+**Matrix version:** `2026-08-05.2`
 
 This matrix records the visible LinkedIn controls and outputs inspected for the
 configured authorized member account. It is evidence for capability acceptance,
@@ -31,7 +31,7 @@ do not upgrade this classification.
 | Jobs search | `linkedin.jobs.search` `2.0.0` | Current virtualized cards, optional keywords, every visible filter family, exact named-facet resolution, recommendation-safe empty results, anonymous postings, evidence, and replay | `mock_verified` + read-only live acceptance |
 | Job detail | `linkedin.jobs.get` `2.0.0` | Current primary-card anchors, optional company identity, application method, single-link composite hiring-team cards with separately typed fields, fully expanded JD, scoped evidence, and replay | `mock_verified` + read-only live acceptance |
 | People search | `linkedin.people.search` `2.0.0` | Every current account-visible People filter, delayed/anonymous rendering, trailing-hyphen slugs, and shared cursor contract is fixture-covered | `mock_verified` + read-only live acceptance |
-| Member profile | `linkedin.people.get` `1.1.1` | Complete/selective sections, exact evidence resources, requested/returned coverage, genuine trailing-hyphen public slugs, nested self-introduction cards, auxiliary-guidance exclusion, and semantic company/school summary controls | `mock_verified` + read-only live acceptance |
+| Member profile | `linkedin.people.get` `1.1.1` | Complete/selective sections, exact evidence resources, requested/returned coverage, genuine trailing-hyphen public slugs, nested self-introduction cards, recommendation/guidance exclusion, semantic company/school summaries, current roleless detail collections and experience cards, exact skill identity, and clean About text | `mock_verified` + read-only live acceptance |
 | Company search | `linkedin.companies.search` `2.0.0` | Complete current Company-search surface: keywords, headquarters, industry, all eight company-size buckets, job-listing and first-degree-connection flags, named-facet resolution, delayed rendering, evidence, and cursor contracts | `mock_verified` |
 | Company profile | `linkedin.companies.get` `2.0.0` | Fixed exact Overview-plus-About read with structured visible fields and two immutable page sources | `mock_verified` |
 | Post search | `linkedin.posts.search` `2.0.0` | Declared content facets, delayed/current card variants, stable references, exact per-card evidence across dynamic rendering, and cursor contract | `mock_verified` + read-only live acceptance |
@@ -76,15 +76,15 @@ page beyond the private server bound is returned in `truncated_sections`.
 | Visible/profile feature | Status | Typed behavior and evidence |
 | --- | --- | --- |
 | Canonical member overview and exact slug identity | `supported` | Always captured; typed introduction fields and exact main-page source |
-| All visible member-owned sections | `supported` | `sections: ["all"]` compatibility default; generic loss-preserving sections |
+| All visible member-owned sections | `supported` | `sections: ["all"]` compatibility default; generic loss-preserving entries from both semantic lists and the current roleless detail collection boundary |
 | Overview only | `supported` | `overview`; no detail-page navigation |
 | About | `supported` | `about`; typed body plus exact field evidence when visible |
-| Experience | `supported` | `experience`; typed entries and matching visible detail link |
+| Experience | `supported` | `experience`; typed entries and matching visible detail link. Standalone employment type is retained without inventing an organization or location when the current card does not expose either field; legacy combined organization/employment cards remain supported. |
 | Education | `supported` | `education`; typed entries and matching visible detail link |
 | Licenses and certifications | `supported` | `licenses-certifications`; generic entries and source |
 | Projects | `supported` | `projects`; generic entries, links, and source |
 | Volunteer experience | `supported` | `volunteering`; current route/heading aliases normalize to one key |
-| Skills | `supported` | `skills`; matching detail navigation and generic entries |
+| Skills | `supported` | `skills`; matching detail navigation and exact skill-card identity from the accessible endorsement control, with generic loss-preserving fallback entries |
 | Interests | `supported` | `interests`; matching visible detail navigation |
 | Featured | `supported` | `featured`; matching visible detail navigation |
 | Courses | `supported` | `courses`; matching visible detail navigation |
@@ -97,7 +97,7 @@ page beyond the private server bound is returned in `truncated_sections`.
 | Test scores | `supported` | `test-scores`; matching visible detail navigation |
 | Requested/returned/unavailable coverage | `supported` | Strict enum input and typed coverage tuples |
 | Discovered/visited/truncated detail coverage | `supported` | Exact normalized detail keys and private page bound |
-| Recommendation rails and owner optimization panels | `outside_named_capability` | Retained only in immutable raw source; never attributed to the member |
+| Recommendation rails and owner optimization panels | `outside_named_capability` | Retained only in immutable raw source; `More profiles for you`, Premium-profile exploration, and similar rails are never attributed to the member |
 | Hidden/private profile fields | `outside_named_capability` | No private endpoint access or inference |
 
 ## Company research (`search 2.0.0`, `profile 2.0.0`)

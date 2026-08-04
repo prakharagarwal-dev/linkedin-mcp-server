@@ -8,6 +8,12 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Parse current member experience cards without treating employment type or
+  description bullets as company and location fields, bind skill identity to
+  the exact accessible endorsement control, and exclude About-section
+  expansion and `Top skills` UI chrome. Read current roleless profile-detail
+  collection cards and exclude recommendation rails from member-owned
+  sections.
 - Read the nearest current member introduction card, ignore self-only
   verification and guidance prompts, and retain visible top-card company and
   education summaries from LinkedIn's semantic organization buttons.

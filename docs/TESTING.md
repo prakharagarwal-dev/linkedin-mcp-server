@@ -113,6 +113,16 @@ the nested introduction section, self-verification link, auxiliary guidance
 detail link, separator-only location line, and semantic company/school button
 icons using synthetic identity and profile text only.
 
+The sanitized current member-detail fixtures were reverified on 2026-08-05.
+They preserve experience cards where LinkedIn exposes a standalone employment
+type but no visible company name or location, exact skill cards anchored by
+their accessible `Endorse <skill>` control, and About-section expansion and
+`Top skills` UI suffixes. They also preserve the current roleless detail-page
+collection boundary used by licenses, honors, languages, and other generic
+member-owned sections, while keeping recommendation rails outside the member
+result. Legacy combined organization/employment and visible location cards
+remain covered separately. No live identity or profile text is retained.
+
 The Posts fixtures under `tests/fixtures/linkedin/posts/latest/` are
 `mock_verified` from authenticated visible search and detail surfaces
 inspected on 2026-08-04. Search variants preserve dynamic card-text evidence;
@@ -218,7 +228,13 @@ only sanitized provenance and the UI behaviors represented by each fixture.
   discovered detail pages. It excluded the self-only guidance destination,
   returned the visible headline and location from the nearest introduction
   card, retained both semantic top-card organization summaries, and completed
-  without truncation. No account state changed.
+  without truncation. The replay also exposed the current standalone
+  employment-type experience layout, accessible skill-card identity, and
+  About-section UI suffixes; sanitized fixture coverage now locks those
+  behaviors. Current roleless licenses, honors, and languages cards were then
+  verified against their bounded semantic collection container, while
+  recommendation rails remained outside the member result. No account state
+  changed.
 
 - 2026-08-04: a prepare-only personal-composer replay observed a bounded
   loading dialog, restored the exact personal composer, traversed unchanged

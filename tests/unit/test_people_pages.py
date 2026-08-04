@@ -150,6 +150,25 @@ class SelfProfileFixtureBrowser:
         await page.set_content((FIXTURES / "person-profile-self-current.html").read_text())
 
 
+class CurrentRolelessDetailFixtureBrowser:
+    def __init__(self, page: Page) -> None:
+        self._page = page
+        self.navigations: list[str] = []
+
+    @asynccontextmanager
+    async def page(self) -> AsyncGenerator[Page]:
+        yield self._page
+
+    async def navigate(self, page: Page, url: str) -> None:
+        self.navigations.append(url)
+        fixture = (
+            "person-profile-honors-current.html"
+            if urlsplit(url).path.endswith("/details/honors/")
+            else "person-profile-roleless-detail-overview.html"
+        )
+        await page.set_content((FIXTURES / fixture).read_text())
+
+
 class CurrentPeoplePaginationFixtureBrowser:
     def __init__(self, page: Page) -> None:
         self._page = page
@@ -182,7 +201,7 @@ def test_people_fixture_manifest_locks_every_current_visible_filter() -> None:
     )
 
     assert manifest["provenance"] == "mock_verified"
-    assert manifest["verified_at"] == "2026-07-30"
+    assert manifest["verified_at"] == "2026-08-05"
     assert manifest["contains_live_data"] is False
     assert manifest["filter_sections"] == [
         "Connections",
@@ -820,10 +839,25 @@ async def test_person_profile_supports_current_heading_and_roleless_detail_layou
     assert [experience.title for experience in person.experiences] == [
         "Staff Software Engineer",
         "Senior Software Engineer",
+        "Software Engineer Intern",
     ]
-    assert person.experiences[0].organization == "Acme Cloud"
+    assert person.experiences[0].organization is None
+    assert person.experiences[0].employment_type == "Full-time"
+    assert person.experiences[0].location is None
+    assert person.experiences[0].description == (
+        "• Leading reliability engineering.\nCore Technologies: Distributed systems and Python"
+    )
     assert person.experiences[0].is_current is True
-    assert person.experiences[1].organization == "Contoso"
+    assert person.experiences[1].organization is None
+    assert person.experiences[1].employment_type == "Full-time"
+    assert person.experiences[1].location is None
+    assert person.experiences[1].description == (
+        "• Built high-scale storage services.\nSkills: Cloud Storage • Reliability"
+    )
+    assert person.experiences[2].organization is None
+    assert person.experiences[2].employment_type == "Internship"
+    assert person.experiences[2].location is None
+    assert person.experiences[2].description is None
     assert person.experiences[1].is_current is False
     assert [education.school for education in person.education] == [
         "Stanford University",
@@ -838,7 +872,12 @@ async def test_person_profile_supports_current_heading_and_roleless_detail_layou
         "projects",
     }
     assert {section.key for section in person.sections}.isdisjoint(
-        {"people-you-may-know", "who-your-viewers-also-viewed"}
+        {
+            "explore-premium-profiles",
+            "more-profiles-for-you",
+            "people-you-may-know",
+            "who-your-viewers-also-viewed",
+        }
     )
     project = next(section for section in person.sections if section.key == "projects")
     assert project.entries[0].title == "Open Reliability Toolkit"
@@ -891,6 +930,44 @@ async def test_person_profile_ignores_self_verification_and_guidance() -> None:
     assert fixture_browser.navigations == ["https://www.linkedin.com/in/test-member/"]
 
 
+@pytest.mark.timeout(20)
+async def test_person_profile_reads_current_roleless_detail_collection_cards() -> None:
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        page = await browser.new_page()
+        fixture_browser = CurrentRolelessDetailFixtureBrowser(page)
+        reader = PersonProfilePage(
+            cast(BrowserManager, fixture_browser),
+            max_detail_pages=10,
+        )
+        try:
+            person, captures = await reader.read(
+                PeopleGetInput(
+                    context_id="context-1",
+                    request_id="current-roleless-honors",
+                    profile_slug="jane-doe",
+                    sections=(PersonProfileSectionSelector.HONORS_AWARDS,),
+                )
+            )
+        finally:
+            await browser.close()
+
+    assert tuple(section.key for section in person.sections) == ("honors-awards",)
+    assert [entry.title for entry in person.sections[0].entries] == [
+        "Reliability Engineering Award",
+        "Open Source Finalist",
+    ]
+    assert person.sections[0].entries[0].subtitle == "Issued by Acme Foundation · Jun 2025"
+    assert "More profiles for you" not in person.sections[0].visible_text
+    assert person.coverage.detail_sections_visited == ("honors-awards",)
+    assert person.coverage.truncated is False
+    assert len(captures) == 2
+    assert fixture_browser.navigations == [
+        "https://www.linkedin.com/in/jane-doe/",
+        "https://www.linkedin.com/in/jane-doe/details/honors/",
+    ]
+
+
 @pytest.mark.timeout(30)
 async def test_person_profile_visits_and_returns_only_selected_detail_sections() -> None:
     async with async_playwright() as playwright:
@@ -917,6 +994,13 @@ async def test_person_profile_visits_and_returns_only_selected_detail_sections()
     assert person.experiences == ()
     assert person.education == ()
     assert tuple(section.key for section in person.sections) == ("skills",)
+    assert [entry.title for entry in person.sections[0].entries] == [
+        "Distributed Systems",
+        "Python",
+        "Kubernetes",
+    ]
+    assert person.sections[0].entries[0].subtitle == "Staff Software Engineer at Acme Cloud"
+    assert all(entry.subtitle != "Endorse" for entry in person.sections[0].entries)
     assert person.coverage.requested_sections == (PersonProfileSectionSelector.SKILLS,)
     assert person.coverage.returned_sections == ("overview", "skills")
     assert person.coverage.detail_pages_discovered == 3
