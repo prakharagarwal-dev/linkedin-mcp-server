@@ -105,6 +105,12 @@ families, all eight size choices, exact location/industry typeaheads, submitted
 query parameters, result identity and pagination, and the fixed
 Overview-plus-About read. They contain synthetic identities and text only.
 
+The sanitized `person-profile-self-current.html` fixture is `mock_verified`
+from the authenticated self-profile UI inspected on 2026-08-05. It preserves
+the nested introduction section, self-verification link, auxiliary guidance
+detail link, separator-only location line, and semantic company/school button
+icons using synthetic identity and profile text only.
+
 The Posts fixtures under `tests/fixtures/linkedin/posts/latest/` are
 `mock_verified` from authenticated visible search and detail surfaces
 inspected on 2026-08-04. Search variants preserve dynamic card-text evidence;
@@ -182,6 +188,12 @@ content, raw DOM, traces, cookies, or browser state. Fixture manifests record
 only sanitized provenance and the UI behaviors represented by each fixture.
 
 ### Aggregate live-acceptance ledger
+
+- 2026-08-05: a full member-profile replay traversed one overview and seven
+  discovered detail pages. It excluded the self-only guidance destination,
+  returned the visible headline and location from the nearest introduction
+  card, retained both semantic top-card organization summaries, and completed
+  without truncation. No account state changed.
 
 - 2026-08-04: a prepare-only personal-composer replay observed a bounded
   loading dialog, restored the exact personal composer, traversed unchanged

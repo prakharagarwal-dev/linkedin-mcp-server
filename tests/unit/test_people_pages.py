@@ -136,6 +136,20 @@ class CurrentProfileFixtureBrowser:
         await page.set_content((FIXTURES / fixture).read_text())
 
 
+class SelfProfileFixtureBrowser:
+    def __init__(self, page: Page) -> None:
+        self._page = page
+        self.navigations: list[str] = []
+
+    @asynccontextmanager
+    async def page(self) -> AsyncGenerator[Page]:
+        yield self._page
+
+    async def navigate(self, page: Page, url: str) -> None:
+        self.navigations.append(url)
+        await page.set_content((FIXTURES / "person-profile-self-current.html").read_text())
+
+
 class CurrentPeoplePaginationFixtureBrowser:
     def __init__(self, page: Page) -> None:
         self._page = page
@@ -839,6 +853,42 @@ async def test_person_profile_supports_current_heading_and_roleless_detail_layou
     assert all(
         evidence.quote in captured_by_url[str(evidence.source_url)] for evidence in person.evidence
     )
+
+
+@pytest.mark.timeout(20)
+async def test_person_profile_ignores_self_verification_and_guidance() -> None:
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        page = await browser.new_page()
+        fixture_browser = SelfProfileFixtureBrowser(page)
+        reader = PersonProfilePage(
+            cast(BrowserManager, fixture_browser),
+            max_detail_pages=10,
+        )
+        try:
+            person, captures = await reader.read(
+                PeopleGetInput(
+                    context_id="context-1",
+                    request_id="self-profile-current",
+                    profile_slug="test-member",
+                )
+            )
+        finally:
+            await browser.close()
+
+    assert person.name == "Test Member"
+    assert person.headline == "Software Engineer at Example Cloud"
+    assert person.location == "Fixture City, Test Region"
+    assert person.connection_count_text == "1 connection"
+    assert person.current_company_text == "Example Cloud"
+    assert person.education_summary_text == "Fixture University"
+    assert person.sections == ()
+    assert person.coverage.detail_pages_discovered == 0
+    assert person.coverage.detail_pages_visited == 0
+    assert person.coverage.detail_sections_discovered == ()
+    assert person.coverage.truncated is False
+    assert len(captures) == 1
+    assert fixture_browser.navigations == ["https://www.linkedin.com/in/test-member/"]
 
 
 @pytest.mark.timeout(30)

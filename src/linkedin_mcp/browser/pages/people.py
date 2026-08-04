@@ -113,6 +113,7 @@ _ACTION_LINES = frozenset(
 _AUXILIARY_PROFILE_SECTION_KEYS = frozenset(
     {
         "analytics",
+        "guidance",
         "people-you-may-know",
         "profile-language",
         "public-profile-url",
@@ -1623,6 +1624,8 @@ async def _profile_detail_urls(
         if not match or match.group("slug") != profile_slug:
             continue
         clean_url = f"https://www.linkedin.com{urlsplit(url).path}"
+        if _detail_section_key(clean_url) in _AUXILIARY_PROFILE_SECTION_KEYS:
+            continue
         if clean_url not in urls:
             urls.append(clean_url)
     return tuple(urls)
@@ -1658,24 +1661,17 @@ async def _top_card(main: Locator) -> tuple[Locator, str, str]:
     else:
         name = _unique_lines(name)[0]
         name_heading = headings.first
-    top = name_heading.locator("..")
-    sections = main.locator("section")
-    for index in range(min(await sections.count(), 100)):
-        candidate = sections.nth(index)
-        exact_name = candidate.get_by_role(
-            "heading",
-            name=re.compile(rf"^{re.escape(name)}$"),
-        )
-        if await exact_name.count():
-            top = candidate
-            break
+    top = name_heading.locator("xpath=ancestor::section[1]")
+    if await top.count() == 0:
+        top = name_heading.locator("..")
     visible_text = (await top.inner_text()).strip()
     if not visible_text:
         raise ParserDriftError("LinkedIn member profile introduction is empty.")
     return top, name, visible_text
 
 
-def _top_card_fields(
+async def _top_card_fields(
+    top: Locator,
     name: str,
     visible_text: str,
 ) -> tuple[
@@ -1687,6 +1683,13 @@ def _top_card_fields(
     str | None,
 ]:
     lines = _unique_lines(visible_text)
+    auxiliary_lines = {
+        line
+        for value in await top.locator(
+            'a[href*="/trust/verification/"], a[href*="/verify/"]'
+        ).all_inner_texts()
+        for line in _unique_lines(value)
+    }
     try:
         name_index = lines.index(name)
     except ValueError:
@@ -1710,6 +1713,7 @@ def _top_card_fields(
             line
             for line in candidates
             if line != pronouns
+            and line not in auxiliary_lines
             and line.casefold() not in _ACTION_LINES
             and not _CONNECTION_DEGREE_PATTERN.fullmatch(line.strip(" ·•"))
             and not _CONNECTION_COUNT_PATTERN.search(line)
@@ -1724,9 +1728,19 @@ def _top_card_fields(
     )
     location = None
     if contact_index > 0:
-        candidate = lines[contact_index - 1]
-        if candidate not in {name, headline, pronouns}:
-            location = candidate
+        location = next(
+            (
+                candidate
+                for candidate in reversed(lines[:contact_index])
+                if candidate not in {name, headline, pronouns}
+                and candidate not in auxiliary_lines
+                and candidate.strip(" ·•")
+                and not _CONNECTION_DEGREE_PATTERN.fullmatch(candidate.strip(" ·•"))
+                and not _CONNECTION_COUNT_PATTERN.search(candidate)
+                and not _FOLLOWER_COUNT_PATTERN.search(candidate)
+            ),
+            None,
+        )
     connection_count = _first_pattern_text(lines, _CONNECTION_COUNT_PATTERN)
     follower_count = _first_pattern_text(lines, _FOLLOWER_COUNT_PATTERN)
     return (
@@ -1798,9 +1812,17 @@ class PersonProfilePage:
                 connection_degree,
                 connection_count_text,
                 follower_count_text,
-            ) = _top_card_fields(name, top_text)
+            ) = await _top_card_fields(top, name, top_text)
             current_company_text = await _first_text(top.locator('a[href*="/company/"]'))
+            if current_company_text is None:
+                current_company_text = await _first_text(
+                    top.locator('[role="button"]:has(svg[id^="company-accent-"])')
+                )
             education_summary_text = await _first_text(top.locator('a[href*="/school/"]'))
+            if education_summary_text is None:
+                education_summary_text = await _first_text(
+                    top.locator('[role="button"]:has(svg[id^="school-accent-"])')
+                )
             actual_slug = profile_slug_from_url(page.url) or request.profile_slug
             profile_url = canonical_profile_url(actual_slug)
             main_text = await _visible_page_text(page)
