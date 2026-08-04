@@ -1,6 +1,6 @@
 # LinkedIn Visible-Feature Matrix
 
-**Matrix version:** `2026-08-05.5`
+**Matrix version:** `2026-08-05.6`
 
 This matrix records the visible LinkedIn controls and outputs inspected for the
 configured authorized member account. It is evidence for capability acceptance,
@@ -37,11 +37,11 @@ do not upgrade this classification.
 | Post search | `linkedin.posts.search` `2.0.0` | Declared content facets; current compact author headers, edited ages, body expansion, numeric engagement and typed content cards; stable identity inventory before virtualized bottom-up extraction; exact evidence and disjoint cumulative cursor pages | `mock_verified` + read-only live acceptance |
 | Post detail | `linkedin.posts.get` `2.0.0` | Exact activity/share/UGC identity, fully expanded text, scoped links/mentions/hashtags, current text/image/video/live-video/document/link/article/newsletter/event/job/poll variants, viewer reaction and engagement, visibility/header metadata, immutable field evidence, bounded completeness coverage, and two-page repost-original resolution | `mock_verified` + read-only live acceptance |
 | Post discussion | `linkedin.posts.comments.list` `1.1.1` | Ordering, cursor-paged top-level comments, delayed expansion including the current `See previous replies` control, flat visually indented parent binding, replies, media, and source retrieval | `mock_verified` + read-only live acceptance |
-| Personal post publishing | `linkedin.posts.create.*` `2.0.0` | Nine current personal composer modes, bounded loader settling, unchanged disabled-setting handling, visible publish-success/rejection postconditions, exact nested options, immutable previews, tamper rejection, execution, and replay | `mock_verified` |
+| Personal post publishing | `linkedin.posts.create.*` `2.0.0` | Nine current personal composer modes, bounded loader settling, unchanged disabled-setting handling, visible publish-success/rejection postconditions, exact nested options, immutable previews, tamper rejection, execution, and replay | `mock_verified` + live mutation/readback acceptance |
 | Post engagement | Comment `3.0.0`; reaction `3.0.0` | Current top-level comment text, photo and GIF controls, all six post reactions, tamper rejection, execution, and replay | `mock_verified` + live mutation/readback acceptance |
-| Invitations | List `4.0.0`; send, accept, and ignore `1.0.0` | Latest-layout-only received/sent extraction; bounded live cursor traversal; exact terminal per-view count reconciliation; and the complete currently implemented invitation lifecycle under one namespace, with scoped hash-locked writes and exact-profile postconditions | `mock_verified` + read-only/prepare-only live acceptance |
+| Invitations | List `4.0.0`; send, accept, and ignore `1.0.0` | Latest-layout-only received/sent extraction; bounded live cursor traversal; exact terminal per-view count reconciliation; and the complete currently implemented invitation lifecycle under one namespace, with scoped hash-locked writes and exact-profile postconditions | `mock_verified` + live mutation/readback acceptance |
 | Connections | List `2.0.0`; search `2.0.0` | Separate sorted inventory and filtered search of established first-degree connections; the server always binds search to first degree and rejects non-first-degree results | `mock_verified` + read-only live acceptance |
-| Messaging | Search, conversation get, message prepare, and execute `2.0.0` | Current recipient/message search criteria and mutually exclusive filters; cursor paging; reverse-virtualized history; exact recipients/replies; current text, file, and KLIPY GIF preparation; reply-aware same-surface postconditions; tamper rejection; and replay | `mock_verified` + read/prepare-only live acceptance |
+| Messaging | Search, conversation get, message prepare, and execute `2.0.0` | Current recipient/message search criteria and mutually exclusive filters; cursor paging; reverse-virtualized history; exact recipients/replies; current text, file, and KLIPY GIF preparation; reply-aware same-surface postconditions; tamper rejection; and replay | `mock_verified` + live mutation/readback acceptance |
 
 ## Shared collection pagination
 

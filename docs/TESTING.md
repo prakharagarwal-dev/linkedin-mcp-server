@@ -250,6 +250,19 @@ only sanitized provenance and the UI behaviors represented by each fixture.
   recommendation rails remained outside the member result. No account state
   changed.
 
+- 2026-08-05: People search resolved an exact first-degree member with current
+  company criteria. Company search combined size, hiring, and network filters,
+  while exact company readback returned the fixed Overview-plus-About contract.
+  Connections inventory produced two disjoint recently-added cursor pages, and
+  exact connection search enforced first degree. No account state changed.
+
+- 2026-08-05: received and sent invitation inventories returned bounded typed
+  pages with continuation state. One exact received invitation was accepted,
+  another was ignored, and one alternate outbound target received a noted
+  invitation from the authorized Test Bot account. Every execute result was
+  verified against its exact visible LinkedIn postcondition; no action was
+  blindly retried.
+
 - 2026-08-05: Posts search returned two disjoint three-result cursor pages from
   a cumulative live rescan. Current cards retained exact author headline and
   relationship degree, simple and edited trailing-bullet ages, fully expanded
@@ -263,6 +276,13 @@ only sanitized provenance and the UI behaviors represented by each fixture.
   current actor-description card's `Author` badge remained UI metadata while
   the following visible line was retained as the comment author's headline.
   No account state changed during these read-only replays.
+
+- 2026-08-05: exact-profile conversation lookup opened the authorized Test Bot
+  one-to-one surface. One uniquely marked message was prepared and sent from
+  the configured member account, execution verified the newly visible outgoing
+  bubble, and independent conversation readback returned exactly that message.
+  Searching its unique content then returned the Test Bot conversation. No
+  duplicate send or blind retry was performed.
 
 - 2026-08-04: a prepare-only personal-composer replay observed a bounded
   loading dialog, restored the exact personal composer, traversed unchanged
