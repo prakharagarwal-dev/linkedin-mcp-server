@@ -1,6 +1,6 @@
 {
   "provenance": "mock_verified",
-  "verified_at": "2026-07-30",
+  "verified_at": "2026-08-05",
   "source_surfaces": [
     "visible LinkedIn Jobs search",
     "visible LinkedIn All filters dialog",
@@ -169,5 +169,6 @@
   "detail_easy_apply_control": "link or button with accessible name containing Easy Apply",
   "detail_external_apply_control": "button with accessible name Apply on company website",
   "detail_hiring_team_anchor": "Meet the hiring team",
+  "detail_hiring_team_profile_link": "one visible profile link may contain name, degree, headline, and role as separate lines",
   "notes": "Synthetic identities and text preserve only current selector, accessibility, complete account-visible filter, virtualized-card hydration, optional company identity, zero-result recommendation, pagination, primary-detail, application-method, expandable-JD, and hiring-team behavior reverified through the authenticated visible UI. Distance is a current top-level filter control rather than a section in the All filters dialog."
 }

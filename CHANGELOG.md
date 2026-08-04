@@ -21,6 +21,8 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Support the current external generic Reply composer, flat visually indented
   reply ancestry, and `See previous replies` expansion without weakening exact
   comment and parent-reference binding.
+- Parse the current hiring-team card when its only visible profile link contains
+  the member name, connection degree, headline, and role as separate lines.
 
 ## [0.16.0] - 2026-08-04
 

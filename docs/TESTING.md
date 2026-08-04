@@ -95,7 +95,9 @@ The Jobs fixtures under `tests/fixtures/linkedin/jobs/latest/` are also
 pagination controls, every visible All Filters section, zero-result
 recommendation replacement, optional company identity, expanded description,
 Easy Apply/external/unavailable application methods, and hiring-team structure
-observed on 2026-07-30. They contain synthetic identities and text only—no raw
+observed through 2026-08-05, including the current single composite profile
+link whose separate lines carry name, degree, headline, and role. They contain
+synthetic identities and text only—no raw
 live DOM, authentication state, trace, or account data.
 
 The Company fixtures under `tests/fixtures/linkedin/companies/latest/` are
@@ -196,6 +198,13 @@ content, raw DOM, traces, cookies, or browser state. Fixture manifests record
 only sanitized provenance and the UI behaviors represented by each fixture.
 
 ### Aggregate live-acceptance ledger
+
+- 2026-08-05: Jobs search returned two disjoint five-result cursor pages and a
+  five-result query combining recency, sort, workplace, experience, employment,
+  and Easy Apply filters. Exact-detail readback returned a fully expanded JD,
+  application method, metadata, and one current composite hiring-team profile
+  card with separately typed name, degree, headline, and role. No account state
+  changed.
 
 - 2026-08-05: the authorized Test Bot published one bounded validation post,
   added one root comment and three exact threaded replies, set and read back a
