@@ -6,6 +6,12 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Read the nearest current member introduction card, ignore self-only
+  verification and guidance prompts, and retain visible top-card company and
+  education summaries from LinkedIn's semantic organization buttons.
+
 ## [0.16.0] - 2026-08-04
 
 ### Added
