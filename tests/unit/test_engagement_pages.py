@@ -33,6 +33,7 @@ from linkedin_mcp.errors import InvalidTargetError
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 ENGAGEMENT_HTML = (FIXTURES / "post-engagement.html").read_text()
 CURRENT_REACTION_HTML = (FIXTURES / "post-reaction-current.html").read_text()
+CURRENT_COMMENT_REACTION_HTML = (FIXTURES / "comment-reaction-current.html").read_text()
 POST_REF = "activity:7312345678901234567"
 COMMENT_REF = "comment:ugc-post:7312345678901234566:111"
 
@@ -480,6 +481,40 @@ async def test_current_portaled_reaction_control_is_prepared_and_verified(
 
 
 @pytest.mark.timeout(30)
+async def test_current_comment_reaction_control_is_bound_by_visible_card_geometry(
+    tmp_path: Path,
+) -> None:
+    request = PostReactionPrepareInput(
+        context_id="engagement-context",
+        request_id="prepare-current-comment-reaction",
+        post_ref=POST_REF,
+        comment_ref=COMMENT_REF,
+        desired_reaction=ReactionState.CELEBRATE,
+    )
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        page = await browser.new_page()
+        adapter = PostEngagementPage(
+            cast(
+                BrowserManager,
+                EngagementFixtureBrowser(page, html=CURRENT_COMMENT_REACTION_HTML),
+            ),
+            LocalAssetStore(tmp_path),
+        )
+        try:
+            draft = await _reaction_draft(adapter, request)
+            result = await adapter.execute_reaction(draft)
+        finally:
+            await browser.close()
+
+    assert isinstance(draft.payload, ReactionSetPayload)
+    assert draft.payload.existing_reaction is ReactionState.NONE
+    assert result.outcome is ActionOutcome.VERIFIED
+    assert result.performed is True
+    assert result.final_state == "reaction_set:celebrate"
+
+
+@pytest.mark.timeout(30)
 @pytest.mark.parametrize(
     ("desired", "performed", "final_state"),
     [
@@ -524,12 +559,12 @@ async def test_comment_reaction_removal_noop_and_change(
 @pytest.mark.timeout(30)
 async def test_reaction_refuses_state_drift_after_approval(tmp_path: Path) -> None:
     changed = ENGAGEMENT_HTML.replace(
-        'data-current-reaction="like"\n              aria-label="Like"',
-        'data-current-reaction="celebrate"\n              aria-label="Celebrate"',
+        'data-fixture-reaction="like"',
+        'data-fixture-reaction="celebrate"',
         1,
     ).replace(
-        ">\n              Like\n            </button>",
-        ">\n              Celebrate\n            </button>",
+        'aria-label="Reaction button state: like"',
+        'aria-label="Reaction button state: celebrate"',
         1,
     )
     request = PostReactionPrepareInput(
@@ -557,6 +592,41 @@ async def test_reaction_refuses_state_drift_after_approval(tmp_path: Path) -> No
     assert result.outcome is ActionOutcome.FAILED
     assert result.performed is False
     assert result.final_state == "reaction_state_changed"
+
+
+@pytest.mark.timeout(30)
+async def test_reaction_reports_missing_preclick_control_as_not_changed(
+    tmp_path: Path,
+) -> None:
+    missing_control = ENGAGEMENT_HTML.replace(
+        "data-reaction-control",
+        "data-unavailable-reaction-control",
+        1,
+    )
+    request = PostReactionPrepareInput(
+        context_id="engagement-context",
+        request_id="prepare-missing-execution-control",
+        post_ref=POST_REF,
+        desired_reaction=ReactionState.LOVE,
+    )
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        page = await browser.new_page()
+        adapter = PostEngagementPage(
+            cast(
+                BrowserManager,
+                EngagementFixtureBrowser(page, second_html=missing_control),
+            ),
+            LocalAssetStore(tmp_path),
+        )
+        try:
+            result = await adapter.execute_reaction(await _reaction_draft(adapter, request))
+        finally:
+            await browser.close()
+
+    assert result.outcome is ActionOutcome.FAILED
+    assert result.performed is False
+    assert result.final_state == "reaction_not_changed"
 
 
 @pytest.mark.timeout(30)

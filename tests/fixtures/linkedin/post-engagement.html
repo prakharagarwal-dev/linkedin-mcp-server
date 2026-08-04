@@ -17,6 +17,11 @@
       .author-headline {
         display: block;
       }
+
+      [data-generated-reply] {
+        box-sizing: border-box;
+        padding-left: 40px;
+      }
     </style>
   </head>
   <body>
@@ -93,6 +98,7 @@
       </article>
 
       <section id="discussion" aria-label="Comments">
+        <div data-comment-thread>
         <article
           id="target-comment"
           data-comment-urn="urn:li:comment:(ugcPost:7312345678901234566,111)"
@@ -105,15 +111,15 @@
           <time>1h</time>
 
           <div class="reaction-group" data-reaction-group>
-            <button
-              type="button"
-              data-reaction-control
-              data-current-reaction="like"
-              aria-label="Like"
-              aria-pressed="true"
+            <div
+              role="button"
+              tabindex="0"
+              data-view-name="comment-reaction-button"
+              data-fixture-reaction="like"
             >
-              Like
-            </button>
+              <svg role="img" aria-label="Reaction button state: like"></svg>
+              <span data-reaction-label>Like</span>
+            </div>
             <div class="reaction-options" aria-label="Comment reaction choices">
               <button type="button" data-reaction-option data-reaction="like">Like</button>
               <button type="button" data-reaction-option data-reaction="celebrate">
@@ -130,15 +136,19 @@
             </div>
           </div>
 
+          <button type="button" aria-label="Reply" data-open-reply>Reply</button>
+        </article>
+
           <div
             id="reply-composer"
             data-comment-composer
             data-parent-comment="urn:li:comment:(ugcPost:7312345678901234566,111)"
+            hidden
           >
             <label>
               Write a reply
               <textarea
-                aria-label="Text editor for creating reply"
+                aria-label="Text editor for creating comment"
                 maxlength="3000"
               ></textarea>
             </label>
@@ -152,7 +162,7 @@
             />
             <button type="button" data-submit-comment>Reply</button>
           </div>
-        </article>
+        </div>
       </section>
     </main>
 
@@ -179,20 +189,32 @@
       let activeGifComposer = null;
 
       function setReaction(group, value) {
-        const control = group.querySelector("[data-reaction-control]");
+        const control = group.querySelector(
+          "[data-reaction-control], [data-view-name='comment-reaction-button']"
+        );
         const label = value === "none"
           ? "Like"
           : value.charAt(0).toUpperCase() + value.slice(1);
-        control.dataset.currentReaction = value;
-        control.setAttribute("aria-pressed", value === "none" ? "false" : "true");
-        control.setAttribute("aria-label", label);
-        control.textContent = label;
+        if (control.dataset.viewName === "comment-reaction-button") {
+          control.dataset.fixtureReaction = value;
+          control.querySelector("[data-reaction-label]").textContent = label;
+          control.querySelector("[aria-label^='Reaction button state:']")
+            .setAttribute("aria-label", `Reaction button state: ${value === "none" ? "no reaction" : value}`);
+        } else {
+          control.dataset.currentReaction = value;
+          control.setAttribute("aria-pressed", value === "none" ? "false" : "true");
+          control.setAttribute("aria-label", label);
+          control.textContent = label;
+        }
       }
 
       document.querySelectorAll("[data-reaction-group]").forEach((group) => {
-        const control = group.querySelector("[data-reaction-control]");
+        const control = group.querySelector(
+          "[data-reaction-control], [data-view-name='comment-reaction-button']"
+        );
         control.addEventListener("click", () => {
-          if (control.dataset.currentReaction !== "none") {
+          const current = control.dataset.currentReaction || control.dataset.fixtureReaction;
+          if (current !== "none") {
             setReaction(group, "none");
           }
         });
@@ -226,9 +248,7 @@
           const commentId = String(nextCommentId++);
           comment.dataset.commentUrn =
             `urn:li:comment:(ugcPost:7312345678901234566,${commentId})`;
-          if (composer.dataset.parentComment) {
-            comment.dataset.parentCommentUrn = composer.dataset.parentComment;
-          }
+          if (composer.dataset.parentComment) comment.dataset.generatedReply = "";
           const author = document.createElement("a");
           author.href = "/in/current-member/";
           author.textContent = "Current Member";
@@ -255,8 +275,17 @@
             comment.append(attachment);
           }
           comment.append(time);
-          document.querySelector("#discussion").append(comment);
+          const destination = composer.dataset.parentComment
+            ? document.querySelector("[data-comment-thread]")
+            : document.querySelector("#discussion");
+          destination.append(comment);
         });
+      });
+
+      document.querySelector("[data-open-reply]").addEventListener("click", () => {
+        const composer = document.querySelector("#reply-composer");
+        composer.hidden = false;
+        composer.querySelector("textarea").focus();
       });
 
       document.querySelectorAll("#mention-suggestions a").forEach((option) => {

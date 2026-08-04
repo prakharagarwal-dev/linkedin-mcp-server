@@ -1,6 +1,6 @@
 {
   "provenance": "mock_verified",
-  "verified_at": "2026-08-04",
+  "verified_at": "2026-08-05",
   "source_surfaces": [
     "visible LinkedIn Posts search",
     "visible LinkedIn Posts All filters panel",
@@ -53,6 +53,7 @@
   },
   "engagement_contract": {
     "fixture": "../post-engagement.html",
+    "current_comment_reaction_fixture": "../comment-reaction-current.html",
     "comment_controls": [
       "Show Emoji Picker",
       "Open GIF picker",
@@ -67,7 +68,10 @@
       "Insightful",
       "Funny"
     ],
-    "discussion_alias_behavior": "activity post URLs may expose native ugc-post comment references"
+    "discussion_alias_behavior": "activity post URLs may expose native ugc-post comment references",
+    "reply_behavior": "the current generic comment editor is accepted only inside a form with one exact Reply control; flat-rendered replies bind to the visible indented thread root",
+    "reply_expansion": "See previous replies",
+    "comment_reaction_control": "a bounded focusable role=button containing an accessible Reaction button state icon; the surface may render after the comment text"
   },
   "filter_sections": [
     "Sort by",
@@ -125,7 +129,7 @@
     "body": "[data-testid=\"expandable-text-box\"]",
     "body_expansion": "[data-testid=\"expandable-text-button\"]",
     "visibility": "[aria-label^=\"Visibility:\"]",
-    "reaction_state": "button[aria-label^=\"Reaction button state:\"]",
+    "reaction_state": "[aria-label^=\"Reaction button state:\"] inside one bounded reaction control",
     "comment_action": "button[aria-label=\"Comment\"]",
     "repost_action": "button[aria-label=\"Repost\"]",
     "document_controls": [
