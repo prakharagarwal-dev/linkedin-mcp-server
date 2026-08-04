@@ -41,9 +41,10 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   primary publication postcondition, preserve that confirmation across a
   post-click browser timeout, and classify a visible publishing rejection as a
   verified failure.
-- Read flat visually indented reply ancestry and expand the current
-  `See previous replies` control without weakening exact parent-reference
-  binding.
+- Bind each flat visually indented reply to its nearest preceding root comment,
+  including discussions with multiple roots in either sort order, and expand
+  the current `See previous replies` control without weakening exact
+  parent-reference binding.
 - Parse the current hiring-team card when its only visible profile link contains
   the member name, connection degree, headline, and role as separate lines.
 

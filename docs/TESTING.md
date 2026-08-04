@@ -149,8 +149,9 @@ bounded composer loader, disabled Save and
 Done controls for unchanged settings, all nine personal composer modes, nested
 image/video/document/poll/celebration/event/hiring/expert controls, settings,
 the current top-level comment photo/GIF controls, native UGC discussion aliases,
-flat visually indented read-only replies, `See previous replies`, and the six
-current post reactions. Initial
+multiple sibling root threads whose visually indented read-only replies bind to
+the nearest preceding root, `See previous replies`, and the six current post
+reactions. Initial
 discovery uploaded synthetic files into draft-only editors without invoking an
 account-changing control.
 

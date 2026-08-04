@@ -198,6 +198,9 @@ def test_post_fixture_manifest_locks_current_visible_filter_surface() -> None:
         "open radio options",
         "closed percentages and Poll closed",
     ]
+    engagement_contract = cast(dict[str, object], manifest["engagement_contract"])
+    assert engagement_contract["current_thread_layout_fixture"] == ("comments-flat-threads.html")
+    assert "nearest preceding root" in cast(str, engagement_contract["current_thread_layout"])
     assert manifest["detail_fixtures"] == [
         "detail-text.html",
         "detail-image.html",
@@ -870,6 +873,44 @@ async def test_comments_open_and_parse_modern_stable_ids_and_nested_replies() ->
     assert coverage.replies_visible == 1
     assert "Modern visible comment body." in captured_text
     assert "Modern nested reply." in captured_text
+
+
+@pytest.mark.timeout(20)
+async def test_comments_bind_current_flattened_replies_to_nearest_root() -> None:
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        page = await browser.new_page()
+        fixture_browser = StaticPostFixtureBrowser(
+            page,
+            (FIXTURES / "posts/latest/comments-flat-threads.html").read_text(),
+        )
+        reader = PostCommentsPage(
+            cast(BrowserManager, fixture_browser),
+            max_expansion_rounds=1,
+        )
+        try:
+            threads, coverage, _, _ = await reader.collect(
+                PostCommentsListInput(
+                    context_id="context-1",
+                    request_id="current-flat-comments",
+                    post_ref=POST_REF,
+                    page_size=10,
+                    max_replies_per_comment=10,
+                )
+            )
+        finally:
+            await browser.close()
+
+    assert [thread.comment.comment_ref for thread in threads] == [
+        "comment:activity:7312345678901234567:301",
+        "comment:activity:7312345678901234567:303",
+    ]
+    assert [[reply.comment_ref for reply in thread.replies] for thread in threads] == [
+        ["comment:activity:7312345678901234567:302"],
+        ["comment:activity:7312345678901234567:304"],
+    ]
+    assert coverage.top_level_visible == 2
+    assert coverage.replies_visible == 2
 
 
 @pytest.mark.timeout(20)

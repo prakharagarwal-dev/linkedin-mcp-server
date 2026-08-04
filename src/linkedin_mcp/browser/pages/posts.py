@@ -2345,36 +2345,6 @@ async def _comment_parent_reference(region: Locator) -> str | None:
     )
     if await parent.count():
         return await _comment_reference(parent.first)
-    current_reference = await _comment_reference(region)
-    current_x = await _comment_identity_x(region)
-    if current_reference is None or current_x is None:
-        return None
-    ancestor = region.locator("xpath=..")
-    for _ in range(10):
-        if await ancestor.count() != 1:
-            break
-        descendants = ancestor.locator(_COMMENT_REGION_SELECTOR)
-        visible: list[Locator] = []
-        references: list[str] = []
-        for index in range(min(await descendants.count(), 100)):
-            candidate = descendants.nth(index)
-            if not await candidate.is_visible():
-                continue
-            reference = await _comment_reference(candidate)
-            if reference is None or reference in references:
-                continue
-            visible.append(candidate)
-            references.append(reference)
-        if len(visible) > 1:
-            if references[0] == current_reference:
-                return None
-            if current_reference not in references:
-                return None
-            root_x = await _comment_identity_x(visible[0])
-            if root_x is None or current_x <= root_x + 1:
-                return None
-            return references[0]
-        ancestor = ancestor.locator("xpath=..")
     return None
 
 
@@ -2389,6 +2359,34 @@ async def _comment_identity_x(region: Locator) -> float | None:
         if box is not None:
             positions.append(box["x"])
     return min(positions) if positions else None
+
+
+def _bind_flattened_comment_parents(
+    comments: list[tuple[CommentObservation, float | None]],
+) -> list[CommentObservation]:
+    """Bind visually indented flat replies to their nearest preceding root."""
+
+    positions = [position for _, position in comments if position is not None]
+    if not positions:
+        return [comment for comment, _ in comments]
+    root_x = min(positions)
+    indentation_threshold = root_x + 12
+    current_root: str | None = None
+    bound: list[CommentObservation] = []
+    for comment, position in comments:
+        if comment.parent_comment_ref is not None:
+            bound.append(comment)
+            continue
+        if position is None or position <= indentation_threshold:
+            current_root = comment.comment_ref
+            bound.append(comment)
+            continue
+        if current_root is None:
+            raise ParserDriftError(
+                "LinkedIn discussion began with an indented reply whose root is not visible."
+            )
+        bound.append(comment.model_copy(update={"parent_comment_ref": current_root}))
+    return bound
 
 
 async def _comment_attachments(
@@ -2803,7 +2801,7 @@ class PostCommentsPage:
                 )
             regions = comment_regions(page)
             native_post_ref = await discussion_post_reference(page, request.post_ref)
-            comments: list[CommentObservation] = []
+            comments_with_layout: list[tuple[CommentObservation, float | None]] = []
             comment_refs: set[str] = set()
             for index in range(min(await regions.count(), 1_000)):
                 region = regions.nth(index)
@@ -2824,8 +2822,9 @@ class PostCommentsPage:
                         "A stable visible LinkedIn comment has no unambiguous content."
                     )
                 if comment.comment_ref not in comment_refs:
-                    comments.append(comment)
+                    comments_with_layout.append((comment, await _comment_identity_x(region)))
                     comment_refs.add(comment.comment_ref)
+            comments = _bind_flattened_comment_parents(comments_with_layout)
             captured_text = (await page.locator("main").inner_text()).strip()
             if not captured_text:
                 raise ParserDriftError("LinkedIn discussion returned no visible source text.")
