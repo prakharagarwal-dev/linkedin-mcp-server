@@ -8,11 +8,11 @@
     "source": "github"
   },
   "websiteUrl": "https://github.com/prakharagarwal-dev/linkedin-mcp-server",
-  "version": "0.15.1",
+  "version": "0.16.0",
   "packages": [
     {
       "registryType": "oci",
-      "identifier": "ghcr.io/prakharagarwal-dev/linkedin-mcp-server:0.15.1",
+      "identifier": "ghcr.io/prakharagarwal-dev/linkedin-mcp-server:0.16.0",
       "transport": {
         "type": "stdio"
       },
