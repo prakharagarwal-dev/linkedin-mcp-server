@@ -1,6 +1,6 @@
 # LinkedIn Visible-Feature Matrix
 
-**Matrix version:** `2026-08-05.2`
+**Matrix version:** `2026-08-05.3`
 
 This matrix records the visible LinkedIn controls and outputs inspected for the
 configured authorized member account. It is evidence for capability acceptance,
@@ -32,8 +32,8 @@ do not upgrade this classification.
 | Job detail | `linkedin.jobs.get` `2.0.0` | Current primary-card anchors, optional company identity, application method, single-link composite hiring-team cards with separately typed fields, fully expanded JD, scoped evidence, and replay | `mock_verified` + read-only live acceptance |
 | People search | `linkedin.people.search` `2.0.0` | Every current account-visible People filter, delayed/anonymous rendering, trailing-hyphen slugs, and shared cursor contract is fixture-covered | `mock_verified` + read-only live acceptance |
 | Member profile | `linkedin.people.get` `1.1.1` | Complete/selective sections, exact evidence resources, requested/returned coverage, genuine trailing-hyphen public slugs, nested self-introduction cards, recommendation/guidance exclusion, semantic company/school summaries, current roleless detail collections and experience cards, exact skill identity, and clean About text | `mock_verified` + read-only live acceptance |
-| Company search | `linkedin.companies.search` `2.0.0` | Complete current Company-search surface: keywords, headquarters, industry, all eight company-size buckets, job-listing and first-degree-connection flags, named-facet resolution, delayed rendering, evidence, and cursor contracts | `mock_verified` |
-| Company profile | `linkedin.companies.get` `2.0.0` | Fixed exact Overview-plus-About read with structured visible fields and two immutable page sources | `mock_verified` |
+| Company search | `linkedin.companies.search` `2.0.0` | Complete current Company-search surface: keywords, headquarters, industry, all eight company-size buckets, job-listing and first-degree-connection flags, named-facet resolution, compact count/social-proof parsing, delayed rendering, evidence, and cursor contracts | `mock_verified` + read-only live acceptance |
+| Company profile | `linkedin.companies.get` `2.0.0` | Fixed exact Overview-plus-About read from the smallest current introduction region, with compact top-card counts, exact associated-member preference, structured visible fields, and two immutable page sources | `mock_verified` + read-only live acceptance |
 | Post search | `linkedin.posts.search` `2.0.0` | Declared content facets, delayed/current card variants, stable references, exact per-card evidence across dynamic rendering, and cursor contract | `mock_verified` + read-only live acceptance |
 | Post detail | `linkedin.posts.get` `2.0.0` | Exact activity/share/UGC identity, fully expanded text, scoped links/mentions/hashtags, current text/image/video/live-video/document/link/article/newsletter/event/job/poll variants, viewer reaction and engagement, visibility/header metadata, immutable field evidence, bounded completeness coverage, and two-page repost-original resolution | `mock_verified` + read-only live acceptance |
 | Post discussion | `linkedin.posts.comments.list` `1.1.1` | Ordering, cursor-paged top-level comments, delayed expansion including the current `See previous replies` control, flat visually indented parent binding, replies, media, and source retrieval | `mock_verified` + read-only live acceptance |

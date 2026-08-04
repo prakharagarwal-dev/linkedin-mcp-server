@@ -8,6 +8,10 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Parse compact Company counts such as `161K` and `8M`, keep social-proof text
+  out of search-result locations, bind the smallest current company
+  introduction region, and prefer the exact About-page associated-member count
+  over employee ranges.
 - Parse current member experience cards without treating employment type or
   description bullets as company and location fields, bind skill identity to
   the exact accessible endorsement control, and exclude About-section

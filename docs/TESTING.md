@@ -101,11 +101,14 @@ synthetic identities and text only—no raw
 live DOM, authentication state, trace, or account data.
 
 The Company fixtures under `tests/fixtures/linkedin/companies/latest/` are
-`mock_verified` from the authenticated visible UI inspected on 2026-07-30.
+`mock_verified` from the authenticated visible UI inspected on 2026-08-05.
 They preserve the current side-panel filter mechanics, all five filter
 families, all eight size choices, exact location/industry typeaheads, submitted
-query parameters, result identity and pagination, and the fixed
-Overview-plus-About read. They contain synthetic identities and text only.
+query parameters, result identity and pagination, compact counts and social
+proof, the smallest exact company introduction region, and the fixed
+Overview-plus-About read. Exact About-page associated-member counts remain
+separate from company-size and compact top-card employee counts. They contain
+synthetic identities and text only.
 
 The sanitized `person-profile-self-current.html` fixture is `mock_verified`
 from the authenticated self-profile UI inspected on 2026-08-05. It preserves
