@@ -119,6 +119,11 @@ media/link/document/poll structures, engagement controls, and bounded
 repost-original behavior. They contain no live post, author, raw DOM,
 authentication state, trace, or account data.
 
+The sanitized `personal-post-composer.html` fixture additionally preserves the
+current visible `Post successful. View post` alert contract and a visible
+publishing-rejection state observed on 2026-08-05; the synthetic fixture never
+contains the live post or account identity.
+
 The sanitized `personal-post-composer.html` and `post-engagement.html`
 fixtures are also `mock_verified` from the authenticated visible UI inspected
 on 2026-08-04. They preserve the bounded composer loader, disabled Save and

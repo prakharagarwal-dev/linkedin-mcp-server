@@ -11,6 +11,10 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Read the nearest current member introduction card, ignore self-only
   verification and guidance prompts, and retain visible top-card company and
   education summaries from LinkedIn's semantic organization buttons.
+- Treat LinkedIn's visible post-success alert and exact View post link as the
+  primary publication postcondition, preserve that confirmation across a
+  post-click browser timeout, and classify a visible publishing rejection as a
+  verified failure.
 
 ## [0.16.0] - 2026-08-04
 
