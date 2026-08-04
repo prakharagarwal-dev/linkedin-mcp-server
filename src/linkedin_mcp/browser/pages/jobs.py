@@ -391,9 +391,16 @@ async def _visible_hiring_team(
         visible_values = [value for value in visible_values if value]
         if not visible_values:
             continue
-        name = min(visible_values, key=len).strip(" \x7f")
         visible_text = max(visible_values, key=len).strip(" \x7f")
         lines = [line.strip(" \x7f") for line in _lines(visible_text)]
+        name_candidates = [
+            candidate_lines[0].strip(" \x7f")
+            for value in visible_values
+            if (candidate_lines := _lines(value))
+        ]
+        if not name_candidates:
+            continue
+        name = min(name_candidates, key=len)
         connection_degree_text = next(
             (line for line in lines if _CONNECTION_DEGREE_PATTERN.fullmatch(line)),
             None,
