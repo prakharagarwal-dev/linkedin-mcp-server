@@ -258,6 +258,12 @@ only sanitized provenance and the UI behaviors represented by each fixture.
   independently matched one result's stable identity, full text, attachment,
   engagement, and evidence. No account state changed.
 
+- 2026-08-05: both current comment sort orders returned two root threads with
+  every visually indented reply attached to its nearest preceding root. The
+  current actor-description card's `Author` badge remained UI metadata while
+  the following visible line was retained as the comment author's headline.
+  No account state changed during these read-only replays.
+
 - 2026-08-04: a prepare-only personal-composer replay observed a bounded
   loading dialog, restored the exact personal composer, traversed unchanged
   audience/comment settings through their enabled Back controls, and did not

@@ -909,6 +909,8 @@ async def test_comments_bind_current_flattened_replies_to_nearest_root() -> None
         ["comment:activity:7312345678901234567:302"],
         ["comment:activity:7312345678901234567:304"],
     ]
+    assert threads[0].comment.author.name == "Alex Ray"
+    assert threads[0].comment.author.headline == "Principal Engineer"
     assert coverage.top_level_visible == 2
     assert coverage.replies_visible == 2
 

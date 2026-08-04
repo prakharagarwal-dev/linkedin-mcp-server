@@ -88,6 +88,7 @@ _POST_ACTION_LINES = frozenset(
         "more",
     }
 )
+_COMMENT_AUTHOR_BADGES = frozenset({"author"})
 _POST_CONTENT_CODES = {
     PostSearchContentType.VIDEOS: "videos",
     PostSearchContentType.IMAGES: "photos",
@@ -859,13 +860,24 @@ async def _post_author(region: Locator) -> PostAuthor | None:
                 name = (await image.first.get_attribute("alt") or "").strip()
         if not name:
             continue
+        metadata = lines[1:]
+        relationship = _post_relationship(metadata)
+        headline_candidates = [
+            line
+            for line in metadata
+            if line.casefold() not in _COMMENT_AUTHOR_BADGES
+            and _POST_RELATIONSHIP_PATTERN.search(line) is None
+            and _POST_FOLLOWER_PATTERN.search(line) is None
+        ]
+        headline = headline_candidates[-1] if headline_candidates else None
         if profile_slug := profile_slug_from_url(url):
             author = PostAuthor(
                 author_type=PostAuthorType.MEMBER,
                 name=name,
                 profile_slug=profile_slug,
                 author_url=HttpUrl(f"https://www.linkedin.com/in/{profile_slug}/"),
-                headline=lines[1] if len(lines) > 1 else None,
+                headline=headline,
+                relationship_text=relationship,
             )
         elif company_slug := company_slug_from_url(url):
             author = PostAuthor(
@@ -873,7 +885,8 @@ async def _post_author(region: Locator) -> PostAuthor | None:
                 name=name,
                 company_slug=company_slug,
                 author_url=HttpUrl(canonical_company_url(company_slug)),
-                headline=lines[1] if len(lines) > 1 else None,
+                headline=headline,
+                relationship_text=relationship,
             )
         else:
             continue
