@@ -53,7 +53,6 @@
   },
   "engagement_contract": {
     "fixture": "../post-engagement.html",
-    "current_comment_reaction_fixture": "../comment-reaction-current.html",
     "comment_controls": [
       "Show Emoji Picker",
       "Open GIF picker",
@@ -69,9 +68,7 @@
       "Funny"
     ],
     "discussion_alias_behavior": "activity post URLs may expose native ugc-post comment references",
-    "reply_behavior": "the current generic comment editor is accepted only inside a form with one exact Reply control; flat-rendered replies bind to the visible indented thread root",
-    "reply_expansion": "See previous replies",
-    "comment_reaction_control": "a bounded focusable role=button containing an accessible Reaction button state icon; the surface may render after the comment text"
+    "reply_expansion": "See previous replies"
   },
   "filter_sections": [
     "Sort by",

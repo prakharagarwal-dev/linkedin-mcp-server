@@ -314,12 +314,11 @@ async def test_ignore_received_connection_request_workflow_is_stateful(
     assert state.actions[-1].action_type == "invitation_ignore"
 
 
-async def test_post_create_reply_and_comment_reaction_workflow_is_stateful(
+async def test_post_create_comment_and_comment_reaction_workflow_is_stateful(
     tmp_path: Path,
 ) -> None:
     state = SimulatorState.standard()
     post_ref = "activity:7312345678901234567"
-    parent_ref = "comment:activity:7312345678901234567:111"
     async with simulator_session(tmp_path, state) as session:
         post_search = await session.call_tool(
             "linkedin.posts.search",
@@ -388,25 +387,24 @@ async def test_post_create_reply_and_comment_reaction_workflow_is_stateful(
             idempotency_key="mock-post-create-1",
         )
 
-        reply = await session.call_tool(
+        comment = await session.call_tool(
             "linkedin.posts.comment.prepare",
             {
                 "context_id": "mock-workflow",
-                "request_id": "reply-prepare",
+                "request_id": "comment-prepare",
                 "post_ref": post_ref,
-                "parent_comment_ref": parent_ref,
                 "text": "Thanks for sharing this.",
             },
         )
-        assert reply.isError is False and reply.structuredContent is not None
+        assert comment.isError is False and comment.structuredContent is not None
         await execute_prepared(
             session,
             execute_tool="linkedin.posts.comment.execute",
             prepared_content=TypeAdapter(dict[str, object]).validate_python(
-                reply.structuredContent
+                comment.structuredContent
             ),
-            request_id="reply-execute",
-            idempotency_key="mock-reply-1",
+            request_id="comment-execute",
+            idempotency_key="mock-comment-1",
         )
 
         reaction = await session.call_tool(
@@ -415,7 +413,6 @@ async def test_post_create_reply_and_comment_reaction_workflow_is_stateful(
                 "context_id": "mock-workflow",
                 "request_id": "reaction-prepare",
                 "post_ref": post_ref,
-                "comment_ref": parent_ref,
                 "desired_reaction": "funny",
             },
         )
@@ -434,8 +431,5 @@ async def test_post_create_reply_and_comment_reaction_workflow_is_stateful(
         candidate for candidate in state.posts.values() if candidate.author_slug == state.actor_slug
     ]
     assert [candidate.text for candidate in created_posts] == ["A synthetic personal post."]
-    assert state.posts[post_ref].comments[-1].parent_comment_ref == parent_ref
-    parent = next(
-        comment for comment in state.posts[post_ref].comments if comment.comment_ref == parent_ref
-    )
-    assert parent.reaction.value == "funny"
+    assert state.posts[post_ref].comments[-1].parent_comment_ref is None
+    assert state.posts[post_ref].reaction.value == "funny"

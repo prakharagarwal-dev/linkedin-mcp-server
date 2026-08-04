@@ -789,10 +789,10 @@ def create_mcp_server(
 
     @mcp.tool(
         name="linkedin.posts.comment.prepare",
-        title="Prepare LinkedIn Comment or Reply",
+        title="Prepare LinkedIn Comment",
         description=(
-            "Inspect one exact visible post or parent comment and prepare an immutable personal-"
-            "member comment or reply. Supports text, links, emoji, exact member/company mentions, "
+            "Inspect one exact visible post and prepare an immutable top-level personal-member "
+            "comment. Supports text, links, emoji, exact member/company mentions, "
             "one local hash-locked photo, or one exact visible GIF result. This tool never submits."
         ),
         annotations=linkedin_prepare,
@@ -805,18 +805,6 @@ def create_mcp_server(
             Field(pattern=r"^(?:activity|share|ugc-post):[0-9]{5,30}$"),
         ],
         ctx: Context[Any, Any, Any],
-        parent_comment_ref: (
-            Annotated[
-                str,
-                Field(
-                    pattern=(
-                        r"^comment:(?:activity|share|ugc-post):"
-                        r"[0-9]{5,30}:[0-9]{1,30}$"
-                    )
-                ),
-            ]
-            | None
-        ) = None,
         text: Annotated[str, Field(min_length=1, max_length=3_000)] | None = None,
         mentions: Annotated[tuple[PostMentionInput, ...], Field(max_length=20)] = (),
         attachment: CommentAttachment | None = None,
@@ -828,23 +816,22 @@ def create_mcp_server(
                     context_id=context_id,
                     request_id=request_id,
                     post_ref=post_ref,
-                    parent_comment_ref=parent_comment_ref,
                     text=text,
                     mentions=mentions,
                     attachment=attachment,
                 )
             )
         )
-        await ctx.report_progress(100, 100, "Immutable comment or reply draft prepared")
+        await ctx.report_progress(100, 100, "Immutable comment draft prepared")
         return result
 
     @mcp.tool(
         name="linkedin.posts.comment.execute",
-        title="Publish Prepared LinkedIn Comment or Reply",
+        title="Publish Prepared LinkedIn Comment",
         description=(
             f"{EXECUTE_APPROVAL_POLICY_DESCRIPTION}Submit exactly one immutable personal-member "
-            "comment or reply after the server verifies the preview, actor, target author, exact "
-            "parent, payload, local asset hash, expiry, and idempotency."
+            "top-level comment after the server verifies the preview, actor, target author, "
+            "payload, local asset hash, expiry, and idempotency."
         ),
         annotations=linkedin_write,
     )
@@ -875,11 +862,11 @@ def create_mcp_server(
 
     @mcp.tool(
         name="linkedin.posts.reaction.prepare",
-        title="Prepare LinkedIn Post or Comment Reaction",
+        title="Prepare LinkedIn Post Reaction",
         description=(
-            "Inspect the exact current reaction state on one visible post or comment and prepare "
-            "an immutable target state: none, like, celebrate, support, love, insightful, or "
-            "funny. This tool never changes the reaction."
+            "Inspect the exact current reaction state on one visible post and prepare an "
+            "immutable target state: none, like, celebrate, support, love, insightful, or funny. "
+            "This tool never changes the reaction."
         ),
         annotations=linkedin_prepare,
     )
@@ -892,18 +879,6 @@ def create_mcp_server(
         ],
         desired_reaction: ReactionState,
         ctx: Context[Any, Any, Any],
-        comment_ref: (
-            Annotated[
-                str,
-                Field(
-                    pattern=(
-                        r"^comment:(?:activity|share|ugc-post):"
-                        r"[0-9]{5,30}:[0-9]{1,30}$"
-                    )
-                ),
-            ]
-            | None
-        ) = None,
     ) -> ActionPrepareOutput:
         await ctx.report_progress(0, 100, "Inspecting exact LinkedIn reaction state")
         result = await _tool_result(
@@ -912,7 +887,6 @@ def create_mcp_server(
                     context_id=context_id,
                     request_id=request_id,
                     post_ref=post_ref,
-                    comment_ref=comment_ref,
                     desired_reaction=desired_reaction,
                 )
             )
@@ -922,7 +896,7 @@ def create_mcp_server(
 
     @mcp.tool(
         name="linkedin.posts.reaction.execute",
-        title="Apply Prepared LinkedIn Post or Comment Reaction",
+        title="Apply Prepared LinkedIn Post Reaction",
         description=(
             f"{EXECUTE_APPROVAL_POLICY_DESCRIPTION}Set, change, remove, or safely no-op one "
             "prepared exact reaction state after the server verifies the preview, actor, target "

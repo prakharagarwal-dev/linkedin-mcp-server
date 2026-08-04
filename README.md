@@ -30,8 +30,8 @@ your network, publish and engage with posts, and read or send messages.
 |  | Read posts | Read complete content, media, links, mentions, hashtags, reactions, and engagement. |
 |  | Read discussions | Read paginated comments, replies, attachments, and reactions. |
 |  | Publish posts | Publish supported personal text, link, image, video, document, poll, celebration, event, hiring, and expert-request posts. |
-|  | Comment and reply | Add text, links, emoji, mentions, photos, or GIFs to posts and discussion threads. |
-|  | React | Add, change, or remove reactions on posts and comments. |
+|  | Comment | Add text, links, emoji, mentions, photos, or GIFs to posts. |
+|  | React | Add, change, or remove reactions on posts. |
 | **Network** | List connections | Browse established first-degree connections with sorting and pagination. |
 |  | Search connections | Search existing connections using applicable People filters. |
 |  | List invitations | Browse received and sent invitations using LinkedIn's visible filters. |
