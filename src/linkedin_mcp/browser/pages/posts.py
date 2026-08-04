@@ -2256,7 +2256,50 @@ async def _comment_parent_reference(region: Locator) -> str | None:
     )
     if await parent.count():
         return await _comment_reference(parent.first)
+    current_reference = await _comment_reference(region)
+    current_x = await _comment_identity_x(region)
+    if current_reference is None or current_x is None:
+        return None
+    ancestor = region.locator("xpath=..")
+    for _ in range(10):
+        if await ancestor.count() != 1:
+            break
+        descendants = ancestor.locator(_COMMENT_REGION_SELECTOR)
+        visible: list[Locator] = []
+        references: list[str] = []
+        for index in range(min(await descendants.count(), 100)):
+            candidate = descendants.nth(index)
+            if not await candidate.is_visible():
+                continue
+            reference = await _comment_reference(candidate)
+            if reference is None or reference in references:
+                continue
+            visible.append(candidate)
+            references.append(reference)
+        if len(visible) > 1:
+            if references[0] == current_reference:
+                return None
+            if current_reference not in references:
+                return None
+            root_x = await _comment_identity_x(visible[0])
+            if root_x is None or current_x <= root_x + 1:
+                return None
+            return references[0]
+        ancestor = ancestor.locator("xpath=..")
     return None
+
+
+async def _comment_identity_x(region: Locator) -> float | None:
+    links = region.locator('a[href*="/in/"], a[href*="/company/"]')
+    positions: list[float] = []
+    for index in range(min(await links.count(), 20)):
+        link = links.nth(index)
+        if not await link.is_visible():
+            continue
+        box = await link.bounding_box()
+        if box is not None:
+            positions.append(box["x"])
+    return min(positions) if positions else None
 
 
 async def _comment_attachments(
@@ -2639,7 +2682,8 @@ class PostCommentsPage:
                 controls = page.get_by_role(
                     "button",
                     name=re.compile(
-                        r"(?:load more comments|load previous replies|show more replies|"
+                        r"(?:load more comments|load previous replies|see previous replies|"
+                        r"show more replies|"
                         r"view replies|more replies)",
                         re.IGNORECASE,
                     ),

@@ -1,6 +1,6 @@
 # LinkedIn Visible-Feature Matrix
 
-**Matrix version:** `2026-08-03.1`
+**Matrix version:** `2026-08-05.1`
 
 This matrix records the visible LinkedIn controls and outputs inspected for the
 configured authorized member account. It is evidence for capability acceptance,
@@ -36,9 +36,9 @@ do not upgrade this classification.
 | Company profile | `linkedin.companies.get` `2.0.0` | Fixed exact Overview-plus-About read with structured visible fields and two immutable page sources | `mock_verified` |
 | Post search | `linkedin.posts.search` `2.0.0` | Declared content facets, delayed/current card variants, stable references, exact per-card evidence across dynamic rendering, and cursor contract | `mock_verified` + read-only live acceptance |
 | Post detail | `linkedin.posts.get` `2.0.0` | Exact activity/share/UGC identity, fully expanded text, scoped links/mentions/hashtags, current text/image/video/live-video/document/link/article/newsletter/event/job/poll variants, viewer reaction and engagement, visibility/header metadata, immutable field evidence, bounded completeness coverage, and two-page repost-original resolution | `mock_verified` + read-only live acceptance |
-| Post discussion | `linkedin.posts.comments.list` `1.1.1` | Ordering, cursor-paged top-level comments, delayed expansion, replies, media, and source retrieval | `mock_verified` |
+| Post discussion | `linkedin.posts.comments.list` `1.1.1` | Ordering, cursor-paged top-level comments, delayed expansion including the current `See previous replies` control, flat visually indented parent binding, replies, media, and source retrieval | `mock_verified` + read-only live acceptance |
 | Personal post publishing | `linkedin.posts.create.*` `2.0.0` | Nine current personal composer modes, bounded loader settling, unchanged disabled-setting handling, visible publish-success/rejection postconditions, exact nested options, immutable previews, tamper rejection, execution, and replay | `mock_verified` |
-| Post/comment engagement | `linkedin.posts.comment.*` and `linkedin.posts.reaction.*` `2.0.0` | Current comment/reply text, photo and GIF controls, native discussion aliases, all six reactions, tamper rejection, execution, and replay | `mock_verified` + prepare-only live acceptance |
+| Post/comment engagement | `linkedin.posts.comment.*` and `linkedin.posts.reaction.*` `2.0.0` | Current comment/reply text, external generic reply composer, photo and GIF controls, native discussion aliases, delayed accessible comment-reaction controls, all six reactions, tamper rejection, execution, and replay | `mock_verified` + live mutation/readback acceptance |
 | Invitations | List `4.0.0`; send, accept, and ignore `1.0.0` | Latest-layout-only received/sent extraction; bounded live cursor traversal; exact terminal per-view count reconciliation; and the complete currently implemented invitation lifecycle under one namespace, with scoped hash-locked writes and exact-profile postconditions | `mock_verified` + read-only/prepare-only live acceptance |
 | Connections | List `2.0.0`; search `2.0.0` | Separate sorted inventory and filtered search of established first-degree connections; the server always binds search to first degree and rejects non-first-degree results | `mock_verified` + read-only live acceptance |
 | Messaging | Search, conversation get, message prepare, and execute `2.0.0` | Current recipient/message search criteria and mutually exclusive filters; cursor paging; reverse-virtualized history; exact recipients/replies; current text, file, and KLIPY GIF preparation; reply-aware same-surface postconditions; tamper rejection; and replay | `mock_verified` + read/prepare-only live acceptance |
@@ -198,7 +198,7 @@ browser access during execution.
 | Visible engagement feature | Status | Typed behavior and evidence |
 | --- | --- | --- |
 | Top-level text/link/emoji comment | `supported` | Exact text through one visible comment composer |
-| Reply to a comment | `supported` | Explicit stable parent comment reference, exact thread binding, and runtime-verified activity-URL to native UGC-discussion mapping |
+| Reply to a comment | `supported` | Explicit stable parent comment reference, exact thread binding including the current flat visually indented layout, one exact Reply-only composer form, and runtime-verified activity-URL to native UGC-discussion mapping |
 | Member/Page mention | `supported` | Exact token plus exact visible identity resolution |
 | Photo | `supported` | One hash-locked GIF/JPEG/JPG/PNG/WebP upload through the current Share photo chooser |
 | GIF picker | `supported` | Exact Search for GIFs/KLIPY query and one unique result image alt label |
@@ -206,7 +206,7 @@ browser access during execution.
 | Remove reaction | `supported` | Explicit `none`; never inferred from a repeated click |
 | Set/change/no-op | `supported` | Existing and desired state are both captured, passed through the client approval policy, and revalidated |
 | Comment/reply verification | `supported` | Exactly one new stable reference must match actor and parent; text and GIF label match exactly, while a photo additionally requires the prepared file hash and visible photo type |
-| Reaction verification | `supported` | Final visible reaction must equal the confirmed desired state |
+| Reaction verification | `supported` | The bounded accessible reaction surface must load before preparation/execution; final visible state must equal the confirmed desired state, while a missing pre-click control is a verified non-mutation rather than an uncertain action |
 | Comment as a LinkedIn Page | `outside_named_capability` | Different actor and authorization contract; personal actor is mandatory |
 | Edit/delete/pin/report/repost a comment | `outside_named_capability` | Materially different effects requiring separate scopes and payloads |
 

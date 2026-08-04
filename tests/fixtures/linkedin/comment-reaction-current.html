@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Current LinkedIn Comment Reaction Fixture</title>
+  </head>
+  <body>
+    <nav aria-label="Primary navigation">
+      <button type="button" aria-label="Open the Me menu"><span>Me</span></button>
+    </nav>
+    <main aria-label="Post detail and discussion">
+      <aside aria-label="Signed-in member profile">
+        <a href="/in/current-member/">Current Member</a>
+      </aside>
+      <article data-post-urn="urn:li:activity:7312345678901234567">
+        <a href="/in/jane-doe/">Jane Doe</a>
+        <p data-post-text>A visible post with a current comment reaction control.</p>
+      </article>
+      <section aria-label="Comments">
+        <div id="comment-layout" style="position: relative; width: 600px;">
+          <article
+            id="target-comment"
+            data-comment-urn="urn:li:comment:(ugcPost:7312345678901234566,111)"
+            style="box-sizing: border-box; height: 140px; width: 600px;"
+          >
+            <a href="/in/alex-ray/">Alex Ray</a>
+            <p data-comment-text>Helpful breakdown.</p>
+            <time>1h</time>
+          </article>
+          <div
+            id="current-comment-reaction"
+            role="button"
+            tabindex="0"
+            style="position: absolute; left: 12px; top: 88px; width: 80px; height: 24px;"
+          >
+            <svg
+              role="img"
+              width="16"
+              height="16"
+              aria-label="Reaction button state: no reaction"
+            ></svg>
+            <span>Like</span>
+          </div>
+        </div>
+      </section>
+    </main>
+    <div id="portaled-reactions" hidden>
+      <button type="button" aria-label="Like">Like</button>
+      <button type="button" aria-label="Celebrate">Celebrate</button>
+      <button type="button" aria-label="Support">Support</button>
+      <button type="button" aria-label="Love">Love</button>
+      <button type="button" aria-label="Insightful">Insightful</button>
+      <button type="button" aria-label="Funny">Funny</button>
+    </div>
+    <script>
+      const control = document.querySelector("#current-comment-reaction");
+      const picker = document.querySelector("#portaled-reactions");
+      control.addEventListener("mouseenter", () => {
+        picker.hidden = false;
+      });
+      picker.querySelectorAll("button").forEach((option) => {
+        option.addEventListener("click", () => {
+          const reaction = option.getAttribute("aria-label").toLowerCase();
+          control
+            .querySelector("[aria-label^='Reaction button state:']")
+            .setAttribute("aria-label", `Reaction button state: ${reaction}`);
+          control.querySelector("span").textContent = option.getAttribute("aria-label");
+          picker.hidden = true;
+        });
+      });
+    </script>
+  </body>
+</html>

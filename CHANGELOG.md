@@ -15,6 +15,12 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   primary publication postcondition, preserve that confirmation across a
   post-click browser timeout, and classify a visible publishing rejection as a
   verified failure.
+- Bind LinkedIn's delayed focusable comment-reaction control through its
+  accessible state icon, wait boundedly for the surface, and distinguish a
+  missing pre-click control from an uncertain post-click outcome.
+- Support the current external generic Reply composer, flat visually indented
+  reply ancestry, and `See previous replies` expansion without weakening exact
+  comment and parent-reference binding.
 
 ## [0.16.0] - 2026-08-04
 

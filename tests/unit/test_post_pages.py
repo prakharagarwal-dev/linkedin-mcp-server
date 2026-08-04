@@ -159,7 +159,7 @@ def test_post_fixture_manifest_locks_current_visible_filter_surface() -> None:
     )
 
     assert manifest["provenance"] == "mock_verified"
-    assert manifest["verified_at"] == "2026-08-04"
+    assert manifest["verified_at"] == "2026-08-05"
     assert manifest["contains_live_data"] is False
     assert manifest["filter_sections"] == [
         "Sort by",
@@ -977,6 +977,61 @@ async def test_comments_wait_for_async_load_more_render() -> None:
     ]
     assert coverage.expansion_rounds == 1
     assert "Late-rendered top-level comment." in captured_text
+
+
+@pytest.mark.timeout(20)
+async def test_comments_expand_current_see_previous_replies_control() -> None:
+    html = (
+        (FIXTURES / "post-comments-modern.html")
+        .read_text()
+        .replace(
+            '<section aria-label="Replies">',
+            (
+                '<div id="see-previous-replies" role="button" tabindex="0">'
+                "See previous replies</div>"
+                '<section id="older-replies" aria-label="Replies" hidden>'
+            ),
+        )
+        .replace(
+            """
+      document.querySelector("#open-comments").addEventListener("click", () => {
+        document.querySelector("#discussion").hidden = false;
+      });
+""",
+            """
+      document.querySelector("#open-comments").addEventListener("click", () => {
+        document.querySelector("#discussion").hidden = false;
+      });
+      document.querySelector("#see-previous-replies").addEventListener("click", () => {
+        document.querySelector("#older-replies").hidden = false;
+        document.querySelector("#see-previous-replies").remove();
+      });
+""",
+        )
+    )
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        page = await browser.new_page()
+        reader = PostCommentsPage(
+            cast(BrowserManager, StaticPostFixtureBrowser(page, html)),
+            max_expansion_rounds=2,
+        )
+        try:
+            threads, coverage, _, _ = await reader.collect(
+                PostCommentsListInput(
+                    context_id="context-1",
+                    request_id="see-previous-replies",
+                    post_ref=POST_REF,
+                    page_size=10,
+                    max_replies_per_comment=10,
+                )
+            )
+        finally:
+            await browser.close()
+
+    assert coverage.expansion_rounds == 1
+    assert coverage.replies_visible == 1
+    assert len(threads[0].replies) == 1
 
 
 @pytest.mark.timeout(20)
