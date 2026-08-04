@@ -8,6 +8,11 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Parse current Post-search cards through the same exact header, content, and
+  engagement contracts as Post detail. Preserve relationship degree, headline,
+  edited age, full expanded text, numeric engagement, and article/job/media
+  classification; inventory virtualized card identities before bottom-up
+  expansion so cursor pages retain their cumulative prefix.
 - Parse compact Company counts such as `161K` and `8M`, keep social-proof text
   out of search-result locations, bind the smallest current company
   introduction region, and prefer the exact About-page associated-member count
