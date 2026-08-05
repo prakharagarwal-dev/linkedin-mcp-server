@@ -18,27 +18,32 @@ your network, publish and engage with posts, and read or send messages.
 
 ## Features
 
-| Area | Function | What it does |
-| --- | --- | --- |
-| **Jobs** | Search jobs | Search by keywords, location, distance, date, workplace, experience, employment type, company, industry, function, title, benefits, Easy Apply, verification, applicant count, network, and other visible filters. |
-|  | Read job details | Read the complete job description, company, application method, and visible hiring team. |
-| **People** | Search people | Search by keywords, connection degree, hiring status, location, current or past company, title, school, industry, services, language, connections, and followers. |
-|  | Read profiles | Read the complete visible profile or request selected sections such as About, experience, education, skills, projects, certifications, and recommendations. |
-| **Companies** | Search companies | Search by keywords, headquarters, industry, size, available jobs, and first-degree connections. |
-|  | Read company details | Read Overview and About information, including website, headquarters, size, type, founding year, and specialties. |
-| **Posts** | Search posts | Search by keywords, date, content type, author, company, relationship, mentions, author industry, and other visible filters. |
-|  | Read posts | Read complete content, media, links, mentions, hashtags, reactions, and engagement. |
-|  | Read discussions | Read paginated comments, replies, attachments, and reactions. |
-|  | Publish posts | Publish supported personal text, link, image, video, document, poll, celebration, event, hiring, and expert-request posts. |
-|  | Comment | Add text, links, emoji, mentions, photos, or GIFs to posts. |
-|  | React | Add, change, or remove reactions on posts. |
-| **Network** | List connections | Browse established first-degree connections with sorting and pagination. |
-|  | Search connections | Search existing connections using applicable People filters. |
-|  | List invitations | Browse received and sent invitations using LinkedIn's visible filters. |
-|  | Manage invitations | Send connection requests with optional notes and accept or ignore incoming requests. |
-| **Messaging** | Search messages | Search by recipient or message text using inbox categories and filters. |
-|  | Read conversations | Read message history, replies, edits, reactions, and attachments. |
-|  | Send messages | Send or reply in one-to-one conversations with text, links, emoji, files, images, and GIFs. |
+| Area | Function | MCP tool(s) | What it does |
+| --- | --- | --- | --- |
+| **Jobs** | Search jobs | `linkedin.jobs.search` | Search by keywords, location, distance, date, workplace, experience, employment type, company, industry, function, title, benefits, Easy Apply, verification, applicant count, network, and other visible filters. |
+|  | Read job details | `linkedin.jobs.get` | Read the complete job description, company, application method, and visible hiring team. |
+| **People** | Search people | `linkedin.people.search` | Search by keywords, connection degree, hiring status, location, current or past company, title, school, industry, services, language, connections, and followers. |
+|  | Read profiles | `linkedin.people.get` | Read the complete visible profile or request selected sections such as About, experience, education, skills, projects, certifications, and recommendations. |
+| **Companies** | Search companies | `linkedin.companies.search` | Search by keywords, headquarters, industry, size, available jobs, and first-degree connections. |
+|  | Read company details | `linkedin.companies.get` | Read Overview and About information, including website, headquarters, size, type, founding year, and specialties. |
+| **Posts** | Search posts | `linkedin.posts.search` | Search by keywords, date, content type, author, company, relationship, mentions, author industry, and other visible filters. |
+|  | Read posts | `linkedin.posts.get` | Read complete content, media, links, mentions, hashtags, reactions, and engagement. |
+|  | Read discussions | `linkedin.posts.comments.list` | Read paginated comments, replies, attachments, and reactions. |
+|  | Publish posts | `linkedin.posts.create.prepare`<br>`linkedin.posts.create.execute` | Publish supported personal text, link, image, video, document, poll, celebration, event, hiring, and expert-request posts. |
+|  | Comment | `linkedin.posts.comment.prepare`<br>`linkedin.posts.comment.execute` | Add text, links, emoji, mentions, photos, or GIFs to posts. |
+|  | React | `linkedin.posts.reaction.prepare`<br>`linkedin.posts.reaction.execute` | Add, change, or remove reactions on posts. |
+| **Network** | List connections | `linkedin.connections.list` | Browse established first-degree connections with sorting and pagination. |
+|  | Search connections | `linkedin.connections.search` | Search existing connections using applicable People filters. |
+|  | List invitations | `linkedin.invitations.list` | Browse received and sent invitations using LinkedIn's visible filters. |
+|  | Send invitations | `linkedin.invitations.send.prepare`<br>`linkedin.invitations.send.execute` | Send connection requests with optional notes. |
+|  | Accept invitations | `linkedin.invitations.accept.prepare`<br>`linkedin.invitations.accept.execute` | Accept incoming connection requests. |
+|  | Ignore invitations | `linkedin.invitations.ignore.prepare`<br>`linkedin.invitations.ignore.execute` | Ignore incoming connection requests. |
+| **Messaging** | Search messages | `linkedin.messaging.search` | Search by recipient or message text using inbox categories and filters. |
+|  | Read conversations | `linkedin.messaging.conversation.get` | Read message history, replies, edits, reactions, and attachments. |
+|  | Send messages | `linkedin.messaging.message.prepare`<br>`linkedin.messaging.message.execute` | Send or reply in one-to-one conversations with text, links, emoji, files, images, and GIFs. |
+| **Server** | Check runtime | `linkedin.server.status` | Inspect the shared runtime, queue, and active browser operation. |
+|  | Check LinkedIn session | `linkedin.session.status` | Inspect browser-profile, authentication, login, and pause state. |
+|  | List capabilities | `linkedin.capabilities.list` | Inspect available capabilities, scopes, and enabled state. |
 
 Actions that change LinkedIn use an immutable prepare-and-execute flow and
 request confirmation by default. Every capability is task-specific; the server
