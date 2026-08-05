@@ -59,6 +59,24 @@ _DATE_RANGE_PATTERN = re.compile(
     r"\b(?:19|20)\d{2}\b|\bPresent\b|\b(?:\d+\s+)?(?:mos?|yrs?)\b",
     re.IGNORECASE,
 )
+_EMPLOYMENT_TYPE_LINES = frozenset(
+    {
+        "apprenticeship",
+        "contract",
+        "freelance",
+        "full-time",
+        "internship",
+        "part-time",
+        "seasonal",
+        "self-employed",
+        "temporary",
+        "volunteer",
+    }
+)
+_SKILL_ACTION_PATTERN = re.compile(
+    r"^(?:endorse|remove endorsement for|unendorse)\s+(.+)$",
+    re.IGNORECASE,
+)
 _PROFILE_DETAIL_PATH = re.compile(
     rf"^/in/(?P<slug>{PROFILE_SLUG_SEGMENT_PATTERN})/"
     r"details/(?P<section>[A-Za-z0-9_-]+)/?"
@@ -113,6 +131,9 @@ _ACTION_LINES = frozenset(
 _AUXILIARY_PROFILE_SECTION_KEYS = frozenset(
     {
         "analytics",
+        "explore-premium-profiles",
+        "guidance",
+        "more-profiles-for-you",
         "people-you-may-know",
         "profile-language",
         "public-profile-url",
@@ -1265,6 +1286,88 @@ async def _section_entries(section: Locator) -> tuple[PersonProfileSectionEntry,
     return tuple(entries)
 
 
+async def _current_collection_entries(
+    section: Locator,
+) -> tuple[PersonProfileSectionEntry, ...]:
+    """Read current roleless profile-detail cards from their collection boundary."""
+
+    entries: list[PersonProfileSectionEntry] = []
+    items = section.locator(
+        '[data-component-type="LazyColumn"] '
+        "> [data-lazy-mount-id] "
+        '> [componentkey^="entity-collection-item-"]'
+    )
+    for index in range(min(await items.count(), 500)):
+        item = items.nth(index)
+        if not await item.is_visible():
+            continue
+        visible_text = (await item.inner_text()).strip()
+        lines = _unique_lines(visible_text)
+        if not lines:
+            continue
+        entry = PersonProfileSectionEntry(
+            title=lines[0],
+            subtitle=lines[1] if len(lines) > 1 else None,
+            visible_text=visible_text,
+            links=await _entry_links(item),
+        )
+        if entry.visible_text not in {existing.visible_text for existing in entries}:
+            entries.append(entry)
+    return tuple(entries)
+
+
+async def _skill_entries(section: Locator) -> tuple[PersonProfileSectionEntry, ...]:
+    """Bind current skill cards through their exact accessible action control."""
+
+    entries: list[PersonProfileSectionEntry] = []
+    seen_skills: set[str] = set()
+    controls = section.get_by_role("button")
+    for index in range(min(await controls.count(), 500)):
+        control = controls.nth(index)
+        if not await control.is_visible():
+            continue
+        accessible_name = (await control.get_attribute("aria-label") or "").strip()
+        match = _SKILL_ACTION_PATTERN.fullmatch(accessible_name)
+        if not match:
+            continue
+        skill_name = match.group(1).strip()
+        if not skill_name or skill_name.casefold() in seen_skills:
+            continue
+
+        region = control.locator("xpath=..")
+        for _ in range(6):
+            visible_text = (await region.inner_text()).strip()
+            lines = _unique_lines(visible_text)
+            matching_controls = region.get_by_role("button", name=accessible_name, exact=True)
+            if (
+                lines
+                and lines[0].casefold() == skill_name.casefold()
+                and await matching_controls.count() == 1
+            ):
+                action_lines = {
+                    line.casefold()
+                    for line in _unique_lines(await matching_controls.first.inner_text())
+                }
+                metadata_lines = [
+                    line
+                    for line in lines[1:]
+                    if line.casefold() not in action_lines
+                    and line.casefold() != accessible_name.casefold()
+                ]
+                entries.append(
+                    PersonProfileSectionEntry(
+                        title=skill_name,
+                        subtitle=metadata_lines[0] if metadata_lines else None,
+                        visible_text=visible_text,
+                        links=await _entry_links(region),
+                    )
+                )
+                seen_skills.add(skill_name.casefold())
+                break
+            region = region.locator("xpath=..")
+    return tuple(entries)
+
+
 async def _linked_section_entries(
     section: Locator,
     link_fragment: str,
@@ -1350,14 +1453,39 @@ async def _entries_for_section(
     section: Locator,
     section_key: str,
 ) -> tuple[PersonProfileSectionEntry, ...]:
+    if section_key == "skills":
+        current_entries = await _skill_entries(section)
+        if current_entries:
+            return current_entries
+    if section_key not in {"education", "experience", "interests", "skills"}:
+        current_entries = await _current_collection_entries(section)
+        if current_entries:
+            return current_entries
     entries = await _section_entries(section)
     if entries:
         return entries
     link_fragment = {
         "experience": "/company/",
         "education": "/school/",
+        "interests": "/company/",
     }.get(section_key)
-    return await _linked_section_entries(section, link_fragment) if link_fragment else ()
+    linked_entries = await _linked_section_entries(section, link_fragment) if link_fragment else ()
+    if section_key != "interests":
+        return linked_entries
+    return tuple(
+        entry.model_copy(
+            update={
+                "title": (
+                    re.sub(r",\s*Company$", "", entry.title, flags=re.IGNORECASE)
+                    if entry.title
+                    else entry.title
+                ),
+                "subtitle": _find_line(_unique_lines(entry.visible_text), _FOLLOWER_COUNT_PATTERN)
+                or entry.subtitle,
+            }
+        )
+        for entry in linked_entries
+    )
 
 
 async def _extract_sections(
@@ -1395,7 +1523,8 @@ async def _extract_sections(
                 entries=await _entries_for_section(section, section_key),
             )
         )
-    if not results:
+    detail_match = _PROFILE_DETAIL_PATH.match(urlsplit(source_url).path)
+    if not results and detail_match:
         page_heading = await _first_text(main.get_by_role("heading"))
         page_text = (await main.inner_text()).strip()
         if page_heading and page_text and page_text != page_heading:
@@ -1412,7 +1541,6 @@ async def _extract_sections(
                 )
             )
 
-    detail_match = _PROFILE_DETAIL_PATH.match(urlsplit(source_url).path)
     if detail_match:
         detail_key = detail_match.group("section").lower().replace("_", "-")
         matching = [
@@ -1443,6 +1571,18 @@ def _section_body(section: PersonProfileSection) -> str | None:
     heading_index = value.casefold().find(section.heading.casefold())
     if heading_index == 0:
         value = value[len(section.heading) :].strip()
+    value = re.split(
+        r"\n\s*(?:\N{HORIZONTAL ELLIPSIS}|\.\.\.)\s*more\s*(?:\n|$)",
+        value,
+        maxsplit=1,
+        flags=re.IGNORECASE,
+    )[0].strip()
+    value = re.split(
+        r"\n\s*top skills\s*(?:\n|$)",
+        value,
+        maxsplit=1,
+        flags=re.IGNORECASE,
+    )[0].strip()
     value = re.sub(
         r"\n(?:see more|show all|show less)(?:\s+[^\n]+)?\s*$",
         "",
@@ -1464,6 +1604,24 @@ def _first_pattern_text(lines: list[str], pattern: re.Pattern[str]) -> str | Non
     return None
 
 
+def _looks_like_experience_location(value: str) -> bool:
+    normalized = value.strip()
+    if not normalized or len(normalized) > 200:
+        return False
+    if normalized.startswith(("-", "*", "\N{BULLET}")):
+        return False
+    if normalized.casefold().startswith(("core technologies:", "skills:")):
+        return False
+    lowered = normalized.casefold()
+    if re.search(r"\bskills?\b", lowered):
+        return False
+    return (
+        lowered in {"remote", "hybrid", "on-site", "onsite"}
+        or "," in normalized
+        or lowered.endswith(" area")
+    )
+
+
 def _parse_experiences(
     sections: tuple[PersonProfileSection, ...],
 ) -> tuple[PersonExperience, ...]:
@@ -1475,6 +1633,12 @@ def _parse_experiences(
             lines = _unique_lines(entry.visible_text)
             if not lines:
                 continue
+            skill_association_lines = {
+                line
+                for link in entry.links
+                if "skill-associations-details" in urlsplit(str(link.url)).path
+                for line in _unique_lines(link.label)
+            }
             date_range = _find_line(lines, _DATE_RANGE_PATTERN)
             date_index = lines.index(date_range) if date_range in lines else -1
             title = lines[0]
@@ -1482,15 +1646,35 @@ def _parse_experiences(
             organization: str | None = None
             employment_type: str | None = None
             if organization_line:
-                organization_parts = [part.strip() for part in organization_line.split("·")]
-                organization = organization_parts[0] or None
-                employment_type = organization_parts[1] if len(organization_parts) > 1 else None
+                if organization_line.casefold() in _EMPLOYMENT_TYPE_LINES:
+                    employment_type = organization_line
+                else:
+                    organization_parts = [part.strip() for part in organization_line.split("·")]
+                    organization = organization_parts[0] or None
+                    employment_type = organization_parts[1] if len(organization_parts) > 1 else None
             date_parts = [part.strip() for part in date_range.split("·")] if date_range else []
-            location = (
+            location_candidate = (
                 lines[date_index + 1] if date_index >= 0 and date_index + 1 < len(lines) else None
+            )
+            location = (
+                location_candidate
+                if location_candidate
+                and location_candidate not in skill_association_lines
+                and _looks_like_experience_location(location_candidate)
+                else None
             )
             description_start = date_index + 2 if location else date_index + 1
             description_lines = lines[description_start:] if description_start > 0 else lines[2:]
+            cleaned_description_lines: list[str] = []
+            for line in description_lines:
+                if re.fullmatch(
+                    r"(?:\N{HORIZONTAL ELLIPSIS}|\.\.\.)\s*more",
+                    line,
+                    flags=re.IGNORECASE,
+                ):
+                    break
+                if line not in skill_association_lines:
+                    cleaned_description_lines.append(line)
             organization_url = next(
                 (link.url for link in entry.links if "/company/" in urlsplit(str(link.url)).path),
                 None,
@@ -1504,7 +1688,7 @@ def _parse_experiences(
                     date_range=date_parts[0] if date_parts else date_range,
                     duration=date_parts[1] if len(date_parts) > 1 else None,
                     location=location,
-                    description="\n".join(description_lines).strip() or None,
+                    description="\n".join(cleaned_description_lines).strip() or None,
                     is_current=("present" in date_range.casefold() if date_range else None),
                     source_url=section.source_url,
                     visible_text=entry.visible_text,
@@ -1623,6 +1807,8 @@ async def _profile_detail_urls(
         if not match or match.group("slug") != profile_slug:
             continue
         clean_url = f"https://www.linkedin.com{urlsplit(url).path}"
+        if _detail_section_key(clean_url) in _AUXILIARY_PROFILE_SECTION_KEYS:
+            continue
         if clean_url not in urls:
             urls.append(clean_url)
     return tuple(urls)
@@ -1658,24 +1844,17 @@ async def _top_card(main: Locator) -> tuple[Locator, str, str]:
     else:
         name = _unique_lines(name)[0]
         name_heading = headings.first
-    top = name_heading.locator("..")
-    sections = main.locator("section")
-    for index in range(min(await sections.count(), 100)):
-        candidate = sections.nth(index)
-        exact_name = candidate.get_by_role(
-            "heading",
-            name=re.compile(rf"^{re.escape(name)}$"),
-        )
-        if await exact_name.count():
-            top = candidate
-            break
+    top = name_heading.locator("xpath=ancestor::section[1]")
+    if await top.count() == 0:
+        top = name_heading.locator("..")
     visible_text = (await top.inner_text()).strip()
     if not visible_text:
         raise ParserDriftError("LinkedIn member profile introduction is empty.")
     return top, name, visible_text
 
 
-def _top_card_fields(
+async def _top_card_fields(
+    top: Locator,
     name: str,
     visible_text: str,
 ) -> tuple[
@@ -1687,6 +1866,13 @@ def _top_card_fields(
     str | None,
 ]:
     lines = _unique_lines(visible_text)
+    auxiliary_lines = {
+        line
+        for value in await top.locator(
+            'a[href*="/trust/verification/"], a[href*="/verify/"]'
+        ).all_inner_texts()
+        for line in _unique_lines(value)
+    }
     try:
         name_index = lines.index(name)
     except ValueError:
@@ -1710,6 +1896,7 @@ def _top_card_fields(
             line
             for line in candidates
             if line != pronouns
+            and line not in auxiliary_lines
             and line.casefold() not in _ACTION_LINES
             and not _CONNECTION_DEGREE_PATTERN.fullmatch(line.strip(" ·•"))
             and not _CONNECTION_COUNT_PATTERN.search(line)
@@ -1719,14 +1906,28 @@ def _top_card_fields(
         None,
     )
     contact_index = next(
-        (index for index, line in enumerate(lines) if line.casefold().startswith("contact info")),
+        (
+            index
+            for index, line in enumerate(lines)
+            if line.casefold().strip(" ·•").startswith("contact info")
+        ),
         -1,
     )
     location = None
     if contact_index > 0:
-        candidate = lines[contact_index - 1]
-        if candidate not in {name, headline, pronouns}:
-            location = candidate
+        location = next(
+            (
+                candidate
+                for candidate in reversed(lines[:contact_index])
+                if candidate not in {name, headline, pronouns}
+                and candidate not in auxiliary_lines
+                and candidate.strip(" ·•")
+                and not _CONNECTION_DEGREE_PATTERN.fullmatch(candidate.strip(" ·•"))
+                and not _CONNECTION_COUNT_PATTERN.search(candidate)
+                and not _FOLLOWER_COUNT_PATTERN.search(candidate)
+            ),
+            None,
+        )
     connection_count = _first_pattern_text(lines, _CONNECTION_COUNT_PATTERN)
     follower_count = _first_pattern_text(lines, _FOLLOWER_COUNT_PATTERN)
     return (
@@ -1798,9 +1999,17 @@ class PersonProfilePage:
                 connection_degree,
                 connection_count_text,
                 follower_count_text,
-            ) = _top_card_fields(name, top_text)
+            ) = await _top_card_fields(top, name, top_text)
             current_company_text = await _first_text(top.locator('a[href*="/company/"]'))
+            if current_company_text is None:
+                current_company_text = await _first_text(
+                    top.locator('[role="button"]:has(svg[id^="company-accent-"])')
+                )
             education_summary_text = await _first_text(top.locator('a[href*="/school/"]'))
+            if education_summary_text is None:
+                education_summary_text = await _first_text(
+                    top.locator('[role="button"]:has(svg[id^="school-accent-"])')
+                )
             actual_slug = profile_slug_from_url(page.url) or request.profile_slug
             profile_url = canonical_profile_url(actual_slug)
             main_text = await _visible_page_text(page)

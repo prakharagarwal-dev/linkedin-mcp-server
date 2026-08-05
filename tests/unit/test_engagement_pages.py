@@ -101,7 +101,6 @@ async def _comment_draft(
         target=capture.target,
         payload=CommentCreatePayload(
             post_ref=request.post_ref,
-            parent_comment_ref=request.parent_comment_ref,
             text=request.text,
             mentions=request.mentions,
             attachment=request.attachment,
@@ -127,7 +126,6 @@ async def _reaction_draft(
         target=capture.target,
         payload=ReactionSetPayload(
             post_ref=request.post_ref,
-            comment_ref=request.comment_ref,
             existing_reaction=capture.existing_reaction,
             desired_reaction=request.desired_reaction,
         ),
@@ -166,7 +164,7 @@ async def test_top_level_comment_preserves_text_link_emoji_mention_and_target(
     assert draft.target.actor_profile_slug == "current-member"
     assert draft.target.content_author_name == "Jane Doe"
     assert draft.target.post_ref == POST_REF
-    assert draft.target.comment_ref is None
+    assert draft.target.post_ref == POST_REF
     assert result.outcome is ActionOutcome.VERIFIED
     assert result.performed is True
     assert result.final_state.startswith("comment_published:comment:ugc-post:7312345678901234566:")
@@ -269,98 +267,6 @@ async def test_comment_verifies_native_ugc_discussion_alias_for_activity_url(
     assert result.outcome is ActionOutcome.VERIFIED
     assert result.performed is True
     assert result.final_state.startswith("comment_published:comment:ugc-post:7999999999999999998:")
-
-
-@pytest.mark.timeout(30)
-async def test_reply_binds_exact_parent_comment_and_visible_author(tmp_path: Path) -> None:
-    request = PostCommentPrepareInput(
-        context_id="engagement-context",
-        request_id="prepare-exact-reply",
-        post_ref=POST_REF,
-        parent_comment_ref=COMMENT_REF,
-        text="A bound fixture reply.",
-    )
-    async with async_playwright() as playwright:
-        browser = await playwright.chromium.launch(headless=True)
-        page = await browser.new_page()
-        adapter = PostEngagementPage(
-            cast(BrowserManager, EngagementFixtureBrowser(page)),
-            LocalAssetStore(tmp_path),
-        )
-        try:
-            draft = await _comment_draft(adapter, request)
-            result = await adapter.execute_comment(draft)
-        finally:
-            await browser.close()
-
-    assert draft.target.comment_ref == COMMENT_REF
-    assert draft.target.content_author_name == "Alex Ray"
-    assert result.outcome is ActionOutcome.VERIFIED
-    assert result.final_state.startswith("reply_published:comment:ugc-post:7312345678901234566:")
-    assert "A bound fixture reply." in result.captured_text
-
-
-@pytest.mark.timeout(30)
-async def test_reply_waits_through_current_async_discussion_render(tmp_path: Path) -> None:
-    html = ENGAGEMENT_HTML.replace(
-        '<div\n          id="top-level-composer"',
-        (
-            '<button type="button" aria-label="Comment" '
-            'onclick="setTimeout(() => '
-            "document.getElementById('discussion').removeAttribute('hidden'), 1200)\">"
-            "7</button>\n\n"
-            '        <div hidden\n          id="top-level-composer"'
-        ),
-    ).replace(
-        '<section id="discussion" aria-label="Comments">',
-        '<section id="discussion" aria-label="Comments" hidden>',
-    )
-    request = PostCommentPrepareInput(
-        context_id="engagement-context",
-        request_id="prepare-delayed-discussion-reply",
-        post_ref=POST_REF,
-        parent_comment_ref=COMMENT_REF,
-        text="A delayed exact reply.",
-    )
-    async with async_playwright() as playwright:
-        browser = await playwright.chromium.launch(headless=True)
-        page = await browser.new_page()
-        adapter = PostEngagementPage(
-            cast(BrowserManager, EngagementFixtureBrowser(page, html=html)),
-            LocalAssetStore(tmp_path),
-        )
-        try:
-            capture = await adapter.prepare_comment(request)
-        finally:
-            await browser.close()
-
-    assert capture.target.comment_ref == COMMENT_REF
-    assert capture.target.content_author_name == "Alex Ray"
-
-
-@pytest.mark.timeout(30)
-async def test_comment_alias_is_accepted_syntactically_but_verified_against_live_discussion(
-    tmp_path: Path,
-) -> None:
-    request = PostCommentPrepareInput(
-        context_id="engagement-context",
-        request_id="prepare-wrong-native-parent",
-        post_ref=POST_REF,
-        parent_comment_ref="comment:ugc-post:7999999999999999999:111",
-        text="Wrong parent",
-    )
-    async with async_playwright() as playwright:
-        browser = await playwright.chromium.launch(headless=True)
-        page = await browser.new_page()
-        adapter = PostEngagementPage(
-            cast(BrowserManager, EngagementFixtureBrowser(page)),
-            LocalAssetStore(tmp_path),
-        )
-        try:
-            with pytest.raises(InvalidTargetError, match="No unique visible comment"):
-                await adapter.prepare_comment(request)
-        finally:
-            await browser.close()
 
 
 @pytest.mark.timeout(40)
@@ -488,24 +394,26 @@ async def test_current_portaled_reaction_control_is_prepared_and_verified(
         (ReactionState.LOVE, True, "reaction_set:love"),
     ],
 )
-async def test_comment_reaction_removal_noop_and_change(
+async def test_post_reaction_removal_noop_and_change(
     tmp_path: Path,
     desired: ReactionState,
     performed: bool,
     final_state: str,
 ) -> None:
+    initially_liked = ENGAGEMENT_HTML.replace(
+        'data-current-reaction="none"', 'data-current-reaction="like"', 1
+    ).replace('aria-pressed="false"', 'aria-pressed="true"', 1)
     request = PostReactionPrepareInput(
         context_id="engagement-context",
-        request_id=f"prepare-comment-{desired.value}",
+        request_id=f"prepare-post-{desired.value}",
         post_ref=POST_REF,
-        comment_ref=COMMENT_REF,
         desired_reaction=desired,
     )
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         adapter = PostEngagementPage(
-            cast(BrowserManager, EngagementFixtureBrowser(page)),
+            cast(BrowserManager, EngagementFixtureBrowser(page, html=initially_liked)),
             LocalAssetStore(tmp_path),
         )
         try:
@@ -523,20 +431,23 @@ async def test_comment_reaction_removal_noop_and_change(
 
 @pytest.mark.timeout(30)
 async def test_reaction_refuses_state_drift_after_approval(tmp_path: Path) -> None:
-    changed = ENGAGEMENT_HTML.replace(
-        'data-current-reaction="like"\n              aria-label="Like"',
-        'data-current-reaction="celebrate"\n              aria-label="Celebrate"',
-        1,
-    ).replace(
-        ">\n              Like\n            </button>",
-        ">\n              Celebrate\n            </button>",
-        1,
+    changed = (
+        ENGAGEMENT_HTML.replace(
+            'data-current-reaction="none"',
+            'data-current-reaction="celebrate"',
+            1,
+        )
+        .replace(
+            'aria-label="Like"',
+            'aria-label="Celebrate"',
+            1,
+        )
+        .replace('aria-pressed="false"', 'aria-pressed="true"', 1)
     )
     request = PostReactionPrepareInput(
         context_id="engagement-context",
         request_id="prepare-state-drift",
         post_ref=POST_REF,
-        comment_ref=COMMENT_REF,
         desired_reaction=ReactionState.LOVE,
     )
     async with async_playwright() as playwright:
@@ -557,6 +468,41 @@ async def test_reaction_refuses_state_drift_after_approval(tmp_path: Path) -> No
     assert result.outcome is ActionOutcome.FAILED
     assert result.performed is False
     assert result.final_state == "reaction_state_changed"
+
+
+@pytest.mark.timeout(30)
+async def test_reaction_reports_missing_preclick_control_as_not_changed(
+    tmp_path: Path,
+) -> None:
+    missing_control = ENGAGEMENT_HTML.replace(
+        "data-reaction-control",
+        "data-unavailable-reaction-control",
+        1,
+    )
+    request = PostReactionPrepareInput(
+        context_id="engagement-context",
+        request_id="prepare-missing-execution-control",
+        post_ref=POST_REF,
+        desired_reaction=ReactionState.LOVE,
+    )
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        page = await browser.new_page()
+        adapter = PostEngagementPage(
+            cast(
+                BrowserManager,
+                EngagementFixtureBrowser(page, second_html=missing_control),
+            ),
+            LocalAssetStore(tmp_path),
+        )
+        try:
+            result = await adapter.execute_reaction(await _reaction_draft(adapter, request))
+        finally:
+            await browser.close()
+
+    assert result.outcome is ActionOutcome.FAILED
+    assert result.performed is False
+    assert result.final_state == "reaction_not_changed"
 
 
 @pytest.mark.timeout(30)
@@ -663,19 +609,23 @@ def test_engagement_contract_rejects_empty_inputs_and_allows_native_discussion_a
                 visible_result_label="Celebration confetti GIF",
             ),
         )
-    reply = PostCommentPrepareInput(
-        context_id="engagement-context",
-        request_id="native-parent",
-        post_ref=POST_REF,
-        parent_comment_ref=COMMENT_REF,
-        text="Native discussion parent",
-    )
-    reaction = PostReactionPrepareInput(
-        context_id="engagement-context",
-        request_id="native-reaction-target",
-        post_ref=POST_REF,
-        comment_ref=COMMENT_REF,
-        desired_reaction=ReactionState.LIKE,
-    )
-    assert reply.parent_comment_ref == COMMENT_REF
-    assert reaction.comment_ref == COMMENT_REF
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        PostCommentPrepareInput.model_validate(
+            {
+                "context_id": "engagement-context",
+                "request_id": "threaded-reply-not-supported",
+                "post_ref": POST_REF,
+                "parent_comment_ref": COMMENT_REF,
+                "text": "Threaded reply",
+            }
+        )
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        PostReactionPrepareInput.model_validate(
+            {
+                "context_id": "engagement-context",
+                "request_id": "comment-reaction-not-supported",
+                "post_ref": POST_REF,
+                "comment_ref": COMMENT_REF,
+                "desired_reaction": "like",
+            }
+        )

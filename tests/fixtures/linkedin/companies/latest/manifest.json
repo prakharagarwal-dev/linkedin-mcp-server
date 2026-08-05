@@ -1,6 +1,6 @@
 {
   "provenance": "mock_verified",
-  "verified_at": "2026-07-30",
+  "verified_at": "2026-08-05",
   "source_surfaces": [
     "visible LinkedIn Company search",
     "visible LinkedIn Company All filters side panel",
@@ -68,5 +68,11 @@
     "Founded",
     "Specialties"
   ],
-  "notes": "Synthetic identities and text preserve only current accessible controls, exact typeahead selection, submitted query parameters, result-card identity, pagination, and fixed Overview-plus-About behavior observed through the authenticated visible UI."
+  "current_count_behaviors": [
+    "compact follower counts such as 161K and 8M",
+    "social-proof text sharing a line with a follower count",
+    "compact overview employee counts",
+    "exact About-page associated-member counts preferred over employee ranges"
+  ],
+  "notes": "Synthetic identities and text preserve only current accessible controls, exact typeahead selection, submitted query parameters, result-card identity, pagination, compact count metadata, the smallest current company introduction region, and fixed Overview-plus-About behavior observed through the authenticated visible UI."
 }

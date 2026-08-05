@@ -119,7 +119,7 @@ def test_latest_job_fixture_manifest_locks_live_verified_ui_contract() -> None:
     manifest = json.loads((JOB_FIXTURES / "manifest.json").read_text())
 
     assert manifest["provenance"] == "mock_verified"
-    assert manifest["verified_at"] == "2026-07-30"
+    assert manifest["verified_at"] == "2026-08-05"
     assert manifest["contains_live_data"] is False
     assert manifest["contains_authentication_state"] is False
     assert manifest["search_card_selector"] == "main li[data-occludable-job-id]"
@@ -797,6 +797,7 @@ async def test_current_easy_apply_job_expands_jd_and_retains_hiring_team() -> No
     assert len(job.hiring_team) == 1
     assert job.hiring_team[0].profile_slug == "leena-shah-fixture"
     assert job.hiring_team[0].name == "Leena Shah"
+    assert job.hiring_team[0].headline == "Engineering Leader at Acme Cloud"
     assert job.hiring_team[0].role_text == "Job poster"
     assert "Noise that must not enter retained job evidence." not in job.visible_text
     source = source_from_job_detail(job)

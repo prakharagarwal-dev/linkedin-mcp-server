@@ -168,63 +168,78 @@
         </div>
       </div>
       <div role="listitem">
-        <a href="/in/jane-doe/"><img alt="Jane Doe" src="jane.png" /></a>
-        <a href="/in/jane-doe/">Jane Doe</a>
-        <p>Staff Engineer at Acme Cloud</p>
-        <time>2h</time>
+        <div data-current-post-header>
+          <a href="/in/jane-doe/">
+            <img alt="View Jane Doe’s profile" height="48" src="jane.png" width="48" />
+          </a>
+          <a href="/in/jane-doe/">
+            <span>Jane Doe</span>
+            <span>• 1st</span>
+          </a>
+          <p>Staff Engineer at Acme Cloud</p>
+          <p>2h • Edited •</p>
+          <button
+            type="button"
+            aria-label="Open control menu for post by Jane Doe"
+            data-open-post-menu
+          ></button>
+          <div data-post-menu hidden>
+            <button
+              type="button"
+              data-copy-post-link
+              data-copy-url="https://www.linkedin.com/posts/jane-doe_python-activity-7312345678901234567-x/"
+            >
+              Copy link to post
+            </button>
+          </div>
+        </div>
         <p>
-          <span data-testid="expandable-text-box" data-post-text="dynamic">
+          <span
+            data-testid="expandable-text-box"
+            data-post-text="dynamic"
+            style="display: block; position: relative"
+          >
             A practical guide to reliable Python services. #python
-            <button data-testid="expandable-text-button" type="button">… more</button>
+            <button
+              data-testid="expandable-text-button"
+              style="bottom: 0; height: 20px; position: absolute; right: 0; width: 70px"
+              type="button"
+            >… more</button>
+            <span
+              aria-hidden="true"
+              style="bottom: 0; height: 20px; position: absolute; right: 0; width: 70px; z-index: 2"
+            ></span>
           </span>
         </p>
-        <p>12 reactions</p>
-        <p>3 comments</p>
-        <p>1 repost</p>
-        <button
-          type="button"
-          aria-label="Open control menu for post by Jane Doe"
-          data-open-post-menu
-        >
-          More
-        </button>
-        <div data-post-menu hidden>
-          <button
-            type="button"
-            data-copy-post-link
-            data-copy-url="https://www.linkedin.com/posts/jane-doe_python-activity-7312345678901234567-x/"
-          >
-            Copy link to post
-          </button>
-        </div>
-        <button type="button">Like</button>
-        <button type="button">Comment</button>
+        <button type="button" aria-label="Reaction button state: no reaction">12</button>
+        <button type="button" aria-label="Comment">3</button>
+        <button type="button" aria-label="Repost">1</button>
       </div>
-      <div role="listitem">
-        <a href="/company/acme-cloud/">
-          Acme Cloud
-          <span>Reliable cloud infrastructure</span>
-        </a>
-        <time>3d</time>
-        <p data-post-text>Infrastructure release notes for engineering teams.</p>
-        <p>8 reactions</p>
-        <p>2 comments</p>
-        <button
-          type="button"
-          aria-label="Open control menu for post by Acme Cloud"
-          data-open-post-menu
-        >
-          More
-        </button>
-        <div data-post-menu hidden>
+      <div data-virtualized-lower-card role="listitem">
+        <div data-current-post-header>
+          <a href="/company/acme-cloud/">Acme Cloud</a>
+          <p>Reliable cloud infrastructure</p>
+          <p>161K followers</p>
+          <p>3d •</p>
           <button
             type="button"
-            data-copy-post-link
-            data-copy-url="https://www.linkedin.com/posts/acme-cloud_release-activity-7312345678901234999-x/"
-          >
-            Copy link to post
-          </button>
+            aria-label="Open control menu for post by Acme Cloud"
+            data-open-post-menu
+          ></button>
+          <div data-post-menu hidden>
+            <button
+              type="button"
+              data-copy-post-link
+              data-copy-url="https://www.linkedin.com/posts/acme-cloud_release-activity-7312345678901234999-x/"
+            >
+              Copy link to post
+            </button>
+          </div>
         </div>
+        <p data-post-text>Infrastructure release notes for engineering teams.</p>
+        <button type="button" aria-label="Reaction button state: no reaction">8</button>
+        <button type="button" aria-label="Comment">2</button>
+        <button type="button" aria-label="Repost"></button>
       </div>
     </main>
 
@@ -311,6 +326,7 @@
       document
         .querySelector('[data-testid="expandable-text-button"]')
         .addEventListener("click", (event) => {
+          document.querySelector("[data-virtualized-lower-card]")?.remove();
           event.currentTarget.remove();
         });
       })();

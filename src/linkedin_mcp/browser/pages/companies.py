@@ -49,9 +49,17 @@ _COMPANY_SIZE_CODES = {
     CompanySize.EMPLOYEES_5001_10000: "H",
     CompanySize.EMPLOYEES_10001_PLUS: "I",
 }
-_FOLLOWER_COUNT_PATTERN = re.compile(r"\b[\d,.+]+\s+followers?\b", re.IGNORECASE)
+_VISIBLE_COUNT = r"\d[\d,.]*[KMB]?\+?"
+_FOLLOWER_COUNT_PATTERN = re.compile(
+    rf"\b{_VISIBLE_COUNT}\s+followers?\b",
+    re.IGNORECASE,
+)
 _ASSOCIATED_MEMBER_PATTERN = re.compile(
-    r"\b[\d,.+]+\s+(?:associated\s+)?(?:members?|employees?)\b",
+    rf"\b{_VISIBLE_COUNT}\s+(?:associated\s+)?(?:members?|employees?)\b",
+    re.IGNORECASE,
+)
+_EXPLICIT_ASSOCIATED_MEMBER_PATTERN = re.compile(
+    rf"\b{_VISIBLE_COUNT}\s+associated\s+members?\b",
     re.IGNORECASE,
 )
 _COMPANY_SIZE_PATTERN = re.compile(
@@ -748,8 +756,12 @@ async def _top_company_region(main: Locator, name: str) -> Locator:
         heading = headings.nth(index)
         if not await heading.is_visible():
             continue
-        sections = heading.locator("xpath=ancestor::section[1]")
-        return sections.first if await sections.count() else heading.locator("..")
+        region = heading.locator("..")
+        for _ in range(8):
+            lines = _unique_lines((await region.inner_text()).strip())
+            if name in lines and any(line != name for line in lines):
+                return region
+            region = region.locator("..")
     raise ParserDriftError("LinkedIn company profile has no unique visible introduction.")
 
 
@@ -915,7 +927,10 @@ class CompanyProfilePage:
         company_size_match = _COMPANY_SIZE_PATTERN.search(
             company_size_line or ""
         ) or _COMPANY_SIZE_PATTERN.search("\n".join(all_lines))
-        member_match = _ASSOCIATED_MEMBER_PATTERN.search("\n".join(all_lines))
+        all_text = "\n".join(all_lines)
+        member_match = _EXPLICIT_ASSOCIATED_MEMBER_PATTERN.search(
+            all_text
+        ) or _ASSOCIATED_MEMBER_PATTERN.search(top_text)
         follower_match = _FOLLOWER_COUNT_PATTERN.search(top_text)
         specialties_text = _line_after_label(all_lines, "Specialties")
         specialties = tuple(
@@ -932,7 +947,8 @@ class CompanyProfilePage:
             (
                 line
                 for line in _unique_lines(top_text)[1:]
-                if line.casefold() not in _ACTION_LINES
+                if line != name
+                and line.casefold() not in _ACTION_LINES
                 and not _FOLLOWER_COUNT_PATTERN.search(line)
                 and not _ASSOCIATED_MEMBER_PATTERN.search(line)
             ),

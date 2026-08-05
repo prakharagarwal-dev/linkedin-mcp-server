@@ -1,6 +1,6 @@
 # LinkedIn Visible-Feature Matrix
 
-**Matrix version:** `2026-08-03.1`
+**Matrix version:** `2026-08-05.6`
 
 This matrix records the visible LinkedIn controls and outputs inspected for the
 configured authorized member account. It is evidence for capability acceptance,
@@ -29,19 +29,19 @@ do not upgrade this classification.
 | Capability family | Contract version | Current evidence | Verification |
 | --- | --- | --- | --- |
 | Jobs search | `linkedin.jobs.search` `2.0.0` | Current virtualized cards, optional keywords, every visible filter family, exact named-facet resolution, recommendation-safe empty results, anonymous postings, evidence, and replay | `mock_verified` + read-only live acceptance |
-| Job detail | `linkedin.jobs.get` `2.0.0` | Current primary-card anchors, optional company identity, application method, hiring team, fully expanded JD, scoped evidence, and replay | `mock_verified` + read-only live acceptance |
+| Job detail | `linkedin.jobs.get` `2.0.0` | Current primary-card anchors, optional company identity, application method, single-link composite hiring-team cards with separately typed fields, fully expanded JD, scoped evidence, and replay | `mock_verified` + read-only live acceptance |
 | People search | `linkedin.people.search` `2.0.0` | Every current account-visible People filter, delayed/anonymous rendering, trailing-hyphen slugs, and shared cursor contract is fixture-covered | `mock_verified` + read-only live acceptance |
-| Member profile | `linkedin.people.get` `1.1.1` | Complete/selective sections, exact evidence resources, requested/returned coverage, and genuine trailing-hyphen public slugs | `mock_verified` |
-| Company search | `linkedin.companies.search` `2.0.0` | Complete current Company-search surface: keywords, headquarters, industry, all eight company-size buckets, job-listing and first-degree-connection flags, named-facet resolution, delayed rendering, evidence, and cursor contracts | `mock_verified` |
-| Company profile | `linkedin.companies.get` `2.0.0` | Fixed exact Overview-plus-About read with structured visible fields and two immutable page sources | `mock_verified` |
-| Post search | `linkedin.posts.search` `2.0.0` | Declared content facets, delayed/current card variants, stable references, exact per-card evidence across dynamic rendering, and cursor contract | `mock_verified` + read-only live acceptance |
+| Member profile | `linkedin.people.get` `1.1.1` | Complete/selective sections, exact evidence resources, requested/returned coverage, genuine trailing-hyphen public slugs, nested self-introduction cards, recommendation/guidance exclusion, semantic company/school summaries, current roleless detail collections and experience cards, exact skill identity, and clean About text | `mock_verified` + read-only live acceptance |
+| Company search | `linkedin.companies.search` `2.0.0` | Complete current Company-search surface: keywords, headquarters, industry, all eight company-size buckets, job-listing and first-degree-connection flags, named-facet resolution, compact count/social-proof parsing, delayed rendering, evidence, and cursor contracts | `mock_verified` + read-only live acceptance |
+| Company profile | `linkedin.companies.get` `2.0.0` | Fixed exact Overview-plus-About read from the smallest current introduction region, with compact top-card counts, exact associated-member preference, structured visible fields, and two immutable page sources | `mock_verified` + read-only live acceptance |
+| Post search | `linkedin.posts.search` `2.0.0` | Declared content facets; current compact author headers, edited ages, body expansion, numeric engagement and typed content cards; stable identity inventory before virtualized bottom-up extraction; exact evidence and disjoint cumulative cursor pages | `mock_verified` + read-only live acceptance |
 | Post detail | `linkedin.posts.get` `2.0.0` | Exact activity/share/UGC identity, fully expanded text, scoped links/mentions/hashtags, current text/image/video/live-video/document/link/article/newsletter/event/job/poll variants, viewer reaction and engagement, visibility/header metadata, immutable field evidence, bounded completeness coverage, and two-page repost-original resolution | `mock_verified` + read-only live acceptance |
-| Post discussion | `linkedin.posts.comments.list` `1.1.1` | Ordering, cursor-paged top-level comments, delayed expansion, replies, media, and source retrieval | `mock_verified` |
-| Personal post publishing | `linkedin.posts.create.*` `2.0.0` | Nine current personal composer modes, bounded loader settling, unchanged disabled-setting handling, pre-submit failure classification, exact nested options, immutable previews, tamper rejection, execution, and replay | `mock_verified` + prepare-only live acceptance |
-| Post/comment engagement | `linkedin.posts.comment.*` and `linkedin.posts.reaction.*` `2.0.0` | Current comment/reply text, photo and GIF controls, native discussion aliases, all six reactions, tamper rejection, execution, and replay | `mock_verified` + prepare-only live acceptance |
-| Invitations | List `4.0.0`; send, accept, and ignore `1.0.0` | Latest-layout-only received/sent extraction; bounded live cursor traversal; exact terminal per-view count reconciliation; and the complete currently implemented invitation lifecycle under one namespace, with scoped hash-locked writes and exact-profile postconditions | `mock_verified` + read-only/prepare-only live acceptance |
+| Post discussion | `linkedin.posts.comments.list` `1.1.1` | Ordering, cursor-paged top-level comments, delayed expansion including the current `See previous replies` control, flat visually indented parent binding, replies, media, and source retrieval | `mock_verified` + read-only live acceptance |
+| Personal post publishing | `linkedin.posts.create.*` `2.0.0` | Nine current personal composer modes, bounded loader settling, unchanged disabled-setting handling, visible publish-success/rejection postconditions, exact nested options, immutable previews, tamper rejection, execution, and replay | `mock_verified` + live mutation/readback acceptance |
+| Post engagement | Comment `3.0.0`; reaction `3.0.0` | Current top-level comment text, photo and GIF controls, all six post reactions, tamper rejection, execution, and replay | `mock_verified` + live mutation/readback acceptance |
+| Invitations | List `4.0.0`; send, accept, and ignore `1.0.0` | Latest-layout-only received/sent extraction; bounded live cursor traversal; exact terminal per-view count reconciliation; and the complete currently implemented invitation lifecycle under one namespace, with scoped hash-locked writes and exact-profile postconditions | `mock_verified` + live mutation/readback acceptance |
 | Connections | List `2.0.0`; search `2.0.0` | Separate sorted inventory and filtered search of established first-degree connections; the server always binds search to first degree and rejects non-first-degree results | `mock_verified` + read-only live acceptance |
-| Messaging | Search, conversation get, message prepare, and execute `2.0.0` | Current recipient/message search criteria and mutually exclusive filters; cursor paging; reverse-virtualized history; exact recipients/replies; current text, file, and KLIPY GIF preparation; reply-aware same-surface postconditions; tamper rejection; and replay | `mock_verified` + read/prepare-only live acceptance |
+| Messaging | Search, conversation get, message prepare, and execute `2.0.0` | Current recipient/message search criteria and mutually exclusive filters; cursor paging; reverse-virtualized history; exact recipients/replies; current text, file, and KLIPY GIF preparation; reply-aware same-surface postconditions; tamper rejection; and replay | `mock_verified` + live mutation/readback acceptance |
 
 ## Shared collection pagination
 
@@ -76,15 +76,15 @@ page beyond the private server bound is returned in `truncated_sections`.
 | Visible/profile feature | Status | Typed behavior and evidence |
 | --- | --- | --- |
 | Canonical member overview and exact slug identity | `supported` | Always captured; typed introduction fields and exact main-page source |
-| All visible member-owned sections | `supported` | `sections: ["all"]` compatibility default; generic loss-preserving sections |
+| All visible member-owned sections | `supported` | `sections: ["all"]` compatibility default; generic loss-preserving entries from both semantic lists and the current roleless detail collection boundary |
 | Overview only | `supported` | `overview`; no detail-page navigation |
 | About | `supported` | `about`; typed body plus exact field evidence when visible |
-| Experience | `supported` | `experience`; typed entries and matching visible detail link |
+| Experience | `supported` | `experience`; typed entries and matching visible detail link. Standalone employment type is retained without inventing an organization or location when the current card does not expose either field; legacy combined organization/employment cards remain supported. |
 | Education | `supported` | `education`; typed entries and matching visible detail link |
 | Licenses and certifications | `supported` | `licenses-certifications`; generic entries and source |
 | Projects | `supported` | `projects`; generic entries, links, and source |
 | Volunteer experience | `supported` | `volunteering`; current route/heading aliases normalize to one key |
-| Skills | `supported` | `skills`; matching detail navigation and generic entries |
+| Skills | `supported` | `skills`; matching detail navigation and exact skill-card identity from the accessible endorsement control, with generic loss-preserving fallback entries |
 | Interests | `supported` | `interests`; matching visible detail navigation |
 | Featured | `supported` | `featured`; matching visible detail navigation |
 | Courses | `supported` | `courses`; matching visible detail navigation |
@@ -97,7 +97,7 @@ page beyond the private server bound is returned in `truncated_sections`.
 | Test scores | `supported` | `test-scores`; matching visible detail navigation |
 | Requested/returned/unavailable coverage | `supported` | Strict enum input and typed coverage tuples |
 | Discovered/visited/truncated detail coverage | `supported` | Exact normalized detail keys and private page bound |
-| Recommendation rails and owner optimization panels | `outside_named_capability` | Retained only in immutable raw source; never attributed to the member |
+| Recommendation rails and owner optimization panels | `outside_named_capability` | Retained only in immutable raw source; `More profiles for you`, Premium-profile exploration, and similar rails are never attributed to the member |
 | Hidden/private profile fields | `outside_named_capability` | No private endpoint access or inference |
 
 ## Company research (`search 2.0.0`, `profile 2.0.0`)
@@ -156,11 +156,11 @@ constructed only from visible post URNs/URLs.
 | Reaction, comment, and repost counts | `supported` | Human-readable visible count text, not inferred numbers |
 | Relevant/recent comment order | `supported` | `most_relevant` or `most_recent` |
 | Top-level comments and nested replies | `supported` | Stable comment refs with exact parent binding |
-| Comment author, body, time, edit, counts | `supported` | Exact visible observation fields |
-| Photo/GIF-only comments and replies | `supported` | Optional text plus typed attachment kind, accessible label, visible resource URL when present, and exact accessibility evidence |
+| Comment author, body, time, edit, counts | `supported` | Exact visible observation fields; the current post-author badge is classified as UI metadata rather than the actor headline |
+| Photo/GIF-only comments and replies | `supported` | Read-only discussion output retains optional text plus typed attachment kind, accessible label, visible resource URL when present, and exact accessibility evidence |
 | Bounded comment/reply expansion | `supported` | Private expansion bound and explicit visible/returned/truncated coverage |
 | Hidden posts, comments, or private endpoints | `outside_named_capability` | No inference or private endpoint access |
-| Publishing, comments, replies, or reactions | `outside_named_capability` | Separate M15/M16 write contracts; no read scope grants mutation |
+| Publishing, top-level comments, or reactions | `outside_named_capability` | Separate write contracts; no read scope grants mutation. Threaded reply creation is not exposed. |
 
 ## Personal publishing `2.0.0`
 
@@ -187,27 +187,28 @@ browser access during execution.
 | Collaborators | `supported_if_visible` | Up to five exact member/company identities; public audience enforced; fails closed where the rollout is unavailable |
 | Scheduling | `supported` | Timezone-aware 10-minute-to-3-month future time and visible confirmation; LinkedIn does not schedule event, hiring, or expert-request posts |
 | Personal actor binding | `supported` | Active slug/name are captured and revalidated before the final action |
-| Publication verification | `supported` | One newly visible stable post reference must match the confirmed marker |
+| Publication verification | `supported` | A visible LinkedIn success alert and exact View post link are authoritative; a newly visible stable post matching the confirmed marker remains a bounded fallback, and a visible rejection is a verified failure |
 | New job creation from Hiring | `outside_named_capability` | Creates a new job entity and requires a separate Jobs-domain effect |
 | Articles and newsletters | `outside_named_capability` | Long-form/editor and recurring-publication workflows need separate capabilities |
 | Repost/share of an existing post | `outside_named_capability` | Requires an exact source-post target and its own mutation contract |
 | Company/Page publishing | `outside_named_capability` | Permanently excluded from this personal-actor capability |
 
-## Personal comments, replies, and reactions `2.0.0`
+## Personal comments and post reactions `3.0.0`
 
 | Visible engagement feature | Status | Typed behavior and evidence |
 | --- | --- | --- |
 | Top-level text/link/emoji comment | `supported` | Exact text through one visible comment composer |
-| Reply to a comment | `supported` | Explicit stable parent comment reference, exact thread binding, and runtime-verified activity-URL to native UGC-discussion mapping |
 | Member/Page mention | `supported` | Exact token plus exact visible identity resolution |
 | Photo | `supported` | One hash-locked GIF/JPEG/JPG/PNG/WebP upload through the current Share photo chooser |
 | GIF picker | `supported` | Exact Search for GIFs/KLIPY query and one unique result image alt label |
-| Like, Celebrate, Support, Love, Insightful, Funny | `supported` | Typed reaction states for both posts and comments |
+| Like, Celebrate, Support, Love, Insightful, Funny | `supported` | Typed reaction states for exact posts |
 | Remove reaction | `supported` | Explicit `none`; never inferred from a repeated click |
 | Set/change/no-op | `supported` | Existing and desired state are both captured, passed through the client approval policy, and revalidated |
-| Comment/reply verification | `supported` | Exactly one new stable reference must match actor and parent; text and GIF label match exactly, while a photo additionally requires the prepared file hash and visible photo type |
-| Reaction verification | `supported` | Final visible reaction must equal the confirmed desired state |
+| Comment verification | `supported` | Exactly one new top-level stable reference must match the actor and post; text and GIF label match exactly, while a photo additionally requires the prepared file hash and visible photo type |
+| Reaction verification | `supported` | The bounded accessible post-reaction surface must load before preparation/execution; final visible state must equal the confirmed desired state, while a missing pre-click control is a verified non-mutation rather than an uncertain action |
 | Comment as a LinkedIn Page | `outside_named_capability` | Different actor and authorization contract; personal actor is mandatory |
+| Reply to a comment | `outside_named_capability` | Threaded reply creation is not exposed; visible replies remain available through `linkedin.posts.comments.list` |
+| React to a comment | `outside_named_capability` | Comment reaction changes are not exposed; visible aggregate reaction counts remain readable |
 | Edit/delete/pin/report/repost a comment | `outside_named_capability` | Materially different effects requiring separate scopes and payloads |
 
 ## M17 Jobs parity audit

@@ -88,6 +88,7 @@ _POST_ACTION_LINES = frozenset(
         "more",
     }
 )
+_COMMENT_AUTHOR_BADGES = frozenset({"author"})
 _POST_CONTENT_CODES = {
     PostSearchContentType.VIDEOS: "videos",
     PostSearchContentType.IMAGES: "photos",
@@ -127,7 +128,7 @@ _COMMENT_TIME_PATTERN = re.compile(
 _POST_MENU_PATTERN = re.compile(r"^Open control menu for post by (.+)$", re.IGNORECASE)
 _POST_AGE_PATTERN = re.compile(
     r"^(?:\d+\s*(?:s|m|h|d|w|mo|yr)s?|just now)"
-    r"(?:\s*[•·]\s*(?:Edited)?)?$",
+    r"(?:\s*[•·]\s*(?:Edited(?:\s*[•·])?)?)?$",
     re.IGNORECASE,
 )
 _POST_RELATIONSHIP_PATTERN = re.compile(
@@ -352,12 +353,86 @@ async def _wait_for_post_search_state(page: Page) -> CollectionSettleOutcome:
     return result.outcome
 
 
-async def _expand_visible_content(page: Page) -> None:
+async def _prepare_visible_content(page: Page) -> None:
     main = page.locator("main")
     try:
         await main.wait_for(state="visible", timeout=10_000)
     except PlaywrightTimeoutError as error:
         raise ParserDriftError("LinkedIn content surface has no visible main region.") from error
+
+
+async def _expand_search_post_body(page: Page, region: Locator) -> None:
+    source_url = page.url
+    bodies = await _post_body_boxes(region)
+    if len(bodies) > 2:
+        raise ParserDriftError("LinkedIn post search exposed too many nested post bodies.")
+    for body in bodies:
+        for _ in range(5):
+            buttons = body.locator('[data-testid="expandable-text-button"]').or_(
+                body.get_by_role(
+                    "button",
+                    name=re.compile(r"^(?:see more|show more)(?:\b|$)", re.IGNORECASE),
+                )
+            )
+            visible = [
+                buttons.nth(index)
+                for index in range(min(await buttons.count(), 5))
+                if await buttons.nth(index).is_visible()
+            ]
+            if not visible:
+                break
+            expandable = visible[0]
+            button_name = " ".join(
+                (
+                    (await expandable.inner_text()).strip(),
+                    (await expandable.get_attribute("aria-label") or "").strip(),
+                )
+            )
+            if re.search(r"\b(?:comments?|repl(?:y|ies))\b", button_name, re.IGNORECASE):
+                break
+            before_text = (await body.inner_text()).strip()
+            try:
+                await expandable.click(timeout=2_000)
+                await page.wait_for_timeout(100)
+            except PlaywrightTimeoutError:
+                if not await expandable.is_visible():
+                    continue
+                # Current search cards can paint their text layer over the visible
+                # expansion button. Keyboard activation preserves the same exact,
+                # user-facing control without bypassing its semantics.
+                await expandable.focus()
+                await expandable.press("Enter")
+                await page.wait_for_timeout(100)
+            if page.url != source_url:
+                raise ParserDriftError("A LinkedIn content expansion unexpectedly navigated away.")
+            after_text = (await body.inner_text()).strip()
+            remaining = body.locator('[data-testid="expandable-text-button"]').or_(
+                body.get_by_role(
+                    "button",
+                    name=re.compile(r"^(?:see more|show more)(?:\b|$)", re.IGNORECASE),
+                )
+            )
+            remaining_visible = False
+            for index in range(min(await remaining.count(), 5)):
+                if await remaining.nth(index).is_visible():
+                    remaining_visible = True
+                    break
+            if before_text == after_text and remaining_visible:
+                raise ParserDriftError("LinkedIn post-search text could not be fully expanded.")
+        else:
+            raise ParserDriftError(
+                "LinkedIn post search exceeded the per-post text-expansion safety bound."
+            )
+
+
+async def _expand_visible_content(page: Page) -> None:
+    """Preserve bounded best-effort expansion for the discussion collection."""
+
+    await _prepare_visible_content(page)
+    main = page.locator("main")
+    await page.keyboard.press("End")
+    await page.wait_for_timeout(500)
+    await page.keyboard.press("Home")
     buttons = main.locator('[data-testid="expandable-text-button"]').or_(
         main.get_by_role(
             "button",
@@ -367,26 +442,22 @@ async def _expand_visible_content(page: Page) -> None:
     for index in range(min(await buttons.count(), 100)):
         button = buttons.nth(index)
         try:
-            if await button.is_visible():
-                button_name = " ".join(
-                    (
-                        (await button.inner_text()).strip(),
-                        (await button.get_attribute("aria-label") or "").strip(),
-                    )
+            if not await button.is_visible():
+                continue
+            button_name = " ".join(
+                (
+                    (await button.inner_text()).strip(),
+                    (await button.get_attribute("aria-label") or "").strip(),
                 )
-                if re.search(r"\b(?:comments?|repl(?:y|ies))\b", button_name, re.IGNORECASE):
-                    continue
-                source_url = page.url
-                await button.click(timeout=1_000)
-                if page.url != source_url:
-                    raise ParserDriftError(
-                        "A LinkedIn content expansion unexpectedly navigated away."
-                    )
+            )
+            if re.search(r"\b(?:comments?|repl(?:y|ies))\b", button_name, re.IGNORECASE):
+                continue
+            source_url = page.url
+            await button.click(timeout=1_000)
+            if page.url != source_url:
+                raise ParserDriftError("A LinkedIn content expansion unexpectedly navigated away.")
         except PlaywrightTimeoutError:
             continue
-    await page.keyboard.press("End")
-    await page.wait_for_timeout(200)
-    await page.keyboard.press("Home")
 
 
 def _json_array(values: tuple[str, ...]) -> str:
@@ -789,13 +860,24 @@ async def _post_author(region: Locator) -> PostAuthor | None:
                 name = (await image.first.get_attribute("alt") or "").strip()
         if not name:
             continue
+        metadata = lines[1:]
+        relationship = _post_relationship(metadata)
+        headline_candidates = [
+            line
+            for line in metadata
+            if line.casefold() not in _COMMENT_AUTHOR_BADGES
+            and _POST_RELATIONSHIP_PATTERN.search(line) is None
+            and _POST_FOLLOWER_PATTERN.search(line) is None
+        ]
+        headline = headline_candidates[-1] if headline_candidates else None
         if profile_slug := profile_slug_from_url(url):
             author = PostAuthor(
                 author_type=PostAuthorType.MEMBER,
                 name=name,
                 profile_slug=profile_slug,
                 author_url=HttpUrl(f"https://www.linkedin.com/in/{profile_slug}/"),
-                headline=lines[1] if len(lines) > 1 else None,
+                headline=headline,
+                relationship_text=relationship,
             )
         elif company_slug := company_slug_from_url(url):
             author = PostAuthor(
@@ -803,7 +885,8 @@ async def _post_author(region: Locator) -> PostAuthor | None:
                 name=name,
                 company_slug=company_slug,
                 author_url=HttpUrl(canonical_company_url(company_slug)),
-                headline=lines[1] if len(lines) > 1 else None,
+                headline=headline,
+                relationship_text=relationship,
             )
         else:
             continue
@@ -841,28 +924,6 @@ async def _post_text(region: Locator, *, author: PostAuthor) -> str | None:
     return "\n".join(content) if content else None
 
 
-async def _post_content_type(region: Locator) -> PostContentType:
-    markers = (
-        ("video", PostContentType.VIDEO),
-        ('iframe[title*="video" i]', PostContentType.VIDEO),
-        ("[data-document-urn]", PostContentType.DOCUMENT),
-        ('img:not([alt=""])', PostContentType.IMAGE),
-        ("[data-poll-option]", PostContentType.POLL),
-        ("[data-event-urn]", PostContentType.EVENT),
-        ("[data-job-id]", PostContentType.JOB),
-        ('article a[href*="/pulse/"]', PostContentType.ARTICLE),
-    )
-    for selector, content_type in markers:
-        if await region.locator(selector).count():
-            return content_type
-    text = (await region.inner_text()).casefold()
-    if "newsletter" in text:
-        return PostContentType.NEWSLETTER
-    if "celebrate an occasion" in text:
-        return PostContentType.CELEBRATION
-    return PostContentType.TEXT
-
-
 def _first_count(lines: list[str], kind: str) -> str | None:
     pattern = _COUNT_PATTERNS[kind]
     return next(
@@ -871,51 +932,88 @@ def _first_count(lines: list[str], kind: str) -> str | None:
     )
 
 
-async def _post_summary_from_region(region: Locator) -> PostSummary | None:
-    reference = await _post_reference_for_region(region)
-    author = await _post_author(region)
+async def _post_summary_from_region(
+    region: Locator,
+    *,
+    known_reference: str | None = None,
+) -> PostSummary | None:
+    reference = known_reference or await _post_reference_for_region(region)
     visible_text = (await region.inner_text()).strip()
-    if reference is None or author is None or not visible_text:
+    if reference is None or not visible_text:
         return None
-    lines = _unique_lines(visible_text)
-    posted_at = next(
-        (
-            line
-            for line in lines
-            if re.fullmatch(
-                r"(?:\d+\s*[smhdw](?:\s*·\s*Edited)?|just now)",
-                line,
-                re.IGNORECASE,
-            )
-        ),
-        None,
-    )
+    header = await _post_header_fields(region)
+    body_boxes = await _post_body_boxes(region)
+    if len(body_boxes) > 2:
+        raise ParserDriftError("LinkedIn post search exposed too many nested post bodies.")
+    body = body_boxes[0] if body_boxes else None
+    text = (await body.inner_text()).strip() if body is not None else None
+    if text == "":
+        text = None
+    if text is None:
+        text = await _post_text(region, author=header.author)
+    engagement = await _post_engagement(region)
+    content_type = PostContentType.REPOST
+    if len(body_boxes) < 2:
+        content_type = (await _post_content_fields(region, body)).content_type
     return PostSummary(
         post_ref=reference,
         post_url=HttpUrl(canonical_post_url(reference)),
-        author=author,
-        text=await _post_text(region, author=author),
-        posted_at_text=posted_at,
-        content_type=await _post_content_type(region),
-        reaction_count_text=_first_count(lines, "reaction"),
-        comment_count_text=_first_count(lines, "comment"),
-        repost_count_text=_first_count(lines, "repost"),
+        author=header.author,
+        text=text,
+        posted_at_text=header.posted_at_text,
+        content_type=content_type,
+        reaction_count_text=engagement.reaction_count_text,
+        comment_count_text=engagement.comment_count_text,
+        repost_count_text=engagement.repost_count_text,
         visible_text=visible_text,
     )
 
 
-async def _visible_posts(page: Page) -> tuple[PostSummary, ...]:
+async def _visible_posts(
+    page: Page,
+    *,
+    result_limit: int,
+    excluded_refs: frozenset[str],
+) -> tuple[PostSummary, ...]:
     main = page.locator("main")
     candidates = main.locator(_POST_REGION_SELECTOR)
-    values: dict[str, PostSummary] = {}
+    inventory: list[tuple[int, str]] = []
+    observed_refs: set[str] = set(excluded_refs)
     for index in range(min(await candidates.count(), 500)):
         candidate = candidates.nth(index)
         if not await candidate.is_visible():
             continue
-        summary = await _post_summary_from_region(candidate)
+        reference = await _post_reference_for_region(candidate)
+        if reference is None or reference in observed_refs:
+            continue
+        observed_refs.add(reference)
+        inventory.append((index, reference))
+        if len(inventory) >= result_limit:
+            break
+
+    # Expanding a high-ranked card makes the virtualized cards below it move and
+    # can detach them. Capture the ordered identity prefix first, then parse that
+    # prefix bottom-up so each lower card is retained until it has been read.
+    values: dict[str, PostSummary] = {}
+    for index, reference in reversed(inventory):
+        candidate = candidates.nth(index)
+        if not await candidate.is_visible():
+            raise ParserDriftError(
+                "LinkedIn post search changed an inventoried result before extraction."
+            )
+        await _expand_search_post_body(page, candidate)
+        stable_reference = await _post_reference_for_region(candidate)
+        if stable_reference != reference:
+            raise ParserDriftError(
+                "LinkedIn post search changed an exact result identity during extraction."
+            )
+        summary = await _post_summary_from_region(
+            candidate,
+            known_reference=reference,
+        )
         if summary is not None:
-            values.setdefault(summary.post_ref, summary)
-    return tuple(values.values())
+            values[reference] = summary
+    return tuple(values[reference] for _, reference in inventory if reference in values)
 
 
 async def _region_for_post(page: Page, post_ref: str) -> Locator:
@@ -972,9 +1070,13 @@ class PostSearchPage:
                     resolved=resolved,
                 )
                 await self._browser.navigate(page, target)
-                await _expand_visible_content(page)
                 rendered_state = await _wait_for_post_search_state(page)
-                visible_posts = await _visible_posts(page)
+                await _prepare_visible_content(page)
+                visible_posts = await _visible_posts(
+                    page,
+                    result_limit=limit - len(posts),
+                    excluded_refs=frozenset(posts),
+                )
                 captured_text = (await page.locator("main").inner_text()).strip()
                 if not captured_text:
                     raise ParserDriftError("LinkedIn post search returned no visible text.")
@@ -2259,6 +2361,47 @@ async def _comment_parent_reference(region: Locator) -> str | None:
     return None
 
 
+async def _comment_identity_x(region: Locator) -> float | None:
+    links = region.locator('a[href*="/in/"], a[href*="/company/"]')
+    positions: list[float] = []
+    for index in range(min(await links.count(), 20)):
+        link = links.nth(index)
+        if not await link.is_visible():
+            continue
+        box = await link.bounding_box()
+        if box is not None:
+            positions.append(box["x"])
+    return min(positions) if positions else None
+
+
+def _bind_flattened_comment_parents(
+    comments: list[tuple[CommentObservation, float | None]],
+) -> list[CommentObservation]:
+    """Bind visually indented flat replies to their nearest preceding root."""
+
+    positions = [position for _, position in comments if position is not None]
+    if not positions:
+        return [comment for comment, _ in comments]
+    root_x = min(positions)
+    indentation_threshold = root_x + 12
+    current_root: str | None = None
+    bound: list[CommentObservation] = []
+    for comment, position in comments:
+        if comment.parent_comment_ref is not None:
+            bound.append(comment)
+            continue
+        if position is None or position <= indentation_threshold:
+            current_root = comment.comment_ref
+            bound.append(comment)
+            continue
+        if current_root is None:
+            raise ParserDriftError(
+                "LinkedIn discussion began with an indented reply whose root is not visible."
+            )
+        bound.append(comment.model_copy(update={"parent_comment_ref": current_root}))
+    return bound
+
+
 async def _comment_attachments(
     region: Locator,
     *,
@@ -2480,6 +2623,12 @@ async def post_summary_from_region(region: Locator) -> PostSummary | None:
     return await _post_summary_from_region(region)
 
 
+async def post_author_from_region(region: Locator) -> PostAuthor:
+    """Parse the exact visible author header without parsing post engagement."""
+
+    return (await _post_header_fields(region)).author
+
+
 async def region_for_post(page: Page, post_ref: str) -> Locator:
     """Resolve one exact visible post region by its stable reference."""
 
@@ -2639,7 +2788,8 @@ class PostCommentsPage:
                 controls = page.get_by_role(
                     "button",
                     name=re.compile(
-                        r"(?:load more comments|load previous replies|show more replies|"
+                        r"(?:load more comments|load previous replies|see previous replies|"
+                        r"show more replies|"
                         r"view replies|more replies)",
                         re.IGNORECASE,
                     ),
@@ -2664,7 +2814,7 @@ class PostCommentsPage:
                 )
             regions = comment_regions(page)
             native_post_ref = await discussion_post_reference(page, request.post_ref)
-            comments: list[CommentObservation] = []
+            comments_with_layout: list[tuple[CommentObservation, float | None]] = []
             comment_refs: set[str] = set()
             for index in range(min(await regions.count(), 1_000)):
                 region = regions.nth(index)
@@ -2685,8 +2835,9 @@ class PostCommentsPage:
                         "A stable visible LinkedIn comment has no unambiguous content."
                     )
                 if comment.comment_ref not in comment_refs:
-                    comments.append(comment)
+                    comments_with_layout.append((comment, await _comment_identity_x(region)))
                     comment_refs.add(comment.comment_ref)
+            comments = _bind_flattened_comment_parents(comments_with_layout)
             captured_text = (await page.locator("main").inner_text()).strip()
             if not captured_text:
                 raise ParserDriftError("LinkedIn discussion returned no visible source text.")

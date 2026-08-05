@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Current flattened LinkedIn discussion fixture</title>
+  </head>
+  <body>
+    <main aria-label="Post detail and discussion">
+      <article data-post-urn="urn:li:activity:7312345678901234567">
+        <a href="/in/jane-doe/">Jane Doe</a>
+        <p>Current flattened discussion fixture.</p>
+        <button id="open-comments" type="button" aria-label="Comment">4</button>
+      </article>
+
+      <section id="discussion" aria-label="Comments" hidden>
+        <div
+          id="replaceableComment_urn:li:comment:(urn:li:activity:7312345678901234567,301)"
+        >
+          <a href="/in/alex-ray/">
+            <p><span>Alex Ray</span></p>
+            <p>Author</p>
+            <p><span>Principal Engineer</span></p>
+          </a>
+          <p><span>4h</span></p>
+          <button type="button" aria-label="View more options for Alex Ray's comment."></button>
+          <div><p><span>First top-level comment.</span></p></div>
+          <button type="button" aria-label="Open reactions menu"></button>
+          <button type="button" aria-label="Reply"></button>
+        </div>
+
+        <div
+          id="replaceableComment_urn:li:comment:(urn:li:activity:7312345678901234567,302)"
+        >
+          <a href="/in/jane-doe/" style="display: block; margin-left: 40px">
+            Jane Doe<span>Software Engineer</span>
+          </a>
+          <p><span>3h</span></p>
+          <button type="button" aria-label="View more options for Jane Doe's comment."></button>
+          <div><p><span>Reply to the first comment.</span></p></div>
+          <button type="button" aria-label="Open reactions menu"></button>
+          <button type="button" aria-label="Reply"></button>
+        </div>
+
+        <div
+          id="replaceableComment_urn:li:comment:(urn:li:activity:7312345678901234567,303)"
+        >
+          <a href="/in/sam-lee/">Sam Lee<span>Product Manager</span></a>
+          <p><span>2h</span></p>
+          <button type="button" aria-label="View more options for Sam Lee's comment."></button>
+          <div><p><span>Second top-level comment.</span></p></div>
+          <button type="button" aria-label="Open reactions menu"></button>
+          <button type="button" aria-label="Reply"></button>
+        </div>
+
+        <div
+          id="replaceableComment_urn:li:comment:(urn:li:activity:7312345678901234567,304)"
+        >
+          <a href="/in/jane-doe/" style="display: block; margin-left: 40px">
+            Jane Doe<span>Software Engineer</span>
+          </a>
+          <p><span>1h</span></p>
+          <button type="button" aria-label="View more options for Jane Doe's comment."></button>
+          <div><p><span>Reply to the second comment.</span></p></div>
+          <button type="button" aria-label="Open reactions menu"></button>
+          <button type="button" aria-label="Reply"></button>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      document.querySelector("#open-comments").addEventListener("click", () => {
+        document.querySelector("#discussion").hidden = false;
+      });
+    </script>
+  </body>
+</html>

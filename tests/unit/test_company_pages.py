@@ -76,7 +76,7 @@ def test_company_fixture_manifest_locks_current_visible_surface() -> None:
     )
 
     assert manifest["provenance"] == "mock_verified"
-    assert manifest["verified_at"] == "2026-07-30"
+    assert manifest["verified_at"] == "2026-08-05"
     assert manifest["contains_live_data"] is False
     assert manifest["filter_sections"] == [
         "Locations",
@@ -193,7 +193,7 @@ async def test_company_search_resolves_visible_names_and_extracts_results() -> N
     assert companies[0].name == "Acme Cloud"
     assert companies[0].tagline == "Reliable cloud infrastructure"
     assert companies[0].location == "Bengaluru, Karnataka, India"
-    assert companies[0].follower_count_text == "12,345 followers"
+    assert companies[0].follower_count_text == "161K followers"
     assert companies[0].associated_member_count_text == "2,400 associated members"
     assert coverage.pages_visited == 1
     assert coverage.stop_reason is StopReason.RESULT_LIMIT
@@ -371,7 +371,7 @@ async def test_company_profile_reads_exact_overview_and_about_with_evidence() ->
     assert company.company_size_range == "1,001-5,000 employees"
     assert company.associated_member_count_text == "2,400 associated members"
     assert company.company_size_range != company.associated_member_count_text
-    assert company.follower_count_text == "12,345 followers"
+    assert company.follower_count_text == "12K followers"
     assert company.headquarters == "Bengaluru, Karnataka"
     assert company.organization_type == "Privately Held"
     assert company.founded_text == "2015"
@@ -390,7 +390,7 @@ async def test_company_profile_reads_exact_overview_and_about_with_evidence() ->
         for evidence in company.evidence
         if evidence.field == "associated_member_count_text"
     )
-    assert associated_member_evidence.source_url == captures[0].source_url
+    assert associated_member_evidence.source_url == captures[1].source_url
     assert fixture_browser.navigations == [
         "https://www.linkedin.com/company/acme-cloud/",
         "https://www.linkedin.com/company/acme-cloud/about/",

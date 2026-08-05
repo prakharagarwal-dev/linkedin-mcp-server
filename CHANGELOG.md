@@ -6,6 +6,49 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Remove account-changing threaded comment replies from
+  `linkedin.posts.comment.prepare` and `linkedin.posts.comment.execute`. These
+  tools now create top-level post comments only; read-only discussion results
+  continue to include visible replies and their exact parent references.
+- Limit `linkedin.posts.reaction.prepare` and
+  `linkedin.posts.reaction.execute` to exact posts. Comment reaction counts
+  remain available through read-only post discussions, but setting reactions
+  on comments is no longer exposed.
+
+### Fixed
+
+- Parse current Post-search cards through the same exact header, content, and
+  engagement contracts as Post detail. Preserve relationship degree, headline,
+  edited age, full expanded text, numeric engagement, and article/job/media
+  classification; inventory virtualized card identities before bottom-up
+  expansion so cursor pages retain their cumulative prefix.
+- Parse compact Company counts such as `161K` and `8M`, keep social-proof text
+  out of search-result locations, bind the smallest current company
+  introduction region, and prefer the exact About-page associated-member count
+  over employee ranges.
+- Parse current member experience cards without treating employment type or
+  description bullets as company and location fields, bind skill identity to
+  the exact accessible endorsement control, and exclude About-section
+  expansion and `Top skills` UI chrome. Read current roleless profile-detail
+  collection cards and exclude recommendation rails from member-owned
+  sections.
+- Read the nearest current member introduction card, ignore self-only
+  verification and guidance prompts, and retain visible top-card company and
+  education summaries from LinkedIn's semantic organization buttons.
+- Treat LinkedIn's visible post-success alert and exact View post link as the
+  primary publication postcondition, preserve that confirmation across a
+  post-click browser timeout, and classify a visible publishing rejection as a
+  verified failure.
+- Bind each flat visually indented reply to its nearest preceding root comment,
+  including discussions with multiple roots in either sort order, and expand
+  the current `See previous replies` control without weakening exact
+  parent-reference binding. Keep the current comment-card `Author` badge out of
+  the actor headline and retain the following visible headline instead.
+- Parse the current hiring-team card when its only visible profile link contains
+  the member name, connection degree, headline, and role as separate lines.
+
 ## [0.16.0] - 2026-08-04
 
 ### Added

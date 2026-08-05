@@ -1,4 +1,4 @@
-"""Narrow native-confirmation-gated comment, reply, and reaction interactions."""
+"""Narrow native-confirmation-gated comment and reaction interactions."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urljoin
 
+from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import Locator, Page
 from pydantic import HttpUrl
 
@@ -15,10 +16,9 @@ from linkedin_mcp.assets import LocalAssetStore
 from linkedin_mcp.browser.manager import BrowserManager
 from linkedin_mcp.browser.pages.posts import (
     comment_from_region,
-    comment_reference,
     comment_regions,
     discussion_post_reference,
-    post_summary_from_region,
+    post_author_from_region,
     region_for_post,
 )
 from linkedin_mcp.domain.models import (
@@ -54,6 +54,13 @@ _REACTION_LABELS = {
     ReactionState.INSIGHTFUL: "Insightful",
     ReactionState.FUNNY: "Funny",
 }
+_REACTION_STATE_SELECTOR = "[aria-label^='Reaction button state:' i]"
+_REACTION_CONTROL_SELECTOR = (
+    "[data-reaction-control], "
+    "button[aria-label^='Reaction button state:' i], "
+    "[role='button'][tabindex='0']:has("
+    "[aria-label^='Reaction button state:' i])"
+)
 _COMMENT_ATTACHMENT_SELECTOR = (
     "[data-comment-attachment], [data-test-comment-attachment], "
     '[class*="comments-comment-item__comment-image"], '
@@ -111,7 +118,7 @@ async def _unique_visible(locator: Locator, description: str) -> Locator:
 
 
 class PostEngagementPage:
-    """Personal-member comments/replies and explicit reaction-state changes."""
+    """Personal-member comments and explicit reaction-state changes."""
 
     def __init__(self, browser: BrowserManager, assets: LocalAssetStore) -> None:
         self._browser = browser
@@ -130,28 +137,12 @@ class PostEngagementPage:
         target_url = canonical_post_url(request.post_ref)
         async with self._browser.page() as page:
             await self._browser.navigate(page, target_url)
-            target = await self._resolve_target(
-                page,
-                request.post_ref,
-                request.parent_comment_ref,
-            )
-            composer = await self._open_comment_composer(
-                page,
-                target.region,
-                reply=request.parent_comment_ref is not None,
-            )
+            target = await self._resolve_target(page, request.post_ref)
+            composer = await self._open_comment_composer(page, target.region)
             await self._assert_comment_options(page, composer, request)
             return ActionPreparationCapture(
-                target=self._action_target(
-                    target,
-                    request.post_ref,
-                    request.parent_comment_ref,
-                ),
-                current_state=(
-                    "reply_composer_ready"
-                    if request.parent_comment_ref is not None
-                    else "comment_composer_ready"
-                ),
+                target=self._action_target(target, request.post_ref),
+                current_state="comment_composer_ready",
                 source_url=HttpUrl(target_url),
                 captured_text=await _visible_text(page),
                 captured_at=datetime.now(UTC),
@@ -165,11 +156,7 @@ class PostEngagementPage:
         target_url = canonical_post_url(payload.post_ref)
         async with self._browser.page() as page:
             await self._browser.navigate(page, target_url)
-            target = await self._resolve_target(
-                page,
-                payload.post_ref,
-                payload.parent_comment_ref,
-            )
+            target = await self._resolve_target(page, payload.post_ref)
             if not self._matches_confirmed_target(draft.target, target):
                 return await self._result(
                     page,
@@ -178,11 +165,7 @@ class PostEngagementPage:
                     "engagement_target_changed",
                     "The active member or visible content target changed after confirmation.",
                 )
-            composer = await self._open_comment_composer(
-                page,
-                target.region,
-                reply=payload.parent_comment_ref is not None,
-            )
+            composer = await self._open_comment_composer(page, target.region)
             if payload.text is not None:
                 maximum = await composer.get_attribute("maxlength")
                 if maximum and len(payload.text) > int(maximum):
@@ -211,24 +194,18 @@ class PostEngagementPage:
                 payload,
                 target.actor_slug,
             )
-            final_label = (
-                re.compile(r"^reply$", re.I)
-                if payload.parent_comment_ref is not None
-                else re.compile(r"^comment$", re.I)
-            )
-            final_text = "Reply" if payload.parent_comment_ref is not None else "Comment"
             submission_scope = composer.locator(
-                f"xpath=ancestor::*[.//button[normalize-space(.)='{final_text}']][1]"
+                "xpath=ancestor::*[.//button[normalize-space(.)='Comment']][1]"
             )
             if await submission_scope.count() != 1:
                 raise ParserDriftError(
                     "The visible comment composer has no unique submission region."
                 )
             final = await _unique_visible(
-                submission_scope.get_by_role("button", name=final_label).filter(
-                    has_text=final_label
+                submission_scope.get_by_role("button", name=re.compile(r"^comment$", re.I)).filter(
+                    has_text=re.compile(r"^comment$", re.I)
                 ),
-                "Comment or Reply submission control",
+                "Comment submission control",
             )
             try:
                 await self._browser.click_visible_control(page, final)
@@ -248,13 +225,12 @@ class PostEngagementPage:
                 )
                 created = tuple(ref for ref in after if ref not in before)
                 if len(created) == 1:
-                    kind = "reply" if payload.parent_comment_ref else "comment"
                     return await self._result(
                         page,
                         ActionOutcome.VERIFIED,
                         True,
-                        f"{kind}_published:{created[0]}",
-                        f"One new exact visible {kind} matched the confirmed payload.",
+                        f"comment_published:{created[0]}",
+                        "One new exact visible comment matched the confirmed payload.",
                     )
                 await page.wait_for_timeout(250)
             return await self._result(
@@ -272,7 +248,10 @@ class PostEngagementPage:
         target_url = canonical_post_url(request.post_ref)
         async with self._browser.page() as page:
             await self._browser.navigate(page, target_url)
-            target = await self._resolve_target(page, request.post_ref, request.comment_ref)
+            target = await self._resolve_target(page, request.post_ref)
+            controls = await self._wait_for_visible_reaction_controls(target.region)
+            if len(controls) != 1:
+                raise ParserDriftError("LinkedIn has no unique visible reaction control.")
             existing = await self._reaction_state(target.region)
             if request.desired_reaction is not ReactionState.NONE:
                 await self._reaction_option(
@@ -281,11 +260,8 @@ class PostEngagementPage:
                     request.desired_reaction,
                 )
             return ActionPreparationCapture(
-                target=self._action_target(target, request.post_ref, request.comment_ref),
-                current_state=(
-                    f"reaction_ready:{'comment' if request.comment_ref else 'post'}:"
-                    f"{existing.value}"
-                ),
+                target=self._action_target(target, request.post_ref),
+                current_state=f"reaction_ready:post:{existing.value}",
                 source_url=HttpUrl(target_url),
                 captured_text=await _visible_text(page),
                 captured_at=datetime.now(UTC),
@@ -298,7 +274,7 @@ class PostEngagementPage:
         payload = draft.payload
         async with self._browser.page() as page:
             await self._browser.navigate(page, canonical_post_url(payload.post_ref))
-            target = await self._resolve_target(page, payload.post_ref, payload.comment_ref)
+            target = await self._resolve_target(page, payload.post_ref)
             if not self._matches_confirmed_target(draft.target, target):
                 return await self._result(
                     page,
@@ -306,6 +282,15 @@ class PostEngagementPage:
                     False,
                     "engagement_target_changed",
                     "The active member or visible reaction target changed after confirmation.",
+                )
+            controls = await self._wait_for_visible_reaction_controls(target.region)
+            if len(controls) != 1:
+                return await self._result(
+                    page,
+                    ActionOutcome.FAILED,
+                    False,
+                    "reaction_not_changed",
+                    "The exact visible reaction control did not load before execution.",
                 )
             current = await self._reaction_state(target.region)
             if current is not payload.existing_reaction:
@@ -324,13 +309,25 @@ class PostEngagementPage:
                     self._reaction_final_state(current),
                     "LinkedIn already shows the exact requested reaction state.",
                 )
-            if payload.desired_reaction is ReactionState.NONE:
-                control = await self._pressed_reaction_control(target.region, current)
-            else:
-                control = await self._reaction_option(
+            try:
+                if payload.desired_reaction is ReactionState.NONE:
+                    control = await self._pressed_reaction_control(target.region, current)
+                else:
+                    control = await self._reaction_option(
+                        page,
+                        target.region,
+                        payload.desired_reaction,
+                    )
+            except (ParserDriftError, PlaywrightError):
+                return await self._result(
                     page,
-                    target.region,
-                    payload.desired_reaction,
+                    ActionOutcome.FAILED,
+                    False,
+                    "reaction_not_changed",
+                    (
+                        "The exact visible reaction control was unavailable before "
+                        "the final state-changing click."
+                    ),
                 )
             try:
                 await self._browser.click_visible_control(page, control)
@@ -343,7 +340,11 @@ class PostEngagementPage:
                     "The reaction control was invoked, but its outcome is unknown.",
                 )
             for _ in range(20):
-                current = await self._reaction_state(target.region)
+                try:
+                    current = await self._reaction_state(target.region)
+                except ParserDriftError:
+                    await page.wait_for_timeout(250)
+                    continue
                 if current is payload.desired_reaction:
                     return await self._result(
                         page,
@@ -365,111 +366,17 @@ class PostEngagementPage:
         self,
         page: Page,
         post_ref: str,
-        comment_ref: str | None,
     ) -> _VisibleTarget:
         post_region = await region_for_post(page, post_ref)
-        if comment_ref is None:
-            region = post_region
-            summary = await post_summary_from_region(post_region)
-            if summary is None:
-                raise ParserDriftError("The exact post target has no visible author identity.")
-            author_name = summary.author.name
-            author_url = summary.author.author_url
-        else:
-            embedded_post_ref = self._post_ref_from_comment_ref(comment_ref)
-            region = await self._reveal_comment(
-                page,
-                post_region,
-                comment_ref,
-            )
-            native_post_ref = await discussion_post_reference(page, post_ref)
-            if native_post_ref != embedded_post_ref:
-                raise InvalidTargetError(
-                    "The exact comment does not belong to the visible LinkedIn discussion."
-                )
-            comment = await comment_from_region(
-                region,
-                expected_post_ref=embedded_post_ref,
-            )
-            if comment is None:
-                raise ParserDriftError("The exact comment target has no stable visible identity.")
-            author_name = comment.author.name
-            author_url = comment.author.author_url
+        author = await post_author_from_region(post_region)
         actor_slug, actor_name = await self._active_actor(page)
         return _VisibleTarget(
-            region=region,
+            region=post_region,
             actor_slug=actor_slug,
             actor_name=actor_name,
-            content_author_name=author_name,
-            content_author_url=author_url,
+            content_author_name=author.name,
+            content_author_url=author.author_url,
         )
-
-    @staticmethod
-    def _post_ref_from_comment_ref(comment_ref: str) -> str:
-        _, kind, post_id, _ = comment_ref.split(":")
-        return f"{kind}:{post_id}"
-
-    @staticmethod
-    async def _comment_region(page: Page, comment_ref: str) -> Locator | None:
-        candidates = comment_regions(page)
-        matches: list[Locator] = []
-        for index in range(min(await candidates.count(), 1_000)):
-            candidate = candidates.nth(index)
-            if await candidate.is_visible() and await comment_reference(candidate) == comment_ref:
-                matches.append(candidate)
-        if len(matches) > 1:
-            raise ParserDriftError("Multiple visible comments expose the exact same reference.")
-        return matches[0] if matches else None
-
-    async def _reveal_comment(
-        self,
-        page: Page,
-        post_region: Locator,
-        comment_ref: str,
-    ) -> Locator:
-        match = await self._comment_region(page, comment_ref)
-        if match is not None:
-            return match
-        comment_control = post_region.get_by_role(
-            "button",
-            name=re.compile(r"^(?:[0-9,]+\s+)?comments?$", re.I),
-        )
-        visible_comment_controls = [
-            comment_control.nth(index)
-            for index in range(await comment_control.count())
-            if await comment_control.nth(index).is_visible()
-        ]
-        if len(visible_comment_controls) == 1:
-            await self._browser.click_visible_control(page, visible_comment_controls[0])
-            await page.wait_for_timeout(500)
-        elif len(visible_comment_controls) > 1:
-            raise ParserDriftError("The exact post has no unique visible Comment control.")
-        expansion_name = re.compile(
-            r"^(?:load|show|view|see).*(?:comments?|repl(?:y|ies))$",
-            re.I,
-        )
-        quiet_rounds = 0
-        for _ in range(25):
-            match = await self._comment_region(page, comment_ref)
-            if match is not None:
-                return match
-            controls = post_region.get_by_role("button", name=expansion_name).or_(
-                page.get_by_role("button", name=expansion_name)
-            )
-            visible: list[Locator] = []
-            for index in range(min(await controls.count(), 100)):
-                candidate = controls.nth(index)
-                if await candidate.is_visible():
-                    visible.append(candidate)
-            if visible:
-                await self._browser.click_visible_control(page, visible[0])
-                quiet_rounds = 0
-            else:
-                quiet_rounds += 1
-                if quiet_rounds >= 8:
-                    break
-            await page.wait_for_timeout(500)
-        raise InvalidTargetError("No unique visible comment matches the exact reference.")
 
     @staticmethod
     async def _active_actor(page: Page) -> tuple[str, str]:
@@ -527,7 +434,6 @@ class PostEngagementPage:
     def _action_target(
         target: _VisibleTarget,
         post_ref: str,
-        comment_ref: str | None,
     ) -> ActionTarget:
         actor_url = HttpUrl(canonical_profile_url(target.actor_slug))
         return ActionTarget(
@@ -539,7 +445,6 @@ class PostEngagementPage:
             actor_display_name=target.actor_name,
             post_ref=post_ref,
             post_url=HttpUrl(canonical_post_url(post_ref)),
-            comment_ref=comment_ref,
             content_author_name=target.content_author_name,
             content_author_url=target.content_author_url,
         )
@@ -568,16 +473,10 @@ class PostEngagementPage:
         self,
         page: Page,
         region: Locator,
-        *,
-        reply: bool,
     ) -> Locator:
-        scoped_label = (
-            re.compile(r"add a reply|write a reply|text editor for creating (?:a )?reply", re.I)
-            if reply
-            else re.compile(
-                r"add a comment|leave your thoughts|text editor for creating (?:a )?comment",
-                re.I,
-            )
+        scoped_label = re.compile(
+            r"add a comment|leave your thoughts|text editor for creating (?:a )?comment",
+            re.I,
         )
         composer = region.get_by_role("textbox", name=scoped_label)
         visible = [
@@ -589,11 +488,9 @@ class PostEngagementPage:
             action = await _unique_visible(
                 region.get_by_role(
                     "button",
-                    name=(
-                        re.compile(r"^reply$", re.I) if reply else re.compile(r"^comment$", re.I)
-                    ),
+                    name=re.compile(r"^comment$", re.I),
                 ),
-                "Reply or Comment opener",
+                "Comment opener",
             )
             await self._browser.click_visible_control(page, action)
             for _ in range(20):
@@ -603,19 +500,6 @@ class PostEngagementPage:
                     for index in range(await composer.count())
                     if await composer.nth(index).is_visible()
                 ]
-                if not visible and reply:
-                    current_reply = page.get_by_role(
-                        "textbox",
-                        name=re.compile(
-                            r"text editor for creating (?:a )?(?:comment|reply)",
-                            re.I,
-                        ),
-                    ).and_(page.locator(":focus"))
-                    visible = [
-                        current_reply.nth(index)
-                        for index in range(await current_reply.count())
-                        if await current_reply.nth(index).is_visible()
-                    ]
                 if visible:
                     break
                 await page.wait_for_timeout(250)
@@ -790,7 +674,7 @@ class PostEngagementPage:
             if (
                 comment is not None
                 and comment.author.profile_slug == actor_slug
-                and comment.parent_comment_ref == payload.parent_comment_ref
+                and comment.parent_comment_ref is None
                 and PostEngagementPage._comment_matches_payload(comment, payload)
                 and comment.comment_ref not in matches
             ):
@@ -869,11 +753,9 @@ class PostEngagementPage:
     ) -> Locator:
         if desired is ReactionState.NONE:
             raise InvalidTargetError("Removal has no reaction-menu option.")
-        base = region.locator(
-            "[data-reaction-control], button[aria-label^='Reaction button state:' i]"
-        )
-        if await base.count() == 0:
-            base = region.get_by_role(
+        controls = await self._wait_for_visible_reaction_controls(region)
+        if not controls:
+            fallback = region.get_by_role(
                 "button",
                 name=re.compile(
                     r"^(?:like|react|remove (?:like|reaction)|"
@@ -881,7 +763,14 @@ class PostEngagementPage:
                     re.I,
                 ),
             )
-        control = await _unique_visible(base, "reaction control")
+            controls = [
+                fallback.nth(index)
+                for index in range(await fallback.count())
+                if await fallback.nth(index).is_visible()
+            ]
+        if len(controls) != 1:
+            raise ParserDriftError("LinkedIn has no unique visible reaction control.")
+        control = controls[0]
         await control.hover()
         option_name = re.compile(rf"^{_REACTION_LABELS[desired]}$", re.I)
         explicit = region.get_by_role(
@@ -899,8 +788,8 @@ class PostEngagementPage:
             raise ParserDriftError(
                 f"LinkedIn has no unique visible {desired.value} reaction option."
             )
-        # The current UI portals the six reaction buttons outside the post or
-        # comment region after hover. Their exact accessible names remain the
+        # The current UI portals the six reaction buttons outside the post
+        # region after hover. Their exact accessible names remain the
         # binding, and only one visible option is accepted.
         return await _unique_visible(
             page.get_by_role("button", name=option_name),
@@ -917,12 +806,15 @@ class PostEngagementPage:
             value = (await item.get_attribute("data-current-reaction") or "").casefold()
             if value in {state.value for state in ReactionState}:
                 return ReactionState(value)
-        current_controls = region.locator("button[aria-label^='Reaction button state:' i]")
-        for index in range(await current_controls.count()):
-            item = current_controls.nth(index)
-            if not await item.is_visible():
-                continue
-            label = (await item.get_attribute("aria-label") or "").strip().casefold()
+        current_controls = await PostEngagementPage._visible_reaction_controls(region)
+        for item in current_controls:
+            state = item.locator(_REACTION_STATE_SELECTOR)
+            label = (
+                await state.get_attribute("aria-label")
+                if await state.count() == 1
+                else await item.get_attribute("aria-label")
+            )
+            label = (label or "").strip().casefold()
             _, _, value = label.partition(":")
             normalized = value.strip()
             if normalized == "no reaction":
@@ -947,7 +839,7 @@ class PostEngagementPage:
             for state in ReactionState:
                 if state is not ReactionState.NONE and state.value in label:
                     return state
-        return ReactionState.NONE
+        raise ParserDriftError("LinkedIn exposed no visible reaction state.")
 
     @staticmethod
     async def _pressed_reaction_control(
@@ -971,18 +863,58 @@ class PostEngagementPage:
             raise ParserDriftError(
                 "LinkedIn has no unique visible current pressed reaction control."
             )
-        current_controls = region.locator("button[aria-label^='Reaction button state:' i]")
+        current_containers = await PostEngagementPage._visible_reaction_controls(region)
         current_matches: list[Locator] = []
-        for index in range(await current_controls.count()):
-            candidate = current_controls.nth(index)
-            if not await candidate.is_visible():
-                continue
-            label = (await candidate.get_attribute("aria-label") or "").strip().casefold()
+        for candidate in current_containers:
+            state = candidate.locator(_REACTION_STATE_SELECTOR)
+            if await state.count() == 1:
+                label = (await state.get_attribute("aria-label") or "").strip().casefold()
+            else:
+                label = (await candidate.get_attribute("aria-label") or "").strip().casefold()
             if label.partition(":")[2].strip() == current.value:
                 current_matches.append(candidate)
         if len(current_matches) != 1:
             raise ParserDriftError("LinkedIn has no unique visible current reaction control.")
         return current_matches[0]
+
+    @staticmethod
+    async def _visible_reaction_controls(region: Locator) -> list[Locator]:
+        local = region.locator(_REACTION_CONTROL_SELECTOR)
+        visible = [
+            local.nth(index)
+            for index in range(await local.count())
+            if await local.nth(index).is_visible()
+        ]
+        if visible:
+            return visible
+        region_box = await region.bounding_box()
+        if region_box is None:
+            return []
+        current = region.page.locator(_REACTION_CONTROL_SELECTOR)
+        for index in range(await current.count()):
+            candidate = current.nth(index)
+            if not await candidate.is_visible():
+                continue
+            box = await candidate.bounding_box()
+            if box is None:
+                continue
+            center_x = box["x"] + box["width"] / 2
+            center_y = box["y"] + box["height"] / 2
+            if (
+                region_box["x"] <= center_x <= region_box["x"] + region_box["width"]
+                and region_box["y"] <= center_y <= region_box["y"] + region_box["height"]
+            ):
+                visible.append(candidate)
+        return visible
+
+    @staticmethod
+    async def _wait_for_visible_reaction_controls(region: Locator) -> list[Locator]:
+        for _ in range(20):
+            visible = await PostEngagementPage._visible_reaction_controls(region)
+            if visible:
+                return visible
+            await region.page.wait_for_timeout(250)
+        return []
 
     @staticmethod
     def _reaction_final_state(value: ReactionState) -> str:

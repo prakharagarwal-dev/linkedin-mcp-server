@@ -1548,15 +1548,14 @@ class PostCommentPrepareInput(StrictModel):
     context_id: Identifier
     request_id: Identifier
     post_ref: PostReference
-    parent_comment_ref: CommentReference | None = None
     text: Annotated[str, Field(min_length=1, max_length=3_000)] | None = None
     mentions: Annotated[tuple[PostMentionInput, ...], Field(max_length=20)] = ()
     attachment: CommentAttachment | None = None
 
     @model_validator(mode="after")
-    def validate_comment_content_and_parent(self) -> PostCommentPrepareInput:
+    def validate_comment_content(self) -> PostCommentPrepareInput:
         if self.text is None and self.attachment is None:
-            raise ValueError("A comment or reply requires text, a photo, or a GIF")
+            raise ValueError("A comment requires text, a photo, or a GIF")
         if self.mentions and self.text is None:
             raise ValueError("Comment mentions require comment text")
         tokens = tuple(mention.token for mention in self.mentions)
@@ -1575,7 +1574,6 @@ class PostReactionPrepareInput(StrictModel):
     context_id: Identifier
     request_id: Identifier
     post_ref: PostReference
-    comment_ref: CommentReference | None = None
     desired_reaction: ReactionState
 
 
@@ -3116,8 +3114,6 @@ class ActionTarget(StrictModel):
     actor_display_name: Annotated[str, Field(min_length=1, max_length=500)] | None = None
     post_ref: PostReference | None = None
     post_url: HttpUrl | None = None
-    comment_ref: CommentReference | None = None
-    parent_comment_ref: CommentReference | None = None
     content_author_name: Annotated[str, Field(min_length=1, max_length=500)] | None = None
     content_author_url: HttpUrl | None = None
 
@@ -3132,10 +3128,6 @@ class ActionTarget(StrictModel):
             value is not None for value in actor_values
         ):
             raise ValueError("An action actor requires slug, URL, and display name")
-        if self.comment_ref is not None and self.post_ref is None:
-            raise ValueError("A comment target requires its parent post reference")
-        if self.parent_comment_ref is not None and self.comment_ref is None:
-            raise ValueError("A parent comment requires a comment target")
         return self
 
 
@@ -3263,7 +3255,6 @@ class PostCreatePayload(StrictModel):
 class CommentCreatePayload(StrictModel):
     action_type: Literal[ActionType.COMMENT_CREATE] = ActionType.COMMENT_CREATE
     post_ref: PostReference
-    parent_comment_ref: CommentReference | None = None
     text: Annotated[str, Field(min_length=1, max_length=3_000)] | None = None
     mentions: Annotated[tuple[PostMentionInput, ...], Field(max_length=20)] = ()
     attachment: CommentAttachment | None = None
@@ -3293,7 +3284,6 @@ class CommentCreatePayload(StrictModel):
 class ReactionSetPayload(StrictModel):
     action_type: Literal[ActionType.REACTION_SET] = ActionType.REACTION_SET
     post_ref: PostReference
-    comment_ref: CommentReference | None = None
     existing_reaction: ReactionState
     desired_reaction: ReactionState
 
@@ -3415,12 +3405,8 @@ def action_approval_preview(draft: ActionDraft) -> ActionApprovalPreview:
             effects.append(f"Targets the exact group {payload.group_target.display_name}.")
         external_effect = " ".join(effects)
     elif isinstance(payload, CommentCreatePayload):
-        if payload.parent_comment_ref is None:
-            summary = "Publish the prepared LinkedIn comment."
-            external_effect = "Adds one top-level comment from the configured personal account."
-        else:
-            summary = "Publish the prepared LinkedIn comment reply."
-            external_effect = "Adds one reply beneath the exact parent LinkedIn comment."
+        summary = "Publish the prepared LinkedIn comment."
+        external_effect = "Adds one top-level comment from the configured personal account."
     else:
         if payload.desired_reaction is ReactionState.NONE:
             summary = "Remove the prepared LinkedIn reaction."

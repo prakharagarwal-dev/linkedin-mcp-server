@@ -833,21 +833,11 @@ class ProtocolNetwork:
                             "https://www.linkedin.com/feed/update/"
                             "urn:li:activity:7312345678901234567/"
                         ),
-                        "comment_ref": request.parent_comment_ref,
-                        "content_author_name": (
-                            "Alex Ray" if request.parent_comment_ref else "Jane Doe"
-                        ),
-                        "content_author_url": HttpUrl(
-                            "https://www.linkedin.com/in/"
-                            f"{'alex-ray' if request.parent_comment_ref else 'jane-doe'}/"
-                        ),
+                        "content_author_name": "Jane Doe",
+                        "content_author_url": HttpUrl("https://www.linkedin.com/in/jane-doe/"),
                     }
                 ),
-                "current_state": (
-                    "reply_composer_ready"
-                    if request.parent_comment_ref
-                    else "comment_composer_ready"
-                ),
+                "current_state": "comment_composer_ready",
                 "source_url": HttpUrl(
                     "https://www.linkedin.com/feed/update/urn:li:activity:7312345678901234567/"
                 ),
@@ -856,7 +846,7 @@ class ProtocolNetwork:
 
     async def execute_comment(self, draft: ActionDraft) -> ActionPageResult:
         del draft
-        return self._result("reply_published:comment:activity:7312345678901234567:900")
+        return self._result("comment_published:comment:activity:7312345678901234567:900")
 
     async def prepare_reaction(
         self,
@@ -867,16 +857,13 @@ class ProtocolNetwork:
                 context_id=request.context_id,
                 request_id=request.request_id,
                 post_ref=request.post_ref,
-                parent_comment_ref=request.comment_ref,
                 text="typed protocol preparation",
             )
         )
         return capture.model_copy(
             update={
                 "current_state": "reaction_ready",
-                "existing_reaction": (
-                    ReactionState.LIKE if request.comment_ref else ReactionState.NONE
-                ),
+                "existing_reaction": ReactionState.NONE,
             }
         )
 
@@ -1160,7 +1147,6 @@ async def test_mcp_client_discovers_calls_and_reads_evidence() -> None:
                 "context_id",
                 "request_id",
                 "post_ref",
-                "parent_comment_ref",
                 "text",
                 "mentions",
                 "attachment",
@@ -1170,7 +1156,6 @@ async def test_mcp_client_discovers_calls_and_reads_evidence() -> None:
                 "request_id",
                 "post_ref",
                 "desired_reaction",
-                "comment_ref",
             } == set(reaction_prepare_tool.inputSchema["properties"])
             reaction_values = reaction_prepare_tool.inputSchema["$defs"]["ReactionState"]["enum"]
             assert {
@@ -1941,8 +1926,7 @@ async def test_mcp_client_discovers_calls_and_reads_evidence() -> None:
                     "context_id": "post-write-context",
                     "request_id": "comment-prepare-request",
                     "post_ref": "activity:7312345678901234567",
-                    "parent_comment_ref": ("comment:activity:7312345678901234567:111"),
-                    "text": "Exact protocol reply.",
+                    "text": "Exact protocol comment.",
                 },
             )
             assert comment_prepared.isError is False
@@ -1954,11 +1938,8 @@ async def test_mcp_client_discovers_calls_and_reads_evidence() -> None:
             comment_payload_hash = comment_draft["payload_hash"]
             assert isinstance(comment_action_id, str)
             assert isinstance(comment_payload_hash, str)
-            assert (
-                TypeAdapter(dict[str, object]).validate_python(comment_draft["payload"])[
-                    "parent_comment_ref"
-                ]
-                == "comment:activity:7312345678901234567:111"
+            assert "parent_comment_ref" not in TypeAdapter(dict[str, object]).validate_python(
+                comment_draft["payload"]
             )
             comment_approval_preview = TypeAdapter(dict[str, object]).validate_python(
                 comment_prepared.structuredContent["approval_preview"]
@@ -1977,7 +1958,7 @@ async def test_mcp_client_discovers_calls_and_reads_evidence() -> None:
             assert comment_executed.isError is False
             assert comment_executed.structuredContent is not None
             assert comment_executed.structuredContent["result"]["final_state"].startswith(
-                "reply_published:"
+                "comment_published:"
             )
 
             reaction_prepared = await session.call_tool(
@@ -1986,7 +1967,6 @@ async def test_mcp_client_discovers_calls_and_reads_evidence() -> None:
                     "context_id": "post-write-context",
                     "request_id": "reaction-prepare-request",
                     "post_ref": "activity:7312345678901234567",
-                    "comment_ref": "comment:activity:7312345678901234567:111",
                     "desired_reaction": "funny",
                 },
             )
@@ -2002,7 +1982,7 @@ async def test_mcp_client_discovers_calls_and_reads_evidence() -> None:
             reaction_payload = TypeAdapter(dict[str, object]).validate_python(
                 reaction_draft["payload"]
             )
-            assert reaction_payload["existing_reaction"] == "like"
+            assert reaction_payload["existing_reaction"] == "none"
             assert reaction_payload["desired_reaction"] == "funny"
             reaction_approval_preview = TypeAdapter(dict[str, object]).validate_python(
                 reaction_prepared.structuredContent["approval_preview"]
