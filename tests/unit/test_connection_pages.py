@@ -270,7 +270,7 @@ async def test_connections_read_delayed_tail_and_trailing_hyphen_slugs() -> None
         "riley-quinn--",
         "jordan-lee-",
     ]
-    assert 2 <= coverage.rounds_visited <= 4
+    assert 1 <= coverage.rounds_visited <= 4
     assert coverage.stop_reason is StopReason.VISIBLE_PAGE_COMPLETE
     assert "Jordan Lee" in captured_text
 
@@ -343,9 +343,38 @@ async def test_connections_detect_virtualized_same_count_replacement() -> None:
         "jane-doe",
         "tail-member-",
     ]
-    assert 2 <= coverage.rounds_visited <= 4
+    assert 1 <= coverage.rounds_visited <= 4
     assert coverage.stop_reason is StopReason.VISIBLE_PAGE_COMPLETE
     assert "Tail Member" in captured_text
+
+
+@pytest.mark.timeout(20)
+async def test_exact_connection_lookup_reads_terminal_virtualized_render() -> None:
+    html = (FIXTURES / "connections-list-virtualized-current.html").read_text()
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        page = await browser.new_page()
+        adapter = ConnectionsListPage(
+            cast(
+                BrowserManager,
+                ConnectionFixtureBrowser(
+                    page,
+                    {"/mynetwork/invite-connect/connections/": html},
+                ),
+            ),
+            max_scroll_rounds=5,
+        )
+        try:
+            connection, image_src = await adapter.find_exact(
+                page,
+                profile_slug="tail-member-",
+                query="Tail Member",
+            )
+        finally:
+            await browser.close()
+
+    assert connection.name == "Tail Member"
+    assert image_src == "https://media.example.com/tail.jpg"
 
 
 def test_latest_connection_and_invitation_fixtures_record_live_selector_provenance() -> None:

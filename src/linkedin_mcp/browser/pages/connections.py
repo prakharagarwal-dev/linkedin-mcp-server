@@ -643,6 +643,8 @@ class ConnectionsListPage:
                     end_text = await _visible_text(page)
                     if not captures or captures[-1] != end_text:
                         captures.append(end_text)
+                    for item in await self.extract_visible_connections(page):
+                        connections.setdefault(item.profile_slug, item)
                     stop_reason = (
                         StopReason.NO_NEW_RESULTS
                         if not connections
@@ -749,6 +751,13 @@ class ConnectionsListPage:
                 break
             settled = await _settle_scroll(page)
             if settled.outcome is CollectionSettleOutcome.EXPLICIT_END:
+                for card in await _raw_member_cards(page):
+                    connection = _connection_from_card(card)
+                    if connection is None or connection.profile_slug != profile_slug:
+                        continue
+                    raw_image = card.get("image_src")
+                    image_src = raw_image if isinstance(raw_image, str) and raw_image else None
+                    return connection, image_src
                 break
             if await terminal_tracker.observe(page, settled):
                 break
