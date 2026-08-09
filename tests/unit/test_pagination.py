@@ -8,6 +8,8 @@ from linkedin_mcp.application.pagination import PaginationManager, select_page
 from linkedin_mcp.domain.models import (
     CapabilityName,
     ConnectionsListInput,
+    InvitationFilter,
+    InvitationListInput,
     JobSearchInput,
     PostCommentsListInput,
 )
@@ -148,7 +150,7 @@ async def test_cursor_continuation_is_single_use_and_preserves_scan_identity() -
 
 
 @pytest.mark.asyncio
-async def test_cursor_is_bound_to_account_capability_and_semantic_filters() -> None:
+async def test_cursor_is_bound_to_client_account_capability_and_semantic_filters() -> None:
     manager = _manager()
     request = JobSearchInput(
         context_id="pagination",
@@ -159,6 +161,7 @@ async def test_cursor_is_bound_to_account_capability_and_semantic_filters() -> N
     )
     lease = await manager.acquire(
         account_id="personal",
+        client_id="client-a",
         capability_name=CapabilityName.JOBS_SEARCH,
         request=request,
     )
@@ -179,30 +182,79 @@ async def test_cursor_is_bound_to_account_capability_and_semantic_filters() -> N
 
     with pytest.raises(InvalidCursorError, match="does not match"):
         await manager.acquire(
+            account_id="personal",
+            client_id="client-b",
+            capability_name=CapabilityName.JOBS_SEARCH,
+            request=continuation,
+        )
+    with pytest.raises(InvalidCursorError, match="does not match"):
+        await manager.acquire(
             account_id="other-account",
+            client_id="client-a",
             capability_name=CapabilityName.JOBS_SEARCH,
             request=continuation,
         )
     with pytest.raises(InvalidCursorError, match="does not match"):
         await manager.acquire(
             account_id="personal",
+            client_id="client-a",
             capability_name=CapabilityName.PEOPLE_SEARCH,
             request=continuation,
         )
     with pytest.raises(InvalidCursorError, match="does not match"):
         await manager.acquire(
             account_id="personal",
+            client_id="client-a",
             capability_name=CapabilityName.JOBS_SEARCH,
             request=continuation.model_copy(update={"query": "rust"}),
         )
 
     valid = await manager.acquire(
         account_id="personal",
+        client_id="client-a",
         capability_name=CapabilityName.JOBS_SEARCH,
         request=continuation,
     )
     assert valid.seen_keys == frozenset({"job-1", "job-2"})
     await manager.abort(valid)
+
+
+@pytest.mark.asyncio
+async def test_invitation_cursor_binds_the_resolved_default_filter() -> None:
+    manager = _manager()
+    request = InvitationListInput(
+        context_id="pagination",
+        request_id="invitations-page-1",
+        page_size=1,
+    )
+    lease = await manager.acquire(
+        account_id="personal",
+        capability_name=CapabilityName.INVITATIONS_LIST,
+        request=request,
+    )
+    first = await manager.advance(
+        lease,
+        page_size=1,
+        returned_keys=("invitation-1",),
+        provider_has_more=True,
+    )
+    assert first.next_cursor is not None
+
+    continuation = request.model_copy(
+        update={
+            "request_id": "invitations-page-2",
+            "cursor": first.next_cursor,
+            "invitation_filter": InvitationFilter.ALL,
+        }
+    )
+    continued = await manager.acquire(
+        account_id="personal",
+        capability_name=CapabilityName.INVITATIONS_LIST,
+        request=continuation,
+    )
+
+    assert continued.seen_keys == frozenset({"invitation-1"})
+    await manager.abort(continued)
 
 
 @pytest.mark.asyncio

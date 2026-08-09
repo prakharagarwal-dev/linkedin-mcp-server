@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import sys
 import uuid
@@ -27,6 +28,7 @@ from linkedin_mcp.application import (
     ConversationSearchProvider,
     InvitationActionProvider,
     InvitationListProvider,
+    PaginationManager,
     PostCommentsProvider,
     PostDetailProvider,
     PostEngagementProvider,
@@ -545,7 +547,8 @@ class ProtocolNetwork:
         | tuple[tuple[ConnectionSummary, ...], ConnectionsListCoverage, str, str]
         | tuple[tuple[ConversationSummary, ...], ConversationSearchCoverage, str, str]
     ):
-        del result_limit, progress
+        del progress
+        limit = request.page_size if result_limit is None else result_limit
         captured_at = datetime.now(UTC)
         if isinstance(request, InvitationListInput):
             source_url = "https://www.linkedin.com/mynetwork/invitation-manager/"
@@ -606,18 +609,14 @@ class ProtocolNetwork:
                     ),
                     view_membership_count=1,
                     overlap_count=0,
-                    snapshot_count=1,
-                    returned_count=1,
+                    result_count=1,
+                    max_results=limit,
                     scroll_rounds=1,
                     collection_attempts=1,
                     neighboring_recommendation_count=0,
                     invitation_type_counts={InvitationType.CONNECTION_REQUEST: 1},
                     entity_type_counts={InvitationEntityType.PERSON: 1},
-                    completion_reason=(
-                        "visible_view_union_reconciled"
-                        if request.resolved_filter is InvitationFilter.ALL
-                        else "advertised_count_reconciled"
-                    ),
+                    stop_reason=StopReason.VISIBLE_PAGE_COMPLETE,
                     captured_at=captured_at,
                 ),
                 text,
@@ -949,6 +948,11 @@ def _container() -> AppContainer:
     registry = create_default_registry()
     browser = BrowserManager(settings)
     network = ProtocolNetwork()
+    pagination = PaginationManager(
+        ttl_seconds=settings.pagination_cursor_ttl_seconds,
+        max_active_cursors=settings.pagination_max_active_cursors,
+        max_seen_items_per_cursor=settings.pagination_max_seen_items_per_cursor,
+    )
     executor = CapabilityExecutor(
         settings=settings,
         registry=registry,
@@ -969,8 +973,15 @@ def _container() -> AppContainer:
         invitation_actions=cast(InvitationActionProvider, network),
         conversation_search=cast(ConversationSearchProvider, network),
         conversation=cast(ConversationProvider, network),
+        pagination=pagination,
     )
-    worker = CapabilityWorker(executor, queue_capacity=settings.queue_capacity)
+    worker = CapabilityWorker(
+        executor,
+        queue_capacity=settings.queue_capacity,
+        pagination=pagination,
+        account_id=settings.account_id,
+        call_lookup=repository.find_call,
+    )
     return AppContainer(
         settings=settings,
         registry=registry,
@@ -1007,6 +1018,13 @@ async def test_mcp_client_discovers_calls_and_reads_evidence() -> None:
             initialized = await session.initialize()
             assert initialized.serverInfo.name == "linkedin-mcp-server"
             assert initialized.serverInfo.version == __version__
+            assert initialized.instructions is not None
+            assert "explicit durable per-tool approval" in initialized.instructions
+            assert "interactive confirmation is the safe default" in initialized.instructions
+            assert "Never treat chat text as a durable client approval policy" in (
+                initialized.instructions
+            )
+            assert "native user confirmation" not in initialized.instructions
 
             tools = await session.list_tools()
             names = {tool.name for tool in tools.tools}
@@ -1116,6 +1134,7 @@ async def test_mcp_client_discovers_calls_and_reads_evidence() -> None:
             content_schema = post_prepare_tool.inputSchema["properties"]["content"]
             assert "oneOf" in content_schema
             assert len(content_schema["oneOf"]) == 9
+            assert content_schema["description"].endswith("use mode, not kind.")
             assert execute_fields == set(post_execute_tool.inputSchema["properties"])
             comment_prepare_tool = next(
                 tool for tool in tools.tools if tool.name == "linkedin.posts.comment.prepare"
@@ -1185,6 +1204,10 @@ async def test_mcp_client_discovers_calls_and_reads_evidence() -> None:
                 assert execute_tool.annotations.readOnlyHint is False
                 assert execute_tool.annotations.destructiveHint is True
                 assert execute_tool.annotations.idempotentHint is True
+                assert execute_tool.description is not None
+                assert "configured approval policy" in execute_tool.description
+                assert "explicit durable per-tool approval" in execute_tool.description
+                assert "native user confirmation" not in execute_tool.description
                 assert execute_fields == set(execute_tool.inputSchema["properties"])
             conversation_tool = next(
                 tool for tool in tools.tools if tool.name == "linkedin.messaging.conversation.get"
@@ -1229,14 +1252,14 @@ async def test_mcp_client_discovers_calls_and_reads_evidence() -> None:
                 "view_source_urls",
                 "view_membership_count",
                 "overlap_count",
-                "snapshot_count",
-                "returned_count",
+                "result_count",
+                "max_results",
                 "scroll_rounds",
                 "collection_attempts",
                 "neighboring_recommendation_count",
                 "invitation_type_counts",
                 "entity_type_counts",
-                "completion_reason",
+                "stop_reason",
             }.issubset(invitation_coverage_properties)
             invitation_summary_properties = cast(
                 dict[str, object],
@@ -1848,12 +1871,13 @@ async def test_mcp_client_discovers_calls_and_reads_evidence() -> None:
             }
             assert invitations.structuredContent["coverage"]["view_membership_count"] == 1
             assert invitations.structuredContent["coverage"]["overlap_count"] == 0
-            assert invitations.structuredContent["coverage"]["snapshot_count"] == 1
+            assert invitations.structuredContent["coverage"]["result_count"] == 1
+            assert invitations.structuredContent["coverage"]["max_results"] == 25
             assert (
-                invitations.structuredContent["coverage"]["completion_reason"]
-                == "advertised_count_reconciled"
+                invitations.structuredContent["coverage"]["stop_reason"] == "visible_page_complete"
             )
             assert invitations.structuredContent["pagination"]["has_more"] is False
+            assert invitations.structuredContent["pagination"]["consistency"] == "live_deduplicated"
             assert inbox.structuredContent["coverage"]["category"] == "other"
             assert inbox.structuredContent["coverage"]["filter"] == "jobs"
             assert connections.structuredContent["connections"][0]["name"] == "Jane Doe"
@@ -2264,3 +2288,288 @@ async def test_streamable_http_transport_runs_on_loopback(unused_tcp_port: int) 
         assert result.isError is False
         assert result.structuredContent is not None
         assert result.structuredContent["transport"] == "stdio"
+
+
+@pytest.mark.asyncio
+async def test_stdio_proxy_forwards_tools_annotations_calls_and_evidence(
+    unused_tcp_port: int,
+) -> None:
+    mcp = create_mcp_server(_container())
+    server = uvicorn.Server(
+        uvicorn.Config(
+            mcp.streamable_http_app(),
+            host="127.0.0.1",
+            port=unused_tcp_port,
+            log_level="critical",
+        )
+    )
+    endpoint = f"http://127.0.0.1:{unused_tcp_port}/mcp"
+
+    async with anyio.create_task_group() as task_group:
+        task_group.start_soon(server.serve)
+        for _ in range(200):
+            if server.started:
+                break
+            await anyio.sleep(0.01)
+        else:
+            raise AssertionError("Streamable HTTP server did not start")
+
+        parameters = StdioServerParameters(
+            command=sys.executable,
+            args=[str(Path(__file__).with_name("stdio_proxy_fixture.py")), endpoint],
+            cwd=ROOT,
+        )
+        try:
+            async with (
+                stdio_client(parameters) as (read_stream, write_stream),
+                ClientSession(read_stream, write_stream) as session,
+            ):
+                initialized = await session.initialize()
+                tools = await session.list_tools()
+                jobs_tool = next(
+                    tool for tool in tools.tools if tool.name == "linkedin.jobs.search"
+                )
+                assert jobs_tool.annotations is not None
+                assert jobs_tool.annotations.readOnlyHint is True
+                assert jobs_tool.annotations.openWorldHint is True
+
+                result = await session.call_tool(
+                    "linkedin.jobs.search",
+                    {
+                        "context_id": "proxy-contract",
+                        "request_id": "proxy-jobs-search",
+                        "query": "python",
+                        "page_size": 10,
+                    },
+                )
+                assert result.isError is False
+                assert result.structuredContent is not None
+                source_uri = result.structuredContent["sources"][0]["resource_uri"]
+                resource = await session.read_resource(AnyUrl(source_uri))
+        finally:
+            server.should_exit = True
+
+        assert initialized.serverInfo.name == "linkedin-mcp-server"
+        assert initialized.serverInfo.version == __version__
+        assert len(resource.contents) == 1
+        assert isinstance(resource.contents[0], TextResourceContents)
+        assert "Senior Python Engineer" in resource.contents[0].text
+
+
+@pytest.mark.asyncio
+async def test_streamable_http_sessions_isolate_requests_and_action_drafts(
+    unused_tcp_port: int,
+) -> None:
+    mcp = create_mcp_server(_container())
+    server = uvicorn.Server(
+        uvicorn.Config(
+            mcp.streamable_http_app(),
+            host="127.0.0.1",
+            port=unused_tcp_port,
+            log_level="critical",
+        )
+    )
+    endpoint = f"http://127.0.0.1:{unused_tcp_port}/mcp"
+
+    async with anyio.create_task_group() as task_group:
+        task_group.start_soon(server.serve)
+        for _ in range(200):
+            if server.started:
+                break
+            await anyio.sleep(0.01)
+        else:
+            raise AssertionError("Streamable HTTP server did not start")
+
+        try:
+            async with (
+                streamable_http_client(endpoint) as (read_a, write_a, _),
+                ClientSession(read_a, write_a) as client_a,
+                streamable_http_client(endpoint) as (read_b, write_b, _),
+                ClientSession(read_b, write_b) as client_b,
+            ):
+                await client_a.initialize()
+                await client_b.initialize()
+
+                shared_request_a, shared_request_b = await asyncio.gather(
+                    client_a.call_tool(
+                        "linkedin.jobs.search",
+                        {
+                            "context_id": "client-a",
+                            "request_id": "same-request-id",
+                            "query": "python",
+                            "page_size": 10,
+                        },
+                    ),
+                    client_b.call_tool(
+                        "linkedin.jobs.search",
+                        {
+                            "context_id": "client-b",
+                            "request_id": "same-request-id",
+                            "query": "rust",
+                            "page_size": 10,
+                        },
+                    ),
+                )
+                assert shared_request_a.isError is False
+                assert shared_request_b.isError is False
+
+                same_client_conflict = await client_a.call_tool(
+                    "linkedin.jobs.search",
+                    {
+                        "context_id": "client-a",
+                        "request_id": "same-request-id",
+                        "query": "go",
+                        "page_size": 10,
+                    },
+                )
+                assert same_client_conflict.isError is True
+
+                first_page = await client_a.call_tool(
+                    "linkedin.posts.comments.list",
+                    {
+                        "context_id": "client-a-pagination",
+                        "request_id": "comments-page-1",
+                        "post_ref": "activity:7312345678901234567",
+                        "page_size": 1,
+                    },
+                )
+                assert first_page.isError is False
+                assert first_page.structuredContent is not None
+                cursor = first_page.structuredContent["pagination"]["next_cursor"]
+                assert isinstance(cursor, str)
+
+                cross_client_cursor = await client_b.call_tool(
+                    "linkedin.posts.comments.list",
+                    {
+                        "context_id": "client-b-pagination",
+                        "request_id": "cross-client-cursor",
+                        "post_ref": "activity:7312345678901234567",
+                        "page_size": 1,
+                        "cursor": cursor,
+                    },
+                )
+                assert cross_client_cursor.isError is True
+                assert cross_client_cursor.content
+                assert isinstance(cross_client_cursor.content[0], TextContent)
+                assert "invalid_cursor" in cross_client_cursor.content[0].text
+
+                second_page_arguments = {
+                    "context_id": "client-a-pagination",
+                    "request_id": "comments-page-2",
+                    "post_ref": "activity:7312345678901234567",
+                    "page_size": 1,
+                    "cursor": cursor,
+                }
+                second_page = await client_a.call_tool(
+                    "linkedin.posts.comments.list",
+                    second_page_arguments,
+                )
+                replayed_page = await client_a.call_tool(
+                    "linkedin.posts.comments.list",
+                    second_page_arguments,
+                )
+                assert second_page.isError is False
+                assert replayed_page.isError is False
+                assert replayed_page.structuredContent is not None
+                assert replayed_page.structuredContent["replayed"] is True
+
+                consumed_cursor = await client_a.call_tool(
+                    "linkedin.posts.comments.list",
+                    {
+                        **second_page_arguments,
+                        "request_id": "comments-page-2-cursor-reuse",
+                    },
+                )
+                assert consumed_cursor.isError is True
+                assert consumed_cursor.content
+                assert isinstance(consumed_cursor.content[0], TextContent)
+                assert "invalid_cursor" in consumed_cursor.content[0].text
+
+                prepared_a, prepared_b = await asyncio.gather(
+                    client_a.call_tool(
+                        "linkedin.invitations.send.prepare",
+                        {
+                            "context_id": "client-a",
+                            "request_id": "prepare-a",
+                            "profile_slug": "jane-doe",
+                            "note": "Prepared by client A",
+                        },
+                    ),
+                    client_b.call_tool(
+                        "linkedin.invitations.send.prepare",
+                        {
+                            "context_id": "client-b",
+                            "request_id": "prepare-b",
+                            "profile_slug": "jane-doe",
+                            "note": "Prepared by client B",
+                        },
+                    ),
+                )
+                assert prepared_a.isError is False
+                assert prepared_b.isError is False
+                assert prepared_a.structuredContent is not None
+                assert prepared_b.structuredContent is not None
+                draft_a = TypeAdapter(dict[str, object]).validate_python(
+                    prepared_a.structuredContent["draft"]
+                )
+                draft_b = TypeAdapter(dict[str, object]).validate_python(
+                    prepared_b.structuredContent["draft"]
+                )
+                preview_a = TypeAdapter(dict[str, object]).validate_python(
+                    prepared_a.structuredContent["approval_preview"]
+                )
+                preview_b = TypeAdapter(dict[str, object]).validate_python(
+                    prepared_b.structuredContent["approval_preview"]
+                )
+
+                cross_client_execute = await client_b.call_tool(
+                    "linkedin.invitations.send.execute",
+                    {
+                        "context_id": "client-b",
+                        "request_id": "cross-client-execute",
+                        "action_id": draft_a["action_id"],
+                        "payload_hash": draft_a["payload_hash"],
+                        "approval_preview": preview_a,
+                        "idempotency_key": "cross-client-attempt",
+                    },
+                )
+                assert cross_client_execute.isError is True
+                assert cross_client_execute.content
+                assert isinstance(cross_client_execute.content[0], TextContent)
+                assert "invalid_target" in cross_client_execute.content[0].text
+
+                executed_a = await client_a.call_tool(
+                    "linkedin.invitations.send.execute",
+                    {
+                        "context_id": "client-a",
+                        "request_id": "execute-a",
+                        "action_id": draft_a["action_id"],
+                        "payload_hash": draft_a["payload_hash"],
+                        "approval_preview": preview_a,
+                        "idempotency_key": "account-global-key",
+                    },
+                )
+                assert executed_a.isError is False
+
+                global_key_conflict = await client_b.call_tool(
+                    "linkedin.invitations.send.execute",
+                    {
+                        "context_id": "client-b",
+                        "request_id": "execute-b",
+                        "action_id": draft_b["action_id"],
+                        "payload_hash": draft_b["payload_hash"],
+                        "approval_preview": preview_b,
+                        "idempotency_key": "account-global-key",
+                    },
+                )
+                assert global_key_conflict.isError is True
+                assert global_key_conflict.content
+                assert isinstance(global_key_conflict.content[0], TextContent)
+                assert "idempotency_conflict" in global_key_conflict.content[0].text
+
+                status = await client_a.call_tool("linkedin.server.status", {})
+                assert status.isError is False
+                assert status.structuredContent is not None
+                assert status.structuredContent["connected_clients"] >= 2
+        finally:
+            server.should_exit = True

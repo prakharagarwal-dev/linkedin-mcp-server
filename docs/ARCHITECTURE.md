@@ -6,36 +6,39 @@ The project is one standalone Python MCP server for one configured LinkedIn
 account.
 
 ```text
-┌───────────────────────────────────────────────────────────────────┐
-│ Client process                                                    │
-│ Codex, LangGraph graph, scheduler, or another trusted MCP client  │
-└──────────────────────────────┬────────────────────────────────────┘
-                               │ typed MCP
-┌──────────────────────────────▼────────────────────────────────────┐
-│ LinkedIn MCP server process                                      │
-│                                                                   │
-│ transport -> registry/policy -> asyncio.Queue -> executor         │
-│                                               │                   │
-│ operation store + cursor/snapshot managers    │                   │
-│                                               ▼                   │
-│                            typed LinkedIn page objects            │
-│                                               │                   │
-│                          browser manager + navigation pacer       │
-└──────────────────────────────┬────────────────────────────────────┘
-                               │ official Playwright, visible UI
-┌──────────────────────────────▼────────────────────────────────────┐
-│ linkedin.com on configured exact hosts                           │
-└───────────────────────────────────────────────────────────────────┘
+┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐
+│ MCP client A        │  │ MCP client B        │  │ MCP client C        │
+│ stdio bridge        │  │ stdio bridge        │  │ direct HTTP         │
+└──────────┬──────────┘  └──────────┬──────────┘  └──────────┬──────────┘
+           └────────────────────────┼────────────────────────┘
+                                    │ stateful loopback MCP
+┌───────────────────────────────────▼────────────────────────────────┐
+│ One shared local runtime for one configured LinkedIn account       │
+│                                                                    │
+│ session identity -> registry/policy -> fair asyncio queue           │
+│                                          │                         │
+│ client-scoped calls/cursors/drafts        ▼                         │
+│                              one atomic browser operation           │
+│                                          │                         │
+│                    typed page objects + global navigation pacer     │
+│                                          │                         │
+│                    one Chromium context + one temporary Page        │
+└──────────────────────────────────────────┬─────────────────────────┘
+                                           │ Playwright, visible UI
+                              ┌────────────▼────────────┐
+                              │ exact LinkedIn hosts   │
+                              └─────────────────────────┘
 
 Persistent local filesystem:
   browser cache ─ matching Playwright Chromium revision
   browser profile ─ LinkedIn cookies and normal Chromium preferences
   asset root ─ explicitly selected user files
+  runtime lock ─ non-secret owner, version, endpoint, and configuration hash
 ```
 
 The server does not contain an agent, LLM, LangGraph graph, ranking algorithm,
-scheduler, cross-run memory, or database. It does not expose generic browser,
-click, JavaScript, selector, URL, HTTP, or network capabilities.
+workflow scheduler, cross-run memory, or database. It does not expose generic
+browser, click, JavaScript, selector, URL, HTTP, or network capabilities.
 
 ## Composition and layers
 
@@ -44,15 +47,32 @@ click, JavaScript, selector, URL, HTTP, or network capabilities.
 `server.py` builds the official SDK `FastMCP` server and registers each typed
 tool and evidence resource.
 
-- stdio is the default local transport;
-- Streamable HTTP is restricted to loopback;
-- MCP initialization starts the application lifespan;
+- stdio is the default client-facing transport;
+- every stdio process is a transparent bridge to the shared loopback runtime;
+- direct Streamable HTTP is restricted to the same loopback endpoint;
+- the first client elects and starts the runtime, and later clients attach;
 - browser installation and authentication bootstrap run as background tasks,
   keeping initialization responsive.
 
+The loopback listener owns the application lifecycle. One container, internal
+ownership lock, fair queue, browser context, pacing history, cursor manager,
+operation store, and authentication coordinator remain alive when an
+individual stdio or HTTP client disconnects. `linkedin-mcp stop` gracefully
+ends the exact elected owner. The lock is runtime election and maintenance
+coordination; normal MCP clients do not compete for browser-profile ownership.
+The lock's SHA-256 configuration fingerprint also prevents a client with
+different profile, policy, browser, pacing, or endpoint settings from silently
+inheriting the first client's runtime configuration.
+
+The runtime uses stateful MCP sessions. It assigns each server session an
+opaque internal identity; callers cannot provide or override it. That identity
+scopes request replay, in-flight coalescing, cursor ownership, progress, and
+prepared actions.
+
 Tool annotations describe read, prepare, and destructive execution behavior.
-They help a native MCP client decide when to ask the user for confirmation but
-do not authorize a scope on the server.
+They request confirmation for execute tools by default, but the MCP client's
+durable per-tool policy may explicitly pre-approve selected tools. Neither mode
+authorizes a scope on the server.
 
 ### Domain contracts
 
@@ -101,22 +121,39 @@ Authorization requires all of the following:
 Enabling one capability does not grant generic access to related LinkedIn
 features.
 
-### Queue and worker
+### Fair queue and atomic worker
 
-One bounded `asyncio.Queue` accepts local capability work. One worker consumes
-it, which guarantees a single ordered Playwright operation stream for the
-configured account. Queue backpressure is internal; callers simply wait for
-their response.
+A bounded in-process scheduler uses `asyncio.Queue` for ready client lanes and
+FIFO deques within each lane. It preserves submission order for one client and
+round-robins across clients. A client with a large backlog therefore cannot
+indefinitely delay another client, while queue backpressure remains internal.
 
-The queue is not durable. A process exit discards pending calls.
+One worker still permits exactly one browser-backed capability call at a time.
+A call is atomic: it is never paused halfway through so another client can
+reuse its Page. Each call starts from its typed target, obtains one temporary
+Page, finishes or fails, and closes that Page. Fairness happens between calls.
+A paginated workflow can interleave with other clients only when it returns a
+page and the client later submits its next cursor call.
+
+The queue is not durable. A runtime exit rejects queued work. If a caller
+cancels its last waiter, queued work is removed; an active read or prepare is
+cancelled; an active execute continues in the background until it records a
+verified, failed, or uncertain result. This avoids retrying a LinkedIn write
+whose external effect may already have started.
+
+`status` inspects non-secret owner and queue metadata without browser access.
+`stop` rechecks exact ownership, sends `SIGTERM`, and waits for release. Clean
+shutdown stops admission, rejects queued calls, preserves an active write to a
+terminal result, closes memory and Chromium, and releases the lock. The CLI
+never escalates to a force kill.
 
 ### Executor
 
 The executor owns the common capability lifecycle:
 
 1. authorize the registered descriptor;
-2. validate process-local request replay;
-3. acquire and validate a cursor lease for collection capabilities;
+2. validate session-scoped request replay;
+3. use the cursor lease reserved before queue admission for collection calls;
 4. call the narrow page-object provider with an internal traversal target;
 5. remove already-seen stable identities and retain one-item lookahead;
 6. normalize typed output, pagination metadata, and captured evidence;
@@ -127,13 +164,13 @@ Browser and page-object exceptions are projected as safe domain errors.
 Secrets, raw page dumps, subprocess output, and internal exception details are
 not sent to clients.
 
-Invitation listing is an intentional specialized path. For one selected view,
-the page object captures every item and reconciles it to that view's exact
-visible count. The synthetic Received `all` selection scans every current
-visible received view, reconciles each one independently, and deduplicates
-overlapping stable invitation identities into one exact union. The executor
-then stores the immutable snapshot in a dedicated bounded paginator;
-continuation calls slice it without browser access.
+Invitation listing follows the same cursor lifecycle. Its page object still
+preserves the stricter LinkedIn-specific inventory contract: one selected view
+must reconcile its exact advertised count before a terminal response, while
+the synthetic Received `all` selection must reconcile every current visible
+view and deduplicate overlapping invitation identities into one exact union.
+Earlier pages may stop at a bounded live prefix; a continuation revisits the
+visible UI and suppresses identities already returned by the scan.
 
 ### Process-local operation store
 
@@ -149,23 +186,29 @@ protected by one async lock. It retains only what a live process needs:
 Nothing is serialized. A server restart creates a new empty store. This is an
 intentional local-runtime tradeoff, not an accidental loss of durability.
 
-The store remains necessary for write safety: an execute call must match the
-exact draft created by a prior prepare call. It is not workflow memory and
-cannot be used for cross-run tracking.
+Request replay and action drafts are scoped by the internal MCP-session
+identity. An execute call must come from the session that created its exact
+draft. Execution idempotency keys are deliberately account-global, preventing
+two clients from using the same key for different actions. Evidence remains an
+immutable runtime resource. The store is not workflow memory and cannot be
+used for cross-run tracking.
 
 ### General collection cursor manager
 
 The cursor manager is separate from `MemoryRepository`. It keeps a bounded
 process-local map from random opaque cursor tokens to:
 
-- account, capability, and canonical semantic-input binding;
+- client session, account, capability, and canonical semantic-input binding;
 - one scan ID and the stable identities already returned;
 - expiry and a short-lived in-use reservation.
 
-The first call has no cursor. A continuation consumes its input cursor and, if
-more live items are visible, returns a new single-use cursor. Failed browser or
-parser work releases the reservation so the same continuation can be retried.
-Successful consumption, expiry, filter mismatch, account mismatch, process
+The first call has no cursor. A continuation cursor is validated and reserved
+before its call waits in the fair queue. Queue delay therefore cannot expire
+the reserved continuation or let a second call consume it. If more live items
+are visible, successful completion consumes the input cursor and returns a new
+single-use cursor. Failed or cancelled browser/parser work releases the
+reservation so the same originating client can retry. Successful consumption,
+expiry before reservation, client/filter/account/capability mismatch, runtime
 restart, and concurrent reuse fail closed with `invalid_cursor`.
 
 LinkedIn does not provide a public snapshot token through the visible UI. A
@@ -174,29 +217,17 @@ skips stable identities already emitted, and reads one unseen lookahead item.
 This is reported as `live_deduplicated`: it prevents duplicates within the scan
 but does not promise snapshot isolation while LinkedIn results change.
 
-### Invitation snapshot paginator
+### Invitation terminal reconciliation
 
-Invitation pagination is separate because every current invitation view
-exposes an exact count even though the latest received surface has no reliable
-All control. The first
-`linkedin.invitations.list` call:
-
-1. selects the exact Received or Sent view, or every current Received view for
-   the synthetic `all` filter;
-2. captures each selected view's current advertised count;
-3. accumulates typed invitations across lazy-loaded and virtualized windows;
-4. reconciles each view independently and excludes neighboring
-   recommendations;
-5. deduplicates identical stable identities across overlapping Received
-   views, failing closed if their visible data conflicts;
-6. records membership, overlap, and unique snapshot counts;
-7. creates one immutable process-local snapshot; and
-8. returns the requested first slice.
-
-Continuation tokens are random, opaque, single-use, account/direction/filter
-bound, and share one absolute expiry with the snapshot. Page size may change.
-Continuation calls perform no LinkedIn navigation. Final consumption, expiry,
-capacity eviction, or process shutdown deletes the snapshot state.
+Invitation reads use the general cursor manager but retain stronger terminal
+proof. A bounded request selects the exact Received or Sent view—or the current
+six-view Received union—captures advertised counts, accumulates typed cards
+across lazy-loaded or virtualized windows, excludes neighboring
+recommendations, and deduplicates stable identities. Reaching the requested
+live prefix returns `result_limit`; exhausting the private traversal bound
+returns `safety_bound`. Only a complete exact count, or an exact reconciled
+multi-view union, returns `visible_page_complete` and terminal
+`has_more=false` without truncation.
 
 ### Browser bootstrap
 
@@ -234,21 +265,28 @@ writes cookies and preferences normally when the context closes.
 
 Startup behavior:
 
-1. schedule managed Chromium setup when automatic installation is enabled;
-2. inspect whether the persistent profile contains browser data;
-3. silently validate an existing session;
-4. otherwise open one headed login context on that profile;
-5. select LinkedIn's visible **Keep me signed in** control when available;
-6. wait for the user to finish LinkedIn login/checkpoint work;
-7. require a persistent LinkedIn session cookie and departure from interactive
+1. acquire the configured account lock and publish non-secret owner metadata;
+2. schedule managed Chromium setup when automatic installation is enabled;
+3. initialize the dedicated persistent profile when it is missing;
+4. silently validate an existing session when profile data is already present;
+5. otherwise open one headed LinkedIn login context on that profile;
+6. select LinkedIn's visible **Keep me signed in** control when available;
+7. wait for the user to finish LinkedIn login/checkpoint work;
+8. require a persistent LinkedIn session cookie and departure from interactive
    auth surfaces;
-8. close the login context normally and reopen the exact profile in the
+9. close the login context normally and reopen the exact profile in the
    configured headed or headless mode;
-9. navigate to the authenticated feed and apply the normal safety guard; and
-10. only then report login success and start the normal runtime context.
+10. navigate to the authenticated feed and apply the normal safety guard; and
+11. only then report login success and start the normal runtime context.
 
-The MCP handshake does not wait for steps 3–10. A capability that requires the
+The MCP handshake does not wait for steps 2–11. A capability that requires the
 browser waits for the background authentication task.
+
+The same profile manager backs explicit `profile create`, `profile status`, and
+recoverable `profile reset` commands. Manual `login` operates only on an
+initialized profile. Manual `logout` follows LinkedIn's visible account menu
+and Sign Out control, then proves the session remains absent after a clean
+profile reopen. No command imports or adopts a user's general Chrome profile.
 
 For each capability operation, the manager creates a fresh Page within the one
 persistent context and closes that Page afterwards. The context itself is
@@ -296,12 +334,13 @@ probes, and no loader or tail control is visible. An unambiguous visible
 ## Read lifecycle
 
 ```text
-client tool call
+client tool call (internal MCP-session identity)
   -> Pydantic input validation
   -> surface/scope/effect authorization
-  -> enqueue
-  -> process-local request-id check
-  -> acquire/validate collection cursor when applicable
+  -> reserve collection cursor when applicable
+  -> enqueue in the client's FIFO lane
+  -> fair selection of the next client
+  -> session-scoped request-id check
   -> wait for browser setup/authentication
   -> paced visible LinkedIn interaction
   -> page safety check
@@ -331,8 +370,8 @@ typed payload and any local asset hashes, then creates:
 - human-readable approval preview;
 - expiry time.
 
-The draft is stored in process memory and returned. No final LinkedIn action is
-performed.
+The draft is stored in process memory for the originating MCP session and
+returned. No final LinkedIn action is performed.
 
 Invitation actions use exact member profiles rather than scanning invitation
 filters. Send preparation opens and validates the current invitation dialog
@@ -341,23 +380,26 @@ require the exact current paired request controls. This keeps action identity
 independent of LinkedIn's current invitation bucket and prevents a broad list
 scan from selecting the wrong member.
 
-### Client confirmation
+### Client approval policy
 
-The matching execute tool is marked destructive. A trusted MCP client should
-display its arguments and ask the user before sending the tool call. Denial
-means the execute call never reaches this server.
+The matching execute tool is marked destructive, which requests interactive
+confirmation by default. A trusted MCP client may instead apply an explicit
+durable pre-approval for that exact named tool when the operator wants
+unattended execution. An interactive denial, a rejected unattended call, or a
+missing approval means the execute call never reaches this server.
 
-The server treats an arriving execute call as the client's confirmed request,
-but it still independently checks scopes, effects, draft identity, hash,
-preview, expiry, account, action type, idempotency, and current visible target.
+The server treats an arriving execute call as authorized by the client's
+configured policy, but it still independently checks scopes, effects, draft
+identity, hash, preview, expiry, account, action type, idempotency, and current
+visible target. It neither receives nor stores the client's approval mode.
 
 ### Execute
 
 ```text
 exact action_id + hash + preview + idempotency key
-  -> load process-local draft
+  -> load the originating session's process-local draft
   -> require byte-for-byte semantic preview equality
-  -> reserve the idempotency key
+  -> reserve the account-global idempotency key
   -> revalidate actor, target, payload, assets, and visible precondition
   -> perform one narrow final UI action
   -> verify visible postcondition
@@ -379,7 +421,8 @@ LangGraph connects as an MCP client. A graph typically:
 5. ranks or deduplicates in graph state;
 6. checkpoints graph state in the application's own checkpointer;
 7. calls a prepare tool when it wants to propose a write;
-8. passes the exact execute call through native user confirmation;
+8. passes the exact execute call through the configured MCP client approval
+   policy;
 9. continues based on the verified result or later read observations.
 
 The LangGraph checkpointer is independent of the MCP server. It may use

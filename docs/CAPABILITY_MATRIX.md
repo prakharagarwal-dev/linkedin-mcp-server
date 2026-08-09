@@ -1,6 +1,6 @@
 # LinkedIn Visible-Feature Matrix
 
-**Matrix version:** `2026-07-30.1`
+**Matrix version:** `2026-08-03.1`
 
 This matrix records the visible LinkedIn controls and outputs inspected for the
 configured authorized member account. It is evidence for capability acceptance,
@@ -34,12 +34,12 @@ do not upgrade this classification.
 | Member profile | `linkedin.people.get` `1.1.1` | Complete/selective sections, exact evidence resources, requested/returned coverage, and genuine trailing-hyphen public slugs | `mock_verified` |
 | Company search | `linkedin.companies.search` `2.0.0` | Complete current Company-search surface: keywords, headquarters, industry, all eight company-size buckets, job-listing and first-degree-connection flags, named-facet resolution, delayed rendering, evidence, and cursor contracts | `mock_verified` |
 | Company profile | `linkedin.companies.get` `2.0.0` | Fixed exact Overview-plus-About read with structured visible fields and two immutable page sources | `mock_verified` |
-| Post search | `linkedin.posts.search` `1.1.1` | Declared content facets, delayed/current card variants, stable references, and cursor contract | `mock_verified` |
+| Post search | `linkedin.posts.search` `2.0.0` | Declared content facets, delayed/current card variants, stable references, exact per-card evidence across dynamic rendering, and cursor contract | `mock_verified` + read-only live acceptance |
 | Post detail | `linkedin.posts.get` `2.0.0` | Exact activity/share/UGC identity, fully expanded text, scoped links/mentions/hashtags, current text/image/video/live-video/document/link/article/newsletter/event/job/poll variants, viewer reaction and engagement, visibility/header metadata, immutable field evidence, bounded completeness coverage, and two-page repost-original resolution | `mock_verified` + read-only live acceptance |
 | Post discussion | `linkedin.posts.comments.list` `1.1.1` | Ordering, cursor-paged top-level comments, delayed expansion, replies, media, and source retrieval | `mock_verified` |
-| Personal post publishing | `linkedin.posts.create.*` `2.0.0` | Nine current personal composer modes, exact nested options, immutable previews, tamper rejection, execution, and replay | `mock_verified` + prepare-only live acceptance |
+| Personal post publishing | `linkedin.posts.create.*` `2.0.0` | Nine current personal composer modes, bounded loader settling, unchanged disabled-setting handling, pre-submit failure classification, exact nested options, immutable previews, tamper rejection, execution, and replay | `mock_verified` + prepare-only live acceptance |
 | Post/comment engagement | `linkedin.posts.comment.*` and `linkedin.posts.reaction.*` `2.0.0` | Current comment/reply text, photo and GIF controls, native discussion aliases, all six reactions, tamper rejection, execution, and replay | `mock_verified` + prepare-only live acceptance |
-| Invitations | List `3.0.0`; send, accept, and ignore `1.0.0` | Latest-layout-only received/sent extraction; exact per-view count reconciliation; immutable snapshot cursors; and the complete currently implemented invitation lifecycle under one namespace, with scoped hash-locked writes and exact-profile postconditions | `mock_verified` + read-only/prepare-only live acceptance |
+| Invitations | List `4.0.0`; send, accept, and ignore `1.0.0` | Latest-layout-only received/sent extraction; bounded live cursor traversal; exact terminal per-view count reconciliation; and the complete currently implemented invitation lifecycle under one namespace, with scoped hash-locked writes and exact-profile postconditions | `mock_verified` + read-only/prepare-only live acceptance |
 | Connections | List `2.0.0`; search `2.0.0` | Separate sorted inventory and filtered search of established first-degree connections; the server always binds search to first degree and rejects non-first-degree results | `mock_verified` + read-only live acceptance |
 | Messaging | Search, conversation get, message prepare, and execute `2.0.0` | Current recipient/message search criteria and mutually exclusive filters; cursor paging; reverse-virtualized history; exact recipients/replies; current text, file, and KLIPY GIF preparation; reply-aware same-surface postconditions; tamper rejection; and replay | `mock_verified` + read/prepare-only live acceptance |
 
@@ -54,17 +54,17 @@ browser-traversal safety limits. The compatibility names `max_results` and
 `max_comments` remain accepted during the transition but are not the canonical
 domain-model fields.
 
-Ten collection families report `live_deduplicated` and rescan a bounded live
-prefix for continuations. `linkedin.invitations.list` instead reports
-`captured_snapshot`: its initial request captures and exactly reconciles the
-entire selected invitation inventory, while every cursor page is an in-memory
-slice of that same immutable snapshot and performs no browser navigation.
+Every collection family reports `live_deduplicated` and rescans a bounded live
+prefix for continuations. Cursor state stores stable identities already
+returned, not captured LinkedIn content. A continuation skips those identities
+and returns the next unseen page plus terminal or truncation metadata.
 
 Collection completion is evidence-driven: raw visible identities detect
-appended and same-count virtualized progress; polling idleness alone never
-sets `has_more=false`. Only a visible empty/end state completes a quiet
-collection. Exhausting the private traversal bound reports truncation rather
-than silently advertising a complete list.
+appended and same-count virtualized progress, and polling idleness alone never
+sets `has_more=false`. Count-backed invitation views complete only after exact
+reconciliation; collectors without an exact count require independent visible
+terminal evidence. Exhausting a private traversal bound reports truncation
+rather than silently advertising a complete list.
 
 ## `linkedin.people.get` `1.1.1`
 
@@ -204,7 +204,7 @@ browser access during execution.
 | GIF picker | `supported` | Exact Search for GIFs/KLIPY query and one unique result image alt label |
 | Like, Celebrate, Support, Love, Insightful, Funny | `supported` | Typed reaction states for both posts and comments |
 | Remove reaction | `supported` | Explicit `none`; never inferred from a repeated click |
-| Set/change/no-op | `supported` | Existing and desired state are both captured, natively confirmed, and revalidated |
+| Set/change/no-op | `supported` | Existing and desired state are both captured, passed through the client approval policy, and revalidated |
 | Comment/reply verification | `supported` | Exactly one new stable reference must match actor and parent; text and GIF label match exactly, while a photo additionally requires the prepared file hash and visible photo type |
 | Reaction verification | `supported` | Final visible reaction must equal the confirmed desired state |
 | Comment as a LinkedIn Page | `outside_named_capability` | Different actor and authorization contract; personal actor is mandatory |
@@ -269,16 +269,16 @@ limit as an enumeration guarantee.
 | Group, event, and newsletter invitations | `supported` | Typed entity URL/slug/name and invitation family |
 | Newly introduced invitation surfaces | `supported` | Loss-preserving `other` entity/type with exact visible evidence |
 | Invitation completion | `supported` | Single views reconcile their exact advertised count; `all` reconciles every view, then reports membership, overlap, and unique union counts; idle, bottom, loader, and end copy never prove completion |
-| Invitation pagination | `supported` | One full immutable snapshot, opaque single-use cursors, changing page size, absolute expiry, and no continuation browser reads |
+| Invitation pagination | `supported` | Opaque filter-bound single-use cursors rescan a bounded live prefix, suppress already returned invitation identities, permit page-size changes, refresh expiry on continuation, and claim terminal completion only after exact selected-view reconciliation |
 | Neighboring recommendations | `supported` | Excluded from invitations and counted separately |
 | Current first-degree connections | `supported` | `linkedin.connections.list` cursor-pages the visible inventory without mixing search semantics |
 | Recently added/first name/last name order | `supported` | Typed visible sorting |
 | Established-connection search | `supported` | `linkedin.connections.search` follows the visible Search with filters entry, always submits the first-degree filter, exposes every applicable non-degree People filter, and rejects any result not visibly marked first-degree |
 | Broad People discovery | `supported` | `linkedin.people.search` owns first-, second-, and third-plus-degree discovery and exposes the explicit connection-degree filter |
 | Search pagination | `supported` | Opaque filter-bound cursor rescans a bounded People-search prefix and suppresses already returned profile identities |
-| Invite with optional note | `supported` | Preparation binds LinkedIn's current `Invite {name} to connect` button to the exact profile, waits for asynchronous action hydration, and validates both current dialogs plus exact note/counter/actionability without sending. After the hash-locked, natively confirmed Send click, execution performs exactly one fresh exact-profile check: visible Pending is verified success and visible Connect is verified LinkedIn failure. An unreadable, identity-mismatched, or otherwise ambiguous fresh profile is uncertain. No toast parsing, post-click polling, or Sent-list reconciliation is part of this capability. |
-| Accept invitation | `supported` | Exact member-profile request controls, hash-locked native confirmation, and fresh-profile first-degree postcondition |
-| Ignore incoming invitation | `supported` | Separate `linkedin.invitations.ignore.prepare/execute` action with its own scope, paired exact-profile controls, hash-locked native confirmation, and fresh-profile removal-without-connection postcondition |
+| Invite with optional note | `supported` | Preparation binds LinkedIn's current `Invite {name} to connect` button to the exact profile, waits for asynchronous action hydration, and validates both current dialogs plus exact note/counter/actionability without sending. After the hash-locked, client-authorized Send click, execution performs exactly one fresh exact-profile check: visible Pending is verified success and Connect is verified LinkedIn failure. An unreadable, identity-mismatched, or otherwise ambiguous fresh profile is uncertain. No toast parsing, post-click polling, or Sent-list reconciliation is part of this capability. |
+| Accept invitation | `supported` | Exact member-profile request controls, hash-locked client approval policy, and fresh-profile first-degree postcondition |
+| Ignore incoming invitation | `supported` | Separate `linkedin.invitations.ignore.prepare/execute` action with its own scope, paired exact-profile controls, hash-locked client approval policy, and fresh-profile removal-without-connection postcondition |
 | Report incoming invitation | `outside_named_capability` | Distinct moderation target and effect |
 | Withdraw sent invitation | `outside_named_capability` | Distinct destructive effect |
 | Reply to invitation message | `outside_named_capability` | Distinct pre-connection messaging target and effect |
@@ -335,8 +335,9 @@ current first-party help documentation:
 M11-M17 completed the opt-in installed-stdio inventory on 2026-07-24 under the
 legacy local-approval design. All read and preparation outputs used readable
 immutable source resources, and the audit performed zero LinkedIn writes.
-Version `0.4.0` replaces that gate with native MCP client confirmation: every
-execute schema carries the canonical human-readable preview, and fixture,
-repository, and protocol tests reject altered hashes or previews before an
-action attempt. Live smoke tests remain non-mutating by intentionally altering
-the preview.
+Version `0.4.0` replaced that gate with MCP client approval: every execute
+schema carries the canonical human-readable preview, and fixture, repository,
+and protocol tests reject altered hashes or previews before an action attempt.
+Current clients may use interactive confirmation or an explicit durable
+per-tool approval. Live smoke tests remain non-mutating by intentionally
+altering the preview.

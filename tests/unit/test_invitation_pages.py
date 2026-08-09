@@ -23,6 +23,7 @@ from linkedin_mcp.domain.models import (
     InvitationListInput,
     InvitationSummary,
     InvitationType,
+    StopReason,
 )
 from linkedin_mcp.errors import BrowserUnavailableError, ParserDriftError
 
@@ -113,15 +114,14 @@ async def _collect(
     request: InvitationListInput,
     path: str,
     max_scroll_rounds: int = 4,
-    max_snapshot_items: int = 5_000,
+    result_limit: int | None = None,
 ) -> tuple[tuple[InvitationSummary, ...], InvitationListCoverage, str, str]:
     fixture_browser = InvitationFixtureBrowser(page, {path: html})
     adapter = InvitationListPage(
         cast(BrowserManager, fixture_browser),
         max_scroll_rounds=max_scroll_rounds,
-        max_snapshot_items=max_snapshot_items,
     )
-    return await adapter.collect(request)
+    return await adapter.collect(request, result_limit=result_limit)
 
 
 def test_fixture_manifest_records_sanitized_current_selector_provenance() -> None:
@@ -200,7 +200,7 @@ async def test_received_all_returns_every_invitation_entity_type(
     assert company.headline is None
     assert company.context == "Invited you to follow"
     assert coverage.advertised_count is None
-    assert coverage.unique_count == coverage.snapshot_count == 8
+    assert coverage.unique_count == 8
     assert coverage.view_counts == {
         InvitationFilter.FOCUSED: 4,
         InvitationFilter.OTHER: 3,
@@ -211,9 +211,10 @@ async def test_received_all_returns_every_invitation_entity_type(
     }
     assert coverage.view_membership_count == 11
     assert coverage.overlap_count == 3
-    assert coverage.returned_count == 8
+    assert coverage.result_count == 8
+    assert coverage.max_results == 25
     assert coverage.neighboring_recommendation_count == 1
-    assert coverage.completion_reason == "visible_view_union_reconciled"
+    assert coverage.stop_reason is StopReason.VISIBLE_PAGE_COMPLETE
     assert sum(coverage.invitation_type_counts.values()) == 8
     assert sum(coverage.entity_type_counts.values()) == 8
     assert all(
@@ -299,7 +300,7 @@ async def test_same_company_can_invite_to_two_distinct_current_newsletters(
         path="/mynetwork/invitation-manager/received/",
     )
 
-    assert len({item.invitation_ref for item in values}) == coverage.snapshot_count == 2
+    assert len({item.invitation_ref for item in values}) == coverage.unique_count == 2
     assert [item.primary_entity.entity_type for item in values] == [
         InvitationEntityType.NEWSLETTER,
         InvitationEntityType.NEWSLETTER,
@@ -335,7 +336,7 @@ async def test_sent_people_uses_the_distinct_current_direct_card_root(
     assert values[0].sent_or_received_at_text == "Sent 2 weeks ago"
     assert coverage.invitation_filter is InvitationFilter.PEOPLE
     assert coverage.view_counts == {InvitationFilter.PEOPLE: 2}
-    assert coverage.snapshot_count == 2
+    assert coverage.unique_count == 2
 
 
 @pytest.mark.parametrize(
@@ -368,7 +369,7 @@ async def test_every_current_received_radio_filter_uses_its_exact_visible_count(
 
 
 @pytest.mark.asyncio
-async def test_zero_advertised_count_is_the_only_successful_empty_snapshot(
+async def test_zero_advertised_count_is_the_only_successful_empty_inventory(
     invitation_page: Page,
 ) -> None:
     values, coverage, captured_text, _ = await _collect(
@@ -379,7 +380,7 @@ async def test_zero_advertised_count_is_the_only_successful_empty_snapshot(
     )
 
     assert values == ()
-    assert coverage.snapshot_count == coverage.unique_count == coverage.advertised_count == 0
+    assert coverage.unique_count == coverage.advertised_count == 0
     assert coverage.scroll_rounds == 0
     assert coverage.view_counts == {InvitationFilter.FOCUSED: 0}
     assert captured_text == "Focused (0)"
@@ -403,7 +404,7 @@ async def test_loading_pause_never_counts_as_end_of_list(invitation_page: Page) 
 
 
 @pytest.mark.asyncio
-async def test_virtualized_same_size_windows_accumulate_one_complete_snapshot(
+async def test_virtualized_same_size_windows_accumulate_one_complete_inventory(
     invitation_page: Page,
 ) -> None:
     values, coverage, _, _ = await _collect(
@@ -418,7 +419,8 @@ async def test_virtualized_same_size_windows_accumulate_one_complete_snapshot(
         "second-window",
         "third-window",
     ]
-    assert coverage.snapshot_count == 3
+    assert coverage.unique_count == 3
+    assert coverage.stop_reason is StopReason.VISIBLE_PAGE_COMPLETE
 
 
 @pytest.mark.asyncio
@@ -443,17 +445,21 @@ async def test_one_count_change_discards_the_partial_scan_and_restarts(
 
 
 @pytest.mark.asyncio
-async def test_end_copy_and_idle_bottom_cannot_override_count_mismatch(
+async def test_end_copy_and_idle_bottom_return_an_honest_safety_bound(
     invitation_page: Page,
 ) -> None:
-    with pytest.raises(BrowserUnavailableError, match=r"1 of 2"):
-        await _collect(
-            invitation_page,
-            html=_fixture("received-count-mismatch.html"),
-            request=_request(invitation_filter=InvitationFilter.FOCUSED),
-            path="/mynetwork/invitation-manager/received/",
-            max_scroll_rounds=2,
-        )
+    values, coverage, _, _ = await _collect(
+        invitation_page,
+        html=_fixture("received-count-mismatch.html"),
+        request=_request(invitation_filter=InvitationFilter.FOCUSED),
+        path="/mynetwork/invitation-manager/received/",
+        max_scroll_rounds=2,
+    )
+
+    assert [item.primary_entity.slug for item in values] == ["only-rendered"]
+    assert coverage.advertised_count == 2
+    assert coverage.unique_count == 1
+    assert coverage.stop_reason is StopReason.SAFETY_BOUND
 
 
 @pytest.mark.parametrize(
@@ -521,7 +527,7 @@ async def test_identical_virtualized_render_copies_are_deduplicated(
         path="/mynetwork/invitation-manager/received/",
     )
 
-    assert len(values) == coverage.snapshot_count == 1
+    assert len(values) == coverage.unique_count == 1
     assert values[0].primary_entity.slug == "duplicate-member"
 
 
@@ -584,27 +590,25 @@ async def test_conflicting_copies_across_current_received_views_fail_closed(
 
 
 @pytest.mark.asyncio
-async def test_advertised_inventory_above_snapshot_bound_fails_before_scrolling(
+async def test_live_traversal_stops_at_the_requested_result_limit(
     invitation_page: Page,
 ) -> None:
-    html = """
-      <html><body><main>
-        <div role="button" aria-expanded="false" tabindex="0">
-          <input type="checkbox" checked />
-          Focused (6)
-        </div>
-        <div data-testid="lazy-column"></div>
-      </main></body></html>
-    """
+    values, coverage, _, _ = await _collect(
+        invitation_page,
+        html=_fixture("received-virtualized.html"),
+        request=_request(invitation_filter=InvitationFilter.FOCUSED),
+        path="/mynetwork/invitation-manager/received/",
+        max_scroll_rounds=3,
+        result_limit=2,
+    )
 
-    with pytest.raises(ParserDriftError, match="exceeds the configured snapshot bound"):
-        await _collect(
-            invitation_page,
-            html=html,
-            request=_request(invitation_filter=InvitationFilter.FOCUSED),
-            path="/mynetwork/invitation-manager/received/",
-            max_snapshot_items=5,
-        )
+    assert [item.primary_entity.slug for item in values] == [
+        "first-window",
+        "second-window",
+    ]
+    assert coverage.advertised_count == 3
+    assert coverage.unique_count == coverage.result_count == coverage.max_results == 2
+    assert coverage.stop_reason is StopReason.RESULT_LIMIT
 
 
 @pytest.mark.asyncio

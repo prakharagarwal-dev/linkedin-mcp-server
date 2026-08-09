@@ -200,7 +200,7 @@ async def test_semantic_site_drives_network_discussion_and_company_feed_reads() 
                     page_size=10,
                 )
             )
-            assert filtered_coverage.snapshot_count == filtered_coverage.advertised_count == 1
+            assert filtered_coverage.unique_count == filtered_coverage.advertised_count == 1
             filtered_invitations[invitation_filter] = tuple(
                 item.primary_entity.slug or item.primary_entity.display_name for item in filtered
             )
@@ -258,7 +258,7 @@ async def test_semantic_site_drives_network_discussion_and_company_feed_reads() 
         "filter-member-",
     ]
     assert invitation_coverage.advertised_count is None
-    assert invitation_coverage.unique_count == invitation_coverage.snapshot_count == 8
+    assert invitation_coverage.unique_count == 8
     assert invitation_coverage.view_counts == {
         InvitationFilter.FOCUSED: 4,
         InvitationFilter.OTHER: 3,
@@ -271,14 +271,14 @@ async def test_semantic_site_drives_network_discussion_and_company_feed_reads() 
     assert invitation_coverage.overlap_count == 3
     assert invitation_coverage.scroll_rounds == 0
     assert invitation_coverage.neighboring_recommendation_count == 1
-    assert invitation_coverage.completion_reason == "visible_view_union_reconciled"
+    assert invitation_coverage.stop_reason is StopReason.VISIBLE_PAGE_COMPLETE
     assert "Focused (4)" in invitation_text
     assert "Other (3)" in invitation_text
     assert [item.primary_entity.slug for item in sent_invitations] == [
         "jordan-sent-",
         "morgan-sent",
     ]
-    assert sent_coverage.advertised_count == sent_coverage.snapshot_count == 2
+    assert sent_coverage.advertised_count == sent_coverage.unique_count == 2
     assert sent_coverage.invitation_filter is InvitationFilter.PEOPLE
     assert sent_coverage.view_counts == {InvitationFilter.PEOPLE: 2}
     assert filtered_invitations == {

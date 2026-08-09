@@ -1,6 +1,6 @@
 [project]
 name = "linkedin-mcp-local"
-version = "0.15.1"
+version = "0.16.0"
 description = "A LinkedIn MCP server to find jobs, search people, research companies, manage your network, publish and engage with posts, and read or send messages."
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
@@ -19,6 +19,7 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
+  "anyio>=4.5,<5",
   "mcp[cli]>=1.27,<2",
   "platformdirs>=4,<5",
   "playwright>=1.54,<2",
@@ -27,6 +28,7 @@ dependencies = [
   "pydantic>=2.12,<3",
   "pydantic-settings>=2.10,<3",
   "structlog>=25,<26",
+  "uvicorn>=0.35,<1",
 ]
 
 [project.urls]

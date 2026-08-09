@@ -257,7 +257,7 @@ def create_default_registry() -> CapabilityRegistry:
             ),
             CapabilityDescriptor(
                 name=CapabilityName.INVITATIONS_LIST,
-                version="3.0.0",
+                version="4.0.0",
                 effect=CapabilityEffect.READ,
                 input_model=InvitationListInput,
                 output_model=InvitationListOutput,

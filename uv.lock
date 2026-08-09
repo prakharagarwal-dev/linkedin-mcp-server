@@ -308,9 +308,10 @@ wheels = [
 
 [[package]]
 name = "linkedin-mcp-local"
-version = "0.15.1"
+version = "0.16.0"
 source = { editable = "." }
 dependencies = [
+    { name = "anyio" },
     { name = "mcp", extra = ["cli"] },
     { name = "platformdirs" },
     { name = "playwright" },
@@ -319,6 +320,7 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "pyrate-limiter" },
     { name = "structlog" },
+    { name = "uvicorn" },
 ]
 
 [package.dev-dependencies]
@@ -334,6 +336,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "anyio", specifier = ">=4.5,<5" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.27,<2" },
     { name = "platformdirs", specifier = ">=4,<5" },
     { name = "playwright", specifier = ">=1.54,<2" },
@@ -342,6 +345,7 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.10,<3" },
     { name = "pyrate-limiter", specifier = ">=4.4,<5" },
     { name = "structlog", specifier = ">=25,<26" },
+    { name = "uvicorn", specifier = ">=0.35,<1" },
 ]
 
 [package.metadata.requires-dev]

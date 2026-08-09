@@ -40,9 +40,10 @@ your network, publish and engage with posts, and read or send messages.
 |  | Read conversations | Read message history, replies, edits, reactions, and attachments. |
 |  | Send messages | Send or reply in one-to-one conversations with text, links, emoji, files, images, and GIFs. |
 
-Actions that change LinkedIn require confirmation before execution. Every
-capability is task-specific; the server does not expose unrestricted browser,
-click, navigation, JavaScript, or network access.
+Actions that change LinkedIn use an immutable prepare-and-execute flow and
+request confirmation by default. Every capability is task-specific; the server
+does not expose unrestricted browser, click, navigation, JavaScript, or network
+access.
 
 See the [capability matrix](docs/CAPABILITY_MATRIX.md) for exact filters,
 supported formats, inputs, outputs, limits, and unsupported features.
@@ -83,6 +84,7 @@ command = "uvx"
 args = ["--from", "linkedin-mcp-local", "linkedin-mcp", "serve", "--transport", "stdio"]
 startup_timeout_sec = 60
 tool_timeout_sec = 900
+default_tools_approval_mode = "auto"
 ```
 
 Codex CLI, the Codex IDE extension, and ChatGPT Desktop share this local
@@ -288,16 +290,38 @@ See the [Warp MCP documentation](https://docs.warp.dev/agent-platform/capabiliti
 ### First-time LinkedIn login
 
 After installation, restart your MCP client. The server opens LinkedIn in a
-browser window where you can sign in and complete MFA or any checkpoint. Your
-session is saved locally and reused across restarts.
+browser window where you can sign in and complete MFA or any checkpoint. On
+this first use it creates its own persistent Chromium profile automatically.
+Your session is saved in that profile and reused across restarts.
 
-If the window does not open, run:
+If you have not started the server yet and want to log in manually, create the
+dedicated profile first:
 
 ```bash
+uvx --from linkedin-mcp-local linkedin-mcp profile create
 uvx --from linkedin-mcp-local linkedin-mcp login
 ```
 
 The server never asks for or stores your LinkedIn password.
+
+### Local session controls
+
+Use these commands without locating PIDs or deleting lock files manually:
+
+```bash
+# Show or gracefully stop the process that owns this account
+uvx --from linkedin-mcp-local linkedin-mcp status
+uvx --from linkedin-mcp-local linkedin-mcp stop
+
+# Inspect the dedicated Chromium profile or sign out visibly
+uvx --from linkedin-mcp-local linkedin-mcp profile status
+uvx --from linkedin-mcp-local linkedin-mcp logout
+```
+
+For a clean profile, run `linkedin-mcp profile reset`. The command asks for
+confirmation, archives the old profile, and creates a replacement. See
+[Configuration](docs/CONFIGURATION.md#browser-profile-and-linkedin-session)
+for the complete lifecycle.
 
 ### Try it
 
@@ -329,34 +353,51 @@ Ask your MCP client naturally:
 
 > Send `<message>` to `<profile URL>`.
 
-Actions that change LinkedIn are shown for confirmation before they run.
+### Approval modes
+
+Account-changing execute tools request confirmation by default. Approval is a
+setting of the MCP client, not something an agent can grant itself. To let a
+Codex scheduled task publish posts unattended while every other LinkedIn action
+keeps its default behavior, add this explicit per-tool approval:
+
+```toml
+[mcp_servers."linkedin-mcp".tools."linkedin.posts.create.execute"]
+approval_mode = "approve"
+```
+
+Restart Codex after changing its configuration. The post still goes through the
+same immutable draft, scope, payload-hash, idempotency, identity, and visible
+postcondition checks. Avoid approving the entire server when only one action is
+needed. See [Configuration](docs/CONFIGURATION.md#client-approval-policy) for
+the full policy model.
 
 ## Architecture
 
 ```mermaid
 %%{init: {"flowchart": {"nodeSpacing": 55, "rankSpacing": 65}, "themeVariables": {"fontSize": "20px"}}}%%
 flowchart LR
-    A["MCP Client<br/>Codex · Claude · Cursor"] --> B["LinkedIn MCP Server"]
-    B --> C["Typed LinkedIn Tools"]
-    C --> D["Bounded Local Queue"]
-    D --> E["Single Playwright Worker"]
+    A["MCP Clients<br/>Codex · Claude · Cursor"] --> B["stdio bridges or<br/>loopback HTTP"]
+    B --> C["Shared Local Runtime<br/>Typed LinkedIn Tools"]
+    C --> D["Fair Per-Client Queue"]
+    D --> E["One Atomic Browser Operation<br/>Fresh Page · Global Pacing"]
     E -->|"Visible UI only"| F["LinkedIn"]
-
-    E <--> G["Persistent Browser Profile"]
-    B -. "Confirmation previews" .-> A
+    E <--> G["One Chromium Context<br/>Persistent Profile"]
+    C -. "Confirmation previews" .-> A
 ```
 
 Everything runs locally. There is no hosted backend, telemetry, database,
 external queue, LangGraph runtime, or credential service. Browser cookies live
-only in the local Playwright profile; operation state lives only until the
-server process exits. Read the full [architecture](docs/ARCHITECTURE.md) and
-[privacy policy](PRIVACY.md).
+only in the local Playwright profile. The first client starts one shared local
+runtime; later clients attach to it, and fair scheduling gives each client a
+turn between complete tool calls. Operation state lasts only for that runtime.
+Read the full [architecture](docs/ARCHITECTURE.md) and [privacy policy](PRIVACY.md).
 
 ## Configuration
 
 Common settings control:
 
 - enabled LinkedIn surfaces, capability scopes, and effect classes;
+- client-side interactive or explicit per-tool approval behavior;
 - the persistent browser profile and headed/headless operation;
 - the local attachment directory;
 - internal pacing, queue capacity, and bounded collection traversal; and

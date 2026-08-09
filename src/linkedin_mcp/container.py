@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from linkedin_mcp import __version__
 from linkedin_mcp.application import (
     AccountProcessLock,
     CapabilityExecutor,
     CapabilityWorker,
+    ClientSessionRegistry,
+    PaginationManager,
 )
 from linkedin_mcp.assets import LocalAssetStore
 from linkedin_mcp.browser import BrowserManager
@@ -30,7 +33,7 @@ from linkedin_mcp.browser.pages import (
     PostSearchPage,
 )
 from linkedin_mcp.capabilities import CapabilityRegistry, create_default_registry
-from linkedin_mcp.config import Settings
+from linkedin_mcp.config import Settings, runtime_configuration_fingerprint
 from linkedin_mcp.persistence import MemoryRepository, Repository
 
 
@@ -43,6 +46,7 @@ class AppContainer:
     executor: CapabilityExecutor
     worker: CapabilityWorker
     process_lock: AccountProcessLock
+    clients: ClientSessionRegistry = field(default_factory=ClientSessionRegistry)
     _started: bool = field(default=False, init=False)
 
     async def start(self) -> None:
@@ -58,20 +62,30 @@ class AppContainer:
         self._started = True
 
     async def close(self) -> None:
-        self._started = False
         try:
-            await self.worker.close()
+            if self._started:
+                await self.worker.quiesce()
         finally:
+            self._started = False
             try:
-                await self.executor.close()
+                await self.worker.close()
             finally:
                 try:
-                    await self.browser.close()
+                    await self.executor.close()
                 finally:
                     try:
-                        await self.repository.close()
+                        await self.browser.close()
                     finally:
-                        self.process_lock.release()
+                        try:
+                            await self.repository.close()
+                        finally:
+                            self.process_lock.release()
+
+    async def quiesce(self) -> None:
+        """Stop accepting queued calls and let the active call reach a terminal result."""
+
+        if self._started:
+            await self.worker.quiesce()
 
 
 def create_production_container(settings: Settings) -> AppContainer:
@@ -85,15 +99,16 @@ def create_production_container(settings: Settings) -> AppContainer:
     invitation_list = InvitationListPage(
         browser,
         max_scroll_rounds=settings.invitations_max_scroll_rounds_per_call,
-        max_snapshot_items=min(
-            5_000,
-            settings.pagination_max_seen_items_per_cursor,
-        ),
     )
     asset_store = LocalAssetStore(settings.asset_root_path)
     conversation_search = ConversationSearchPage(
         browser,
         max_scroll_rounds=settings.messaging_max_scroll_rounds_per_call,
+    )
+    pagination = PaginationManager(
+        ttl_seconds=settings.pagination_cursor_ttl_seconds,
+        max_active_cursors=settings.pagination_max_active_cursors,
+        max_seen_items_per_cursor=settings.pagination_max_seen_items_per_cursor,
     )
     executor = CapabilityExecutor(
         settings=settings,
@@ -144,8 +159,15 @@ def create_production_container(settings: Settings) -> AppContainer:
             conversation_search=conversation_search,
             max_history_rounds=settings.messaging_max_scroll_rounds_per_call,
         ),
+        pagination=pagination,
     )
-    worker = CapabilityWorker(executor, queue_capacity=settings.queue_capacity)
+    worker = CapabilityWorker(
+        executor,
+        queue_capacity=settings.queue_capacity,
+        pagination=pagination,
+        account_id=settings.account_id,
+        call_lookup=repository.find_call,
+    )
     return AppContainer(
         settings=settings,
         registry=registry,
@@ -153,5 +175,12 @@ def create_production_container(settings: Settings) -> AppContainer:
         browser=browser,
         executor=executor,
         worker=worker,
-        process_lock=AccountProcessLock(settings.runtime_lock_path),
+        process_lock=AccountProcessLock(
+            settings.runtime_lock_path,
+            account_id=settings.account_id,
+            command="serve",
+            transport=settings.transport,
+            version=__version__,
+            configuration_fingerprint=runtime_configuration_fingerprint(settings),
+        ),
     )

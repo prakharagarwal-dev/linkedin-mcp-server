@@ -34,8 +34,9 @@ Contributions must preserve these boundaries:
 - Expose typed capabilities, never generic browser, selector, JavaScript,
   click, network, or navigation tools.
 - Keep read and account-changing capabilities separate.
-- Require scopes, immutable hash-locked previews, idempotency, and native MCP
-  client confirmation for writes.
+- Require scopes, immutable hash-locked previews, idempotency, and a trusted MCP
+  client approval policy for writes. Keep interactive confirmation as the
+  default while permitting explicit durable per-tool client approval.
 - Do not add CAPTCHA bypass, proxy rotation, fingerprint spoofing, stealth
   plugins, credential collection, private endpoint access, or bulk-spam
   features.

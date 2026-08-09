@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
 from typing import Literal
 
@@ -117,6 +119,7 @@ class Settings(BaseSettings):
     pagination_max_seen_items_per_cursor: int = Field(default=5_000, ge=100, le=50_000)
     action_draft_ttl_seconds: int = Field(default=86_400, ge=300, le=604_800)
     runtime_lock_path: Path = Field(default_factory=_default_runtime_lock_path)
+    runtime_start_timeout_seconds: float = Field(default=30.0, ge=1, le=300)
 
     browser_headless: bool = True
     browser_timeout_seconds: float = Field(default=20.0, ge=1, le=300)
@@ -146,3 +149,15 @@ class Settings(BaseSettings):
                 "Unauthenticated Streamable HTTP is restricted to loopback in this release."
             )
         return self
+
+
+def runtime_configuration_fingerprint(settings: Settings) -> str:
+    """Hash the effective shared-runtime policy without exposing local values."""
+
+    values = settings.model_dump(mode="json")
+    values["transport"] = "streamable-http"
+    values.pop("runtime_start_timeout_seconds", None)
+    for field_name in ("allowed_surfaces", "allowed_scopes", "allowed_effects"):
+        values[field_name] = sorted(values[field_name])
+    canonical = json.dumps(values, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()

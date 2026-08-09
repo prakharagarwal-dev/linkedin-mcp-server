@@ -3,7 +3,7 @@
 LinkedIn MCP Server is configured with environment variables using the
 `LINKEDIN_MCP_` prefix. The standard package configuration enables every
 currently implemented capability. Actions that change LinkedIn still use the
-prepare, client-confirmation, and execute flow described in
+prepare, client-approval-policy, and execute flow described in
 [Security](SECURITY.md).
 
 For `uvx` installations, put environment variables in the MCP client's server
@@ -20,7 +20,7 @@ A capability is enabled only when all four checks pass:
 3. every required named scope is allowed; and
 4. its `read`, `prepare`, or `write` effect is allowed.
 
-Client approval annotations do not grant server permissions. Use
+Client approval settings and tool annotations do not grant server permissions. Use
 `linkedin.capabilities.list` to see which installed tools are enabled and why
 another tool is disabled.
 
@@ -36,8 +36,54 @@ effects:  read, prepare, write
 ```
 
 `linkedin.capabilities.list` therefore reports every installed capability as
-enabled. Execute tools remain destructive MCP operations and should always be
-confirmed by the user in the MCP client.
+enabled. Execute tools remain destructive MCP operations and request interactive
+confirmation by default. A user may explicitly pre-approve an individual
+execute tool in the MCP client without changing server scopes or safeguards.
+
+## Client approval policy
+
+Tool availability and tool approval are separate:
+
+- server surfaces, scopes, and effects decide whether a capability is available;
+- MCP tool annotations request confirmation for account-changing execute tools;
+- the MCP client's durable configuration decides whether to prompt, reject, or
+  pre-approve a particular tool; and
+- an agent cannot broaden either the server authorization or client approval
+  policy through chat or tool arguments.
+
+Interactive confirmation is the safe default. Prepare tools may inspect and
+return an immutable draft but never perform the final LinkedIn action. Execute
+tools remain hash-locked, idempotent, and visibly revalidated regardless of the
+client's approval mode.
+
+Codex installations can make the default explicit:
+
+```toml
+[mcp_servers."linkedin-mcp"]
+default_tools_approval_mode = "auto"
+```
+
+Codex accepts these server-wide or per-tool modes:
+
+| Mode | Behavior |
+| --- | --- |
+| `auto` | Use each tool's annotations; this is the recommended default. |
+| `prompt` | Ask before every configured tool call. |
+| `writes` | Ask for tools not marked read-only. |
+| `approve` | Treat the configured server or exact tool as pre-approved. |
+
+For an unattended recurring publisher, pre-approve only post execution:
+
+```toml
+[mcp_servers."linkedin-mcp".tools."linkedin.posts.create.execute"]
+approval_mode = "approve"
+```
+
+The scheduled run still calls `linkedin.posts.create.prepare` first and copies
+its exact `action_id`, `payload_hash`, and `approval_preview` into execute. Do
+not set the whole server to `approve` unless every available LinkedIn action is
+intentionally authorized for unattended use. Other MCP clients may expose the
+same choice through their own tool-permission interface.
 
 ## Optional restriction presets
 
@@ -98,7 +144,8 @@ feature contracts.
 | `PAGINATION_MAX_ACTIVE_CURSORS` | `64` | Maximum active cursor states |
 | `PAGINATION_MAX_SEEN_ITEMS_PER_CURSOR` | `5000` | Stable identities retained by one live scan |
 | `ACTION_DRAFT_TTL_SECONDS` | `86400` | Maximum age of an unexecuted in-process draft |
-| `RUNTIME_LOCK_PATH` | per-user application data | Single-account process lock file |
+| `RUNTIME_LOCK_PATH` | per-user application data | Shared-runtime election and owner metadata file |
+| `RUNTIME_START_TIMEOUT_SECONDS` | `30` | Maximum wait for the elected shared runtime to become healthy |
 | `BROWSER_HEADLESS` | `true` | Capability browsing mode; human login remains headed |
 | `BROWSER_TIMEOUT_SECONDS` | `20` | Default browser-operation bound |
 | `LOGIN_TIMEOUT_SECONDS` | `900` | Maximum time for human login or checkpoint handling |
@@ -110,24 +157,55 @@ feature contracts.
 Callers control typed `page_size` and opaque cursors. Browser traversal,
 collection reconciliation, and pacing remain server-controlled safety policy.
 
-## Browser profile and login
+## Browser profile and LinkedIn session
 
 The browser profile is the server's only authentication persistence. It stores
 normal Chromium cookies and preferences and must be treated as sensitive. The
 server does not receive or store a LinkedIn password.
 
+Normal first use remains automatic: `serve` installs Chromium when needed,
+creates the dedicated profile when missing, opens LinkedIn for login, and then
+reuses that same profile on later starts. The MCP handshake remains responsive
+while setup and authentication run in the background.
+
+The explicit lifecycle commands are:
+
 ```bash
 uvx --from linkedin-mcp-local linkedin-mcp setup
+uvx --from linkedin-mcp-local linkedin-mcp profile create
+uvx --from linkedin-mcp-local linkedin-mcp profile status
+uvx --from linkedin-mcp-local linkedin-mcp profile reset
 uvx --from linkedin-mcp-local linkedin-mcp login
+uvx --from linkedin-mcp-local linkedin-mcp logout
 uvx --from linkedin-mcp-local linkedin-mcp doctor
+uvx --from linkedin-mcp-local linkedin-mcp status
+uvx --from linkedin-mcp-local linkedin-mcp stop
 ```
 
-`login` opens a headed browser, waits for the operator to complete login, MFA,
-or a checkpoint, closes Chromium normally, and verifies that the same profile
-survives a clean restart. Later headed or headless server starts reuse it.
+`profile create` is idempotent and initializes only the configured dedicated
+profile. `login` never creates a profile: it opens LinkedIn in an existing
+profile, waits for the operator to complete login, MFA, or a checkpoint, closes
+Chromium normally, and verifies that the same session survives a clean restart.
+`logout` uses LinkedIn's visible **Me → Sign Out** controls and verifies the
+signed-out state through another clean restart.
 
-One account lock prevents two server processes from owning the same profile.
-Give separate accounts distinct profile and lock paths.
+`profile reset` is a recoverable destructive operation. It requires typing
+`RESET` in an interactive terminal or passing `--yes`, renames the exact
+configured profile to a sibling `*.backup-*` directory, and creates a clean
+replacement. If replacement creation fails, the old profile is restored. The
+backup still contains sensitive browser data and remains until you delete it.
+
+`profile status`, `status`, and `doctor` expose only non-secret local state and
+do not open LinkedIn. `status` identifies the shared runtime and reports its
+health, attached client count, queue depth, and current browser operation.
+`stop` sends that exact owner a graceful termination request and waits for lock
+release; it never force-kills a process. During clean shutdown the runtime
+rejects new and queued calls, lets an active write reach a terminal result,
+closes Chromium, and releases the lock.
+
+Profile-changing and LinkedIn authentication commands hold the same account
+lock as `serve`, preventing a server from starting halfway through them. Give
+separate accounts distinct profile and lock paths.
 
 ## Local assets
 
@@ -140,33 +218,45 @@ execute call must reference the same unchanged file.
 
 ### Stdio
 
-Use stdio for one local MCP client:
+Use the normal stdio command in every local MCP client:
 
 ```bash
 uvx --from linkedin-mcp-local linkedin-mcp serve --transport stdio
 ```
 
-The MCP client owns the process lifecycle. The server must keep stdout reserved
-for MCP protocol messages.
+Each client starts a lightweight stdio bridge. The first bridge elects and
+starts one background runtime on the configured loopback host and port; later
+bridges attach to that same runtime. Closing one client closes only its bridge,
+so other clients and queued work continue. Use `linkedin-mcp status` and
+`linkedin-mcp stop` to inspect or end the shared runtime.
+
+The bridge keeps stdout reserved for MCP protocol messages. All clients that
+share an account must use the same effective runtime settings. The lock stores
+only a SHA-256 configuration fingerprint, so a later client fails safely
+instead of silently inheriting different profiles, permissions, browser
+behavior, pacing, or transport settings.
 
 ### Loopback Streamable HTTP
 
-Use one shared local process when several clients need the same worker, browser
-profile, and pacing state:
+Start the same shared runtime explicitly when a client connects directly over
+Streamable HTTP:
 
 ```bash
 uvx --from linkedin-mcp-local linkedin-mcp serve --transport streamable-http
 ```
 
-The default endpoint is `http://127.0.0.1:8000/mcp`. Non-loopback binds are
-rejected because the server does not implement HTTP authentication.
+The default endpoint is `http://127.0.0.1:8000/mcp`. Stdio bridges also use
+this endpoint internally. Non-loopback binds are rejected because the server
+does not implement HTTP authentication.
 
 ## Process-local state
 
 Calls, evidence, request replay, action drafts, attempts, idempotency keys,
-queue state, and continuation cursors exist only in memory. A restart clears
-them. The persistent browser profile, managed browser cache, and explicitly
-selected local assets survive.
+queue state, and continuation cursors exist only in shared-runtime memory. A
+runtime restart clears them; disconnecting one client does not. Request replay,
+cursors, and prepared actions belong to the MCP session that created them,
+while execution idempotency keys remain account-wide. The persistent browser
+profile, managed browser cache, and explicitly selected local assets survive.
 
 After a hard interruption during a write, inspect LinkedIn's visible state
 before preparing another action. Never blindly retry an old execute request.

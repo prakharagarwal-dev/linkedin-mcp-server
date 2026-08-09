@@ -16,6 +16,10 @@
       <div id="toast" role="status"></div>
     </main>
 
+    <section role="dialog" aria-label="Loading" id="composer-loader" hidden>
+      <h2>Loading</h2>
+    </section>
+
     <section role="dialog" aria-label="Create a post" id="composer" hidden>
       <a href="/in/current-member/">Current Member</a>
       <button type="button" aria-label="Post settings: Anyone">Post settings</button>
@@ -278,12 +282,13 @@
         </label>
         <label><input type="radio" name="audience" aria-label="Group" />Group</label>
       </fieldset>
-      <button type="button" aria-label="Comment control">Comment control</button>
+      <button type="button">Comment control Anyone</button>
       <label>
         Brand partnership
         <input type="checkbox" aria-label="Brand partnership" />
       </label>
-      <button type="button" aria-label="Done">Done</button>
+      <button type="button" aria-label="Back">Back</button>
+      <button type="button" aria-label="Done" disabled>Done</button>
     </section>
     <section role="dialog" aria-label="Comment control" id="comment-control" hidden>
       <label><input type="radio" name="comments" aria-label="Anyone" checked />Anyone</label>
@@ -292,7 +297,8 @@
         Connections only
       </label>
       <label><input type="radio" name="comments" aria-label="No one" />No one</label>
-      <button type="button" aria-label="Save">Save</button>
+      <button type="button" aria-label="Back">Back</button>
+      <button type="button" aria-label="Save" disabled>Save</button>
     </section>
     <section role="dialog" aria-label="Choose a group" id="group-picker" hidden>
       <label role="radio">
@@ -315,6 +321,7 @@
 
     <script>
       const composer = document.querySelector("#composer");
+      const composerLoader = document.querySelector("#composer-loader");
       const more = document.querySelector("#more-options");
       const mediaEditor = document.querySelector("#media-editor");
       const photoDetails = document.querySelector("#photo-details");
@@ -354,7 +361,18 @@
         document.querySelector("#templates").append(template);
       }
 
-      document.querySelector('[aria-label="Start a post"]').onclick = () => show(composer);
+      document.querySelector('[aria-label="Start a post"]').onclick = () => {
+        const delay = Number(window.__linkedinMcpComposerDelayMs || 0);
+        if (!delay) {
+          show(composer);
+          return;
+        }
+        show(composerLoader);
+        setTimeout(() => {
+          hide(composerLoader);
+          show(composer);
+        }, delay);
+      };
       composer.querySelector('[aria-label="More"]').onclick = () => show(more);
       composer.querySelector('[aria-label="Add media"]').onclick = () => {
         hide(composer); show(mediaEditor);
@@ -480,15 +498,38 @@
       composer.querySelector('[aria-label^="Post settings"]').onclick = () => {
         hide(composer); show(postSettings);
       };
-      postSettings.querySelector('[aria-label="Comment control"]').onclick = () => {
+      postSettings.querySelector("button:not([aria-label])").onclick = () => {
         hide(postSettings); show(commentControl);
       };
+      commentControl.querySelectorAll('input[name="comments"]').forEach(input => {
+        input.onchange = () => {
+          commentControl.querySelector('[aria-label="Save"]').disabled = false;
+        };
+      });
       commentControl.querySelector('[aria-label="Save"]').onclick = () => {
+        const selected = commentControl.querySelector('input[name="comments"]:checked');
+        postSettings.querySelector("button:not([aria-label])").innerText =
+          `Comment control ${selected.getAttribute("aria-label")}`;
+        commentControl.querySelector('[aria-label="Save"]').disabled = true;
         hide(commentControl); show(postSettings);
       };
-      postSettings.querySelector('[aria-label="Group"]').onchange = () => show(groupPicker);
+      commentControl.querySelector('[aria-label="Back"]').onclick = () => {
+        hide(commentControl); show(postSettings);
+      };
+      postSettings.querySelectorAll('input[name="audience"]').forEach(input => {
+        input.onchange = () => {
+          postSettings.querySelector('[aria-label="Done"]').disabled = false;
+          if (input.getAttribute("aria-label") === "Group") show(groupPicker);
+        };
+      });
+      postSettings.querySelector('[aria-label="Brand partnership"]').onchange = () => {
+        postSettings.querySelector('[aria-label="Done"]').disabled = false;
+      };
       groupPicker.querySelector("a").onclick = event => event.preventDefault();
       groupPicker.querySelector('[aria-label="Done"]').onclick = () => hide(groupPicker);
+      postSettings.querySelector('[aria-label="Back"]').onclick = () => {
+        returnToComposer(postSettings);
+      };
       postSettings.querySelector('[aria-label="Done"]').onclick = () => {
         returnToComposer(postSettings);
       };

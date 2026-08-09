@@ -974,13 +974,24 @@ class PostSearchPage:
                 await self._browser.navigate(page, target)
                 await _expand_visible_content(page)
                 rendered_state = await _wait_for_post_search_state(page)
+                visible_posts = await _visible_posts(page)
                 captured_text = (await page.locator("main").inner_text()).strip()
                 if not captured_text:
                     raise ParserDriftError("LinkedIn post search returned no visible text.")
+                missing_snapshots = tuple(
+                    post.visible_text
+                    for post in visible_posts
+                    if post.visible_text not in captured_text
+                )
+                if missing_snapshots:
+                    captured_text = (
+                        f"{captured_text}\n\n--- exact visible post-card snapshots ---\n"
+                        + "\n\n".join(missing_snapshots)
+                    )
                 pages_visited += 1
                 captures.append((target, captured_text))
                 before = len(posts)
-                for post in await _visible_posts(page):
+                for post in visible_posts:
                     posts.setdefault(post.post_ref, post)
                     if len(posts) >= limit:
                         stop_reason = StopReason.RESULT_LIMIT

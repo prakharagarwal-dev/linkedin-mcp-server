@@ -44,11 +44,11 @@ policy.
 ## Third-party sharing
 
 The server communicates with LinkedIn only through the visible web UI. LinkedIn
-receives the same page requests and, for a confirmed write, the same content
-that a user would submit in the web interface. Tool results and evidence are
-returned to the MCP client that invoked the server. Local assets are sent to
-LinkedIn only when you execute the specifically prepared action that references
-them.
+receives the same page requests and, for a client-authorized write, the same
+content that a user would submit in the web interface. Tool results and
+evidence are returned to the MCP client that invoked the server. Local assets
+are sent to LinkedIn only when the specifically prepared action that references
+them is executed.
 
 The project does not sell personal data or send LinkedIn content, cookies,
 credentials, messages, or local assets to the maintainer, advertisers, data
@@ -61,7 +61,9 @@ your MCP client's processing is governed by that client's policy.
 - Process-memory data is discarded when the server process exits and may be
   removed earlier by expiry or bounded-capacity eviction.
 - The Chromium profile persists until you sign out and/or delete the configured
-  profile directory. Treat that directory as sensitive authentication data.
+  profile directory. `profile reset` archives the old directory as a sibling
+  `*.backup-*` path; backups and failed-creation archives persist until you
+  remove them. Treat all of these directories as sensitive authentication data.
 - Files in the configured asset directory remain until you remove them.
 - Playwright browser binaries and ordinary browser cache may persist in their
   configured local cache locations until you remove them.
@@ -70,18 +72,17 @@ your MCP client's processing is governed by that client's policy.
   full private message bodies. Retention of captured logs is controlled by
   that environment.
 
-Stop the server before deleting its local profile or asset directory. The
-locations are derived from your operating system's per-user application-data
-directory and can be overridden with `LINKEDIN_MCP_BROWSER_PROFILE_PATH` and
-`LINKEDIN_MCP_ASSET_ROOT_PATH`.
+Use `linkedin-mcp status` and `linkedin-mcp stop` before deleting local profile
+or asset data. The locations are derived from your operating system's per-user
+application-data directory and can be overridden with
+`LINKEDIN_MCP_BROWSER_PROFILE_PATH` and `LINKEDIN_MCP_ASSET_ROOT_PATH`.
 
 ## Your choices
 
-Live LinkedIn access is disabled unless you enable it. Scopes, surfaces, and
-effects are deny-by-default. You can revoke the saved LinkedIn session by
-signing out or deleting the local browser profile, remove local assets at any
-time, restrict or disable account-changing scopes, and stop the process to
-clear its in-memory state.
+You can revoke the saved LinkedIn session with `linkedin-mcp logout`, delete the
+local browser profile and its archives, remove local assets at any time,
+restrict surfaces, scopes, or effects, and stop the process to clear its
+in-memory state.
 
 ## Contact
 
@@ -91,4 +92,3 @@ For privacy questions, open a GitHub issue at
 profiles, access tokens, private messages, or other sensitive LinkedIn content.
 Report security vulnerabilities through the repository's private
 [security-advisory process](SECURITY.md).
-

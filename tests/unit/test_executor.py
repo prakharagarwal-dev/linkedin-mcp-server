@@ -641,10 +641,12 @@ class FakeInvitationList:
         self,
         request: InvitationListInput,
         *,
+        result_limit: int | None = None,
         progress: object | None = None,
     ) -> tuple[tuple[InvitationSummary, ...], InvitationListCoverage, str, str]:
         del progress
         self.calls += 1
+        limit = request.page_size if result_limit is None else result_limit
         now = datetime.now(UTC)
         source_url = "https://www.linkedin.com/mynetwork/invitation-manager/"
         text = "Jane Doe\nStaff Engineer\nHi, let us connect.\nAccept"
@@ -702,18 +704,14 @@ class FakeInvitationList:
                 ),
                 view_membership_count=1,
                 overlap_count=0,
-                snapshot_count=1,
-                returned_count=1,
+                result_count=1,
+                max_results=limit,
                 scroll_rounds=1,
                 collection_attempts=1,
                 neighboring_recommendation_count=0,
                 invitation_type_counts={InvitationType.CONNECTION_REQUEST: 1},
                 entity_type_counts={InvitationEntityType.PERSON: 1},
-                completion_reason=(
-                    "visible_view_union_reconciled"
-                    if request.resolved_filter is InvitationFilter.ALL
-                    else "advertised_count_reconciled"
-                ),
+                stop_reason=StopReason.VISIBLE_PAGE_COMPLETE,
                 captured_at=now,
             ),
             text,
@@ -722,14 +720,21 @@ class FakeInvitationList:
 
 
 class PaginatedFakeInvitationList(FakeInvitationList):
+    def __init__(self) -> None:
+        super().__init__()
+        self.result_limits: list[int] = []
+
     async def collect(
         self,
         request: InvitationListInput,
         *,
+        result_limit: int | None = None,
         progress: object | None = None,
     ) -> tuple[tuple[InvitationSummary, ...], InvitationListCoverage, str, str]:
         del progress
         self.calls += 1
+        limit = request.page_size if result_limit is None else result_limit
+        self.result_limits.append(limit)
         captured_at = datetime.now(UTC)
         source_url = "https://www.linkedin.com/mynetwork/invitation-manager/"
         all_items = tuple(
@@ -761,16 +766,17 @@ class PaginatedFakeInvitationList(FakeInvitationList):
             )
             for index in range(1, 6)
         )
-        text = "\n\n".join(item.visible_text for item in all_items)
+        visible_items = all_items[:limit]
+        text = "\n\n".join(item.visible_text for item in visible_items)
         return (
-            all_items,
+            visible_items,
             InvitationListCoverage(
                 direction=request.direction,
                 invitation_filter=request.resolved_filter,
                 advertised_count=(
                     None if request.resolved_filter is InvitationFilter.ALL else len(all_items)
                 ),
-                unique_count=len(all_items),
+                unique_count=len(visible_items),
                 view_counts=(
                     {
                         invitation_filter: (
@@ -791,17 +797,17 @@ class PaginatedFakeInvitationList(FakeInvitationList):
                 ),
                 view_membership_count=len(all_items),
                 overlap_count=0,
-                snapshot_count=len(all_items),
-                returned_count=len(all_items),
+                result_count=len(visible_items),
+                max_results=limit,
                 scroll_rounds=5,
                 collection_attempts=1,
                 neighboring_recommendation_count=0,
-                invitation_type_counts={InvitationType.CONNECTION_REQUEST: len(all_items)},
-                entity_type_counts={InvitationEntityType.PERSON: len(all_items)},
-                completion_reason=(
-                    "visible_view_union_reconciled"
-                    if request.resolved_filter is InvitationFilter.ALL
-                    else "advertised_count_reconciled"
+                invitation_type_counts={InvitationType.CONNECTION_REQUEST: len(visible_items)},
+                entity_type_counts={InvitationEntityType.PERSON: len(visible_items)},
+                stop_reason=(
+                    StopReason.VISIBLE_PAGE_COMPLETE
+                    if len(visible_items) == len(all_items)
+                    else StopReason.RESULT_LIMIT
                 ),
                 captured_at=captured_at,
             ),
@@ -1544,7 +1550,7 @@ async def test_job_search_cursor_walks_live_prefix_without_duplicates_and_replay
 
 
 @pytest.mark.asyncio
-async def test_invitation_cursor_pages_one_snapshot_without_browser_revisit() -> None:
+async def test_invitation_cursor_walks_live_prefix_without_duplicates() -> None:
     repository = MemoryRepository()
     invitations = PaginatedFakeInvitationList()
     executor = _executor(
@@ -1565,13 +1571,15 @@ async def test_invitation_cursor_pages_one_snapshot_without_browser_revisit() ->
         "invitation-member-1",
         "invitation-member-2",
     ]
-    assert first.coverage.snapshot_count == first.coverage.advertised_count == 5
-    assert first.coverage.returned_count == 2
-    assert first.pagination.consistency == "captured_snapshot"
+    assert first.coverage.advertised_count == 5
+    assert first.coverage.unique_count == 3
+    assert first.coverage.result_count == 2
+    assert first.coverage.stop_reason is StopReason.RESULT_LIMIT
+    assert first.pagination.consistency == "live_deduplicated"
     assert first.pagination.cumulative_count == 2
     assert first.pagination.next_cursor is not None
 
-    with pytest.raises(InvalidCursorError, match="direction, or filter"):
+    with pytest.raises(InvalidCursorError, match="account, capability, or filter set"):
         await executor.list_invitations(
             first_request.model_copy(
                 update={
@@ -1581,7 +1589,7 @@ async def test_invitation_cursor_pages_one_snapshot_without_browser_revisit() ->
                 }
             )
         )
-    with pytest.raises(InvalidCursorError, match="direction, or filter"):
+    with pytest.raises(InvalidCursorError, match="account, capability, or filter set"):
         await executor.list_invitations(
             first_request.model_copy(
                 update={
@@ -1632,14 +1640,15 @@ async def test_invitation_cursor_pages_one_snapshot_without_browser_revisit() ->
     assert third.pagination.cumulative_count == 5
     assert third.pagination.has_more is False
     assert third.pagination.truncated is False
-    assert third.coverage.completion_reason == "advertised_count_reconciled"
-    assert third.coverage.returned_count == 2
+    assert third.coverage.stop_reason is StopReason.VISIBLE_PAGE_COMPLETE
+    assert third.coverage.result_count == 2
 
     replay = await executor.list_invitations(second_request)
     assert replay.replayed is True
     assert replay.invitations == second.invitations
     assert replay.pagination == second.pagination
-    assert invitations.calls == 1
+    assert invitations.calls == 3
+    assert invitations.result_limits == [3, 4, 6]
 
 
 @pytest.mark.asyncio

@@ -17,6 +17,9 @@ of done.
   and idempotency coverage;
 - cursor lifecycle, filter binding, single-use continuation, expiry, capacity,
   stable-identity deduplication, and terminal truncation coverage;
+- multi-client runtime election, fair scheduling, same-client FIFO ordering,
+  session-scoped replay/cursors/drafts, account-global write idempotency,
+  disconnect survival, cancellation, and graceful stop coverage;
 - shared raw-DOM convergence coverage proving that timed idleness is not
   completion and that progress is parsed before a simultaneously rendered end
   marker;
@@ -35,7 +38,7 @@ not be described as `live_verified` based only on this suite.
 official MCP test client
   -> production FastMCP tools and resources
   -> production policy and process-local operation store
-  -> production asyncio.Queue and one worker
+  -> production fair asyncio scheduler and one worker
   -> production executor
   -> stateful typed simulator providers
 
@@ -59,7 +62,7 @@ The test-only simulator lives under `tests/simulator/`:
 - `scenario.py` maps supported LinkedIn URL surfaces to versioned fixtures;
 - `browser.py` runs official Playwright Chromium and fulfills document
   requests locally;
-- `providers.py` applies confirmed writes to typed simulator state;
+- `providers.py` applies client-authorized writes to typed simulator state;
 - `harness.py` composes the production executor, repository, worker, and
   policy around those providers; and
 - `mcp.py` connects the official MCP client to that container.
@@ -104,14 +107,16 @@ Overview-plus-About read. They contain synthetic identities and text only.
 
 The Posts fixtures under `tests/fixtures/linkedin/posts/latest/` are
 `mock_verified` from authenticated visible search and detail surfaces
-inspected on 2026-07-30. Detail variants preserve current exact-menu identity,
-body expansion, typed media/link/document/poll structures, engagement
-controls, and bounded repost-original behavior. They contain no live post,
-author, raw DOM, authentication state, trace, or account data.
+inspected on 2026-08-04. Search variants preserve dynamic card-text evidence;
+detail variants preserve current exact-menu identity, body expansion, typed
+media/link/document/poll structures, engagement controls, and bounded
+repost-original behavior. They contain no live post, author, raw DOM,
+authentication state, trace, or account data.
 
 The sanitized `personal-post-composer.html` and `post-engagement.html`
 fixtures are also `mock_verified` from the authenticated visible UI inspected
-on 2026-07-30. They preserve all nine personal composer modes, nested
+on 2026-08-04. They preserve the bounded composer loader, disabled Save and
+Done controls for unchanged settings, all nine personal composer modes, nested
 image/video/document/poll/celebration/event/hiring/expert controls, settings,
 the current comment photo/GIF controls, native UGC discussion aliases, and the
 six current reactions. Discovery uploaded synthetic files into draft-only
@@ -128,13 +133,14 @@ and valid trailing-hyphen profile slugs. Invitation-specific fixtures add
 every supported entity type, every current filter, Received/Sent root
 differences, zero inventory, recommendations, count mismatch, one count-change
 restart, repeated count change, identity ambiguity, duplicate identity, old
-layout rejection, snapshot bounds, exact-count-only completion, six-view union
+layout rejection, live result bounds, exact-count-only completion, six-view union
 deduplication, and cross-view conflict rejection.
 
-Invitation cursor tests cover 0, 1, 25, 26, 100, 101, and 180 items; disjoint
-page union; page-size changes; account/direction/filter binding; reservation,
-abort, and single use; absolute and in-use expiry; capacity eviction; process
-restart invalidation; and continuation without a second page-provider call.
+Invitation cursor tests cover bounded live prefixes, disjoint page identities,
+page-size changes, canonical direction/filter binding, provider revisits,
+cumulative traversal targets, terminal exact reconciliation, honest safety
+bounds, reservation, abort, single use, capacity eviction, and process-restart
+invalidation.
 
 ## Coverage ownership
 
@@ -169,18 +175,26 @@ The former one-off live-acceptance runners have been removed. The repository
 contains no executable live LinkedIn test scripts, and `pytest` remains fully
 offline and network-blocked.
 
-When current-UI validation is needed, use a confirmation-capable MCP client
-with the minimum required effects, scopes, and surfaces. Convert only the
-sanitized behavior into offline fixtures; never retain live identities,
+When current-UI validation is needed, use a trusted MCP client with an explicit
+approval policy and the minimum required effects, scopes, and surfaces. Convert
+only the sanitized behavior into offline fixtures; never retain live identities,
 content, raw DOM, traces, cookies, or browser state. Fixture manifests record
 only sanitized provenance and the UI behaviors represented by each fixture.
+
+### Aggregate live-acceptance ledger
+
+- 2026-08-04: a prepare-only personal-composer replay observed a bounded
+  loading dialog, restored the exact personal composer, traversed unchanged
+  audience/comment settings through their enabled Back controls, and did not
+  invoke Post. A one-page read-only Posts search returned six typed cards; all
+  six exact card snapshots reconciled with the immutable captured source.
 
 ## Test groups
 
 | Group | Responsibility |
 | --- | --- |
-| `tests/unit/` | Models, URLs, policy, repository, queue, pacing, cursor state, browser lifecycle, page objects |
-| `tests/contract/` | MCP discovery, schemas, annotations, evidence, write conformance, transports |
+| `tests/unit/` | Models, URLs, policy, client identity, fair queue, repository, pacing, cursor state, cancellation, browser lifecycle, page objects |
+| `tests/contract/` | MCP discovery, schemas, annotations, evidence, write conformance, stateful sessions, stdio proxying, shared-runtime election, and transports |
 | `tests/simulator/` | Typed state, synthetic site, faults, real Playwright routing |
 | `tests/workflows/` | Multi-page job scan, job/referral, connection/message, and post-engagement journeys |
 | `tests/package/` | Wheel contents, entry point, forbidden dependencies, secret/profile exclusion |

@@ -173,7 +173,7 @@
         <p>Staff Engineer at Acme Cloud</p>
         <time>2h</time>
         <p>
-          <span data-testid="expandable-text-box">
+          <span data-testid="expandable-text-box" data-post-text="dynamic">
             A practical guide to reliable Python services. #python
             <button data-testid="expandable-text-button" type="button">… more</button>
           </span>
@@ -200,7 +200,7 @@
         <button type="button">Like</button>
         <button type="button">Comment</button>
       </div>
-      <article data-urn="urn:li:ugcPost:7312345678901234999">
+      <div role="listitem">
         <a href="/company/acme-cloud/">
           Acme Cloud
           <span>Reliable cloud infrastructure</span>
@@ -209,7 +209,23 @@
         <p data-post-text>Infrastructure release notes for engineering teams.</p>
         <p>8 reactions</p>
         <p>2 comments</p>
-      </article>
+        <button
+          type="button"
+          aria-label="Open control menu for post by Acme Cloud"
+          data-open-post-menu
+        >
+          More
+        </button>
+        <div data-post-menu hidden>
+          <button
+            type="button"
+            data-copy-post-link
+            data-copy-url="https://www.linkedin.com/posts/acme-cloud_release-activity-7312345678901234999-x/"
+          >
+            Copy link to post
+          </button>
+        </div>
+      </div>
     </main>
 
     <script>
@@ -281,6 +297,15 @@
         copy.addEventListener("click", async () => {
           await navigator.clipboard.writeText(copy.dataset.copyUrl);
           menu.hidden = true;
+          document.querySelectorAll("[data-dynamic-post-text]").forEach((item) => {
+            item.remove();
+          });
+          if (region.querySelector('[data-post-text="dynamic"]')) {
+            const transient = document.createElement("span");
+            transient.dataset.dynamicPostText = "true";
+            transient.textContent = " 42";
+            region.append(transient);
+          }
         });
       });
       document

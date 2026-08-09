@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit
 
+from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
@@ -116,6 +117,7 @@ _EXPERT_CATEGORY_LABELS = {
     ExpertRequestCategory.MARKETING: "Marketing",
     ExpertRequestCategory.OTHER: "Other",
 }
+_COMPOSER_READY_TIMEOUT_MS = 12_000
 
 
 async def _visible_text(page: Page) -> str:
@@ -203,37 +205,52 @@ class PostPublishingPage:
         self._validate_schedule(payload.scheduled_at)
         paths = await self._assets.verify(payload)
         async with self._browser.page() as page:
-            await self._browser.navigate(page, _HOME_URL)
-            dialog, slug, name = await self._open_composer(page)
-            expected_slug = draft.target.actor_profile_slug or draft.target.profile_slug
-            expected_name = draft.target.actor_display_name or draft.target.display_name
-            if slug != expected_slug or name.casefold() != expected_name.casefold():
+            try:
+                await self._browser.navigate(page, _HOME_URL)
+                dialog, slug, name = await self._open_composer(page)
+                expected_slug = draft.target.actor_profile_slug or draft.target.profile_slug
+                expected_name = draft.target.actor_display_name or draft.target.display_name
+                if slug != expected_slug or name.casefold() != expected_name.casefold():
+                    return await self._result(
+                        page,
+                        ActionOutcome.FAILED,
+                        False,
+                        "actor_identity_changed",
+                        (
+                            "The active personal member no longer matches the confirmed "
+                            "publishing actor."
+                        ),
+                    )
+
+                await self._compose(page, dialog, payload, paths)
+                dialog = await self._composer_dialog(page)
+                await self._configure_settings(page, dialog, payload)
+                if payload.scheduled_at is not None:
+                    await self._configure_schedule(page, dialog, payload.scheduled_at)
+                    dialog = await self._composer_dialog(page)
+
+                marker = self._verification_marker(payload)
+                before_refs = await self._matching_post_refs(page, marker)
+                final_name = (
+                    re.compile(r"^schedule$", re.I)
+                    if payload.scheduled_at is not None
+                    else re.compile(r"^post$", re.I)
+                )
+                final_control = await _unique_visible(
+                    dialog.get_by_role("button", name=final_name),
+                    "final Post or Schedule control",
+                )
+            except (ParserDriftError, PlaywrightError):
                 return await self._result(
                     page,
                     ActionOutcome.FAILED,
                     False,
-                    "actor_identity_changed",
-                    "The active personal member no longer matches the confirmed publishing actor.",
+                    "post_not_submitted",
+                    (
+                        "The visible composer did not reach a safe, operable state before "
+                        "the final publishing control; no post was submitted."
+                    ),
                 )
-
-            await self._compose(page, dialog, payload, paths)
-            dialog = await self._composer_dialog(page)
-            await self._configure_settings(page, dialog, payload)
-            if payload.scheduled_at is not None:
-                await self._configure_schedule(page, dialog, payload.scheduled_at)
-                dialog = await self._composer_dialog(page)
-
-            marker = self._verification_marker(payload)
-            before_refs = await self._matching_post_refs(page, marker)
-            final_name = (
-                re.compile(r"^schedule$", re.I)
-                if payload.scheduled_at is not None
-                else re.compile(r"^post$", re.I)
-            )
-            final_control = await _unique_visible(
-                dialog.get_by_role("button", name=final_name),
-                "final Post or Schedule control",
-            )
             try:
                 await self._browser.click_visible_control(page, final_control)
             except Exception:
@@ -396,7 +413,10 @@ class PostPublishingPage:
             name=re.compile(r"(?:create|share|start).*(?:post)|post composer", re.I),
         )
         with suppress(PlaywrightTimeoutError):
-            await candidates.first.wait_for(state="visible", timeout=3_000)
+            await candidates.first.wait_for(
+                state="visible",
+                timeout=_COMPOSER_READY_TIMEOUT_MS,
+            )
         return await _unique_visible(candidates, "personal post composer dialog")
 
     async def _assert_mode_available(
@@ -1823,14 +1843,31 @@ class PostPublishingPage:
             )
             if not await comments.is_checked():
                 await self._browser.click_visible_control(page, comments)
-            save = await _unique_visible(
-                comment_dialog.get_by_role(
-                    "button",
-                    name=re.compile(r"^save$", re.I),
-                ),
-                "Comment control Save control",
-            )
-            await self._browser.click_visible_control(page, save)
+                if not await comments.is_checked():
+                    raise ParserDriftError(
+                        "LinkedIn did not retain the exact confirmed comment-control state."
+                    )
+                save = await _unique_visible(
+                    comment_dialog.get_by_role(
+                        "button",
+                        name=re.compile(r"^save$", re.I),
+                    ),
+                    "Comment control Save control",
+                )
+                if not await save.is_enabled():
+                    raise ParserDriftError(
+                        "LinkedIn did not enable the changed Comment control Save action."
+                    )
+                await self._browser.click_visible_control(page, save)
+            else:
+                back = await _unique_visible(
+                    comment_dialog.get_by_role(
+                        "button",
+                        name=re.compile(r"^back$", re.I),
+                    ),
+                    "unchanged Comment control Back control",
+                )
+                await self._browser.click_visible_control(page, back)
             with suppress(PlaywrightTimeoutError):
                 await settings_candidates.first.wait_for(state="visible", timeout=3_000)
             settings = await _unique_visible(
@@ -1864,7 +1901,14 @@ class PostPublishingPage:
             settings.get_by_role("button", name=re.compile(r"^done$", re.I)),
             "Post settings Done control",
         )
-        await self._browser.click_visible_control(page, done)
+        if await done.is_enabled():
+            await self._browser.click_visible_control(page, done)
+        else:
+            back = await _unique_visible(
+                settings.get_by_role("button", name=re.compile(r"^back$", re.I)),
+                "unchanged Post settings Back control",
+            )
+            await self._browser.click_visible_control(page, back)
 
     @staticmethod
     async def _brand_partnership_control(settings: Locator) -> Locator:
