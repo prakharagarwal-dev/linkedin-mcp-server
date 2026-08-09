@@ -177,7 +177,7 @@ invalidation.
 
 ## Coverage ownership
 
-`tests/verification_manifest.py` owns the explicit mapping for all 33 tools.
+`tests/verification_manifest.py` owns the explicit mapping for all 31 tools.
 The manifest test fails when:
 
 - the public tool registry and verification inventory differ;
