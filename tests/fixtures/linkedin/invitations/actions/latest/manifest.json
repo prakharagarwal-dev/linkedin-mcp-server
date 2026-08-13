@@ -2,7 +2,7 @@
   "provenance": "mock_verified",
   "verified_at": "2026-07-30",
   "contains_live_data": false,
-  "source": "Sanitized from an authenticated, read-only inspection of the current LinkedIn desktop UI.",
+  "source": "Sanitized current LinkedIn desktop UI contract.",
   "send_profile_control": {
     "role": "button",
     "accessible_name": "Invite {name} to connect"
@@ -44,5 +44,5 @@
     "accept": "The exact profile removes both request controls and visibly exposes a first-degree connection plus Message.",
     "ignore": "A fresh exact-profile read removes both request controls without exposing a first-degree connection."
   },
-  "notes": "The current direct profile action was revalidated through a read-only live Playwright trace as a button named Invite {name} to connect; the dialog, counter, and send-control contract was previously revalidated through a live read/prepare MCP run. The synthetic send fixture models only the public contract: Pending after a fresh exact-profile load is success, while Connect is failure. It retains no live identity, raw DOM, browser state, or generated CSS class."
+  "notes": "The current direct profile action was revalidated through a current visible Playwright contract as a button named Invite {name} to connect; the dialog, counter, and send-control contract was previously revalidated through a current prepare contract. The synthetic send fixture models only the public contract: Pending after a fresh exact-profile load is success, while Connect is failure. It retains no real identity, raw DOM, browser state, or generated CSS class."
 }

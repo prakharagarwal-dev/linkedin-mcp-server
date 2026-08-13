@@ -27,7 +27,6 @@ FORBIDDEN_RUNTIME_DEPENDENCIES = {
     "keyring",
 }
 PUBLIC_REPOSITORY_FILES = {
-    ".github/actionlint.yaml",
     ".github/CODEOWNERS",
     ".github/ISSUE_TEMPLATE/bug_report.yml",
     ".github/ISSUE_TEMPLATE/config.yml",
@@ -36,7 +35,6 @@ PUBLIC_REPOSITORY_FILES = {
     ".github/pull_request_template.md",
     ".github/workflows/ci.yml",
     ".github/workflows/codeql.yml",
-    ".github/workflows/live-validation.yml",
     ".github/workflows/publish-registries.yml",
     ".github/workflows/publish.yml",
     "assets/icon.png",
@@ -48,9 +46,6 @@ PUBLIC_REPOSITORY_FILES = {
     "README.md",
     "SECURITY.md",
     "docs/PUBLISHING.md",
-    "docs/LIVE_VALIDATION.md",
-    "infra/aws-live-validation/run-live-validation.sh",
-    "infra/aws-live-validation/template.yaml",
     "packaging/mcpb/manifest.json",
     "server.json",
 }

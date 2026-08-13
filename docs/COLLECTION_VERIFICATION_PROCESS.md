@@ -47,13 +47,12 @@ When LinkedIn exposes no unambiguous inventory, completion requires independent
 terminal evidence. The absence of a count must never be replaced with a guessed
 count.
 
-## Phase 1: Observe the complete live surface
+## Phase 1: Define the complete surface contract
 
 Before designing or changing a collector:
 
-1. Use the saved authenticated profile, official Playwright, and visible
-   LinkedIn UI only.
-2. Traverse to the actual tail with a read-only, bounded diagnostic.
+1. Use approved current-UI evidence and visible LinkedIn semantics only.
+2. Account for the actual tail with a read-only, bounded contract.
 3. Identify the real scroll container. Do not assume document scrolling.
 4. Record aggregate, non-personal facts:
    - selected filter and its advertised count;
@@ -163,7 +162,7 @@ Verification proceeds from narrowest to broadest:
 2. Real Playwright page-object tests against semantic fixtures.
 3. Convergence, queue, pacing, cancellation, and safety-bound tests.
 4. Executor tests for coverage, completion reasons, evidence, error mapping,
-   and cumulative live traversal targets across cursor pages.
+   and cumulative traversal targets across cursor pages.
 5. Official MCP client tests for schemas and structured output.
 6. Cursor workflow tests proving disjoint identities, cumulative counts,
    client/account/filter binding, pre-queue reservation, single-use cursors,
@@ -175,43 +174,23 @@ Tests must assert expected inventory and rejection categories independently.
 They must not use the collector's own output as the source of the expected
 count.
 
-## Phase 6: Perform low-volume live acceptance
-
-Live acceptance is opt-in, read-only where possible, and never part of the
-default pytest suite.
-
-For a paginated collection, acceptance must:
-
-1. Start through the official MCP transport, not only a page-object script.
-2. Traverse every cursor page until terminal state or an honest safety bound.
-3. Verify disjoint stable identities between pages.
-4. Reconcile the terminal cumulative typed count plus classified unsupported
-   count with the selected rendered inventory.
-5. Confirm neighboring collections were excluded.
-6. Record rounds, stop reason, cumulative count, `has_more`, and `truncated`.
-7. Confirm authentication remains valid and the server is not paused.
-8. Retain only aggregate evidence in a dated live-acceptance ledger.
-
-A successful first page, a non-hanging cursor, or a clean terminal response is
-not sufficient acceptance.
-
 ## Definition of done
 
 A collection change may be called complete only when all of these are true:
 
-- the complete live surface was inspected;
+- the complete selected surface contract is represented;
 - selected and neighboring collections were classified;
 - terminal reconciliation passes or truncation is reported honestly;
 - raw candidate normalization occurs before private bounds;
 - offline fixtures include the observed failure shape;
 - page-object, executor, MCP, cursor, simulator, and complete-suite checks pass;
-- a low-volume production-MCP replay passes when live acceptance is in scope;
 - the capability matrix, changelog, and relevant durable documentation are updated;
   and
-- no live personal data or authentication material was retained.
+- no personal data or authentication material was retained.
 
 If any item is missing, describe the result as incomplete, blocked, or
-mock-verified as appropriate. Do not call it fully fixed or live-accepted.
+mock-verified as appropriate. Do not call it fully fixed without the complete
+contract evidence.
 
 ## Required static gates
 

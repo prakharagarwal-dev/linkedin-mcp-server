@@ -65,5 +65,5 @@
     "company": "company",
     "school": "schoolFreetext"
   },
-  "notes": "Synthetic identities and values preserve only selector, accessibility, filter-submission, sort, result-card, and pagination behavior observed through the authenticated visible UI. The shared People panel visibly exposes all degrees, but linkedin.connections.search always submits first degree; broader degree selection belongs to linkedin.people.search."
+  "notes": "Synthetic identities and values preserve only selector, accessibility, filter-submission, sort, result-card, and pagination behavior represented by the current visible-UI contract. The shared People panel visibly exposes all degrees, but linkedin.connections.search always submits first degree; broader degree selection belongs to linkedin.people.search."
 }
