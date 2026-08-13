@@ -177,7 +177,7 @@ invalidation.
 
 ## Coverage ownership
 
-`tests/verification_manifest.py` owns the explicit mapping for all 31 tools.
+`tests/verification_manifest.py` owns the explicit offline mapping for all 31 tools.
 The manifest test fails when:
 
 - the public tool registry and verification inventory differ;
@@ -195,24 +195,32 @@ idempotent replay.
 ## Network isolation
 
 `tests/conftest.py` blocks non-loopback Python socket connections for every
-test. Unix sockets and loopback connections remain available for Playwright
-and Streamable HTTP protocol tests. The repository has no live LinkedIn tests;
-the complete suite is offline.
+pytest test. Unix sockets and loopback connections remain available for
+Playwright and Streamable HTTP protocol tests. The complete default suite is
+offline; the separately invoked `tests/live/runner.py` module is never collected
+by pytest.
 
 The semantic browser also aborts any document route not registered by the
 simulator.
 
 ## Live acceptance
 
-The former one-off live-acceptance runners have been removed. The repository
-contains no executable live LinkedIn test scripts, and `pytest` remains fully
-offline and network-blocked.
+The opt-in [weekly live-validation workflow](LIVE_VALIDATION.md) uses the
+official MCP stdio transport and two authorized test accounts. It covers all 25
+repeatable tools in a closed loop and reports the six invitation-changing tools
+as simulator-only. It is scheduled and manually dispatchable, but never runs in
+the default pytest suite or for pull requests.
 
-When current-UI validation is needed, use a trusted MCP client with an explicit
-approval policy and the minimum required effects, scopes, and surfaces. Convert
-only the sanitized behavior into offline fixtures; never retain live identities,
-content, raw DOM, traces, cookies, or browser state. Fixture manifests record
-only sanitized provenance and the UI behaviors represented by each fixture.
+The GitHub-hosted orchestration job assumes a short-lived AWS OIDC role, starts
+an outbound-only EC2 worker, and invokes the exact `main` revision through
+Systems Manager. The worker uses two Chromium profiles directly from encrypted,
+retained EBS storage and stops after the run; a three-hour instance watchdog is
+the cleanup fallback.
+
+Only sanitized aggregate outcomes return to GitHub. The workflow never uploads
+live identities, content, raw DOM, traces, cookies, or browser state. Current-UI
+behavior discovered during diagnosis must still be converted into sanitized
+offline fixtures before it becomes default-suite coverage.
 
 ### Aggregate live-acceptance ledger
 
@@ -298,6 +306,7 @@ only sanitized provenance and the UI behaviors represented by each fixture.
 | `tests/contract/` | MCP discovery, schemas, annotations, evidence, write conformance, stateful sessions, stdio proxying, shared-runtime election, and transports |
 | `tests/simulator/` | Typed state, synthetic site, faults, real Playwright routing |
 | `tests/workflows/` | Multi-page job scan, job/referral, connection/message, and post-engagement journeys |
+| `tests/live/` | Explicitly invoked two-account MCP scenario and privacy-safe status generation; never collected by pytest |
 | `tests/package/` | Wheel contents, entry point, forbidden dependencies, secret/profile exclusion |
 
 ## Running verification

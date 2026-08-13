@@ -21,3 +21,4 @@ playwright-report/
 test-results/
 .action-writing-state/
 .linkedin-mcp/
+.live-validation/
