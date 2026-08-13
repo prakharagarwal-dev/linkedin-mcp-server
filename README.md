@@ -3,6 +3,7 @@
 <!-- mcp-name: io.github.prakharagarwal-dev/linkedin-mcp-server -->
 
 [![CI](https://github.com/prakharagarwal-dev/linkedin-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/prakharagarwal-dev/linkedin-mcp-server/actions/workflows/ci.yml)
+[![Weekly live validation](https://github.com/prakharagarwal-dev/linkedin-mcp-server/actions/workflows/live-validation.yml/badge.svg?branch=main)](https://github.com/prakharagarwal-dev/linkedin-mcp-server/actions/workflows/live-validation.yml)
 [![CodeQL](https://github.com/prakharagarwal-dev/linkedin-mcp-server/actions/workflows/codeql.yml/badge.svg)](https://github.com/prakharagarwal-dev/linkedin-mcp-server/actions/workflows/codeql.yml)
 [![PyPI](https://img.shields.io/pypi/v/linkedin-mcp-local.svg)](https://pypi.org/project/linkedin-mcp-local/)
 [![Python 3.12–3.13](https://img.shields.io/badge/Python-3.12%E2%80%933.13-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
@@ -16,34 +17,72 @@
 A LinkedIn MCP server to find jobs, search people, research companies, manage
 your network, publish and engage with posts, and read or send messages.
 
-## Features
+## Tools
 
-| Area | Function | MCP tool(s) | What it does |
-| --- | --- | --- | --- |
-| **Jobs** | Search jobs | `linkedin.jobs.search` | Search by keywords, location, distance, date, workplace, experience, employment type, company, industry, function, title, benefits, Easy Apply, verification, applicant count, network, and other visible filters. |
-|  | Read job details | `linkedin.jobs.get` | Read the complete job description, company, application method, and visible hiring team. |
-| **People** | Search people | `linkedin.people.search` | Search by keywords, connection degree, hiring status, location, current or past company, title, school, industry, services, language, connections, and followers. |
-|  | Read profiles | `linkedin.people.get` | Read the complete visible profile or request selected sections such as About, experience, education, skills, projects, certifications, and recommendations. |
-| **Companies** | Search companies | `linkedin.companies.search` | Search by keywords, headquarters, industry, size, available jobs, and first-degree connections. |
-|  | Read company details | `linkedin.companies.get` | Read Overview and About information, including website, headquarters, size, type, founding year, and specialties. |
-| **Posts** | Search posts | `linkedin.posts.search` | Search by keywords, date, content type, author, company, relationship, mentions, author industry, and other visible filters. |
-|  | Read posts | `linkedin.posts.get` | Read complete content, media, links, mentions, hashtags, reactions, and engagement. |
-|  | Read discussions | `linkedin.posts.comments.list` | Read paginated comments, replies, attachments, and reactions. |
-|  | Publish posts | `linkedin.posts.create.prepare`<br>`linkedin.posts.create.execute` | Publish supported personal text, link, image, video, document, poll, celebration, event, hiring, and expert-request posts. |
-|  | Comment | `linkedin.posts.comment.prepare`<br>`linkedin.posts.comment.execute` | Add text, links, emoji, mentions, photos, or GIFs to posts. |
-|  | React | `linkedin.posts.reaction.prepare`<br>`linkedin.posts.reaction.execute` | Add, change, or remove reactions on posts. |
-| **Network** | List connections | `linkedin.connections.list` | Browse established first-degree connections with sorting and pagination. |
-|  | Search connections | `linkedin.connections.search` | Search existing connections using applicable People filters. |
-|  | List invitations | `linkedin.invitations.list` | Browse received and sent invitations using LinkedIn's visible filters. |
-|  | Send invitations | `linkedin.invitations.send.prepare`<br>`linkedin.invitations.send.execute` | Send connection requests with optional notes. |
-|  | Accept invitations | `linkedin.invitations.accept.prepare`<br>`linkedin.invitations.accept.execute` | Accept incoming connection requests. |
-|  | Ignore invitations | `linkedin.invitations.ignore.prepare`<br>`linkedin.invitations.ignore.execute` | Ignore incoming connection requests. |
-| **Messaging** | Search messages | `linkedin.messaging.search` | Search by recipient or message text using inbox categories and filters. |
-|  | Read conversations | `linkedin.messaging.conversation.get` | Read message history, replies, edits, reactions, and attachments. |
-|  | Send messages | `linkedin.messaging.message.prepare`<br>`linkedin.messaging.message.execute` | Send or reply in one-to-one conversations with text, links, emoji, files, images, and GIFs. |
-| **Server** | Check runtime | `linkedin.server.status` | Inspect the shared runtime, queue, and active browser operation. |
-|  | Check LinkedIn session | `linkedin.session.status` | Inspect browser-profile, authentication, login, and pause state. |
-|  | List capabilities | `linkedin.capabilities.list` | Inspect available capabilities, scopes, and enabled state. |
+| Area | Function | MCP tool(s) | Weekly status | What it does |
+| --- | --- | --- | --- | --- |
+| **Jobs** | Search jobs | `linkedin.jobs.search` | ![Weekly live status][live-linkedin-jobs-search] | Search by keywords, location, distance, date, workplace, experience, employment type, company, industry, function, title, benefits, Easy Apply, verification, applicant count, network, and other visible filters. |
+|  | Read job details | `linkedin.jobs.get` | ![Weekly live status][live-linkedin-jobs-get] | Read the complete job description, company, application method, and visible hiring team. |
+| **People** | Search people | `linkedin.people.search` | ![Weekly live status][live-linkedin-people-search] | Search by keywords, connection degree, hiring status, location, current or past company, title, school, industry, services, language, connections, and followers. |
+|  | Read profiles | `linkedin.people.get` | ![Weekly live status][live-linkedin-people-get] | Read the complete visible profile or request selected sections such as About, experience, education, skills, projects, certifications, and recommendations. |
+| **Companies** | Search companies | `linkedin.companies.search` | ![Weekly live status][live-linkedin-companies-search] | Search by keywords, headquarters, industry, size, available jobs, and first-degree connections. |
+|  | Read company details | `linkedin.companies.get` | ![Weekly live status][live-linkedin-companies-get] | Read Overview and About information, including website, headquarters, size, type, founding year, and specialties. |
+| **Posts** | Search posts | `linkedin.posts.search` | ![Weekly live status][live-linkedin-posts-search] | Search by keywords, date, content type, author, company, relationship, mentions, author industry, and other visible filters. |
+|  | Read posts | `linkedin.posts.get` | ![Weekly live status][live-linkedin-posts-get] | Read complete content, media, links, mentions, hashtags, reactions, and engagement. |
+|  | Read discussions | `linkedin.posts.comments.list` | ![Weekly live status][live-linkedin-posts-comments-list] | Read paginated comments, replies, attachments, and reactions. |
+|  | Publish posts | `linkedin.posts.create.prepare`<br>`linkedin.posts.create.execute` | ![Prepare status][live-linkedin-posts-create-prepare]<br>![Execute status][live-linkedin-posts-create-execute] | Publish supported personal text, link, image, video, document, poll, celebration, event, hiring, and expert-request posts. |
+|  | Comment | `linkedin.posts.comment.prepare`<br>`linkedin.posts.comment.execute` | ![Prepare status][live-linkedin-posts-comment-prepare]<br>![Execute status][live-linkedin-posts-comment-execute] | Add text, links, emoji, mentions, photos, or GIFs to posts. |
+|  | React | `linkedin.posts.reaction.prepare`<br>`linkedin.posts.reaction.execute` | ![Prepare status][live-linkedin-posts-reaction-prepare]<br>![Execute status][live-linkedin-posts-reaction-execute] | Add, change, or remove reactions on posts. |
+| **Network** | List connections | `linkedin.connections.list` | ![Weekly live status][live-linkedin-connections-list] | Browse established first-degree connections with sorting and pagination. |
+|  | Search connections | `linkedin.connections.search` | ![Weekly live status][live-linkedin-connections-search] | Search existing connections using applicable People filters. |
+|  | List invitations | `linkedin.invitations.list` | ![Weekly live status][live-linkedin-invitations-list] | Browse received and sent invitations using LinkedIn's visible filters. |
+|  | Send invitations | `linkedin.invitations.send.prepare`<br>`linkedin.invitations.send.execute` | ![Prepare status][live-linkedin-invitations-send-prepare]<br>![Execute status][live-linkedin-invitations-send-execute] | Send connection requests with optional notes. |
+|  | Accept invitations | `linkedin.invitations.accept.prepare`<br>`linkedin.invitations.accept.execute` | ![Prepare status][live-linkedin-invitations-accept-prepare]<br>![Execute status][live-linkedin-invitations-accept-execute] | Accept incoming connection requests. |
+|  | Ignore invitations | `linkedin.invitations.ignore.prepare`<br>`linkedin.invitations.ignore.execute` | ![Prepare status][live-linkedin-invitations-ignore-prepare]<br>![Execute status][live-linkedin-invitations-ignore-execute] | Ignore incoming connection requests. |
+| **Messaging** | Search messages | `linkedin.messaging.search` | ![Weekly live status][live-linkedin-messaging-search] | Search by recipient or message text using inbox categories and filters. |
+|  | Read conversations | `linkedin.messaging.conversation.get` | ![Weekly live status][live-linkedin-messaging-conversation-get] | Read message history, replies, edits, reactions, and attachments. |
+|  | Send messages | `linkedin.messaging.message.prepare`<br>`linkedin.messaging.message.execute` | ![Prepare status][live-linkedin-messaging-message-prepare]<br>![Execute status][live-linkedin-messaging-message-execute] | Send or reply in one-to-one conversations with text, links, emoji, files, images, and GIFs. |
+| **Server** | Check runtime | `linkedin.server.status` | ![Weekly live status][live-linkedin-server-status] | Inspect the shared runtime, queue, and active browser operation. |
+|  | Check LinkedIn session | `linkedin.session.status` | ![Weekly live status][live-linkedin-session-status] | Inspect browser-profile, authentication, login, and pause state. |
+|  | List capabilities | `linkedin.capabilities.list` | ![Weekly live status][live-linkedin-capabilities-list] | Inspect available capabilities, scopes, and enabled state. |
+
+The badges show the latest bounded two-account live run. Blue `simulator`
+badges identify invitation-changing tools intentionally excluded from the
+stable weekly loop; they remain covered by the offline simulator on every PR.
+See [live validation](docs/LIVE_VALIDATION.md) for the exact scenario and
+safety boundaries.
+
+[live-linkedin-jobs-search]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.jobs.search.json
+[live-linkedin-jobs-get]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.jobs.get.json
+[live-linkedin-people-search]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.people.search.json
+[live-linkedin-people-get]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.people.get.json
+[live-linkedin-companies-search]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.companies.search.json
+[live-linkedin-companies-get]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.companies.get.json
+[live-linkedin-posts-search]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.posts.search.json
+[live-linkedin-posts-get]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.posts.get.json
+[live-linkedin-posts-comments-list]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.posts.comments.list.json
+[live-linkedin-posts-create-prepare]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.posts.create.prepare.json
+[live-linkedin-posts-create-execute]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.posts.create.execute.json
+[live-linkedin-posts-comment-prepare]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.posts.comment.prepare.json
+[live-linkedin-posts-comment-execute]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.posts.comment.execute.json
+[live-linkedin-posts-reaction-prepare]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.posts.reaction.prepare.json
+[live-linkedin-posts-reaction-execute]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.posts.reaction.execute.json
+[live-linkedin-connections-list]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.connections.list.json
+[live-linkedin-connections-search]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.connections.search.json
+[live-linkedin-invitations-list]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.invitations.list.json
+[live-linkedin-invitations-send-prepare]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.invitations.send.prepare.json
+[live-linkedin-invitations-send-execute]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.invitations.send.execute.json
+[live-linkedin-invitations-accept-prepare]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.invitations.accept.prepare.json
+[live-linkedin-invitations-accept-execute]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.invitations.accept.execute.json
+[live-linkedin-invitations-ignore-prepare]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.invitations.ignore.prepare.json
+[live-linkedin-invitations-ignore-execute]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.invitations.ignore.execute.json
+[live-linkedin-messaging-search]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.messaging.search.json
+[live-linkedin-messaging-conversation-get]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.messaging.conversation.get.json
+[live-linkedin-messaging-message-prepare]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.messaging.message.prepare.json
+[live-linkedin-messaging-message-execute]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.messaging.message.execute.json
+[live-linkedin-server-status]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.server.status.json
+[live-linkedin-session-status]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.session.status.json
+[live-linkedin-capabilities-list]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Flive-status%2Fbadges%2Flinkedin.capabilities.list.json
 
 Actions that change LinkedIn use an immutable prepare-and-execute flow and
 request confirmation by default. Every capability is task-specific; the server
@@ -443,6 +482,7 @@ See [SECURITY.md](SECURITY.md) and [the security design](docs/SECURITY.md).
 - [Capability matrix](docs/CAPABILITY_MATRIX.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Testing](docs/TESTING.md)
+- [Weekly live validation](docs/LIVE_VALIDATION.md)
 - [Collection verification](docs/COLLECTION_VERIFICATION_PROCESS.md)
 - [Publishing](docs/PUBLISHING.md)
 - [Changelog](CHANGELOG.md)

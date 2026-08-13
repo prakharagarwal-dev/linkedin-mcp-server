@@ -1,0 +1,434 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  On-demand EC2 worker with encrypted persistent EBS storage for the LinkedIn
+  MCP weekly live-validation workflow.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: linkedin-mcp-live
+    AllowedPattern: "[a-z0-9-]{3,32}"
+  GitHubOwner:
+    Type: String
+    Default: prakharagarwal-dev
+    AllowedPattern: "[A-Za-z0-9_.-]+"
+  GitHubRepository:
+    Type: String
+    Default: linkedin-mcp-server
+    AllowedPattern: "[A-Za-z0-9_.-]+"
+  GitHubEnvironmentName:
+    Type: String
+    Default: linkedin-live
+    AllowedPattern: "[A-Za-z0-9_.-]+"
+  ExistingGitHubOidcProviderArn:
+    Type: String
+    Default: ""
+    Description: >-
+      Existing token.actions.githubusercontent.com IAM OIDC provider ARN. Leave
+      empty only when this AWS account does not already have that provider.
+  InstanceType:
+    Type: String
+    Default: m7i-flex.large
+    AllowedValues:
+      - m7i-flex.large
+      - m7i.large
+      - m6i.large
+      - t3.large
+  RootVolumeSizeGiB:
+    Type: Number
+    Default: 24
+    MinValue: 20
+    MaxValue: 100
+  ProfileVolumeSizeGiB:
+    Type: Number
+    Default: 50
+    MinValue: 30
+    MaxValue: 200
+  MaxRuntimeMinutes:
+    Type: Number
+    Default: 180
+    MinValue: 60
+    MaxValue: 360
+  UbuntuAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id
+
+Conditions:
+  CreateGitHubOidcProvider: !Equals [!Ref ExistingGitHubOidcProviderArn, ""]
+
+Resources:
+  LiveVpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.42.0.0/24
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-vpc
+        - Key: Project
+          Value: !Ref ProjectName
+
+  LiveInternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-igw
+        - Key: Project
+          Value: !Ref ProjectName
+
+  LiveInternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref LiveInternetGateway
+      VpcId: !Ref LiveVpc
+
+  LiveSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock: 10.42.0.0/26
+      MapPublicIpOnLaunch: true
+      VpcId: !Ref LiveVpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-subnet
+        - Key: Project
+          Value: !Ref ProjectName
+
+  LiveRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref LiveVpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-routes
+        - Key: Project
+          Value: !Ref ProjectName
+
+  LiveDefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: LiveInternetGatewayAttachment
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref LiveInternetGateway
+      RouteTableId: !Ref LiveRouteTable
+
+  LiveSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref LiveRouteTable
+      SubnetId: !Ref LiveSubnet
+
+  LiveSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Outbound-only access for the LinkedIn live worker
+      SecurityGroupIngress: []
+      SecurityGroupEgress:
+        - Description: HTTPS for AWS, GitHub, Python packages, and LinkedIn
+          IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - Description: HTTP for operating-system package mirrors
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - Description: DNS over UDP
+          IpProtocol: udp
+          FromPort: 53
+          ToPort: 53
+          CidrIp: 0.0.0.0/0
+        - Description: DNS over TCP
+          IpProtocol: tcp
+          FromPort: 53
+          ToPort: 53
+          CidrIp: 0.0.0.0/0
+        - Description: Network time synchronization
+          IpProtocol: udp
+          FromPort: 123
+          ToPort: 123
+          CidrIp: 0.0.0.0/0
+      VpcId: !Ref LiveVpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-egress
+        - Key: Project
+          Value: !Ref ProjectName
+
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: CreateGitHubOidcProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+  LiveInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+  LiveInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref LiveInstanceRole
+
+  ProfileVolume:
+    Type: AWS::EC2::Volume
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      AvailabilityZone: !GetAtt LiveSubnet.AvailabilityZone
+      Encrypted: true
+      Size: !Ref ProfileVolumeSizeGiB
+      VolumeType: gp3
+      Iops: 3000
+      Throughput: 125
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-profiles
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: DataClassification
+          Value: browser-authentication
+
+  LiveInstance:
+    Type: AWS::EC2::Instance
+    DependsOn: LiveDefaultRoute
+    Properties:
+      ImageId: !Ref UbuntuAmiId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref LiveInstanceProfile
+      InstanceInitiatedShutdownBehavior: stop
+      SecurityGroupIds:
+        - !Ref LiveSecurityGroup
+      SubnetId: !Ref LiveSubnet
+      MetadataOptions:
+        HttpEndpoint: enabled
+        HttpTokens: required
+        HttpPutResponseHopLimit: 1
+        InstanceMetadataTags: enabled
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            DeleteOnTermination: true
+            Encrypted: true
+            VolumeSize: !Ref RootVolumeSizeGiB
+            VolumeType: gp3
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-worker
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: ManagedBy
+          Value: CloudFormation
+      UserData:
+        Fn::Base64: !Sub |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          exec > >(tee -a /var/log/linkedin-live-bootstrap.log) 2>&1
+          export DEBIAN_FRONTEND=noninteractive
+
+          cat >/etc/systemd/system/linkedin-live-watchdog.service <<'UNIT'
+          [Unit]
+          Description=Stop the LinkedIn live worker after its safety bound
+
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/sbin/shutdown -h now
+          UNIT
+
+          cat >/etc/systemd/system/linkedin-live-watchdog.timer <<'UNIT'
+          [Unit]
+          Description=Bound the LinkedIn live worker runtime
+
+          [Timer]
+          OnBootSec=${MaxRuntimeMinutes}min
+          AccuracySec=1min
+          Unit=linkedin-live-watchdog.service
+
+          [Install]
+          WantedBy=timers.target
+          UNIT
+          systemctl daemon-reload
+          systemctl enable --now linkedin-live-watchdog.timer
+
+          apt-get update
+          apt-get install --yes --no-install-recommends \
+            ca-certificates curl git jq openbox python3 python3-venv \
+            snapd unzip websockify x11vnc xvfb novnc
+
+          if ! id -u linkedin-live >/dev/null 2>&1; then
+            useradd --create-home --shell /bin/bash linkedin-live
+          fi
+
+          python3 -m venv /opt/linkedin-live-uv
+          /opt/linkedin-live-uv/bin/pip install --disable-pip-version-check uv==0.11.12
+          ln -sfn /opt/linkedin-live-uv/bin/uv /usr/local/bin/uv
+          ln -sfn /opt/linkedin-live-uv/bin/uvx /usr/local/bin/uvx
+
+          if ! systemctl list-unit-files | grep -q amazon-ssm-agent; then
+            snap install amazon-ssm-agent --classic
+          fi
+          systemctl enable --now snap.amazon-ssm-agent.amazon-ssm-agent.service \
+            || systemctl enable --now amazon-ssm-agent.service
+
+          volume_id='${ProfileVolume}'
+          normalized_volume_id="$(printf '%s' "$volume_id" | tr -d '-')"
+          device_link="/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_$normalized_volume_id"
+          for attempt in $(seq 1 120); do
+            if [ -e "$device_link" ]; then
+              break
+            fi
+            sleep 5
+          done
+          test -e "$device_link"
+          device="$(readlink -f "$device_link")"
+          if [ -z "$(blkid -s TYPE -o value "$device" || true)" ]; then
+            mkfs.ext4 -L linkedin-mcp-live "$device"
+          fi
+          filesystem_uuid="$(blkid -s UUID -o value "$device")"
+          mkdir -p /var/lib/linkedin-mcp-live
+          if ! grep -q "UUID=$filesystem_uuid " /etc/fstab; then
+            printf 'UUID=%s /var/lib/linkedin-mcp-live ext4 defaults,nofail 0 2\n' \
+              "$filesystem_uuid" >>/etc/fstab
+          fi
+          mount /var/lib/linkedin-mcp-live
+          install -d -m 0700 -o linkedin-live -g linkedin-live \
+            /var/lib/linkedin-mcp-live/account-a/profile \
+            /var/lib/linkedin-mcp-live/account-b/profile
+          install -d -m 0750 -o linkedin-live -g linkedin-live \
+            /var/lib/linkedin-mcp-live/cache \
+            /var/lib/linkedin-mcp-live/logs \
+            /var/lib/linkedin-mcp-live/work
+          chown -R linkedin-live:linkedin-live /var/lib/linkedin-mcp-live
+
+          /usr/local/bin/uvx --from playwright==1.61.0 playwright install-deps chromium
+
+          cat >/usr/local/bin/linkedin-live-desktop <<'SCRIPT'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          export DISPLAY=:99
+          Xvfb :99 -screen 0 1440x900x24 -nolisten tcp &
+          openbox --display :99 &
+          x11vnc -display :99 -forever -shared -localhost -nopw -rfbport 5900 &
+          exec websockify --web=/usr/share/novnc 6080 localhost:5900
+          SCRIPT
+          chmod 0755 /usr/local/bin/linkedin-live-desktop
+
+          cat >/etc/systemd/system/linkedin-live-desktop.service <<'UNIT'
+          [Unit]
+          Description=Private desktop for one-time LinkedIn profile login
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          User=linkedin-live
+          Group=linkedin-live
+          Environment=HOME=/home/linkedin-live
+          ExecStart=/usr/local/bin/linkedin-live-desktop
+          Restart=on-failure
+          RestartSec=5
+          KillMode=control-group
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+          systemctl daemon-reload
+          touch /var/lib/linkedin-live-bootstrap-complete
+
+  ProfileVolumeAttachment:
+    Type: AWS::EC2::VolumeAttachment
+    Properties:
+      Device: /dev/sdf
+      InstanceId: !Ref LiveInstance
+      VolumeId: !Ref ProfileVolume
+
+  GitHubActionsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      MaxSessionDuration: 10800
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !If
+                - CreateGitHubOidcProvider
+                - !Ref GitHubOidcProvider
+                - !Ref ExistingGitHubOidcProviderArn
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: !Sub >-
+                  repo:${GitHubOwner}/${GitHubRepository}:environment:${GitHubEnvironmentName}
+      Policies:
+        - PolicyName: OperateLinkedInLiveWorker
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: StartAndStopExactInstance
+                Effect: Allow
+                Action:
+                  - ec2:StartInstances
+                  - ec2:StopInstances
+                Resource: !Sub >-
+                  arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/${LiveInstance}
+              - Sid: DescribeWorker
+                Effect: Allow
+                Action:
+                  - ec2:DescribeInstances
+                  - ec2:DescribeInstanceStatus
+                  - ssm:DescribeInstanceInformation
+                  - ssm:GetCommandInvocation
+                  - ssm:ListCommandInvocations
+                Resource: "*"
+              - Sid: RunExactSsmDocumentOnExactInstance
+                Effect: Allow
+                Action: ssm:SendCommand
+                Resource:
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}::document/AWS-RunShellScript
+                  - !Sub >-
+                      arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/${LiveInstance}
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+Outputs:
+  AwsAccountId:
+    Value: !Ref AWS::AccountId
+  AwsRegion:
+    Value: !Ref AWS::Region
+  GitHubActionsRoleArn:
+    Value: !GetAtt GitHubActionsRole.Arn
+  InstanceId:
+    Value: !Ref LiveInstance
+  ProfileVolumeId:
+    Value: !Ref ProfileVolume
+  AccountAProfilePath:
+    Value: /var/lib/linkedin-mcp-live/account-a/profile
+  AccountBProfilePath:
+    Value: /var/lib/linkedin-mcp-live/account-b/profile
+  PrivateDesktopPort:
+    Value: "6080"
