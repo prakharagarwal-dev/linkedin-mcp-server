@@ -74,5 +74,5 @@
     "compact overview employee counts",
     "exact About-page associated-member counts preferred over employee ranges"
   ],
-  "notes": "Synthetic identities and text preserve only current accessible controls, exact typeahead selection, submitted query parameters, result-card identity, pagination, compact count metadata, the smallest current company introduction region, and fixed Overview-plus-About behavior observed through the authenticated visible UI."
+  "notes": "Synthetic identities and text preserve only current accessible controls, exact typeahead selection, submitted query parameters, result-card identity, pagination, compact count metadata, the smallest current company introduction region, and fixed Overview-plus-About behavior represented by the current visible-UI contract."
 }

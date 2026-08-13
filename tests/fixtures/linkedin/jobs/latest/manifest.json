@@ -170,5 +170,5 @@
   "detail_external_apply_control": "button with accessible name Apply on company website",
   "detail_hiring_team_anchor": "Meet the hiring team",
   "detail_hiring_team_profile_link": "one visible profile link may contain name, degree, headline, and role as separate lines",
-  "notes": "Synthetic identities and text preserve only current selector, accessibility, complete account-visible filter, virtualized-card hydration, optional company identity, zero-result recommendation, pagination, primary-detail, application-method, expandable-JD, and hiring-team behavior reverified through the authenticated visible UI. Distance is a current top-level filter control rather than a section in the All filters dialog."
+  "notes": "Synthetic identities and text preserve only current selector, accessibility, complete account-visible filter, virtualized-card hydration, optional company identity, zero-result recommendation, pagination, primary-detail, application-method, expandable-JD, and hiring-team behavior reproduced by the current visible-UI contract. Distance is a current top-level filter control rather than a section in the All filters dialog."
 }

@@ -2,7 +2,7 @@
   "status": "mock_verified",
   "surface": "linkedin-desktop-messaging",
   "observed_at": "2026-07-31",
-  "source": "sanitized current-shape fixture derived from authenticated visible UI inspection",
+  "source": "sanitized current-shape fixture current visible-UI contract",
   "covers": [
     "Focused/Other/Archived/Spam category dropdown",
     "recipient-or-keyword Search messages submission",

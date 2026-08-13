@@ -447,8 +447,7 @@ A new vertical slice normally requires:
 6. field evidence and safe error mapping;
 7. fixture tests;
 8. executor and protocol tests;
-9. opt-in low-volume live validation;
-10. capability-matrix and build-status updates.
+9. capability-matrix and build-status updates.
 
 A new write must additionally define separate prepare and execute tools,
 immutable preview contents, idempotency behavior, asset rules, visible
