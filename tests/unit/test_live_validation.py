@@ -295,7 +295,9 @@ def test_live_workflow_uses_bounded_oidc_aws_orchestration() -> None:
     assert "aws ec2 start-instances" in workflow
     assert "aws ssm send-command" in workflow
     assert "aws ec2 stop-instances" in workflow
-    assert "- name: Stop the EC2 worker\n        if: always()" in workflow
+    assert "- name: Stop the EC2 worker\n        if: ${{ always() && steps.aws.outcome" in workflow
+    assert "needs.validate.outputs.status-artifact-ready == 'true'" in workflow
+    assert "git rm --force -r --ignore-unmatch ." in workflow
     assert "contents: write" in workflow
     assert "secrets." not in workflow
 
@@ -311,9 +313,9 @@ def test_live_aws_template_retains_encrypted_profiles_without_inbound_access() -
     assert "SecurityGroupIngress: []" in template
     assert "HttpTokens: required" in template
     assert "AmazonSSMManagedInstanceCore" in template
-    assert (
-        "repo:${GitHubOwner}/${GitHubRepository}:environment:${GitHubEnvironmentName}" in template
-    )
+    assert "GitHubOidcSubjectPrefix" in template
+    assert "@17739006/linkedin-mcp-server@1318191392" in template
+    assert "${GitHubOidcSubjectPrefix}:environment:${GitHubEnvironmentName}" in template
     assert "AWS-RunShellScript" in template
     assert "linkedin-live-watchdog.timer" in template
     assert "AccessKey" not in template

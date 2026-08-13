@@ -36,6 +36,12 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Bind the AWS live-validation role to GitHub's exact OIDC subject prefix,
+  including immutable owner and repository IDs for repositories created after
+  GitHub's July 2026 cutoff. Skip EC2 cleanup and status publication cleanly
+  when OIDC fails before a remote result exists.
+- Create the initial generated live-status branch with Git's portable `-r`
+  option so sanitized per-tool badge publication works on hosted runners.
 - Parse current Post-search cards through the same exact header, content, and
   engagement contracts as Post detail. Preserve relationship degree, headline,
   edited age, full expanded text, numeric engagement, and article/job/media

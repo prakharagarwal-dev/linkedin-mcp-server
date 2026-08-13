@@ -19,6 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 150
     environment: linkedin-live
+    outputs:
+      status-artifact-ready: ${{ steps.results.outputs.artifact_ready }}
     permissions:
       contents: read
       id-token: write
@@ -31,6 +33,7 @@ jobs:
       LINKEDIN_LIVE_ACCOUNT_B_PROFILE_PATH: ${{ vars.LINKEDIN_LIVE_ACCOUNT_B_PROFILE_PATH }}
     steps:
       - name: Configure short-lived AWS credentials
+        id: aws
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
           aws-region: ${{ env.AWS_REGION }}
@@ -172,8 +175,11 @@ jobs:
           test -d "$RUNNER_TEMP/linkedin-live-artifact/linkedin-live-status/badges"
           overall_status="$(jq -r '.overall_status' \
             "$RUNNER_TEMP/linkedin-live-artifact/report.json")"
-          echo "overall_status=$overall_status" >>"$GITHUB_OUTPUT"
-          echo "remote_status=$REMOTE_STATUS" >>"$GITHUB_OUTPUT"
+          {
+            echo "overall_status=$overall_status"
+            echo "remote_status=$REMOTE_STATUS"
+            echo "artifact_ready=true"
+          } >>"$GITHUB_OUTPUT"
 
       - name: Upload sanitized live results
         if: ${{ always() && steps.results.outputs.overall_status != '' }}
@@ -185,7 +191,7 @@ jobs:
           retention-days: 30
 
       - name: Stop the EC2 worker
-        if: always()
+        if: ${{ always() && steps.aws.outcome == 'success' }}
         run: |
           set -euo pipefail
           state="$(aws ec2 describe-instances \
@@ -209,7 +215,9 @@ jobs:
   publish-status:
     name: Publish tool status badges
     needs: validate
-    if: ${{ always() && github.ref == 'refs/heads/main' }}
+    if: >-
+      ${{ always() && github.ref == 'refs/heads/main' &&
+          needs.validate.outputs.status-artifact-ready == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -240,7 +248,7 @@ jobs:
             git switch --force-create "$STATUS_BRANCH" FETCH_HEAD
           else
             git switch --orphan "$STATUS_BRANCH"
-            git rm --force --recursive --ignore-unmatch .
+            git rm --force -r --ignore-unmatch .
           fi
 
           rm -rf badges

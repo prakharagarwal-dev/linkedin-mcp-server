@@ -8,14 +8,14 @@ Parameters:
     Type: String
     Default: linkedin-mcp-live
     AllowedPattern: "[a-z0-9-]{3,32}"
-  GitHubOwner:
+  GitHubOidcSubjectPrefix:
     Type: String
-    Default: prakharagarwal-dev
-    AllowedPattern: "[A-Za-z0-9_.-]+"
-  GitHubRepository:
-    Type: String
-    Default: linkedin-mcp-server
-    AllowedPattern: "[A-Za-z0-9_.-]+"
+    Default: repo:prakharagarwal-dev@17739006/linkedin-mcp-server@1318191392
+    AllowedPattern: "repo:[A-Za-z0-9_.-]+(@[0-9]+)?/[A-Za-z0-9_.-]+(@[0-9]+)?"
+    Description: >-
+      Exact sub_claim_prefix returned by the repository's GitHub Actions OIDC
+      customization endpoint. New repositories include immutable owner and
+      repository IDs in this value.
   GitHubEnvironmentName:
     Type: String
     Default: linkedin-live
@@ -382,7 +382,7 @@ Resources:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
                 token.actions.githubusercontent.com:sub: !Sub >-
-                  repo:${GitHubOwner}/${GitHubRepository}:environment:${GitHubEnvironmentName}
+                  ${GitHubOidcSubjectPrefix}:environment:${GitHubEnvironmentName}
       Policies:
         - PolicyName: OperateLinkedInLiveWorker
           PolicyDocument:
@@ -422,6 +422,8 @@ Outputs:
     Value: !Ref AWS::Region
   GitHubActionsRoleArn:
     Value: !GetAtt GitHubActionsRole.Arn
+  GitHubOidcSubject:
+    Value: !Sub ${GitHubOidcSubjectPrefix}:environment:${GitHubEnvironmentName}
   InstanceId:
     Value: !Ref LiveInstance
   ProfileVolumeId:

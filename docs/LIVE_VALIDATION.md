@@ -100,16 +100,25 @@ not create access keys or store LinkedIn credentials.
 Deploy in the chosen AWS region, for example Mumbai:
 
 ```bash
+GITHUB_OIDC_SUBJECT_PREFIX="$(
+  gh api repos/prakharagarwal-dev/linkedin-mcp-server/actions/oidc/customization/sub \
+    --jq .sub_claim_prefix
+)"
+
 aws cloudformation deploy \
   --stack-name linkedin-mcp-live \
   --region ap-south-1 \
   --template-file infra/aws-live-validation/template.yaml \
   --capabilities CAPABILITY_NAMED_IAM \
   --parameter-overrides \
-    GitHubOwner=prakharagarwal-dev \
-    GitHubRepository=linkedin-mcp-server \
+    GitHubOidcSubjectPrefix="$GITHUB_OIDC_SUBJECT_PREFIX" \
     GitHubEnvironmentName=linkedin-live
 ```
+
+Use the exact prefix returned by GitHub. Repositories created after July 15,
+2026 use an immutable prefix containing owner and repository IDs; older
+name-only trust policies do not match those tokens. See GitHub's
+[OIDC subject reference](https://docs.github.com/en/actions/reference/security/oidc#immutable-subject-claims).
 
 An AWS account can have only one GitHub Actions OIDC provider. If one already
 exists, pass its ARN instead of asking this stack to create another:
@@ -121,8 +130,7 @@ aws cloudformation deploy \
   --template-file infra/aws-live-validation/template.yaml \
   --capabilities CAPABILITY_NAMED_IAM \
   --parameter-overrides \
-    GitHubOwner=prakharagarwal-dev \
-    GitHubRepository=linkedin-mcp-server \
+    GitHubOidcSubjectPrefix="$GITHUB_OIDC_SUBJECT_PREFIX" \
     GitHubEnvironmentName=linkedin-live \
     ExistingGitHubOidcProviderArn=arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com
 ```
