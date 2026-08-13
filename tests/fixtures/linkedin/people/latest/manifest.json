@@ -71,5 +71,5 @@
     "roleless profile-detail LazyColumn entity cards",
     "recommendation-rail exclusion from member-owned sections"
   ],
-  "notes": "Synthetic identities and values preserve only the selector, accessibility, typeahead, checkbox, keyword, submitted-parameter, result-card, restricted-member, pagination, current experience-card, skill-card, and About-section behavior reverified through the authenticated visible UI. The current configured account exposes exactly the listed filter sections; no live identity, profile content, raw DOM, cookie, credential, or browser state is retained."
+  "notes": "Synthetic identities and values preserve only the selector, accessibility, typeahead, checkbox, keyword, submitted-parameter, result-card, restricted-member, pagination, current experience-card, skill-card, and About-section behavior reproduced by the current visible-UI contract. The current configured account exposes exactly the listed filter sections; no real identity, profile content, raw DOM, cookie, credential, or browser state is retained."
 }

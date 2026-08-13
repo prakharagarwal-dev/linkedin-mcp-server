@@ -6,23 +6,6 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Added
-
-- Add an opt-in weekly GitHub Actions live-validation suite for all 25 repeatable
-  public tools using two isolated authorized test-account profiles. Publish only
-  privacy-safe overall and per-tool status while keeping invitation send,
-  accept, and ignore mutations simulator-only.
-- Add a hard-coded four-tool live execute allowlist, bounded cross-account post
-  and message readback, serial pacing, no blind write retries, and dedicated
-  AWS execution documentation that keeps browser authentication off GitHub.
-- Add reproducible CloudFormation for an on-demand outbound-only EC2 validation
-  worker, retained encrypted gp3 browser-profile storage, Systems Manager
-  operation, repository-bound GitHub OIDC, and a three-hour shutdown watchdog.
-- Orchestrate the weekly live suite from a GitHub-hosted runner with short-lived
-  AWS credentials, exact-revision execution, guaranteed EC2 cleanup, and a
-  size-bounded sanitized result channel. No permanent self-hosted runner or AWS
-  access key is required.
-
 ### Changed
 
 - Remove account-changing threaded comment replies from
@@ -36,12 +19,6 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
-- Bind the AWS live-validation role to GitHub's exact OIDC subject prefix,
-  including immutable owner and repository IDs for repositories created after
-  GitHub's July 2026 cutoff. Skip EC2 cleanup and status publication cleanly
-  when OIDC fails before a remote result exists.
-- Create the initial generated live-status branch with Git's portable `-r`
-  option so sanitized per-tool badge publication works on hosted runners.
 - Parse current Post-search cards through the same exact header, content, and
   engagement contracts as Post detail. Preserve relationship degree, headline,
   edited age, full expanded text, numeric engagement, and article/job/media

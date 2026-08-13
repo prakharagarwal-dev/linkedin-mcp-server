@@ -161,5 +161,5 @@
     "detail-repost.html",
     "detail-repost-original.html"
   ],
-  "notes": "Synthetic identities and text preserve only current accessibility, section-scoped typeahead, submitted-parameter, result-card, stable-reference, dynamic card-text evidence, pagination, post-detail expansion, media, poll, engagement, composer-loading, unchanged-settings, and repost behavior observed through the authenticated visible UI. LinkedIn's current Content type control is single-choice; Images submits photos, Job posts submits jobs, and Live videos submits liveVideos. No live identity, content, raw DOM, cookie, credential, or browser state is retained."
+  "notes": "Synthetic identities and text preserve only current accessibility, section-scoped typeahead, submitted-parameter, result-card, stable-reference, dynamic card-text evidence, pagination, post-detail expansion, media, poll, engagement, composer-loading, unchanged-settings, and repost behavior represented by the current visible-UI contract. LinkedIn's current Content type control is single-choice; Images submits photos, Job posts submits jobs, and Live videos submits liveVideos. No real identity, content, raw DOM, cookie, credential, or browser state is retained."
 }
