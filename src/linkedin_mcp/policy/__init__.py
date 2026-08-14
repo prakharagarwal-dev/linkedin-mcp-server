@@ -1,6 +1,5 @@
-"""Authorization, target validation, and evidence policies."""
+"""Target validation and evidence policies."""
 
-from .authorization import AuthorizationPolicy
 from .urls import (
     canonical_company_url,
     canonical_conversation_url,
@@ -18,7 +17,6 @@ from .urls import (
 )
 
 __all__ = [
-    "AuthorizationPolicy",
     "canonical_company_url",
     "canonical_conversation_url",
     "canonical_job_url",

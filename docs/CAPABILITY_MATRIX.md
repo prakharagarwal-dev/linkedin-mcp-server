@@ -1,6 +1,6 @@
 # LinkedIn Visible-Feature Matrix
 
-**Matrix version:** `2026-08-05.6`
+**Matrix version:** `2026-08-14.1`
 
 This matrix records the visible LinkedIn controls and outputs inspected for the
 configured authorized member account. It is evidence for capability acceptance,
@@ -10,32 +10,37 @@ Feature status values:
 
 - `supported`: represented by a typed contract, fixture coverage, and a
   fail-closed page adapter;
-- `not_available_to_account`: not represented by the configured account's
-  visible fixture contract;
+- `not_available_to_account`: inspected but not visible to the configured
+  validation account;
 - `outside_named_capability`: visible but belongs to a different explicitly
   authorized capability.
 
-Every accepted family below has a typed, fixture-validated contract. The
-current testing-program classification is `mock_verified` for every family.
+Every accepted family below has a typed, fixture-validated contract. The M11-M17
+families also completed a low-volume authenticated installed-MCP inventory on
+2026-07-24.
+
+The current testing-program classification is `mock_verified` for every
+family. Historical authenticated observations remain recorded as context but
+do not upgrade this classification.
 
 ## Accepted capability families
 
 | Capability family | Contract version | Current evidence | Verification |
 | --- | --- | --- | --- |
-| Jobs search | `linkedin.jobs.search` `2.0.0` | Current virtualized cards, optional keywords, every visible filter family, exact named-facet resolution, recommendation-safe empty results, anonymous postings, evidence, and replay | `mock_verified` |
-| Job detail | `linkedin.jobs.get` `2.0.0` | Current primary-card anchors, optional company identity, application method, single-link composite hiring-team cards with separately typed fields, fully expanded JD, scoped evidence, and replay | `mock_verified` |
-| People search | `linkedin.people.search` `2.0.0` | Every current account-visible People filter, delayed/anonymous rendering, trailing-hyphen slugs, and shared cursor contract is fixture-covered | `mock_verified` |
-| Member profile | `linkedin.people.get` `1.1.1` | Complete/selective sections, exact evidence resources, requested/returned coverage, genuine trailing-hyphen public slugs, nested self-introduction cards, recommendation/guidance exclusion, semantic company/school summaries, current roleless detail collections and experience cards, exact skill identity, and clean About text | `mock_verified` |
-| Company search | `linkedin.companies.search` `2.0.0` | Complete current Company-search surface: keywords, headquarters, industry, all eight company-size buckets, job-listing and first-degree-connection flags, named-facet resolution, compact count/social-proof parsing, delayed rendering, evidence, and cursor contracts | `mock_verified` |
-| Company profile | `linkedin.companies.get` `2.0.0` | Fixed exact Overview-plus-About read from the smallest current introduction region, with compact top-card counts, exact associated-member preference, structured visible fields, and two immutable page sources | `mock_verified` |
-| Post search | `linkedin.posts.search` `2.0.0` | Declared content facets; current compact author headers, edited ages, body expansion, numeric engagement and typed content cards; stable identity inventory before virtualized bottom-up extraction; exact evidence and disjoint cumulative cursor pages | `mock_verified` |
-| Post detail | `linkedin.posts.get` `2.0.0` | Exact activity/share/UGC identity, fully expanded text, scoped links/mentions/hashtags, current text/image/video/live-video/document/link/article/newsletter/event/job/poll variants, viewer reaction and engagement, visibility/header metadata, immutable field evidence, bounded completeness coverage, and two-page repost-original resolution | `mock_verified` |
-| Post discussion | `linkedin.posts.comments.list` `1.1.1` | Ordering, cursor-paged top-level comments, delayed expansion including the current `See previous replies` control, flat visually indented parent binding, replies, media, and source retrieval | `mock_verified` |
-| Personal post publishing | `linkedin.posts.create.*` `2.0.0` | Nine current personal composer modes, bounded loader settling, unchanged disabled-setting handling, visible publish-success/rejection postconditions, exact nested options, immutable previews, tamper rejection, execution, and replay | `mock_verified` |
-| Post engagement | Comment `3.0.0`; reaction `3.0.0` | Current top-level comment text, photo and GIF controls, all six post reactions, tamper rejection, execution, and replay | `mock_verified` |
-| Invitations | List `4.0.0`; send, accept, and ignore `1.0.0` | Latest-layout-only received/sent extraction; bounded live cursor traversal; exact terminal per-view count reconciliation; and the complete currently implemented invitation lifecycle under one namespace, with scoped hash-locked writes and exact-profile postconditions | `mock_verified` |
-| Connections | List `2.0.0`; search `2.0.0` | Separate sorted inventory and filtered search of established first-degree connections; the server always binds search to first degree and rejects non-first-degree results | `mock_verified` |
-| Messaging | Search, conversation get, message prepare, and execute `2.0.0` | Current recipient/message search criteria and mutually exclusive filters; cursor paging; reverse-virtualized history; exact recipients/replies; current text, file, and KLIPY GIF preparation; reply-aware same-surface postconditions; tamper rejection; and replay | `mock_verified` |
+| Jobs search | `linkedin.jobs.search` `2.1.0` | Current virtualized cards, optional keywords, every visible filter family, exact named-facet resolution, recommendation-safe empty results, anonymous postings, evidence, and replay | `mock_verified` + read-only live acceptance |
+| Job detail | `linkedin.jobs.get` `2.0.0` | Current primary-card anchors, optional company identity, application method, single-link composite hiring-team cards with separately typed fields, fully expanded JD, scoped evidence, and replay | `mock_verified` + read-only live acceptance |
+| People search | `linkedin.people.search` `2.1.0` | Every current account-visible People filter, delayed/anonymous rendering, trailing-hyphen slugs, and shared cursor contract is fixture-covered | `mock_verified` + read-only live acceptance |
+| Member profile | `linkedin.people.get` `1.1.1` | Complete/selective sections, exact evidence resources, requested/returned coverage, genuine trailing-hyphen public slugs, nested self-introduction cards, recommendation/guidance exclusion, semantic company/school summaries, current roleless detail collections and experience cards, exact skill identity, and clean About text | `mock_verified` + read-only live acceptance |
+| Company search | `linkedin.companies.search` `2.0.0` | Complete current Company-search surface: keywords, headquarters, industry, all eight company-size buckets, job-listing and first-degree-connection flags, named-facet resolution, compact count/social-proof parsing, delayed rendering, evidence, and cursor contracts | `mock_verified` + read-only live acceptance |
+| Company profile | `linkedin.companies.get` `2.0.0` | Fixed exact Overview-plus-About read from the smallest current introduction region, with compact top-card counts, exact associated-member preference, structured visible fields, and two immutable page sources | `mock_verified` + read-only live acceptance |
+| Post search | `linkedin.posts.search` `2.0.0` | Declared content facets; current compact author headers, edited ages, body expansion, numeric engagement and typed content cards; stable identity inventory before virtualized bottom-up extraction; exact evidence and disjoint cumulative cursor pages | `mock_verified` + read-only live acceptance |
+| Post detail | `linkedin.posts.get` `2.0.0` | Exact activity/share/UGC identity, fully expanded text, scoped links/mentions/hashtags, current text/image/video/live-video/document/link/article/newsletter/event/job/poll variants, viewer reaction and engagement, visibility/header metadata, immutable field evidence, bounded completeness coverage, and two-page repost-original resolution | `mock_verified` + read-only live acceptance |
+| Post discussion | `linkedin.posts.comments.list` `1.1.1` | Ordering, cursor-paged top-level comments, delayed expansion including the current `See previous replies` control, flat visually indented parent binding, replies, media, and source retrieval | `mock_verified` + read-only live acceptance |
+| Personal post publishing | `linkedin.posts.create` `3.0.0` | Nine current personal composer modes, bounded loader settling, unchanged disabled-setting handling, asset-integrity checks, exact nested options, and visible publish-success/rejection postconditions in one direct action | `mock_verified` + live mutation/readback acceptance |
+| Post engagement | Comment `4.0.0`; reaction `4.0.0` | Current top-level comment text, photo and GIF controls, all six post reactions, exact target/state revalidation, and terminal visible outcomes | `mock_verified` + live mutation/readback acceptance |
+| Invitations | List `4.0.0`; send `3.0.0`; accept and ignore `2.0.0` | Latest-layout-only received/sent extraction; bounded live cursor traversal; exact terminal per-view count reconciliation; and the complete currently implemented invitation lifecycle under one namespace, with direct exact-profile actions and visible postconditions | `mock_verified` + live mutation/readback acceptance |
+| Connections | List `2.0.0`; search `2.0.0` | Separate sorted inventory and filtered search of established first-degree connections; the server always binds search to first degree and rejects non-first-degree results | `mock_verified` + read-only live acceptance |
+| Messaging | Search/get `2.0.0`; send `3.0.0` | Current recipient/message search criteria and mutually exclusive filters; cursor paging; reverse-virtualized history; exact recipients/replies; current text, file, and KLIPY GIF sends; attachment-integrity checks; and reply-aware same-surface postconditions | `mock_verified` + live mutation/readback acceptance |
 
 ## Shared collection pagination
 
@@ -122,7 +127,7 @@ sources.
 | Company employees | `supported_via_people_search` | Use `linkedin.people.search` with `current_company_ids` or exact `current_company_names` |
 | Page administration or company publishing | `outside_named_capability` | Not implemented |
 
-## Post and discussion research (`search 2.0.0`, `comments 1.1.1`, `detail 1.0.0`)
+## Post and discussion research (`search 2.0.0`, `comments 1.1.1`, `detail 2.0.0`)
 
 Post search requires keywords or at least one substantive filter. Identity names
 resolve through exact visible choices; stable facet IDs are the explicit
@@ -154,14 +159,14 @@ constructed only from visible post URNs/URLs.
 | Photo/GIF-only comments and replies | `supported` | Read-only discussion output retains optional text plus typed attachment kind, accessible label, visible resource URL when present, and exact accessibility evidence |
 | Bounded comment/reply expansion | `supported` | Private expansion bound and explicit visible/returned/truncated coverage |
 | Hidden posts, comments, or private endpoints | `outside_named_capability` | No inference or private endpoint access |
-| Publishing, top-level comments, or reactions | `outside_named_capability` | Separate write contracts; no read scope grants mutation. Threaded reply creation is not exposed. |
+| Publishing, top-level comments, or reactions | `outside_named_capability` | Separate direct write tools; read tools never mutate. Threaded reply creation is not exposed. |
 
-## Personal publishing `2.0.0`
+## Personal publishing `3.0.0`
 
 Only the configured personal member can be the actor. Every local file is
 resolved below one configured asset root, validated by format/size, hashed at
-preparation, included in the immutable payload, and hash-checked again before
-browser access during execution.
+the start of the action, included in its internal typed command, and
+hash-checked again immediately before browser upload.
 
 | Visible personal-composer feature | Status | Typed behavior and evidence |
 | --- | --- | --- |
@@ -187,23 +192,23 @@ browser access during execution.
 | Repost/share of an existing post | `outside_named_capability` | Requires an exact source-post target and its own mutation contract |
 | Company/Page publishing | `outside_named_capability` | Permanently excluded from this personal-actor capability |
 
-## Personal comments and post reactions `3.0.0`
+## Personal comments and post reactions `4.0.0`
 
 | Visible engagement feature | Status | Typed behavior and evidence |
 | --- | --- | --- |
 | Top-level text/link/emoji comment | `supported` | Exact text through one visible comment composer |
 | Member/Page mention | `supported` | Exact token plus exact visible identity resolution |
-| Photo | `supported` | One hash-locked GIF/JPEG/JPG/PNG/WebP upload through the current Share photo chooser |
+| Photo | `supported` | One snapshotted and rechecked GIF/JPEG/JPG/PNG/WebP upload through the current Share photo chooser |
 | GIF picker | `supported` | Exact Search for GIFs/KLIPY query and one unique result image alt label |
 | Like, Celebrate, Support, Love, Insightful, Funny | `supported` | Typed reaction states for exact posts |
 | Remove reaction | `supported` | Explicit `none`; never inferred from a repeated click |
-| Set/change/no-op | `supported` | Existing and desired state are both captured, passed through the client approval policy, and revalidated |
-| Comment verification | `supported` | Exactly one new top-level stable reference must match the actor and post; text and GIF label match exactly, while a photo additionally requires the prepared file hash and visible photo type |
-| Reaction verification | `supported` | The bounded accessible post-reaction surface must load before preparation/execution; final visible state must equal the confirmed desired state, while a missing pre-click control is a verified non-mutation rather than an uncertain action |
+| Set/change/no-op | `supported` | Existing and desired state are both captured and revalidated within one action |
+| Comment verification | `supported` | Exactly one new top-level stable reference must match the actor and post; text and GIF label match exactly, while a photo additionally requires the snapshotted file hash and visible photo type |
+| Reaction verification | `supported` | The bounded accessible post-reaction surface must load before mutation; final visible state must equal the desired state, while a missing pre-click control is a verified non-mutation rather than an uncertain action |
 | Comment as a LinkedIn Page | `outside_named_capability` | Different actor and authorization contract; personal actor is mandatory |
 | Reply to a comment | `outside_named_capability` | Threaded reply creation is not exposed; visible replies remain available through `linkedin.posts.comments.list` |
 | React to a comment | `outside_named_capability` | Comment reaction changes are not exposed; visible aggregate reaction counts remain readable |
-| Edit/delete/pin/report/repost a comment | `outside_named_capability` | Materially different effects requiring separate scopes and payloads |
+| Edit/delete/pin/report/repost a comment | `outside_named_capability` | Materially different effects requiring separate typed tools and payloads |
 
 ## M17 Jobs parity audit
 
@@ -271,9 +276,9 @@ limit as an enumeration guarantee.
 | Established-connection search | `supported` | `linkedin.connections.search` follows the visible Search with filters entry, always submits the first-degree filter, exposes every applicable non-degree People filter, and rejects any result not visibly marked first-degree |
 | Broad People discovery | `supported` | `linkedin.people.search` owns first-, second-, and third-plus-degree discovery and exposes the explicit connection-degree filter |
 | Search pagination | `supported` | Opaque filter-bound cursor rescans a bounded People-search prefix and suppresses already returned profile identities |
-| Invite with optional note | `supported` | Preparation binds LinkedIn's current `Invite {name} to connect` button to the exact profile, waits for asynchronous action hydration, and validates both current dialogs plus exact note/counter/actionability without sending. After the hash-locked, client-authorized Send click, execution performs exactly one fresh exact-profile check: visible Pending is verified success and Connect is verified LinkedIn failure. An unreadable, identity-mismatched, or otherwise ambiguous fresh profile is uncertain. No toast parsing, post-click polling, or Sent-list reconciliation is part of this capability. |
-| Accept invitation | `supported` | Exact member-profile request controls, hash-locked client approval policy, and fresh-profile first-degree postcondition |
-| Ignore incoming invitation | `supported` | Separate `linkedin.invitations.ignore.prepare/execute` action with its own scope, paired exact-profile controls, hash-locked client approval policy, and fresh-profile removal-without-connection postcondition |
+| Invite with optional note | `supported` | The direct action binds LinkedIn's current `Invite {name} to connect` button to the exact profile, waits for asynchronous action hydration, validates both current dialogs plus exact note/counter/actionability, clicks Send once, then performs exactly one fresh exact-profile check: visible Pending is verified success and Connect is verified LinkedIn failure. An unreadable, identity-mismatched, or otherwise ambiguous fresh profile is uncertain. No toast parsing, post-click polling, or Sent-list reconciliation is part of this capability. |
+| Accept invitation | `supported` | One direct action resolves exact paired member-profile request controls and requires a fresh-profile first-degree postcondition |
+| Ignore incoming invitation | `supported` | One direct `linkedin.invitations.ignore` action resolves exact paired member-profile controls and requires a fresh-profile removal-without-connection postcondition |
 | Report incoming invitation | `outside_named_capability` | Distinct moderation target and effect |
 | Withdraw sent invitation | `outside_named_capability` | Distinct destructive effect |
 | Reply to invitation message | `outside_named_capability` | Distinct pre-connection messaging target and effect |
@@ -281,7 +286,8 @@ limit as an enumeration guarantee.
 
 ## Current Messaging contract
 
-All four Messaging capabilities are version `2.0.0`. Opening a conversation
+Messaging search and conversation get are version `2.0.0`; direct send is
+version `3.0.0`. Opening a conversation
 may mark it seen. Search returns conversation summaries only; there is no
 separate inbox-list tool. GIF selection is modeled separately because the
 current desktop UI sends the selected GIF immediately.
@@ -300,21 +306,21 @@ current desktop UI sends the selected GIF immediately.
 | Plain text, URL, emoji, and reply send | `supported` | Exact 8,000-character-bounded text; an optional message reference binds the hover-only Reply control before Send |
 | Current desktop general files | `supported` | AI, PSD, PDF, DOC/DOCX, PPT/PPTX, PPS/PPSX, XLS/XLSX, TXT, EML, MOV, and MP4 |
 | Current desktop images | `supported` | BMP, GIF, HEIC/HEIF, JPEG/JPG, PNG, TIF/TIFF, and WEBP |
-| Combined attachment size | `supported` | Up to twenty unique relative asset references, hash-locked and capped at 20 MB total |
+| Combined attachment size | `supported` | Up to twenty unique relative asset references, snapshotted and rechecked within the action, capped at 20 MB total |
 | KLIPY GIF search/send | `supported` | Exact search query and exact current result title; selecting the confirmed result is the guarded final action |
-| One-to-one recipient identity | `supported` | Exact hash-locked thread and name; profile targets search the smallest profile-card ancestor containing the exact heading and first-degree marker, then fall back to the visually nearest visible Message action on that already-validated profile. A button must open the smallest recipient-named composer pane in place; a visible Messaging link is followed in the same operation page to an exact-name/profile thread |
+| One-to-one recipient identity | `supported` | Exact visible thread and name; profile targets search the smallest profile-card ancestor containing the exact heading and first-degree marker, then fall back to the visually nearest visible Message action on that already-validated profile. A button must open the smallest recipient-named composer pane in place; a visible Messaging link is followed in the same operation page to an exact-name/profile thread |
 | Send postcondition | `supported` | The same visible surface must gain exactly one matching outgoing bubble; text/file sends must also clear the composer. A reply must quote the exact selected message evidence. A missing reply binding, disappearing surface, or unverifiable result is never reported as success |
 | Group chats | `outside_named_capability` | Multiple recipients require a different target and effect contract |
 | Paid InMail | `outside_named_capability` | Subject, credits, and non-connection recipient require a separate paid effect |
 | Message requests/invitation replies | `outside_named_capability` | Different target state and permissions |
 | Voice messages | `outside_named_capability` | Mobile-only surface is not authorized |
-| Edit/delete/react/forward/star/report/archive | `outside_named_capability` | Distinct mutations requiring separate scopes and payloads |
+| Edit/delete/react/forward/star/report/archive | `outside_named_capability` | Distinct mutations requiring separate typed tools and payloads |
 | Read/delivery receipts or hidden/deleted history | `outside_named_capability` | Never inferred from unavailable state |
 
 ## Inventory references and mutation boundary
 
-The audit used the accepted sanitized fixtures plus current first-party help
-documentation:
+The audit used the previously accepted account fixtures/live evidence plus
+current first-party help documentation:
 
 - [Filter and sort job search results](https://www.linkedin.com/help/linkedin/answer/a507441/filter-and-sort-job-search-results)
 - [Search for jobs](https://www.linkedin.com/help/linkedin/answer/a511260/searching-for-jobs-on-linkedin)
@@ -327,7 +333,9 @@ documentation:
 - [Like, unlike, and react](https://www.linkedin.com/help/linkedin/answer/a522684/like-unlike-and-react-to-posts-or-comments)
 - [Turn off or limit comments](https://www.linkedin.com/help/linkedin/answer/a523384/disable-re-enable-and-limit-comments-on-posts)
 
-Every execute schema carries the canonical human-readable preview, and fixture,
-repository, and protocol tests reject altered hashes or previews before an
-action attempt. Current clients may use interactive confirmation or an explicit
-durable per-tool approval.
+M11-M17 completed the opt-in installed-stdio inventory on 2026-07-24 under an
+older two-call action design. That design is historical and is not part of the
+current public API. Current actions use one direct typed tool, client-controlled
+tool availability/approval, exact visible target inspection, attachment
+integrity checks where applicable, and a terminal `verified`, `failed`, or
+`uncertain` result.

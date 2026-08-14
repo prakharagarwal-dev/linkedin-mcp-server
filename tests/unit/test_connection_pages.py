@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import json
-import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import cast
 
@@ -16,19 +14,18 @@ import linkedin_mcp.browser.pages.connections as connection_pages
 from linkedin_mcp.browser import BrowserManager
 from linkedin_mcp.browser.pages import ConnectionsListPage, InvitationActionPage
 from linkedin_mcp.domain.models import (
-    ActionDraft,
+    ActionCommand,
     ActionOutcome,
-    ActionStatus,
     ActionTarget,
     ActionType,
     ConnectionsListInput,
     ConnectionsSortBy,
+    InvitationAcceptInput,
     InvitationAcceptPayload,
-    InvitationAcceptPrepareInput,
+    InvitationIgnoreInput,
     InvitationIgnorePayload,
-    InvitationIgnorePrepareInput,
+    InvitationSendInput,
     InvitationSendPayload,
-    InvitationSendPrepareInput,
     StopReason,
 )
 from linkedin_mcp.errors import (
@@ -142,10 +139,8 @@ def _draft(
     payload: InvitationSendPayload | InvitationAcceptPayload | InvitationIgnorePayload,
     *,
     name: str = "Jane Doe",
-) -> ActionDraft:
-    now = datetime.now(UTC)
-    return ActionDraft(
-        action_id=str(uuid.uuid4()),
+) -> ActionCommand:
+    return ActionCommand(
         action_type=action_type,
         target=ActionTarget(
             profile_slug="jane-doe",
@@ -160,14 +155,10 @@ def _draft(
             ),
         ),
         payload=payload,
-        payload_hash="a" * 64,
-        status=ActionStatus.EXECUTING,
-        created_at=now,
-        expires_at=now + timedelta(hours=1),
     )
 
 
-def _invite_draft(note: str | None = "Hello Jane", *, name: str = "Jane Doe") -> ActionDraft:
+def _invite_draft(note: str | None = "Hello Jane", *, name: str = "Jane Doe") -> ActionCommand:
     return _draft(
         ActionType.INVITATION_SEND,
         InvitationSendPayload(note=note),
@@ -179,7 +170,7 @@ def _accept_draft(
     invitation_ref: str = INVITATION_REF,
     *,
     name: str = "Jane Doe",
-) -> ActionDraft:
+) -> ActionCommand:
     return _draft(
         ActionType.INVITATION_ACCEPT,
         InvitationAcceptPayload(invitation_ref=invitation_ref),
@@ -191,7 +182,7 @@ def _ignore_draft(
     invitation_ref: str = INVITATION_REF,
     *,
     name: str = "Jane Doe",
-) -> ActionDraft:
+) -> ActionCommand:
     return _draft(
         ActionType.INVITATION_IGNORE,
         InvitationIgnorePayload(invitation_ref=invitation_ref),
@@ -367,7 +358,7 @@ def test_latest_connection_and_invitation_fixtures_record_live_selector_provenan
         "accessible_name": "Invite {name} to connect",
     }
     assert action_manifest["send_note_dialog"]["visible_counter"] == "0/200"
-    assert action_manifest["send_execution_contract"] == {
+    assert action_manifest["send_action_contract"] == {
         "pre_click_checks": [
             "exact note textbox value",
             "exact visible character counter",
@@ -426,7 +417,7 @@ async def test_connections_list_uses_latest_visible_sort_and_card_contract() -> 
 
 @pytest.mark.timeout(20)
 @pytest.mark.parametrize("note", [None, "Hello Jane"])
-async def test_invite_prepare_inspects_current_dialog_without_sending(
+async def test_invite_inspection_reads_current_dialog_without_sending(
     note: str | None,
 ) -> None:
     html = (ACTION_FIXTURES / "send-profile.html").read_text()
@@ -440,10 +431,10 @@ async def test_invite_prepare_inspects_current_dialog_without_sending(
             )
         )
         try:
-            capture = await adapter.prepare_send(
-                InvitationSendPrepareInput(
+            capture = await adapter.inspect_send(
+                InvitationSendInput(
                     context_id="connections-context",
-                    request_id=f"prepare-invite-{note is not None}",
+                    request_id=f"action-invite-{note is not None}",
                     profile_slug="jane-doe",
                     note=note,
                 )
@@ -469,7 +460,9 @@ async def test_invite_prepare_inspects_current_dialog_without_sending(
 
 
 @pytest.mark.timeout(20)
-async def test_invite_prepare_selects_current_identity_bound_button_among_recommendations() -> None:
+async def test_invite_inspection_selects_current_identity_bound_button_among_recommendations() -> (
+    None
+):
     html = (
         (ACTION_FIXTURES / "send-profile.html")
         .read_text()
@@ -492,10 +485,10 @@ async def test_invite_prepare_selects_current_identity_bound_button_among_recomm
             )
         )
         try:
-            capture = await adapter.prepare_send(
-                InvitationSendPrepareInput(
+            capture = await adapter.inspect_send(
+                InvitationSendInput(
                     context_id="connections-context",
-                    request_id="prepare-identity-bound-current-button",
+                    request_id="action-identity-bound-current-button",
                     profile_slug="jane-doe",
                 )
             )
@@ -507,7 +500,7 @@ async def test_invite_prepare_selects_current_identity_bound_button_among_recomm
 
 
 @pytest.mark.timeout(20)
-async def test_invite_prepare_waits_for_current_profile_action_hydration() -> None:
+async def test_invite_inspection_waits_for_current_profile_action_hydration() -> None:
     html = (
         (ACTION_FIXTURES / "send-profile.html")
         .read_text()
@@ -531,10 +524,10 @@ async def test_invite_prepare_waits_for_current_profile_action_hydration() -> No
             )
         )
         try:
-            capture = await adapter.prepare_send(
-                InvitationSendPrepareInput(
+            capture = await adapter.inspect_send(
+                InvitationSendInput(
                     context_id="connections-context",
-                    request_id="prepare-after-profile-action-hydration",
+                    request_id="action-after-profile-action-hydration",
                     profile_slug="jane-doe",
                 )
             )
@@ -547,7 +540,7 @@ async def test_invite_prepare_waits_for_current_profile_action_hydration() -> No
 
 @pytest.mark.timeout(20)
 @pytest.mark.parametrize("note", [None, "Hello Jane"])
-async def test_invite_execute_uses_current_dialog_and_exact_pending_postcondition(
+async def test_invite_action_uses_current_dialog_and_exact_pending_postcondition(
     note: str | None,
 ) -> None:
     html = (ACTION_FIXTURES / "send-profile.html").read_text()
@@ -557,7 +550,7 @@ async def test_invite_execute_uses_current_dialog_and_exact_pending_postconditio
         fixture_browser = ConnectionFixtureBrowser(page, {"/in/jane-doe/": html})
         adapter = InvitationActionPage(cast(BrowserManager, fixture_browser))
         try:
-            result = await adapter.execute_send(_invite_draft(note))
+            result = await adapter.perform_send(_invite_draft(note))
         finally:
             await browser.close()
 
@@ -595,8 +588,8 @@ async def test_invite_fails_closed_for_current_dialog_drift_and_changed_target()
                 )
             )
             with pytest.raises(InvalidTargetError, match="connect_unavailable"):
-                await wrong_adapter.prepare_send(
-                    InvitationSendPrepareInput(
+                await wrong_adapter.inspect_send(
+                    InvitationSendInput(
                         context_id="connections-context",
                         request_id="wrong-link",
                         profile_slug="jane-doe",
@@ -610,8 +603,8 @@ async def test_invite_fails_closed_for_current_dialog_drift_and_changed_target()
                 )
             )
             with pytest.raises(ParserDriftError, match="character limit"):
-                await counter_adapter.prepare_send(
-                    InvitationSendPrepareInput(
+                await counter_adapter.inspect_send(
+                    InvitationSendInput(
                         context_id="connections-context",
                         request_id="missing-counter",
                         profile_slug="jane-doe",
@@ -625,8 +618,8 @@ async def test_invite_fails_closed_for_current_dialog_drift_and_changed_target()
                         BrowserManager,
                         ConnectionFixtureBrowser(page, {"/in/jane-doe/": stale_counter}),
                     )
-                ).prepare_send(
-                    InvitationSendPrepareInput(
+                ).inspect_send(
+                    InvitationSendInput(
                         context_id="connections-context",
                         request_id="stale-counter",
                         profile_slug="jane-doe",
@@ -640,8 +633,8 @@ async def test_invite_fails_closed_for_current_dialog_drift_and_changed_target()
                         BrowserManager,
                         ConnectionFixtureBrowser(page, {"/in/jane-doe/": disabled_send}),
                     )
-                ).prepare_send(
-                    InvitationSendPrepareInput(
+                ).inspect_send(
+                    InvitationSendInput(
                         context_id="connections-context",
                         request_id="disabled-send",
                         profile_slug="jane-doe",
@@ -656,7 +649,7 @@ async def test_invite_fails_closed_for_current_dialog_drift_and_changed_target()
                         {"/in/jane-doe/": base.replace("<h1>Jane Doe</h1>", "<h1>Jane Roe</h1>")},
                     ),
                 )
-            ).execute_send(_invite_draft())
+            ).perform_send(_invite_draft())
         finally:
             await browser.close()
 
@@ -735,7 +728,7 @@ async def test_invite_fails_closed_for_current_dialog_drift_and_changed_target()
         "actionability-race",
     ],
 )
-async def test_invite_prepare_covers_current_dialog_safety_failures(
+async def test_invite_inspection_covers_current_dialog_safety_failures(
     fixture_change: tuple[str, str],
     note: str | None,
     message: str,
@@ -752,10 +745,10 @@ async def test_invite_prepare_covers_current_dialog_safety_failures(
         )
         try:
             with pytest.raises((InvalidTargetError, ParserDriftError), match=message):
-                await adapter.prepare_send(
-                    InvitationSendPrepareInput(
+                await adapter.inspect_send(
+                    InvitationSendInput(
                         context_id="connections-context",
-                        request_id="prepare-safety-failure",
+                        request_id="action-safety-failure",
                         profile_slug="jane-doe",
                         note=note,
                     )
@@ -781,13 +774,13 @@ async def test_invite_click_interruption_is_uncertain_and_fresh_connect_is_faile
                         fail_pattern="send invitation",
                     ),
                 )
-            ).execute_send(_invite_draft())
+            ).perform_send(_invite_draft())
             failed = await InvitationActionPage(
                 cast(
                     BrowserManager,
                     ConnectionFixtureBrowser(page, {"/in/jane-doe/": not_sent}),
                 )
-            ).execute_send(_invite_draft(note=None))
+            ).perform_send(_invite_draft(note=None))
         finally:
             await browser.close()
 
@@ -802,7 +795,7 @@ async def test_invite_click_interruption_is_uncertain_and_fresh_connect_is_faile
 
 
 @pytest.mark.timeout(20)
-async def test_invite_execute_reports_missing_dialog_and_typed_click_uncertainty() -> None:
+async def test_invite_action_reports_missing_dialog_and_typed_click_uncertainty() -> None:
     base = (ACTION_FIXTURES / "send-profile.html").read_text()
     missing_dialog = base.replace("inviteDialog.showModal();", "")
     async with async_playwright() as playwright:
@@ -814,7 +807,7 @@ async def test_invite_execute_reports_missing_dialog_and_typed_click_uncertainty
                     BrowserManager,
                     ConnectionFixtureBrowser(page, {"/in/jane-doe/": missing_dialog}),
                 )
-            ).execute_send(_invite_draft())
+            ).perform_send(_invite_draft())
             interrupted = await InvitationActionPage(
                 cast(
                     BrowserManager,
@@ -825,7 +818,7 @@ async def test_invite_execute_reports_missing_dialog_and_typed_click_uncertainty
                         error=BrowserUnavailableError("Synthetic typed click failure."),
                     ),
                 )
-            ).execute_send(_invite_draft())
+            ).perform_send(_invite_draft())
         finally:
             await browser.close()
 
@@ -855,13 +848,13 @@ async def test_invite_final_click_authentication_failure_is_not_swallowed() -> N
                             error=AuthenticationRequiredError(),
                         ),
                     )
-                ).execute_send(_invite_draft())
+                ).perform_send(_invite_draft())
         finally:
             await browser.close()
 
 
 @pytest.mark.timeout(20)
-async def test_invite_execute_rejects_disabled_send_and_uncommitted_note_before_click() -> None:
+async def test_invite_action_rejects_disabled_send_and_uncommitted_note_before_click() -> None:
     base = (ACTION_FIXTURES / "send-profile.html").read_text()
     disabled = base.replace(
         'id="send-invitation" type="button"',
@@ -880,13 +873,13 @@ async def test_invite_execute_rejects_disabled_send_and_uncommitted_note_before_
                     BrowserManager,
                     ConnectionFixtureBrowser(page, {"/in/jane-doe/": disabled}),
                 )
-            ).execute_send(_invite_draft())
+            ).perform_send(_invite_draft())
             stale_result = await InvitationActionPage(
                 cast(
                     BrowserManager,
                     ConnectionFixtureBrowser(page, {"/in/jane-doe/": stale_counter}),
                 )
-            ).execute_send(_invite_draft())
+            ).perform_send(_invite_draft())
         finally:
             await browser.close()
 
@@ -965,7 +958,7 @@ async def test_invite_execute_rejects_disabled_send_and_uncommitted_note_before_
         "actionability-race",
     ],
 )
-async def test_invite_execute_fails_before_dispatch_for_current_ui_safety_errors(
+async def test_invite_action_fails_before_dispatch_for_current_ui_safety_errors(
     html: str,
     note: str | None,
     final_state: str,
@@ -979,7 +972,7 @@ async def test_invite_execute_fails_before_dispatch_for_current_ui_safety_errors
                     BrowserManager,
                     ConnectionFixtureBrowser(page, {"/in/jane-doe/": html}),
                 )
-            ).execute_send(_invite_draft(note))
+            ).perform_send(_invite_draft(note))
         finally:
             await browser.close()
 
@@ -1004,7 +997,7 @@ async def test_invite_execute_fails_before_dispatch_for_current_ui_safety_errors
         ),
     ],
 )
-async def test_invite_execute_is_a_verified_noop_for_existing_terminal_state(
+async def test_invite_action_is_a_verified_noop_for_existing_terminal_state(
     profile_body: str,
     final_state: str,
 ) -> None:
@@ -1018,7 +1011,7 @@ async def test_invite_execute_is_a_verified_noop_for_existing_terminal_state(
                     BrowserManager,
                     ConnectionFixtureBrowser(page, {"/in/jane-doe/": html}),
                 )
-            ).execute_send(_invite_draft())
+            ).perform_send(_invite_draft())
         finally:
             await browser.close()
 
@@ -1060,7 +1053,7 @@ async def test_invite_post_click_reload_failure_is_uncertain_with_retained_evide
                         error=reload_error,
                     ),
                 )
-            ).execute_send(_invite_draft())
+            ).perform_send(_invite_draft())
         finally:
             await browser.close()
 
@@ -1099,7 +1092,7 @@ async def test_invite_fresh_profile_ambiguous_state_is_uncertain(
         page = await browser.new_page()
         fixture_browser = SequencedConnectionFixtureBrowser(page, (initial, fresh))
         try:
-            result = await InvitationActionPage(cast(BrowserManager, fixture_browser)).execute_send(
+            result = await InvitationActionPage(cast(BrowserManager, fixture_browser)).perform_send(
                 _invite_draft()
             )
         finally:
@@ -1129,13 +1122,13 @@ async def test_invite_post_click_authentication_failure_is_not_swallowed() -> No
                             error=AuthenticationRequiredError(),
                         ),
                     )
-                ).execute_send(_invite_draft())
+                ).perform_send(_invite_draft())
         finally:
             await browser.close()
 
 
 @pytest.mark.timeout(20)
-async def test_accept_and_ignore_prepare_target_exact_current_profile_controls() -> None:
+async def test_accept_and_ignore_inspect_exact_current_profile_controls() -> None:
     html = (ACTION_FIXTURES / "incoming-profile.html").read_text()
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
@@ -1147,17 +1140,17 @@ async def test_accept_and_ignore_prepare_target_exact_current_profile_controls()
             )
         )
         try:
-            accepted = await adapter.prepare_accept(
-                InvitationAcceptPrepareInput(
+            accepted = await adapter.inspect_accept(
+                InvitationAcceptInput(
                     context_id="connections-context",
-                    request_id="prepare-accept",
+                    request_id="action-accept",
                     profile_slug="jane-doe",
                 )
             )
-            ignored = await adapter.prepare_ignore(
-                InvitationIgnorePrepareInput(
+            ignored = await adapter.inspect_ignore(
+                InvitationIgnoreInput(
                     context_id="connections-context",
-                    request_id="prepare-ignore",
+                    request_id="action-ignore",
                     profile_slug="jane-doe",
                 )
             )
@@ -1173,7 +1166,7 @@ async def test_accept_and_ignore_prepare_target_exact_current_profile_controls()
 
 
 @pytest.mark.timeout(20)
-async def test_accept_execute_verifies_exact_profile_terminal_state_after_reload() -> None:
+async def test_accept_action_verifies_exact_profile_terminal_state_after_reload() -> None:
     html = (ACTION_FIXTURES / "incoming-profile.html").read_text()
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
@@ -1185,7 +1178,7 @@ async def test_accept_execute_verifies_exact_profile_terminal_state_after_reload
             )
         )
         try:
-            result = await adapter.execute_accept(_accept_draft())
+            result = await adapter.perform_accept(_accept_draft())
         finally:
             await browser.close()
 
@@ -1196,7 +1189,7 @@ async def test_accept_execute_verifies_exact_profile_terminal_state_after_reload
 
 
 @pytest.mark.timeout(20)
-async def test_ignore_execute_verifies_request_removed_without_connection_after_reload() -> None:
+async def test_ignore_action_verifies_request_removed_without_connection_after_reload() -> None:
     html = (ACTION_FIXTURES / "incoming-profile.html").read_text()
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
@@ -1208,7 +1201,7 @@ async def test_ignore_execute_verifies_request_removed_without_connection_after_
             )
         )
         try:
-            result = await adapter.execute_ignore(_ignore_draft())
+            result = await adapter.perform_ignore(_ignore_draft())
         finally:
             await browser.close()
 
@@ -1239,8 +1232,8 @@ async def test_incoming_actions_fail_closed_for_missing_pair_identity_and_click_
                         BrowserManager,
                         ConnectionFixtureBrowser(page, {"/in/jane-doe/": missing_pair}),
                     )
-                ).prepare_accept(
-                    InvitationAcceptPrepareInput(
+                ).inspect_accept(
+                    InvitationAcceptInput(
                         context_id="connections-context",
                         request_id="missing-pair",
                         profile_slug="jane-doe",
@@ -1252,7 +1245,7 @@ async def test_incoming_actions_fail_closed_for_missing_pair_identity_and_click_
                     BrowserManager,
                     ConnectionFixtureBrowser(page, {"/in/jane-doe/": changed_identity}),
                 )
-            ).execute_accept(_accept_draft())
+            ).perform_accept(_accept_draft())
             interrupted_accept = await InvitationActionPage(
                 cast(
                     BrowserManager,
@@ -1262,7 +1255,7 @@ async def test_incoming_actions_fail_closed_for_missing_pair_identity_and_click_
                         fail_pattern="accept jane doe",
                     ),
                 )
-            ).execute_accept(_accept_draft())
+            ).perform_accept(_accept_draft())
             interrupted_ignore = await InvitationActionPage(
                 cast(
                     BrowserManager,
@@ -1272,7 +1265,7 @@ async def test_incoming_actions_fail_closed_for_missing_pair_identity_and_click_
                         fail_pattern="ignore jane doe",
                     ),
                 )
-            ).execute_ignore(_ignore_draft())
+            ).perform_ignore(_ignore_draft())
         finally:
             await browser.close()
 
@@ -1307,7 +1300,7 @@ async def test_incoming_actions_require_their_distinct_fresh_profile_postconditi
                         {"/in/jane-doe/": accept_removes_without_connecting},
                     ),
                 )
-            ).execute_accept(_accept_draft())
+            ).perform_accept(_accept_draft())
             await page.evaluate("sessionStorage.clear()")
             ignored = await InvitationActionPage(
                 cast(
@@ -1317,7 +1310,7 @@ async def test_incoming_actions_require_their_distinct_fresh_profile_postconditi
                         {"/in/jane-doe/": ignore_creates_connection},
                     ),
                 )
-            ).execute_ignore(_ignore_draft())
+            ).perform_ignore(_ignore_draft())
         finally:
             await browser.close()
 
@@ -1332,12 +1325,12 @@ async def test_connection_action_payload_types_and_references_are_enforced() -> 
     adapter = InvitationActionPage(cast(BrowserManager, object()))
 
     with pytest.raises(InvalidTargetError, match="invitation action payload"):
-        await adapter.execute_send(_accept_draft())
+        await adapter.perform_send(_accept_draft())
     with pytest.raises(InvalidTargetError, match="acceptance action payload"):
-        await adapter.execute_accept(_invite_draft())
+        await adapter.perform_accept(_invite_draft())
     with pytest.raises(InvalidTargetError, match="ignore action payload"):
-        await adapter.execute_ignore(_accept_draft())
+        await adapter.perform_ignore(_accept_draft())
     with pytest.raises(InvalidTargetError, match="acceptance payload does not match"):
-        await adapter.execute_accept(_accept_draft("invitation:" + "f" * 24))
+        await adapter.perform_accept(_accept_draft("invitation:" + "f" * 24))
     with pytest.raises(InvalidTargetError, match="ignore payload does not match"):
-        await adapter.execute_ignore(_ignore_draft("invitation:" + "f" * 24))
+        await adapter.perform_ignore(_ignore_draft("invitation:" + "f" * 24))

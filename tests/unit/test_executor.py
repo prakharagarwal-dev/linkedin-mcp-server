@@ -14,16 +14,12 @@ from linkedin_mcp.capabilities import create_default_registry
 from linkedin_mcp.config import Settings
 from linkedin_mcp.domain.models import (
     CURRENT_RECEIVED_INVITATION_VIEWS,
-    ActionDraft,
-    ActionExecuteInput,
+    ActionAssetSnapshot,
+    ActionCommand,
+    ActionInspection,
     ActionOutcome,
     ActionPageResult,
-    ActionPreparationCapture,
-    ActionStatus,
     ActionTarget,
-    ActionType,
-    CapabilityEffect,
-    CommentCreatePayload,
     CommentObservation,
     CommentSort,
     CommentThread,
@@ -48,17 +44,17 @@ from linkedin_mcp.domain.models import (
     ConversationSearchInput,
     ConversationSummary,
     EvidenceField,
-    InvitationAcceptPrepareInput,
+    InvitationAcceptInput,
     InvitationAvailableAction,
     InvitationDirection,
     InvitationEntity,
     InvitationEntityType,
     InvitationEvidence,
     InvitationFilter,
-    InvitationIgnorePrepareInput,
+    InvitationIgnoreInput,
     InvitationListCoverage,
     InvitationListInput,
-    InvitationSendPrepareInput,
+    InvitationSendInput,
     InvitationSummary,
     InvitationType,
     JobDetailInput,
@@ -66,13 +62,9 @@ from linkedin_mcp.domain.models import (
     JobSearchCoverage,
     JobSearchInput,
     JobSummary,
-    LinkedInSurface,
     MessageDirection,
-    MessageFileInput,
-    MessageGifInput,
     MessageObservation,
-    MessagePrepareInput,
-    MessageSendPayload,
+    MessageSendInput,
     PeopleGetInput,
     PeopleSearchConnectionDegree,
     PeopleSearchCoverage,
@@ -87,29 +79,24 @@ from linkedin_mcp.domain.models import (
     PostAssetRole,
     PostAuthor,
     PostAuthorType,
-    PostCollaboratorInput,
-    PostCommentPrepareInput,
+    PostCommentInput,
     PostCommentsCoverage,
     PostCommentsListInput,
-    PostCreatePayload,
-    PostCreatePrepareInput,
+    PostCreateInput,
     PostDetailCoverage,
     PostEvidence,
     PostGetInput,
     PostObservation,
-    PostReactionPrepareInput,
+    PostReactionInput,
     PostSearchCoverage,
     PostSearchInput,
     PostSummary,
-    PreparedPostAsset,
     ReactionSetPayload,
     ReactionState,
     StopReason,
     TextPostContent,
-    action_approval_preview,
 )
 from linkedin_mcp.errors import (
-    AuthorizationDeniedError,
     IdempotencyConflictError,
     InternalServerError,
     InvalidCursorError,
@@ -888,20 +875,20 @@ class FakeConversationSearch:
 
 class FakeInvitationActions:
     def __init__(self) -> None:
-        self.invite_executions = 0
-        self.accept_executions = 0
-        self.ignore_executions = 0
+        self.invite_actions = 0
+        self.accept_actions = 0
+        self.ignore_actions = 0
 
-    async def prepare_send(
+    async def inspect_send(
         self,
-        request: InvitationSendPrepareInput,
-    ) -> ActionPreparationCapture:
+        request: InvitationSendInput,
+    ) -> ActionInspection:
         return _action_capture(request.profile_slug)
 
-    async def prepare_accept(
+    async def inspect_accept(
         self,
-        request: InvitationAcceptPrepareInput,
-    ) -> ActionPreparationCapture:
+        request: InvitationAcceptInput,
+    ) -> ActionInspection:
         capture = _action_capture(request.profile_slug)
         return capture.model_copy(
             update={
@@ -912,48 +899,48 @@ class FakeInvitationActions:
             }
         )
 
-    async def prepare_ignore(
+    async def inspect_ignore(
         self,
-        request: InvitationIgnorePrepareInput,
-    ) -> ActionPreparationCapture:
-        return await self.prepare_accept(
-            InvitationAcceptPrepareInput(
+        request: InvitationIgnoreInput,
+    ) -> ActionInspection:
+        return await self.inspect_accept(
+            InvitationAcceptInput(
                 context_id=request.context_id,
                 request_id=request.request_id,
                 profile_slug=request.profile_slug,
             )
         )
 
-    async def execute_send(self, draft: ActionDraft) -> ActionPageResult:
-        self.invite_executions += 1
+    async def perform_send(self, command: ActionCommand) -> ActionPageResult:
+        self.invite_actions += 1
         return _page_result("pending_sent")
 
-    async def execute_accept(self, draft: ActionDraft) -> ActionPageResult:
-        self.accept_executions += 1
+    async def perform_accept(self, command: ActionCommand) -> ActionPageResult:
+        self.accept_actions += 1
         return _page_result("connected")
 
-    async def execute_ignore(self, draft: ActionDraft) -> ActionPageResult:
-        self.ignore_executions += 1
+    async def perform_ignore(self, command: ActionCommand) -> ActionPageResult:
+        self.ignore_actions += 1
         return _page_result("invitation_ignored")
 
 
 class FakePostPublishing:
     def __init__(self) -> None:
-        self.asset_preparations = 0
-        self.executions = 0
+        self.asset_snapshots = 0
+        self.post_actions = 0
 
-    async def prepare_assets(
+    async def snapshot_assets(
         self,
-        request: PostCreatePrepareInput,
-    ) -> tuple[PreparedPostAsset, ...]:
+        request: PostCreateInput,
+    ) -> tuple[ActionAssetSnapshot, ...]:
         del request
-        self.asset_preparations += 1
+        self.asset_snapshots += 1
         return ()
 
-    async def prepare_post(
+    async def inspect_post(
         self,
-        request: PostCreatePrepareInput,
-    ) -> ActionPreparationCapture:
+        request: PostCreateInput,
+    ) -> ActionInspection:
         del request
         capture = _action_capture("current-member")
         return capture.model_copy(
@@ -970,30 +957,30 @@ class FakePostPublishing:
             }
         )
 
-    async def execute_post(self, draft: ActionDraft) -> ActionPageResult:
-        del draft
-        self.executions += 1
+    async def perform_post(self, command: ActionCommand) -> ActionPageResult:
+        del command
+        self.post_actions += 1
         return _page_result("post_published:activity:7312345678901234567")
 
 
 class FakePostEngagement:
     def __init__(self) -> None:
-        self.asset_preparations = 0
-        self.comment_executions = 0
-        self.reaction_executions = 0
+        self.asset_snapshots = 0
+        self.comment_actions = 0
+        self.reaction_actions = 0
 
-    async def prepare_comment_assets(
+    async def snapshot_comment_assets(
         self,
-        request: PostCommentPrepareInput,
-    ) -> tuple[PreparedPostAsset, ...]:
+        request: PostCommentInput,
+    ) -> tuple[ActionAssetSnapshot, ...]:
         del request
-        self.asset_preparations += 1
+        self.asset_snapshots += 1
         return ()
 
-    async def prepare_comment(
+    async def inspect_comment(
         self,
-        request: PostCommentPrepareInput,
-    ) -> ActionPreparationCapture:
+        request: PostCommentInput,
+    ) -> ActionInspection:
         capture = _action_capture("current-member")
         return capture.model_copy(
             update={
@@ -1015,15 +1002,15 @@ class FakePostEngagement:
             }
         )
 
-    async def execute_comment(self, draft: ActionDraft) -> ActionPageResult:
-        del draft
-        self.comment_executions += 1
+    async def perform_comment(self, command: ActionCommand) -> ActionPageResult:
+        del command
+        self.comment_actions += 1
         return _page_result("comment_published:comment:activity:7312345678901234567:900")
 
-    async def prepare_reaction(
+    async def inspect_reaction(
         self,
-        request: PostReactionPrepareInput,
-    ) -> ActionPreparationCapture:
+        request: PostReactionInput,
+    ) -> ActionInspection:
         capture = _action_capture("current-member")
         return capture.model_copy(
             update={
@@ -1046,23 +1033,23 @@ class FakePostEngagement:
             }
         )
 
-    async def execute_reaction(self, draft: ActionDraft) -> ActionPageResult:
-        assert isinstance(draft.payload, ReactionSetPayload)
-        self.reaction_executions += 1
-        return _page_result(f"reaction_set:{draft.payload.desired_reaction.value}")
+    async def perform_reaction(self, command: ActionCommand) -> ActionPageResult:
+        assert isinstance(command.payload, ReactionSetPayload)
+        self.reaction_actions += 1
+        return _page_result(f"reaction_set:{command.payload.desired_reaction.value}")
 
 
 class MissingReferenceActions(FakeInvitationActions):
-    async def prepare_accept(
+    async def inspect_accept(
         self,
-        request: InvitationAcceptPrepareInput,
-    ) -> ActionPreparationCapture:
+        request: InvitationAcceptInput,
+    ) -> ActionInspection:
         return _action_capture(request.profile_slug)
 
-    async def prepare_ignore(
+    async def inspect_ignore(
         self,
-        request: InvitationIgnorePrepareInput,
-    ) -> ActionPreparationCapture:
+        request: InvitationIgnoreInput,
+    ) -> ActionInspection:
         return _action_capture(request.profile_slug)
 
 
@@ -1071,16 +1058,22 @@ class InterruptedInvitationActions(FakeInvitationActions):
         super().__init__()
         self.cancelled = cancelled
 
-    async def execute_send(self, draft: ActionDraft) -> ActionPageResult:
-        del draft
+    async def perform_send(self, command: ActionCommand) -> ActionPageResult:
+        del command
         if self.cancelled:
             raise asyncio.CancelledError
-        raise RuntimeError("browser stopped after execution reservation")
+        raise RuntimeError("browser stopped after action dispatch")
+
+
+class RejectedInvitationActions(FakeInvitationActions):
+    async def perform_send(self, command: ActionCommand) -> ActionPageResult:
+        del command
+        raise InvalidTargetError("The exact invitation target is no longer available.")
 
 
 class FakeConversation:
     def __init__(self) -> None:
-        self.message_executions = 0
+        self.message_actions = 0
 
     async def read(self, request: ConversationGetInput) -> ConversationObservation:
         now = datetime.now(UTC)
@@ -1121,10 +1114,10 @@ class FakeConversation:
             captured_at=now,
         )
 
-    async def prepare_message(
+    async def inspect_message(
         self,
-        request: MessagePrepareInput,
-    ) -> ActionPreparationCapture:
+        request: MessageSendInput,
+    ) -> ActionInspection:
         return _action_capture(request.profile_slug or "jane-doe").model_copy(
             update={
                 "target": ActionTarget(
@@ -1138,12 +1131,12 @@ class FakeConversation:
             }
         )
 
-    async def prepare_message_assets(
+    async def snapshot_message_assets(
         self,
-        request: MessagePrepareInput,
-    ) -> tuple[PreparedPostAsset, ...]:
+        request: MessageSendInput,
+    ) -> tuple[ActionAssetSnapshot, ...]:
         return tuple(
-            PreparedPostAsset(
+            ActionAssetSnapshot(
                 asset_ref=attachment.asset_ref,
                 role=PostAssetRole.MESSAGE_ATTACHMENT,
                 sha256="e" * 64,
@@ -1153,8 +1146,8 @@ class FakeConversation:
             for attachment in request.attachments
         )
 
-    async def execute_message(self, draft: ActionDraft) -> ActionPageResult:
-        self.message_executions += 1
+    async def perform_message(self, command: ActionCommand) -> ActionPageResult:
+        self.message_actions += 1
         return _page_result("message_sent")
 
 
@@ -1170,8 +1163,8 @@ class FailureRecordingRepository(MemoryRepository):
         raise RuntimeError("runtime store unavailable")
 
 
-def _action_capture(profile_slug: str) -> ActionPreparationCapture:
-    return ActionPreparationCapture(
+def _action_capture(profile_slug: str) -> ActionInspection:
+    return ActionInspection(
         target=ActionTarget(
             profile_slug=profile_slug,
             profile_url=HttpUrl(f"https://www.linkedin.com/in/{profile_slug}/"),
@@ -1196,52 +1189,8 @@ def _page_result(final_state: str) -> ActionPageResult:
     )
 
 
-def _execute_request(
-    draft: ActionDraft,
-    *,
-    context_id: str,
-    request_id: str,
-    idempotency_key: str,
-) -> ActionExecuteInput:
-    return ActionExecuteInput(
-        context_id=context_id,
-        request_id=request_id,
-        action_id=draft.action_id,
-        payload_hash=draft.payload_hash,
-        approval_preview=action_approval_preview(draft),
-        idempotency_key=idempotency_key,
-    )
-
-
 def _settings() -> Settings:
-    return Settings(
-        minimum_navigation_interval_seconds=0,
-        allowed_surfaces=frozenset(LinkedInSurface),
-        allowed_scopes=frozenset(
-            {
-                "linkedin.jobs.search",
-                "linkedin.jobs.read",
-                "linkedin.people.search",
-                "linkedin.people.read",
-                "linkedin.companies.search",
-                "linkedin.companies.read",
-                "linkedin.posts.search",
-                "linkedin.posts.read",
-                "linkedin.posts.comments.read",
-                "linkedin.posts.comments.create",
-                "linkedin.posts.reactions.set",
-                "linkedin.posts.create",
-                "linkedin.connections.read",
-                "linkedin.invitations.read",
-                "linkedin.invitations.send",
-                "linkedin.invitations.accept",
-                "linkedin.invitations.ignore",
-                "linkedin.messaging.read",
-                "linkedin.messaging.send",
-            }
-        ),
-        allowed_effects=frozenset(CapabilityEffect),
-    )
+    return Settings(minimum_navigation_interval_seconds=0)
 
 
 def _executor(
@@ -1452,13 +1401,13 @@ async def test_read_failures_are_recorded_and_never_silently_retried(
         raise InvalidTargetError("The visible LinkedIn target changed.")
 
     monkeypatch.setattr(provider, provider_method, fail)
-    execute = getattr(executor, executor_method)
+    invoke = getattr(executor, executor_method)
 
     expected_error = asyncio.CancelledError if cancelled else InvalidTargetError
     with pytest.raises(expected_error):
-        await execute(capability_request)
+        await invoke(capability_request)
     with pytest.raises(IdempotencyConflictError, match="failed attempt"):
-        await execute(capability_request)
+        await invoke(capability_request)
 
 
 @pytest.mark.asyncio
@@ -1948,330 +1897,122 @@ async def test_connection_and_messaging_reads_are_persisted_and_replayed() -> No
 
 
 @pytest.mark.asyncio
-async def test_invitation_prepare_confirm_execute_and_attempt_replay() -> None:
-    repository = MemoryRepository()
+async def test_all_seven_actions_run_directly_with_typed_evidence() -> None:
     actions = FakeInvitationActions()
+    publishing = FakePostPublishing()
+    engagement = FakePostEngagement()
+    messaging = FakeConversation()
     executor = _executor(
-        repository,
+        MemoryRepository(),
         FakeJobSearch(),
         FakeJobDetail(),
         invitation_actions=actions,
-    )
-    prepare_request = InvitationSendPrepareInput(
-        context_id="connections-context",
-        request_id="invite-prepare-1",
-        profile_slug="jane-doe",
-        note="Hello Jane",
-    )
-    prepared = await executor.prepare_invitation_send(prepare_request)
-    prepared_replay = await executor.prepare_invitation_send(prepare_request)
-    assert prepared.status == "ready_for_confirmation"
-    assert prepared.draft.status is ActionStatus.READY_FOR_CONFIRMATION
-    assert prepared.approval_preview == action_approval_preview(prepared.draft)
-    assert prepared.approval_preview.summary == (
-        "Send a LinkedIn connection invitation to Jane Doe."
-    )
-    assert prepared_replay.replayed is True
-    assert prepared_replay.draft == prepared.draft
-
-    altered_preview = prepared.approval_preview.model_copy(
-        update={"summary": "Send a different invitation."}
-    )
-    with pytest.raises(AuthorizationDeniedError, match="preview"):
-        await executor.execute_invitation_send(
-            ActionExecuteInput(
-                context_id="connections-context",
-                request_id="invite-altered-preview-1",
-                action_id=prepared.draft.action_id,
-                payload_hash=prepared.draft.payload_hash,
-                approval_preview=altered_preview,
-                idempotency_key="invite-action-1",
-            )
-        )
-
-    first = await executor.execute_invitation_send(
-        _execute_request(
-            prepared.draft,
-            context_id="connections-context",
-            request_id="invite-execute-1",
-            idempotency_key="invite-action-1",
-        )
-    )
-    replay = await executor.execute_invitation_send(
-        _execute_request(
-            prepared.draft,
-            context_id="connections-context",
-            request_id="invite-execute-2",
-            idempotency_key="invite-action-1",
-        )
-    )
-
-    assert first.result.outcome is ActionOutcome.VERIFIED
-    assert first.result.final_state == "pending_sent"
-    assert replay.replayed is True
-    assert replay.result == first.result
-    assert actions.invite_executions == 1
-
-
-@pytest.mark.asyncio
-async def test_personal_post_prepare_confirmation_and_execution_are_hash_locked() -> None:
-    repository = MemoryRepository()
-    publishing = FakePostPublishing()
-    executor = _executor(
-        repository,
-        FakeJobSearch(),
-        FakeJobDetail(),
         post_publishing=publishing,
+        post_engagement=engagement,
+        conversation=messaging,
     )
-    request = PostCreatePrepareInput(
-        context_id="post-write-context",
-        request_id="post-prepare-1",
-        content=TextPostContent(text="Exact confirmed post"),
-        brand_partnership=True,
-        collaborators=(
-            PostCollaboratorInput(
-                profile_slug="alex-ray",
-                display_name="Alex Ray",
-            ),
+    post_ref = "activity:7312345678901234567"
+
+    outputs = (
+        await executor.create_post(
+            PostCreateInput(
+                context_id="actions",
+                request_id="post",
+                content=TextPostContent(text="An atomic post."),
+            )
+        ),
+        await executor.comment_on_post(
+            PostCommentInput(
+                context_id="actions",
+                request_id="comment",
+                post_ref=post_ref,
+                text="Thanks",
+            )
+        ),
+        await executor.react_to_post(
+            PostReactionInput(
+                context_id="actions",
+                request_id="reaction",
+                post_ref=post_ref,
+                desired_reaction=ReactionState.LIKE,
+            )
+        ),
+        await executor.send_invitation(
+            InvitationSendInput(
+                context_id="actions",
+                request_id="invite",
+                profile_slug="jane-doe",
+                note="Hello",
+            )
+        ),
+        await executor.accept_invitation(
+            InvitationAcceptInput(
+                context_id="actions",
+                request_id="accept",
+                profile_slug="jane-doe",
+            )
+        ),
+        await executor.ignore_invitation(
+            InvitationIgnoreInput(
+                context_id="actions",
+                request_id="ignore",
+                profile_slug="jane-doe",
+            )
+        ),
+        await executor.send_message(
+            MessageSendInput(
+                context_id="actions",
+                request_id="message",
+                conversation_id="thread-123",
+                message="Hello",
+            )
         ),
     )
 
-    prepared = await executor.prepare_post_create(request)
-    replayed_prepare = await executor.prepare_post_create(request)
-
-    assert prepared.draft.action_type is ActionType.POST_CREATE
-    assert isinstance(prepared.draft.payload, PostCreatePayload)
-    assert prepared.draft.payload.content == request.content
-    assert prepared.draft.payload.brand_partnership is True
-    assert prepared.draft.payload.collaborators == request.collaborators
-    assert "brand partnership" in prepared.approval_preview.external_effect
-    assert "Alex Ray" in prepared.approval_preview.external_effect
-    assert prepared.draft.target.actor_profile_slug == "current-member"
-    assert prepared.sources[0].source_type.value == "linkedin_action_preparation"
-    assert replayed_prepare.replayed is True
-    assert replayed_prepare.draft == prepared.draft
-    assert publishing.asset_preparations == 1
-
-    execute_request = _execute_request(
-        prepared.draft,
-        context_id="post-write-context",
-        request_id="post-execute-1",
-        idempotency_key="post-global-action-1",
+    assert [output.result.outcome for output in outputs] == [ActionOutcome.VERIFIED] * 7
+    assert [output.result.performed for output in outputs] == [True] * 7
+    assert all(
+        output.sources[0].source_type.value == "linkedin_action_execution" for output in outputs
     )
-    altered_preview = prepared.approval_preview.model_copy(update={"payload_hash": "b" * 64})
-    with pytest.raises(AuthorizationDeniedError, match="hash"):
-        await executor.execute_post_create(
-            execute_request.model_copy(
-                update={
-                    "request_id": "post-execute-altered-hash",
-                    "payload_hash": "b" * 64,
-                    "approval_preview": altered_preview,
-                }
-            )
-        )
-
-    first = await executor.execute_post_create(execute_request)
-    replay = await executor.execute_post_create(
-        execute_request.model_copy(update={"request_id": "post-execute-2"})
+    assert (publishing.asset_snapshots, publishing.post_actions) == (1, 1)
+    assert (engagement.asset_snapshots, engagement.comment_actions) == (
+        1,
+        1,
     )
-
-    assert first.result.outcome is ActionOutcome.VERIFIED
-    assert first.result.final_state == "post_published:activity:7312345678901234567"
-    assert first.sources[0].source_type.value == "linkedin_action_execution"
-    assert replay.replayed is True
-    assert replay.result == first.result
-    assert publishing.executions == 1
-
-    with pytest.raises(IdempotencyConflictError, match="different arguments"):
-        await executor.prepare_post_create(
-            request.model_copy(update={"content": TextPostContent(text="Different post")})
-        )
+    assert engagement.reaction_actions == 1
+    assert (actions.invite_actions, actions.accept_actions, actions.ignore_actions) == (
+        1,
+        1,
+        1,
+    )
+    assert messaging.message_actions == 1
 
 
 @pytest.mark.asyncio
-async def test_comment_and_reaction_actions_use_typed_confirmation_lifecycle() -> None:
-    repository = MemoryRepository()
-    engagement = FakePostEngagement()
-    executor = _executor(
-        repository,
-        FakeJobSearch(),
-        FakeJobDetail(),
-        post_engagement=engagement,
-    )
-    comment_request = PostCommentPrepareInput(
-        context_id="engagement-context",
-        request_id="comment-prepare-1",
-        post_ref="activity:7312345678901234567",
-        text="Exact confirmed comment.",
-    )
-    reaction_request = PostReactionPrepareInput(
-        context_id="engagement-context",
-        request_id="reaction-prepare-1",
-        post_ref="activity:7312345678901234567",
-        desired_reaction=ReactionState.LOVE,
-    )
-
-    comment = await executor.prepare_post_comment(comment_request)
-    reaction = await executor.prepare_post_reaction(reaction_request)
-
-    assert comment.draft.action_type is ActionType.COMMENT_CREATE
-    assert isinstance(comment.draft.payload, CommentCreatePayload)
-    assert comment.draft.target.post_ref == comment_request.post_ref
-    assert comment.draft.target.content_author_name == "Jane Doe"
-    assert reaction.draft.action_type is ActionType.REACTION_SET
-    assert isinstance(reaction.draft.payload, ReactionSetPayload)
-    assert reaction.draft.payload.existing_reaction is ReactionState.NONE
-    assert reaction.draft.payload.desired_reaction is ReactionState.LOVE
-    assert comment.draft.payload_hash != reaction.draft.payload_hash
-    assert engagement.asset_preparations == 1
-
-    comment_execute = _execute_request(
-        comment.draft,
-        context_id="engagement-context",
-        request_id="comment-execute-1",
-        idempotency_key="comment-global-action-1",
-    )
-    reaction_execute = _execute_request(
-        reaction.draft,
-        context_id="engagement-context",
-        request_id="reaction-execute-1",
-        idempotency_key="reaction-global-action-1",
-    )
-    comment_result = await executor.execute_post_comment(comment_execute)
-    reaction_result = await executor.execute_post_reaction(reaction_execute)
-    comment_replay = await executor.execute_post_comment(
-        comment_execute.model_copy(update={"request_id": "comment-execute-2"})
-    )
-    reaction_replay = await executor.execute_post_reaction(
-        reaction_execute.model_copy(update={"request_id": "reaction-execute-2"})
-    )
-
-    assert comment_result.result.outcome is ActionOutcome.VERIFIED
-    assert comment_result.result.final_state.startswith("comment_published:")
-    assert reaction_result.result.outcome is ActionOutcome.VERIFIED
-    assert reaction_result.result.final_state == "reaction_set:love"
-    assert comment_replay.replayed is True
-    assert reaction_replay.replayed is True
-    assert engagement.comment_executions == 1
-    assert engagement.reaction_executions == 1
-
-
-@pytest.mark.asyncio
-async def test_accept_ignore_and_message_actions_use_separate_typed_adapters() -> None:
-    repository = MemoryRepository()
+async def test_repeated_write_request_is_a_new_action_not_a_replay() -> None:
     actions = FakeInvitationActions()
-    conversation = FakeConversation()
     executor = _executor(
-        repository,
+        MemoryRepository(),
         FakeJobSearch(),
         FakeJobDetail(),
         invitation_actions=actions,
-        conversation=conversation,
+    )
+    request = InvitationSendInput(
+        context_id="repeat-action",
+        request_id="same-request-id",
+        profile_slug="jane-doe",
     )
 
-    acceptance = await executor.prepare_invitation_accept(
-        InvitationAcceptPrepareInput(
-            context_id="connections-context",
-            request_id="accept-prepare-1",
-            profile_slug="jane-doe",
-        )
-    )
-    ignore = await executor.prepare_invitation_ignore(
-        InvitationIgnorePrepareInput(
-            context_id="connections-context",
-            request_id="ignore-prepare-1",
-            profile_slug="jane-doe",
-        )
-    )
-    message = await executor.prepare_message(
-        MessagePrepareInput(
-            context_id="messaging-context",
-            request_id="message-prepare-1",
-            conversation_id="thread-123",
-            message="Thanks for getting in touch.",
-        )
-    )
-    attachment_message = await executor.prepare_message(
-        MessagePrepareInput(
-            context_id="messaging-context",
-            request_id="message-attachment-prepare-1",
-            conversation_id="thread-123",
-            message="The brief is attached.",
-            attachments=(MessageFileInput(asset_ref="brief.pdf"),),
-        )
-    )
-    gif_message = await executor.prepare_message(
-        MessagePrepareInput(
-            context_id="messaging-context",
-            request_id="message-gif-prepare-1",
-            conversation_id="thread-123",
-            gif=MessageGifInput(
-                search_query="dancing robot",
-                result_title="Dancing robot GIF",
-            ),
-        )
-    )
-    accepted = await executor.execute_invitation_accept(
-        _execute_request(
-            acceptance.draft,
-            context_id="connections-context",
-            request_id="accept-execute-1",
-            idempotency_key="accept-action-1",
-        )
-    )
-    ignored = await executor.execute_invitation_ignore(
-        _execute_request(
-            ignore.draft,
-            context_id="connections-context",
-            request_id="ignore-execute-1",
-            idempotency_key="ignore-action-1",
-        )
-    )
-    sent = await executor.execute_message(
-        _execute_request(
-            message.draft,
-            context_id="messaging-context",
-            request_id="message-execute-1",
-            idempotency_key="message-action-1",
-        )
-    )
-    attachment_sent = await executor.execute_message(
-        _execute_request(
-            attachment_message.draft,
-            context_id="messaging-context",
-            request_id="message-attachment-execute-1",
-            idempotency_key="message-attachment-action-1",
-        )
-    )
-    gif_sent = await executor.execute_message(
-        _execute_request(
-            gif_message.draft,
-            context_id="messaging-context",
-            request_id="message-gif-execute-1",
-            idempotency_key="message-gif-action-1",
-        )
-    )
+    first = await executor.send_invitation(request)
+    second = await executor.send_invitation(request)
 
-    assert accepted.result.final_state == "connected"
-    assert ignored.result.final_state == "invitation_ignored"
-    assert ignore.draft.action_type is ActionType.INVITATION_IGNORE
-    assert ignore.approval_preview.summary == ("Ignore Jane Doe's LinkedIn connection invitation.")
-    assert "without creating a connection" in ignore.approval_preview.external_effect
-    assert sent.result.final_state == "message_sent"
-    assert attachment_sent.result.final_state == "message_sent"
-    assert gif_sent.result.final_state == "message_sent"
-    assert isinstance(attachment_message.draft.payload, MessageSendPayload)
-    assert isinstance(gif_message.draft.payload, MessageSendPayload)
-    assert attachment_message.draft.payload.attachment_refs == ("brief.pdf",)
-    assert attachment_message.draft.payload.assets[0].role is PostAssetRole.MESSAGE_ATTACHMENT
-    assert gif_message.draft.payload.gif is not None
-    assert actions.accept_executions == 1
-    assert actions.ignore_executions == 1
-    assert conversation.message_executions == 3
+    assert actions.invite_actions == 2
+    assert first.sources != second.sources
+    assert first.result.final_state == second.result.final_state == "pending_sent"
 
 
 @pytest.mark.asyncio
-async def test_incoming_action_preparation_requires_an_exact_invitation_reference() -> None:
+async def test_incoming_invitation_action_requires_exact_visible_reference() -> None:
     executor = _executor(
         MemoryRepository(),
         FakeJobSearch(),
@@ -2280,69 +2021,64 @@ async def test_incoming_action_preparation_requires_an_exact_invitation_referenc
     )
 
     with pytest.raises(RuntimeError, match="invitation reference"):
-        await executor.prepare_invitation_accept(
-            InvitationAcceptPrepareInput(
-                context_id="connections-context",
-                request_id="missing-invitation-reference",
-                profile_slug="jane-doe",
-            )
-        )
-    with pytest.raises(RuntimeError, match="invitation reference"):
-        await executor.prepare_invitation_ignore(
-            InvitationIgnorePrepareInput(
-                context_id="connections-context",
-                request_id="missing-ignore-invitation-reference",
+        await executor.accept_invitation(
+            InvitationAcceptInput(
+                context_id="missing-reference",
+                request_id="accept",
                 profile_slug="jane-doe",
             )
         )
 
 
-@pytest.mark.parametrize("cancelled", [False, True], ids=["exception", "cancellation"])
+@pytest.mark.parametrize("cancelled", [False, True], ids=["uncertain", "cancelled"])
 @pytest.mark.asyncio
-async def test_reserved_action_failures_become_durable_uncertain_outcomes(
+async def test_interrupted_action_is_uncertain_but_cancellation_propagates(
     cancelled: bool,
 ) -> None:
-    repository = MemoryRepository()
     executor = _executor(
-        repository,
+        MemoryRepository(),
         FakeJobSearch(),
         FakeJobDetail(),
         invitation_actions=InterruptedInvitationActions(cancelled=cancelled),
     )
-    prepared = await executor.prepare_invitation_send(
-        InvitationSendPrepareInput(
-            context_id="connections-context",
-            request_id=f"interrupted-prepare-{cancelled}",
-            profile_slug="jane-doe",
-        )
-    )
-    request = _execute_request(
-        prepared.draft,
-        context_id="connections-context",
-        request_id=f"interrupted-execute-{cancelled}",
-        idempotency_key=f"interrupted-action-{cancelled}",
+    request = InvitationSendInput(
+        context_id="interrupted-action",
+        request_id="invite",
+        profile_slug="jane-doe",
     )
 
     if cancelled:
         with pytest.raises(asyncio.CancelledError):
-            await executor.execute_invitation_send(request)
-        stored = await repository.get_action(
-            account_id="personal",
-            action_id=prepared.draft.action_id,
-        )
-        assert stored is not None
-        assert stored.status is ActionStatus.UNCERTAIN
+            await executor.send_invitation(request)
     else:
-        output = await executor.execute_invitation_send(request)
-        replay = await executor.execute_invitation_send(request)
+        output = await executor.send_invitation(request)
         assert output.result.outcome is ActionOutcome.UNCERTAIN
         assert output.result.performed is None
-        assert replay.replayed is True
-        assert replay.result == output.result
+        assert output.result.final_state == "unknown_after_interruption"
+        assert output.sources == ()
 
 
 @pytest.mark.asyncio
-async def test_failure_recording_never_replaces_the_original_capability_error(
+async def test_known_precondition_error_is_not_misreported_as_uncertain() -> None:
+    executor = _executor(
+        MemoryRepository(),
+        FakeJobSearch(),
+        FakeJobDetail(),
+        invitation_actions=RejectedInvitationActions(),
+    )
+
+    with pytest.raises(InvalidTargetError, match="no longer available"):
+        await executor.send_invitation(
+            InvitationSendInput(
+                context_id="rejected-action",
+                request_id="invite",
+                profile_slug="jane-doe",
+            )
+        )
+
+
+@pytest.mark.asyncio
+async def test_failure_recording_never_replaces_original_capability_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     repository = FailureRecordingRepository()
@@ -2353,16 +2089,11 @@ async def test_failure_recording_never_replaces_the_original_capability_error(
         _request: JobSearchInput,
         *,
         result_limit: int | None = None,
-    ) -> tuple[
-        tuple[JobSummary, ...],
-        JobSearchCoverage,
-        str,
-        str,
-    ]:
+    ) -> tuple[tuple[JobSummary, ...], JobSearchCoverage, str, str]:
         del result_limit
         raise RuntimeError("sensitive implementation detail")
 
-    def discard_log(_: str, **values: object) -> None:
+    def discard_log(_event: str, **values: object) -> None:
         del values
 
     monkeypatch.setattr(search, "collect", unexpected)
@@ -2380,7 +2111,6 @@ async def test_failure_recording_never_replaces_the_original_capability_error(
 
 def test_safe_capability_error_preserves_known_errors_and_hides_unknown_details() -> None:
     known = InvalidTargetError("Safe target error.")
-
     assert safe_capability_error(known) is known
     projected = safe_capability_error(RuntimeError("secret"))
     assert isinstance(projected, InternalServerError)

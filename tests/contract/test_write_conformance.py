@@ -1,3 +1,5 @@
+"""Compact conformance coverage for every current account-changing tool."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -6,164 +8,76 @@ from pathlib import Path
 import pytest
 from pydantic import TypeAdapter
 
-from tests.simulator.mcp import execute_prepared, simulator_session
+from tests.simulator.mcp import simulator_session
 from tests.simulator.state import SimulatorState
 
 
 @dataclass(frozen=True, slots=True)
-class WriteCase:
-    case_id: str
-    prepare_tool: str
-    execute_tool: str
-    prepare_args: dict[str, object]
-    expected_action_type: str
+class ActionCase:
+    tool: str
+    arguments: dict[str, object]
+    expected_state: str
 
 
-WRITE_CASES = (
-    WriteCase(
-        case_id="post-create",
-        prepare_tool="linkedin.posts.create.prepare",
-        execute_tool="linkedin.posts.create.execute",
-        prepare_args={
-            "content": {
-                "mode": "text",
-                "text": "Hash-locked synthetic post.",
-                "mentions": [],
-                "link_url": None,
-                "show_link_preview": True,
-            }
-        },
-        expected_action_type="post_create",
+CASES = (
+    ActionCase(
+        "linkedin.posts.create",
+        {"content": {"mode": "text", "text": "Conformance post"}},
+        "post_published:",
     ),
-    WriteCase(
-        case_id="comment",
-        prepare_tool="linkedin.posts.comment.prepare",
-        execute_tool="linkedin.posts.comment.execute",
-        prepare_args={
-            "post_ref": "activity:7312345678901234567",
-            "text": "Hash-locked synthetic comment.",
-        },
-        expected_action_type="comment_create",
+    ActionCase(
+        "linkedin.posts.comment",
+        {"post_ref": "activity:7312345678901234567", "text": "Conformance comment"},
+        "comment_published:",
     ),
-    WriteCase(
-        case_id="post-reaction",
-        prepare_tool="linkedin.posts.reaction.prepare",
-        execute_tool="linkedin.posts.reaction.execute",
-        prepare_args={
-            "post_ref": "activity:7312345678901234567",
-            "desired_reaction": "funny",
-        },
-        expected_action_type="reaction_set",
+    ActionCase(
+        "linkedin.posts.react",
+        {"post_ref": "activity:7312345678901234567", "desired_reaction": "support"},
+        "reaction_set:support",
     ),
-    WriteCase(
-        case_id="connection-invite",
-        prepare_tool="linkedin.invitations.send.prepare",
-        execute_tool="linkedin.invitations.send.execute",
-        prepare_args={
-            "profile_slug": "sam-kim",
-            "note": "Hash-locked synthetic invitation.",
-        },
-        expected_action_type="invitation_send",
+    ActionCase(
+        "linkedin.invitations.send",
+        {"profile_slug": "sam-kim", "note": "Conformance invitation"},
+        "pending_sent",
     ),
-    WriteCase(
-        case_id="connection-accept",
-        prepare_tool="linkedin.invitations.accept.prepare",
-        execute_tool="linkedin.invitations.accept.execute",
-        prepare_args={"profile_slug": "alex-ray"},
-        expected_action_type="invitation_accept",
+    ActionCase(
+        "linkedin.invitations.accept",
+        {"profile_slug": "alex-ray"},
+        "connected",
     ),
-    WriteCase(
-        case_id="connection-ignore",
-        prepare_tool="linkedin.invitations.ignore.prepare",
-        execute_tool="linkedin.invitations.ignore.execute",
-        prepare_args={"profile_slug": "alex-ray"},
-        expected_action_type="invitation_ignore",
+    ActionCase(
+        "linkedin.invitations.ignore",
+        {"profile_slug": "alex-ray"},
+        "invitation_ignored",
     ),
-    WriteCase(
-        case_id="message-send",
-        prepare_tool="linkedin.messaging.message.prepare",
-        execute_tool="linkedin.messaging.message.execute",
-        prepare_args={
-            "conversation_id": "thread-123",
-            "message": "Hash-locked synthetic message.",
-        },
-        expected_action_type="message_send",
+    ActionCase(
+        "linkedin.messaging.send",
+        {"conversation_id": "thread-123", "message": "Conformance message"},
+        "message_sent",
     ),
 )
 
 
-@pytest.mark.parametrize("case", WRITE_CASES, ids=lambda case: case.case_id)
-async def test_every_write_rejects_tampering_and_replays_one_verified_effect(
-    case: WriteCase,
+@pytest.mark.parametrize("case", CASES, ids=lambda case: case.tool)
+async def test_action_tool_is_atomic_and_returns_a_terminal_result(
     tmp_path: Path,
+    case: ActionCase,
 ) -> None:
     state = SimulatorState.standard()
     async with simulator_session(tmp_path, state) as session:
-        prepared = await session.call_tool(
-            case.prepare_tool,
+        result = await session.call_tool(
+            case.tool,
             {
                 "context_id": "write-conformance",
-                "request_id": f"{case.case_id}-prepare",
-                **case.prepare_args,
+                "request_id": case.tool.replace(".", "-"),
+                **case.arguments,
             },
         )
-        assert prepared.isError is False
-        assert prepared.structuredContent is not None
-        content = TypeAdapter(dict[str, object]).validate_python(prepared.structuredContent)
-        draft = TypeAdapter(dict[str, object]).validate_python(content["draft"])
-        preview = TypeAdapter(dict[str, object]).validate_python(content["approval_preview"])
-        action_id = TypeAdapter(str).validate_python(draft["action_id"])
-        payload_hash = TypeAdapter(str).validate_python(draft["payload_hash"])
-        assert draft["action_type"] == case.expected_action_type
-
-        altered_hash_preview = dict(preview)
-        altered_hash_preview["payload_hash"] = "b" * 64
-        wrong_hash = await session.call_tool(
-            case.execute_tool,
-            {
-                "context_id": "write-conformance",
-                "request_id": f"{case.case_id}-wrong-hash",
-                "action_id": action_id,
-                "payload_hash": "b" * 64,
-                "approval_preview": altered_hash_preview,
-                "idempotency_key": f"{case.case_id}-wrong-hash",
-            },
-        )
-        assert wrong_hash.isError is True
-
-        altered_summary_preview = dict(preview)
-        altered_summary_preview["summary"] = "Perform a different external action."
-        wrong_preview = await session.call_tool(
-            case.execute_tool,
-            {
-                "context_id": "write-conformance",
-                "request_id": f"{case.case_id}-wrong-preview",
-                "action_id": action_id,
-                "payload_hash": payload_hash,
-                "approval_preview": altered_summary_preview,
-                "idempotency_key": f"{case.case_id}-wrong-preview",
-            },
-        )
-        assert wrong_preview.isError is True
-        assert state.actions == []
-
-        first = await execute_prepared(
-            session,
-            execute_tool=case.execute_tool,
-            prepared_content=content,
-            request_id=f"{case.case_id}-execute",
-            idempotency_key=f"{case.case_id}-idempotent-effect",
-        )
-        replay = await execute_prepared(
-            session,
-            execute_tool=case.execute_tool,
-            prepared_content=content,
-            request_id=f"{case.case_id}-replay",
-            idempotency_key=f"{case.case_id}-idempotent-effect",
-        )
-
-    first_result = TypeAdapter(dict[str, object]).validate_python(first["result"])
-    replay_result = TypeAdapter(dict[str, object]).validate_python(replay["result"])
-    assert first_result["outcome"] == "verified"
-    assert replay_result["attempt_id"] == first_result["attempt_id"]
-    assert len(state.actions) == 1
+        assert result.isError is False
+        assert result.structuredContent is not None
+        content = TypeAdapter(dict[str, object]).validate_python(result.structuredContent)
+        action_result = TypeAdapter(dict[str, object]).validate_python(content["result"])
+        assert action_result["outcome"] == "verified"
+        assert action_result["performed"] is True
+        assert str(action_result["final_state"]).startswith(case.expected_state)
+        assert content["sources"]

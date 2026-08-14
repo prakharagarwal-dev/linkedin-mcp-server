@@ -192,7 +192,7 @@ def stop_account_runtime(
     confirmed = inspect_account_runtime(path)
     if not confirmed.running or confirmed.owner != owner:
         raise ConfigurationError(
-            "LinkedIn runtime ownership changed while stop was being prepared; retry status first."
+            "LinkedIn runtime ownership changed while stop was being requested; retry status first."
         )
     try:
         os.kill(owner.pid, signal.SIGTERM)

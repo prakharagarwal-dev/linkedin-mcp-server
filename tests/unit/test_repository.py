@@ -1,33 +1,14 @@
 from __future__ import annotations
 
-import uuid
-from datetime import UTC, datetime, timedelta
-from typing import TypedDict
+from datetime import UTC, datetime
 
 import pytest
 from pydantic import HttpUrl
 
 from linkedin_mcp.domain.evidence import canonical_input_fingerprint
-from linkedin_mcp.domain.models import (
-    ActionApprovalPreview,
-    ActionDraft,
-    ActionExecutionResult,
-    ActionOutcome,
-    ActionStatus,
-    ActionTarget,
-    ActionType,
-    CapabilityName,
-    CapturedSource,
-    InvitationSendPayload,
-    SourceType,
-    action_approval_preview,
-)
-from linkedin_mcp.errors import (
-    AuthorizationDeniedError,
-    IdempotencyConflictError,
-    InvalidTargetError,
-)
-from linkedin_mcp.persistence.contracts import AttemptStatus, CallStatus
+from linkedin_mcp.domain.models import CapabilityName, CapturedSource, SourceType
+from linkedin_mcp.errors import IdempotencyConflictError
+from linkedin_mcp.persistence.contracts import CallStatus
 from linkedin_mcp.persistence.memory import MemoryRepository
 
 
@@ -42,62 +23,8 @@ def _source() -> CapturedSource:
     )
 
 
-def _draft(*, expires_at: datetime | None = None) -> ActionDraft:
-    now = datetime.now(UTC)
-    return ActionDraft(
-        action_id=str(uuid.uuid4()),
-        action_type=ActionType.INVITATION_SEND,
-        target=ActionTarget(
-            profile_slug="jane-doe",
-            profile_url=HttpUrl("https://www.linkedin.com/in/jane-doe/"),
-            display_name="Jane Doe",
-        ),
-        payload=InvitationSendPayload(note="Hello Jane"),
-        payload_hash="a" * 64,
-        status=ActionStatus.READY_FOR_CONFIRMATION,
-        created_at=now,
-        expires_at=expires_at or now + timedelta(hours=1),
-    )
-
-
-async def _store_draft(
-    repository: MemoryRepository,
-    draft: ActionDraft,
-    *,
-    request_id: str,
-    client_id: str = "direct-local-client",
-) -> None:
-    call = await repository.begin_call(
-        account_id="personal",
-        client_id=client_id,
-        context_id="context-1",
-        request_id=request_id,
-        capability_name=CapabilityName.INVITATION_SEND_PREPARE,
-        input_fingerprint=draft.payload_hash,
-        input_value={"profile_slug": draft.target.profile_slug},
-    )
-    await repository.complete_preparation_call(
-        call_id=call.call_id,
-        draft=draft,
-        output={},
-        sources=(),
-    )
-
-
-class _ConfirmationKwargs(TypedDict):
-    expected_payload_hash: str
-    approval_preview: ActionApprovalPreview
-
-
-def _confirmation(draft: ActionDraft) -> _ConfirmationKwargs:
-    return {
-        "expected_payload_hash": draft.payload_hash,
-        "approval_preview": action_approval_preview(draft),
-    }
-
-
 @pytest.mark.asyncio
-async def test_completed_call_is_replayed_without_a_second_execution() -> None:
+async def test_completed_read_call_and_evidence_are_replayed() -> None:
     repository = MemoryRepository()
     input_value: dict[str, object] = {"query": "python"}
     fingerprint = canonical_input_fingerprint(input_value)
@@ -124,85 +51,20 @@ async def test_completed_call_is_replayed_without_a_second_execution() -> None:
         input_fingerprint=fingerprint,
         input_value=input_value,
     )
-
     assert replay.created is False
     assert replay.status is CallStatus.COMPLETED
     assert replay.output == {"status": "completed"}
-    found = await repository.find_call(
-        account_id="personal",
-        request_id="request-1",
-        capability_name=CapabilityName.JOBS_SEARCH,
-    )
-    assert found == replay
     assert await repository.get_source(account_id="personal", source_id=source.source_id) == source
 
 
 @pytest.mark.asyncio
-async def test_new_repository_starts_without_prior_operation_state() -> None:
-    first = MemoryRepository()
-    source = _source()
-    draft = _draft()
-    call = await first.begin_call(
-        account_id="personal",
-        context_id="context-1",
-        request_id="prepare-1",
-        capability_name=CapabilityName.INVITATION_SEND_PREPARE,
-        input_fingerprint=draft.payload_hash,
-        input_value={"profile_slug": draft.target.profile_slug},
-    )
-    await first.complete_preparation_call(
-        call_id=call.call_id,
-        draft=draft,
-        output={"prepared": True},
-        sources=(source,),
-    )
-
-    restarted = MemoryRepository()
-    repeated = await restarted.begin_call(
-        account_id="personal",
-        context_id="context-1",
-        request_id="prepare-1",
-        capability_name=CapabilityName.INVITATION_SEND_PREPARE,
-        input_fingerprint=draft.payload_hash,
-        input_value={"profile_slug": draft.target.profile_slug},
-    )
-
-    assert repeated.created is True
-    assert await restarted.get_source(account_id="personal", source_id=source.source_id) is None
-    assert await restarted.get_action(account_id="personal", action_id=draft.action_id) is None
-
-
-@pytest.mark.asyncio
-async def test_request_id_reuse_with_different_input_is_rejected() -> None:
-    repository = MemoryRepository()
-    await repository.begin_call(
-        account_id="personal",
-        context_id="context-1",
-        request_id="request-1",
-        capability_name=CapabilityName.JOBS_SEARCH,
-        input_fingerprint="a" * 64,
-        input_value={"query": "python"},
-    )
-
-    with pytest.raises(IdempotencyConflictError):
-        await repository.begin_call(
-            account_id="personal",
-            context_id="context-1",
-            request_id="request-1",
-            capability_name=CapabilityName.JOBS_SEARCH,
-            input_fingerprint="b" * 64,
-            input_value={"query": "rust"},
-        )
-
-
-@pytest.mark.asyncio
-async def test_request_replay_and_action_drafts_are_isolated_by_mcp_client() -> None:
+async def test_read_request_identity_is_client_local_and_input_locked() -> None:
     repository = MemoryRepository()
     first = await repository.begin_call(
         account_id="personal",
         client_id="client-a",
-        context_id="context-1",
-        request_id="shared-request",
+        context_id="context-a",
+        request_id="shared",
         capability_name=CapabilityName.JOBS_SEARCH,
         input_fingerprint="a" * 64,
         input_value={"query": "python"},
@@ -210,350 +72,77 @@ async def test_request_replay_and_action_drafts_are_isolated_by_mcp_client() -> 
     second = await repository.begin_call(
         account_id="personal",
         client_id="client-b",
-        context_id="context-2",
-        request_id="shared-request",
+        context_id="context-b",
+        request_id="shared",
         capability_name=CapabilityName.JOBS_SEARCH,
         input_fingerprint="b" * 64,
         input_value={"query": "rust"},
     )
-    assert first.created is True
-    assert second.created is True
     assert first.call_id != second.call_id
 
-    draft = _draft()
-    await _store_draft(
-        repository,
-        draft,
-        request_id="client-a-draft",
-        client_id="client-a",
-    )
-    assert (
-        await repository.get_action(
+    with pytest.raises(IdempotencyConflictError):
+        await repository.begin_call(
             account_id="personal",
-            client_id="client-b",
-            action_id=draft.action_id,
-        )
-        is None
-    )
-    with pytest.raises(InvalidTargetError, match="client and account"):
-        await repository.begin_action_attempt(
-            account_id="personal",
-            client_id="client-b",
-            action_id=draft.action_id,
-            expected_action_type=ActionType.INVITATION_SEND,
-            **_confirmation(draft),
-            idempotency_key="cross-client-action",
+            client_id="client-a",
+            context_id="context-a",
+            request_id="shared",
+            capability_name=CapabilityName.JOBS_SEARCH,
+            input_fingerprint="b" * 64,
+            input_value={"query": "rust"},
         )
 
 
 @pytest.mark.asyncio
-async def test_write_idempotency_keys_remain_account_global_across_clients() -> None:
-    repository = MemoryRepository()
-    first = _draft()
-    second = _draft()
-    await _store_draft(repository, first, request_id="draft-a", client_id="client-a")
-    await _store_draft(repository, second, request_id="draft-b", client_id="client-b")
-
-    await repository.begin_action_attempt(
-        account_id="personal",
-        client_id="client-a",
-        action_id=first.action_id,
-        expected_action_type=ActionType.INVITATION_SEND,
-        **_confirmation(first),
-        idempotency_key="account-global-key",
-    )
-    with pytest.raises(IdempotencyConflictError, match="different action"):
-        await repository.begin_action_attempt(
-            account_id="personal",
-            client_id="client-b",
-            action_id=second.action_id,
-            expected_action_type=ActionType.INVITATION_SEND,
-            **_confirmation(second),
-            idempotency_key="account-global-key",
-        )
-
-
-@pytest.mark.asyncio
-async def test_failed_call_retains_safe_error_for_idempotent_replay() -> None:
+async def test_failed_read_call_retains_only_safe_error() -> None:
     repository = MemoryRepository()
     call = await repository.begin_call(
         account_id="personal",
-        context_id="context-1",
-        request_id="request-1",
-        capability_name=CapabilityName.JOBS_SEARCH,
+        context_id="context",
+        request_id="failed",
+        capability_name=CapabilityName.JOBS_GET,
         input_fingerprint="a" * 64,
-        input_value={"query": "python"},
+        input_value={"job_id": "4100000001"},
     )
     await repository.fail_call(
         call_id=call.call_id,
         error_code="browser_unavailable",
         error_message="The browser stopped.",
     )
-
     replay = await repository.begin_call(
         account_id="personal",
-        context_id="context-1",
-        request_id="request-1",
-        capability_name=CapabilityName.JOBS_SEARCH,
+        context_id="context",
+        request_id="failed",
+        capability_name=CapabilityName.JOBS_GET,
         input_fingerprint="a" * 64,
-        input_value={"query": "python"},
+        input_value={"job_id": "4100000001"},
     )
-
     assert replay.status is CallStatus.FAILED
     assert replay.error_code == "browser_unavailable"
     assert replay.error_message == "The browser stopped."
 
 
 @pytest.mark.asyncio
-async def test_action_draft_requires_exact_confirmation_and_replays_verified_attempt() -> None:
-    repository = MemoryRepository()
-    call = await repository.begin_call(
-        account_id="personal",
-        context_id="context-1",
-        request_id="prepare-1",
-        capability_name=CapabilityName.INVITATION_SEND_PREPARE,
-        input_fingerprint="a" * 64,
-        input_value={"profile_slug": "jane-doe"},
-    )
-    draft = _draft()
+async def test_repository_restart_has_no_prior_process_state() -> None:
+    first = MemoryRepository()
     source = _source()
-    await repository.complete_preparation_call(
-        call_id=call.call_id,
-        draft=draft,
-        output={"draft": draft.model_dump(mode="json")},
-        sources=(source,),
-    )
-
-    with pytest.raises(AuthorizationDeniedError, match="hash"):
-        await repository.begin_action_attempt(
-            account_id="personal",
-            action_id=draft.action_id,
-            expected_action_type=ActionType.INVITATION_SEND,
-            expected_payload_hash="b" * 64,
-            approval_preview=action_approval_preview(draft),
-            idempotency_key="wrong-hash",
-        )
-    altered_preview = action_approval_preview(draft).model_copy(
-        update={"summary": "Send a different action."}
-    )
-    with pytest.raises(AuthorizationDeniedError, match="preview"):
-        await repository.begin_action_attempt(
-            account_id="personal",
-            action_id=draft.action_id,
-            expected_action_type=ActionType.INVITATION_SEND,
-            expected_payload_hash=draft.payload_hash,
-            approval_preview=altered_preview,
-            idempotency_key="wrong-preview",
-        )
-
-    attempt = await repository.begin_action_attempt(
+    call = await first.begin_call(
         account_id="personal",
-        action_id=draft.action_id,
-        expected_action_type=ActionType.INVITATION_SEND,
-        **_confirmation(draft),
-        idempotency_key="invite-attempt-1",
-    )
-    assert attempt.created is True
-    assert attempt.status is AttemptStatus.EXECUTING
-    with pytest.raises(IdempotencyConflictError, match="already executing"):
-        await repository.begin_action_attempt(
-            account_id="personal",
-            action_id=draft.action_id,
-            expected_action_type=ActionType.INVITATION_SEND,
-            **_confirmation(draft),
-            idempotency_key="invite-attempt-1",
-        )
-
-    completed_at = datetime.now(UTC)
-    result = ActionExecutionResult(
-        action_id=draft.action_id,
-        action_type=ActionType.INVITATION_SEND,
-        attempt_id=attempt.attempt_id,
-        idempotency_key="invite-attempt-1",
-        outcome=ActionOutcome.VERIFIED,
-        performed=True,
-        final_state="pending_sent",
-        detail="Invitation visibly pending.",
-        started_at=attempt.started_at,
-        completed_at=completed_at,
-    )
-    await repository.complete_action_attempt(
-        account_id="personal",
-        context_id="context-1",
-        attempt_id=attempt.attempt_id,
-        outcome=ActionOutcome.VERIFIED,
-        result=result.model_dump(mode="json"),
-        sources=(source,),
-    )
-
-    replay = await repository.begin_action_attempt(
-        account_id="personal",
-        action_id=draft.action_id,
-        expected_action_type=ActionType.INVITATION_SEND,
-        **_confirmation(draft),
-        idempotency_key="invite-attempt-1",
-    )
-    assert replay.created is False
-    assert replay.status is AttemptStatus.VERIFIED
-    assert replay.result == result.model_dump(mode="json")
-    assert replay.sources == (source,)
-    stored = await repository.get_action(
-        account_id="personal",
-        action_id=draft.action_id,
-    )
-    assert stored is not None
-    assert stored.status is ActionStatus.VERIFIED
-
-
-@pytest.mark.asyncio
-async def test_expired_actions_fail_closed() -> None:
-    repository = MemoryRepository()
-    expired_call = await repository.begin_call(
-        account_id="personal",
-        context_id="context-1",
-        request_id="expired-prepare",
-        capability_name=CapabilityName.INVITATION_SEND_PREPARE,
+        context_id="context",
+        request_id="read",
+        capability_name=CapabilityName.JOBS_SEARCH,
         input_fingerprint="a" * 64,
-        input_value={"profile_slug": "jane-doe"},
+        input_value={"query": "python"},
     )
-    expired = _draft(expires_at=datetime.now(UTC) - timedelta(seconds=1))
-    await repository.complete_preparation_call(
-        call_id=expired_call.call_id,
-        draft=expired,
-        output={},
-        sources=(),
-    )
-    stored_expired = await repository.get_action(
+    await first.complete_call(call_id=call.call_id, output={}, sources=(source,))
+
+    restarted = MemoryRepository()
+    repeated = await restarted.begin_call(
         account_id="personal",
-        action_id=expired.action_id,
+        context_id="context",
+        request_id="read",
+        capability_name=CapabilityName.JOBS_SEARCH,
+        input_fingerprint="a" * 64,
+        input_value={"query": "python"},
     )
-    assert stored_expired is not None
-    assert stored_expired.status is ActionStatus.EXPIRED
-    with pytest.raises(AuthorizationDeniedError, match="expired"):
-        await repository.begin_action_attempt(
-            account_id="personal",
-            action_id=expired.action_id,
-            expected_action_type=ActionType.INVITATION_SEND,
-            **_confirmation(expired),
-            idempotency_key="expired-action",
-        )
-
-
-@pytest.mark.asyncio
-async def test_memory_action_ledger_rejects_conflicts_and_invalid_transitions() -> None:
-    repository = MemoryRepository()
-    draft = _draft()
-    await _store_draft(repository, draft, request_id="strict-draft-1")
-
-    assert (
-        await repository.get_action(
-            account_id="another-account",
-            action_id=draft.action_id,
-        )
-        is None
-    )
-    with pytest.raises(InvalidTargetError, match="does not exist"):
-        await repository.begin_action_attempt(
-            account_id="another-account",
-            action_id=draft.action_id,
-            expected_action_type=ActionType.INVITATION_SEND,
-            **_confirmation(draft),
-            idempotency_key="wrong-account",
-        )
-
-    duplicate_call = await repository.begin_call(
-        account_id="personal",
-        context_id="context-1",
-        request_id="duplicate-action-id",
-        capability_name=CapabilityName.INVITATION_SEND_PREPARE,
-        input_fingerprint="b" * 64,
-        input_value={"profile_slug": "jane-doe"},
-    )
-    conflicting_draft = draft.model_copy(
-        update={
-            "payload": InvitationSendPayload(note="Different note"),
-            "payload_hash": "b" * 64,
-        }
-    )
-    with pytest.raises(IdempotencyConflictError, match="action ID"):
-        await repository.complete_preparation_call(
-            call_id=duplicate_call.call_id,
-            draft=conflicting_draft,
-            output={},
-            sources=(),
-        )
-
-    mismatched = _draft()
-    await _store_draft(repository, mismatched, request_id="mismatched-draft")
-    with pytest.raises(InvalidTargetError, match="action type"):
-        await repository.begin_action_attempt(
-            account_id="personal",
-            action_id=mismatched.action_id,
-            expected_action_type=ActionType.MESSAGE_SEND,
-            **_confirmation(mismatched),
-            idempotency_key="wrong-action-type",
-        )
-    with pytest.raises(AuthorizationDeniedError, match="preview"):
-        await repository.begin_action_attempt(
-            account_id="personal",
-            action_id=mismatched.action_id,
-            expected_action_type=ActionType.INVITATION_SEND,
-            expected_payload_hash=mismatched.payload_hash,
-            approval_preview=action_approval_preview(draft),
-            idempotency_key="mismatched-preview",
-        )
-
-    attempt = await repository.begin_action_attempt(
-        account_id="personal",
-        action_id=draft.action_id,
-        expected_action_type=ActionType.INVITATION_SEND,
-        **_confirmation(draft),
-        idempotency_key="strict-attempt",
-    )
-    with pytest.raises(InvalidTargetError, match="attempt does not exist"):
-        await repository.complete_action_attempt(
-            account_id="personal",
-            context_id="context-1",
-            attempt_id=str(uuid.uuid4()),
-            outcome=ActionOutcome.VERIFIED,
-            result={},
-            sources=(),
-        )
-
-    result: dict[str, object] = {"outcome": "verified"}
-    await repository.complete_action_attempt(
-        account_id="personal",
-        context_id="context-1",
-        attempt_id=attempt.attempt_id,
-        outcome=ActionOutcome.VERIFIED,
-        result=result,
-        sources=(),
-    )
-    await repository.complete_action_attempt(
-        account_id="personal",
-        context_id="context-1",
-        attempt_id=attempt.attempt_id,
-        outcome=ActionOutcome.VERIFIED,
-        result=result,
-        sources=(),
-    )
-    with pytest.raises(IdempotencyConflictError, match="already terminal"):
-        await repository.complete_action_attempt(
-            account_id="personal",
-            context_id="context-1",
-            attempt_id=attempt.attempt_id,
-            outcome=ActionOutcome.VERIFIED,
-            result={"outcome": "different"},
-            sources=(),
-        )
-
-    another = _draft()
-    await _store_draft(repository, another, request_id="strict-draft-2")
-    with pytest.raises(IdempotencyConflictError, match="different action"):
-        await repository.begin_action_attempt(
-            account_id="personal",
-            action_id=another.action_id,
-            expected_action_type=ActionType.INVITATION_SEND,
-            **_confirmation(another),
-            idempotency_key="strict-attempt",
-        )
+    assert repeated.created is True
+    assert await restarted.get_source(account_id="personal", source_id=source.source_id) is None

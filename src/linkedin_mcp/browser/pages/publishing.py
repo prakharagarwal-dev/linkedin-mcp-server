@@ -1,4 +1,4 @@
-"""Native-confirmation-gated personal post publishing through LinkedIn's visible composer."""
+"""Direct personal post publishing through LinkedIn's visible composer."""
 
 from __future__ import annotations
 
@@ -16,10 +16,11 @@ from pydantic import HttpUrl
 from linkedin_mcp.assets import LocalAssetStore
 from linkedin_mcp.browser.manager import BrowserManager
 from linkedin_mcp.domain.models import (
-    ActionDraft,
+    ActionAssetSnapshot,
+    ActionCommand,
+    ActionInspection,
     ActionOutcome,
     ActionPageResult,
-    ActionPreparationCapture,
     ActionTarget,
     CelebrationPostContent,
     CelebrationType,
@@ -35,16 +36,15 @@ from linkedin_mcp.domain.models import (
     PollPostContent,
     PostAudience,
     PostCommentControl,
+    PostCreateInput,
     PostCreateMode,
     PostCreatePayload,
-    PostCreatePrepareInput,
     PostImageAspectRatio,
     PostImageEditInput,
     PostImageFilter,
     PostImageInput,
     PostImageTagInput,
     PostMentionInput,
-    PreparedPostAsset,
     TextPostContent,
     VideoCaptionMode,
     VideoPostContent,
@@ -162,16 +162,16 @@ class PostPublishingPage:
         self._browser = browser
         self._assets = assets
 
-    async def prepare_assets(
+    async def snapshot_assets(
         self,
-        request: PostCreatePrepareInput,
-    ) -> tuple[PreparedPostAsset, ...]:
-        return await self._assets.prepare(request.content)
+        request: PostCreateInput,
+    ) -> tuple[ActionAssetSnapshot, ...]:
+        return await self._assets.snapshot(request.content)
 
-    async def prepare_post(
+    async def inspect_post(
         self,
-        request: PostCreatePrepareInput,
-    ) -> ActionPreparationCapture:
+        request: PostCreateInput,
+    ) -> ActionInspection:
         self._validate_schedule(request.scheduled_at)
         async with self._browser.page() as page:
             await self._browser.navigate(page, _HOME_URL)
@@ -179,7 +179,7 @@ class PostPublishingPage:
             await self._assert_mode_available(page, dialog, request.content)
             await self._assert_settings_available(dialog, request)
             text = await _visible_text(page)
-            return ActionPreparationCapture(
+            return ActionInspection(
                 target=ActionTarget(
                     profile_slug=slug,
                     profile_url=HttpUrl(canonical_profile_url(slug)),
@@ -198,18 +198,18 @@ class PostPublishingPage:
                 captured_at=datetime.now(UTC),
             )
 
-    async def execute_post(self, draft: ActionDraft) -> ActionPageResult:
-        if not isinstance(draft.payload, PostCreatePayload):
+    async def perform_post(self, command: ActionCommand) -> ActionPageResult:
+        if not isinstance(command.payload, PostCreatePayload):
             raise InvalidTargetError("The personal-post action payload is invalid.")
-        payload = draft.payload
+        payload = command.payload
         self._validate_schedule(payload.scheduled_at)
         paths = await self._assets.verify(payload)
         async with self._browser.page() as page:
             try:
                 await self._browser.navigate(page, _HOME_URL)
                 dialog, slug, name = await self._open_composer(page)
-                expected_slug = draft.target.actor_profile_slug or draft.target.profile_slug
-                expected_name = draft.target.actor_display_name or draft.target.display_name
+                expected_slug = command.target.actor_profile_slug or command.target.profile_slug
+                expected_name = command.target.actor_display_name or command.target.display_name
                 if slug != expected_slug or name.casefold() != expected_name.casefold():
                     return await self._result(
                         page,
@@ -217,7 +217,7 @@ class PostPublishingPage:
                         False,
                         "actor_identity_changed",
                         (
-                            "The active personal member no longer matches the confirmed "
+                            "The active personal member no longer matches the requested "
                             "publishing actor."
                         ),
                     )
@@ -274,7 +274,7 @@ class PostPublishingPage:
                             ActionOutcome.VERIFIED,
                             True,
                             "post_scheduled",
-                            "LinkedIn visibly confirmed the exact confirmed post was scheduled.",
+                            "LinkedIn visibly verified the exact requested post was scheduled.",
                         )
                     await page.wait_for_timeout(250)
                 return await self._result(
@@ -298,7 +298,7 @@ class PostPublishingPage:
                         ActionOutcome.VERIFIED,
                         True,
                         f"post_published:{post_ref}",
-                        "A single new visible post matched the exact confirmed content.",
+                        "A single new visible post matched the exact requested content.",
                         source_url=canonical_post_url(post_ref),
                     )
                 await page.wait_for_timeout(250)
@@ -307,7 +307,7 @@ class PostPublishingPage:
                 ActionOutcome.UNCERTAIN,
                 None,
                 "post_outcome_unknown",
-                "No single newly visible post matched the confirmed payload within the bound.",
+                "No single newly visible post matched the requested payload within the bound.",
             )
 
     @staticmethod
@@ -342,7 +342,7 @@ class PostPublishingPage:
                     ActionOutcome.VERIFIED,
                     True,
                     final_state,
-                    "LinkedIn visibly confirmed the exact post was published.",
+                    "LinkedIn visibly verified the exact post was published.",
                     source_url,
                 )
             if re.search(
@@ -545,7 +545,7 @@ class PostPublishingPage:
     async def _assert_settings_available(
         self,
         dialog: Locator,
-        request: PostCreatePrepareInput,
+        request: PostCreateInput,
     ) -> None:
         page = dialog.page
         if request.collaborators:
@@ -695,7 +695,7 @@ class PostPublishingPage:
             maximum = await textbox.get_attribute("maxlength")
             if maximum and len(content.text) > int(maximum):
                 raise InvalidTargetError(
-                    "The confirmed post text exceeds LinkedIn's visible composer limit."
+                    "The requested post text exceeds LinkedIn's visible composer limit."
                 )
             await self._fill_text_with_mentions(page, textbox, content.text, content.mentions)
         if isinstance(content, TextPostContent) and content.link_url is not None:
@@ -704,7 +704,7 @@ class PostPublishingPage:
                 await preview.first.wait_for(state="visible", timeout=5_000)
             except PlaywrightTimeoutError as error:
                 raise ParserDriftError(
-                    "The confirmed link did not produce a visible composer preview."
+                    "The requested link did not produce a visible composer preview."
                 ) from error
             if not content.show_link_preview:
                 remove = await _unique_visible(
@@ -914,7 +914,7 @@ class PostPublishingPage:
         numeric = float(value)
         if not minimum <= numeric <= maximum:
             raise InvalidTargetError(
-                f"The confirmed {label} value is outside LinkedIn's visible control range."
+                f"The requested {label} value is outside LinkedIn's visible control range."
             )
         await slider.fill(str(value))
 
@@ -1587,7 +1587,7 @@ class PostPublishingPage:
         ]
         if not visible_companies:
             raise InvalidTargetError(
-                "The exact confirmed employer is not visible in LinkedIn's hiring chooser."
+                "The exact requested employer is not visible in LinkedIn's hiring chooser."
             )
         selected = False
         for company in visible_companies:
@@ -1600,7 +1600,7 @@ class PostPublishingPage:
                 break
         if not selected:
             raise InvalidTargetError(
-                "The exact confirmed existing job is not visible for the selected employer."
+                "The exact requested existing job is not visible for the selected employer."
             )
         exact_job = await _unique_visible(
             page.locator(f'[data-job-id="{content.job_id}"]'),
@@ -1611,7 +1611,7 @@ class PostPublishingPage:
             job_region = exact_job
         if content.job_title.casefold() not in (await job_region.inner_text()).casefold():
             raise InvalidTargetError(
-                "The visible job title no longer matches the confirmed existing job."
+                "The visible job title no longer matches the requested existing job."
             )
         await self._browser.click_visible_control(page, job_region)
         await self._click_done_or_next(page, "hiring")
@@ -1873,7 +1873,7 @@ class PostPublishingPage:
         audience_labels = _CURRENT_AUDIENCE_LABELS if visible_current_controls else _AUDIENCE_LABELS
         audience = await _unique_visible(
             settings.get_by_role("radio", name=audience_labels[payload.audience]),
-            "confirmed audience option",
+            "requested audience option",
         )
         if not await audience.is_checked():
             await self._browser.click_visible_control(page, audience)
@@ -1910,13 +1910,13 @@ class PostPublishingPage:
                     "radio",
                     name=_CURRENT_COMMENT_LABELS[payload.comment_control],
                 ),
-                "confirmed comment-control option",
+                "requested comment-control option",
             )
             if not await comments.is_checked():
                 await self._browser.click_visible_control(page, comments)
                 if not await comments.is_checked():
                     raise ParserDriftError(
-                        "LinkedIn did not retain the exact confirmed comment-control state."
+                        "LinkedIn did not retain the exact requested comment-control state."
                     )
                 save = await _unique_visible(
                     comment_dialog.get_by_role(
@@ -1951,7 +1951,7 @@ class PostPublishingPage:
                     "radio",
                     name=_COMMENT_LABELS[payload.comment_control],
                 ),
-                "confirmed comment-control option",
+                "requested comment-control option",
             )
             if not await comments.is_checked():
                 await self._browser.click_visible_control(page, comments)
@@ -1966,7 +1966,7 @@ class PostPublishingPage:
             await self._browser.click_visible_control(page, target)
             if await brand.is_checked() != payload.brand_partnership:
                 raise ParserDriftError(
-                    "LinkedIn did not retain the exact confirmed brand-partnership state."
+                    "LinkedIn did not retain the exact requested brand-partnership state."
                 )
         done = await _unique_visible(
             settings.get_by_role("button", name=re.compile(r"^done$", re.I)),
@@ -2015,14 +2015,14 @@ class PostPublishingPage:
         picker = await self._group_picker(page)
         target = await _unique_visible(
             picker.locator(f'a[href*="/groups/{group_id}/"], [data-group-id="{group_id}"]'),
-            "exact confirmed group",
+            "exact requested group",
         )
         region = target.locator("xpath=ancestor::*[@role='radio' or @role='option'][1]")
         if await region.count() == 0:
             region = target
         if display_name.casefold() not in (await region.inner_text()).casefold():
             raise InvalidTargetError(
-                "The exact visible group name no longer matches the confirmed target."
+                "The exact visible group name no longer matches the requested target."
             )
         await self._browser.click_visible_control(page, region)
         done = picker.get_by_role(

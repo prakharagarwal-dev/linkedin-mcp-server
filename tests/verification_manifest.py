@@ -1,4 +1,4 @@
-"""Explicit mock-verification ownership for every public MCP tool."""
+"""Explicit offline-verification ownership for every public MCP tool."""
 
 from __future__ import annotations
 
@@ -16,7 +16,6 @@ class ToolVerification:
 
 _OPERATIONAL = frozenset({"contract", "runtime"})
 _READ = frozenset({"contract", "page", "runtime"})
-_PREPARE = frozenset({"contract", "page", "action", "runtime"})
 _WRITE = frozenset({"contract", "page", "action", "runtime", "workflow"})
 
 
@@ -26,21 +25,12 @@ def _entry(
     layers: frozenset[str],
     *test_files: str,
 ) -> ToolVerification:
-    return ToolVerification(
-        domain=domain,
-        effect=effect,
-        layers=layers,
-        test_files=test_files,
-    )
+    return ToolVerification(domain, effect, layers, test_files)
 
 
 MOCK_VERIFICATION: dict[str, ToolVerification] = {
     "linkedin.server.status": _entry(
-        "operational",
-        "read",
-        _OPERATIONAL,
-        "tests/contract/test_mcp_protocol.py",
-        "tests/unit/test_cli.py",
+        "operational", "read", _OPERATIONAL, "tests/contract/test_mcp_protocol.py"
     ),
     "linkedin.capabilities.list": _entry(
         "operational",
@@ -68,226 +58,157 @@ MOCK_VERIFICATION: dict[str, ToolVerification] = {
         "jobs",
         "read",
         _READ,
-        "tests/unit/test_job_pages.py",
         "tests/contract/test_mcp_protocol.py",
-        "tests/workflows/test_mock_workflows.py",
+        "tests/unit/test_job_pages.py",
+        "tests/unit/test_executor.py",
     ),
     "linkedin.people.search": _entry(
         "people",
         "read",
         _READ,
-        "tests/unit/test_people_pages.py",
         "tests/contract/test_mcp_protocol.py",
-        "tests/workflows/test_mock_workflows.py",
+        "tests/unit/test_people_pages.py",
+        "tests/unit/test_executor.py",
     ),
     "linkedin.people.get": _entry(
         "people",
         "read",
         _READ,
-        "tests/unit/test_people_pages.py",
         "tests/contract/test_mcp_protocol.py",
-        "tests/workflows/test_mock_workflows.py",
+        "tests/unit/test_people_pages.py",
+        "tests/unit/test_executor.py",
     ),
     "linkedin.companies.search": _entry(
         "companies",
         "read",
         _READ,
-        "tests/unit/test_company_pages.py",
         "tests/contract/test_mcp_protocol.py",
-        "tests/workflows/test_mock_workflows.py",
+        "tests/unit/test_company_pages.py",
+        "tests/unit/test_executor.py",
     ),
     "linkedin.companies.get": _entry(
         "companies",
         "read",
         _READ,
-        "tests/unit/test_company_pages.py",
         "tests/contract/test_mcp_protocol.py",
-        "tests/workflows/test_mock_workflows.py",
+        "tests/unit/test_company_pages.py",
+        "tests/unit/test_executor.py",
     ),
     "linkedin.posts.search": _entry(
         "posts",
         "read",
         _READ,
-        "tests/unit/test_post_pages.py",
         "tests/contract/test_mcp_protocol.py",
-        "tests/workflows/test_mock_workflows.py",
+        "tests/unit/test_post_pages.py",
+        "tests/unit/test_executor.py",
     ),
     "linkedin.posts.get": _entry(
         "posts",
         "read",
         _READ,
-        "tests/unit/test_post_pages.py",
         "tests/contract/test_mcp_protocol.py",
-        "tests/workflows/test_mock_workflows.py",
+        "tests/unit/test_post_pages.py",
+        "tests/unit/test_executor.py",
     ),
     "linkedin.posts.comments.list": _entry(
         "posts",
         "read",
         _READ,
+        "tests/contract/test_mcp_protocol.py",
         "tests/unit/test_post_pages.py",
-        "tests/contract/test_mcp_protocol.py",
-        "tests/workflows/test_mock_workflows.py",
-    ),
-    "linkedin.posts.create.prepare": _entry(
-        "posts",
-        "prepare",
-        _PREPARE,
-        "tests/unit/test_publishing_pages.py",
         "tests/unit/test_executor.py",
-        "tests/contract/test_mcp_protocol.py",
     ),
-    "linkedin.posts.create.execute": _entry(
+    "linkedin.posts.create": _entry(
         "posts",
         "write",
         _WRITE,
         "tests/unit/test_publishing_pages.py",
-        "tests/unit/test_executor.py",
-        "tests/contract/test_mcp_protocol.py",
+        "tests/contract/test_write_conformance.py",
         "tests/workflows/test_mock_workflows.py",
     ),
-    "linkedin.posts.comment.prepare": _entry(
-        "posts",
-        "prepare",
-        _PREPARE,
-        "tests/unit/test_engagement_pages.py",
-        "tests/unit/test_executor.py",
-        "tests/contract/test_mcp_protocol.py",
-    ),
-    "linkedin.posts.comment.execute": _entry(
+    "linkedin.posts.comment": _entry(
         "posts",
         "write",
         _WRITE,
         "tests/unit/test_engagement_pages.py",
-        "tests/unit/test_executor.py",
-        "tests/contract/test_mcp_protocol.py",
+        "tests/contract/test_write_conformance.py",
         "tests/workflows/test_mock_workflows.py",
     ),
-    "linkedin.posts.reaction.prepare": _entry(
-        "posts",
-        "prepare",
-        _PREPARE,
-        "tests/unit/test_engagement_pages.py",
-        "tests/unit/test_executor.py",
-        "tests/contract/test_mcp_protocol.py",
-    ),
-    "linkedin.posts.reaction.execute": _entry(
+    "linkedin.posts.react": _entry(
         "posts",
         "write",
         _WRITE,
         "tests/unit/test_engagement_pages.py",
-        "tests/unit/test_executor.py",
-        "tests/contract/test_mcp_protocol.py",
+        "tests/contract/test_write_conformance.py",
         "tests/workflows/test_mock_workflows.py",
     ),
     "linkedin.invitations.list": _entry(
         "invitations",
         "read",
         _READ,
+        "tests/contract/test_mcp_protocol.py",
         "tests/unit/test_invitation_pages.py",
         "tests/unit/test_pagination.py",
-        "tests/unit/test_executor.py",
-        "tests/contract/test_mcp_protocol.py",
-        "tests/workflows/test_mock_workflows.py",
     ),
     "linkedin.connections.list": _entry(
         "connections",
         "read",
         _READ,
-        "tests/unit/test_connection_pages.py",
         "tests/contract/test_mcp_protocol.py",
-        "tests/workflows/test_mock_workflows.py",
+        "tests/unit/test_connection_pages.py",
     ),
     "linkedin.connections.search": _entry(
         "connections",
         "read",
         _READ,
+        "tests/contract/test_mcp_protocol.py",
         "tests/unit/test_people_pages.py",
         "tests/unit/test_executor.py",
-        "tests/contract/test_mcp_protocol.py",
-        "tests/workflows/test_mock_workflows.py",
     ),
-    "linkedin.invitations.send.prepare": _entry(
-        "invitations",
-        "prepare",
-        _PREPARE,
-        "tests/unit/test_connection_pages.py",
-        "tests/unit/test_executor.py",
-        "tests/contract/test_mcp_protocol.py",
-    ),
-    "linkedin.invitations.send.execute": _entry(
+    "linkedin.invitations.send": _entry(
         "invitations",
         "write",
         _WRITE,
         "tests/unit/test_connection_pages.py",
-        "tests/unit/test_executor.py",
-        "tests/contract/test_mcp_protocol.py",
+        "tests/contract/test_write_conformance.py",
         "tests/workflows/test_mock_workflows.py",
     ),
-    "linkedin.invitations.accept.prepare": _entry(
-        "invitations",
-        "prepare",
-        _PREPARE,
-        "tests/unit/test_connection_pages.py",
-        "tests/unit/test_executor.py",
-        "tests/contract/test_mcp_protocol.py",
-    ),
-    "linkedin.invitations.accept.execute": _entry(
+    "linkedin.invitations.accept": _entry(
         "invitations",
         "write",
         _WRITE,
         "tests/unit/test_connection_pages.py",
-        "tests/unit/test_executor.py",
-        "tests/contract/test_mcp_protocol.py",
-        "tests/workflows/test_mock_workflows.py",
+        "tests/contract/test_write_conformance.py",
     ),
-    "linkedin.invitations.ignore.prepare": _entry(
-        "invitations",
-        "prepare",
-        _PREPARE,
-        "tests/unit/test_connection_pages.py",
-        "tests/unit/test_executor.py",
-        "tests/contract/test_mcp_protocol.py",
-    ),
-    "linkedin.invitations.ignore.execute": _entry(
+    "linkedin.invitations.ignore": _entry(
         "invitations",
         "write",
         _WRITE,
         "tests/unit/test_connection_pages.py",
-        "tests/unit/test_executor.py",
-        "tests/contract/test_mcp_protocol.py",
-        "tests/workflows/test_mock_workflows.py",
+        "tests/contract/test_write_conformance.py",
     ),
     "linkedin.messaging.search": _entry(
         "messaging",
         "read",
         _READ,
-        "tests/unit/test_messaging_pages.py",
         "tests/contract/test_mcp_protocol.py",
-        "tests/workflows/test_mock_workflows.py",
+        "tests/unit/test_messaging_pages.py",
+        "tests/unit/test_executor.py",
     ),
     "linkedin.messaging.conversation.get": _entry(
         "messaging",
         "read",
         _READ,
-        "tests/unit/test_messaging_pages.py",
         "tests/contract/test_mcp_protocol.py",
-        "tests/workflows/test_mock_workflows.py",
-    ),
-    "linkedin.messaging.message.prepare": _entry(
-        "messaging",
-        "prepare",
-        _PREPARE,
         "tests/unit/test_messaging_pages.py",
         "tests/unit/test_executor.py",
-        "tests/contract/test_mcp_protocol.py",
     ),
-    "linkedin.messaging.message.execute": _entry(
+    "linkedin.messaging.send": _entry(
         "messaging",
         "write",
         _WRITE,
         "tests/unit/test_messaging_pages.py",
-        "tests/unit/test_executor.py",
-        "tests/contract/test_mcp_protocol.py",
+        "tests/contract/test_write_conformance.py",
         "tests/workflows/test_mock_workflows.py",
     ),
 }

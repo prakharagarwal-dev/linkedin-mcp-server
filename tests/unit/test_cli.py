@@ -173,6 +173,109 @@ def test_main_setup_login_and_serve_commands(
     assert serve_settings[0].transport == "streamable-http"
 
 
+def test_main_dispatches_every_remaining_current_command(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+
+    async def record_async(name: str) -> None:
+        calls.append(name)
+
+    async def fake_profile_create(_: Settings) -> None:
+        await record_async("profile-create")
+
+    async def fake_logout(_: Settings) -> None:
+        await record_async("logout")
+
+    async def fake_status(_: Settings) -> None:
+        await record_async("status")
+
+    async def fake_runtime(_: Settings) -> None:
+        await record_async("runtime")
+
+    async def fake_profile_reset(_: Settings, *, confirmed: bool) -> None:
+        assert confirmed is True
+        calls.append("profile-reset")
+
+    def fake_profile_status(_: Settings) -> None:
+        calls.append("profile-status")
+
+    def fake_stop(_: Settings, *, timeout_seconds: float) -> None:
+        assert timeout_seconds == 4
+        calls.append("stop")
+
+    async def successful_doctor(_: Settings) -> int:
+        calls.append("doctor")
+        return 0
+
+    monkeypatch.setattr(cli, "_profile_create", fake_profile_create)
+    monkeypatch.setattr(cli, "_profile_status", fake_profile_status)
+    monkeypatch.setattr(cli, "_profile_reset", fake_profile_reset)
+    monkeypatch.setattr(cli, "_logout", fake_logout)
+    monkeypatch.setattr(cli, "_doctor", successful_doctor)
+    monkeypatch.setattr(cli, "_status", fake_status)
+    monkeypatch.setattr(cli, "_stop", fake_stop)
+    monkeypatch.setattr(cli, "_run_internal_runtime", fake_runtime)
+    monkeypatch.setenv("LINKEDIN_MCP_RUNTIME_LOCK_PATH", str(tmp_path / "runtime.lock"))
+
+    invocations = (
+        (["linkedin-mcp", "profile", "create"], None),
+        (["linkedin-mcp", "profile", "status"], None),
+        (["linkedin-mcp", "profile", "reset", "--yes"], None),
+        (["linkedin-mcp", "logout"], None),
+        (["linkedin-mcp", "doctor"], 0),
+        (["linkedin-mcp", "status"], None),
+        (["linkedin-mcp", "stop", "--timeout", "4"], None),
+        (["linkedin-mcp", "_runtime"], None),
+    )
+    for argv, expected_exit in invocations:
+        monkeypatch.setattr(sys, "argv", argv)
+        if expected_exit is None:
+            cli.main()
+        else:
+            with pytest.raises(SystemExit) as raised:
+                cli.main()
+            assert raised.value.code == expected_exit
+
+    assert calls == [
+        "profile-create",
+        "profile-status",
+        "profile-reset",
+        "logout",
+        "doctor",
+        "status",
+        "stop",
+        "runtime",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_logout_and_owned_operation_complete_without_a_signal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    settings = Settings(runtime_lock_path=tmp_path / "runtime.lock")
+
+    async def no_signal() -> signal.Signals:
+        await asyncio.Event().wait()
+        raise AssertionError("unreachable")
+
+    async def logged_out(_: Settings) -> bool:
+        return True
+
+    monkeypatch.setattr(cli, "_wait_for_stop_signal", no_signal)
+    monkeypatch.setattr(cli, "logout_interactively", logged_out)
+
+    await cli._logout(settings)  # pyright: ignore[reportPrivateUsage]
+
+    assert json.loads(capsys.readouterr().out) == {
+        "logged_out": True,
+        "status": "logged_out",
+    }
+
+
 def test_main_projects_safe_configuration_errors_to_stderr(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -390,6 +493,22 @@ def test_profile_reset_confirmation_requires_exact_interactive_token(
     cli._confirm_profile_reset(settings)  # pyright: ignore[reportPrivateUsage]
 
 
+def test_profile_reset_confirmation_rejects_a_noninteractive_terminal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class NonInteractiveInput:
+        @staticmethod
+        def isatty() -> bool:
+            return False
+
+    monkeypatch.setattr(sys, "stdin", cast(Any, NonInteractiveInput()))
+    with pytest.raises(ValueError, match="interactive terminal"):
+        cli._confirm_profile_reset(  # pyright: ignore[reportPrivateUsage]
+            Settings(browser_profile_path=tmp_path / "profile")
+        )
+
+
 @pytest.mark.asyncio
 async def test_owned_cli_operation_cleans_up_before_releasing_lock_on_stop_signal(
     tmp_path: Path,
@@ -471,6 +590,83 @@ async def test_streamable_http_starts_shared_runtime_when_no_owner_exists(
     )
 
     assert events == ["runtime-running"]
+
+
+@pytest.mark.asyncio
+async def test_streamable_http_reuses_an_owner_and_recovers_an_election_race(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    settings = Settings(
+        transport="streamable-http",
+        runtime_lock_path=tmp_path / "runtime.lock",
+    )
+    endpoint = "http://127.0.0.1:8000/mcp"
+
+    def running(_: Path) -> AccountRuntimeStatus:
+        return AccountRuntimeStatus(running=True)
+
+    async def wait(_: Settings) -> str:
+        return endpoint
+
+    monkeypatch.setattr(cli, "inspect_account_runtime", running)
+    monkeypatch.setattr(cli, "wait_for_shared_runtime", wait)
+    await cli._serve(settings)  # pyright: ignore[reportPrivateUsage]
+    assert endpoint in capsys.readouterr().err
+
+    inspections = iter(
+        (
+            AccountRuntimeStatus(running=False),
+            AccountRuntimeStatus(running=True),
+        )
+    )
+
+    def racing(_: Path) -> AccountRuntimeStatus:
+        return next(inspections)
+
+    async def lose_election(_: Settings) -> None:
+        raise ConfigurationError("another owner won")
+
+    monkeypatch.setattr(cli, "inspect_account_runtime", racing)
+    monkeypatch.setattr(cli, "run_shared_runtime", lose_election)
+    await cli._serve(settings)  # pyright: ignore[reportPrivateUsage]
+    assert endpoint in capsys.readouterr().err
+
+
+@pytest.mark.asyncio
+async def test_internal_runtime_rewrites_transport_and_recovers_an_election_race(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    observed: list[str] = []
+
+    async def run(settings: Settings) -> None:
+        observed.append(settings.transport)
+
+    monkeypatch.setattr(cli, "run_shared_runtime", run)
+    settings = Settings(
+        transport="stdio",
+        runtime_lock_path=tmp_path / "runtime.lock",
+    )
+    await cli._run_internal_runtime(settings)  # pyright: ignore[reportPrivateUsage]
+
+    async def lose_election(_: Settings) -> None:
+        raise ConfigurationError("another owner won")
+
+    def running(_: Path) -> AccountRuntimeStatus:
+        return AccountRuntimeStatus(running=True)
+
+    async def wait(_: Settings) -> str:
+        observed.append("waited")
+        return "http://127.0.0.1:8000/mcp"
+
+    monkeypatch.setattr(cli, "run_shared_runtime", lose_election)
+    monkeypatch.setattr(cli, "inspect_account_runtime", running)
+    monkeypatch.setattr(cli, "wait_for_shared_runtime", wait)
+    await cli._run_internal_runtime(settings)  # pyright: ignore[reportPrivateUsage]
+
+    assert observed == ["streamable-http", "waited"]
 
 
 @pytest.mark.asyncio

@@ -30,8 +30,8 @@ from linkedin_mcp.browser.profile import BrowserProfileManager
 from linkedin_mcp.config import Settings
 from linkedin_mcp.domain.models import BrowserSetupState, SessionAuthenticationState
 from linkedin_mcp.errors import (
+    AccessPausedError,
     AuthenticationRequiredError,
-    AuthorizationDeniedError,
     BrowserUnavailableError,
     LinkedInMCPError,
     ParserDriftError,
@@ -167,7 +167,7 @@ class BrowserManager:
 
     async def _start(self, *, allow_paused: bool = False) -> BrowserContext:
         if self._paused and not allow_paused:
-            raise AuthorizationDeniedError(
+            raise AccessPausedError(
                 f"LinkedIn access is paused: {self._pause_reason or 'operator review required'}"
             )
         if self.started:

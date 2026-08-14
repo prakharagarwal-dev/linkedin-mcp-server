@@ -16,17 +16,11 @@ from linkedin_mcp.application import (
     bind_client_execution,
 )
 from linkedin_mcp.domain.models import (
-    ActionDraft,
-    ActionExecuteInput,
-    ActionExecuteOutput,
-    ActionExecutionResult,
     ActionOutcome,
-    ActionPrepareOutput,
-    ActionStatus,
-    ActionTarget,
+    ActionOutput,
+    ActionResult,
     ActionType,
     CapabilityName,
-    CommentCreatePayload,
     CompanyGetInput,
     CompanyGetOutput,
     CompanyProfileCoverage,
@@ -41,17 +35,17 @@ from linkedin_mcp.domain.models import (
     ConversationGetInput,
     ConversationSearchInput,
     EvidenceField,
-    InvitationAcceptPrepareInput,
-    InvitationIgnorePrepareInput,
+    InvitationAcceptInput,
+    InvitationIgnoreInput,
     InvitationListInput,
-    InvitationSendPrepareInput,
+    InvitationSendInput,
     JobDetailInput,
     JobDetailObservation,
     JobDetailOutput,
     JobSearchCoverage,
     JobSearchInput,
     JobSearchOutput,
-    MessagePrepareInput,
+    MessageSendInput,
     PaginatedInput,
     PaginationMetadata,
     PeopleGetInput,
@@ -63,24 +57,22 @@ from linkedin_mcp.domain.models import (
     PersonProfileObservation,
     PostAuthor,
     PostAuthorType,
-    PostCommentPrepareInput,
+    PostCommentInput,
     PostCommentsCoverage,
     PostCommentsListInput,
     PostCommentsListOutput,
-    PostCreatePrepareInput,
+    PostCreateInput,
     PostDetailCoverage,
     PostGetInput,
     PostGetOutput,
     PostObservation,
-    PostReactionPrepareInput,
+    PostReactionInput,
     PostSearchCoverage,
     PostSearchInput,
     PostSearchOutput,
-    ReactionSetPayload,
     ReactionState,
     StopReason,
     TextPostContent,
-    action_approval_preview,
 )
 from linkedin_mcp.errors import BrowserUnavailableError, IdempotencyConflictError
 
@@ -115,68 +107,29 @@ def _search_output(request: JobSearchInput) -> JobSearchOutput:
     )
 
 
-def _engagement_prepare_output(
-    request: PostCommentPrepareInput | PostReactionPrepareInput,
-) -> ActionPrepareOutput:
-    now = datetime.now(UTC)
-    if isinstance(request, PostCommentPrepareInput):
-        action_type = ActionType.COMMENT_CREATE
-        payload = CommentCreatePayload(
-            post_ref=request.post_ref,
-            text=request.text,
-            mentions=request.mentions,
-            attachment=request.attachment,
-        )
-    else:
-        action_type = ActionType.REACTION_SET
-        payload = ReactionSetPayload(
-            post_ref=request.post_ref,
-            existing_reaction=ReactionState.NONE,
-            desired_reaction=request.desired_reaction,
-        )
-    action_id = str(uuid.uuid4())
-    draft = ActionDraft(
-        action_id=action_id,
-        action_type=action_type,
-        target=ActionTarget(
-            profile_slug="current-member",
-            profile_url=HttpUrl("https://www.linkedin.com/in/current-member/"),
-            display_name="Current Member",
-            post_ref=request.post_ref,
-            post_url=HttpUrl(
-                "https://www.linkedin.com/feed/update/urn:li:activity:7312345678901234567/"
-            ),
-        ),
-        payload=payload,
-        payload_hash="a" * 64,
-        status=ActionStatus.READY_FOR_CONFIRMATION,
-        created_at=now,
-        expires_at=now + timedelta(minutes=10),
-    )
-    return ActionPrepareOutput(
-        context_id=request.context_id,
-        request_id=request.request_id,
-        draft=draft,
-        approval_preview=action_approval_preview(draft),
-        sources=(),
-    )
+ActionRequest = (
+    InvitationSendInput
+    | InvitationAcceptInput
+    | InvitationIgnoreInput
+    | MessageSendInput
+    | PostCreateInput
+    | PostCommentInput
+    | PostReactionInput
+)
 
 
-def _engagement_execute_output(
-    request: ActionExecuteInput,
+def _action_output(
+    request: ActionRequest,
     *,
     action_type: ActionType,
     final_state: str,
-) -> ActionExecuteOutput:
+) -> ActionOutput:
     now = datetime.now(UTC)
-    return ActionExecuteOutput(
+    return ActionOutput(
         context_id=request.context_id,
         request_id=request.request_id,
-        result=ActionExecutionResult(
-            action_id=request.action_id,
+        result=ActionResult(
             action_type=action_type,
-            attempt_id=str(uuid.uuid4()),
-            idempotency_key=request.idempotency_key,
             outcome=ActionOutcome.VERIFIED,
             performed=True,
             final_state=final_state,
@@ -412,44 +365,64 @@ class BlockingRunner:
             sources=(),
         )
 
-    async def prepare_post_comment(
-        self,
-        request: PostCommentPrepareInput,
-    ) -> ActionPrepareOutput:
-        self.extension_calls.append("comment-prepare")
-        return _engagement_prepare_output(request)
+    async def send_invitation(self, request: InvitationSendInput) -> ActionOutput:
+        self.extension_calls.append("invitation-send")
+        return _action_output(
+            request,
+            action_type=ActionType.INVITATION_SEND,
+            final_state="invitation_pending",
+        )
 
-    async def prepare_post_reaction(
-        self,
-        request: PostReactionPrepareInput,
-    ) -> ActionPrepareOutput:
-        self.extension_calls.append("reaction-prepare")
-        return _engagement_prepare_output(request)
+    async def accept_invitation(self, request: InvitationAcceptInput) -> ActionOutput:
+        self.extension_calls.append("invitation-accept")
+        return _action_output(
+            request,
+            action_type=ActionType.INVITATION_ACCEPT,
+            final_state="invitation_accepted",
+        )
 
-    async def execute_post_comment(
-        self,
-        request: ActionExecuteInput,
-    ) -> ActionExecuteOutput:
-        self.extension_calls.append("comment-execute")
-        return _engagement_execute_output(
+    async def ignore_invitation(self, request: InvitationIgnoreInput) -> ActionOutput:
+        self.extension_calls.append("invitation-ignore")
+        return _action_output(
+            request,
+            action_type=ActionType.INVITATION_IGNORE,
+            final_state="invitation_ignored",
+        )
+
+    async def send_message(self, request: MessageSendInput) -> ActionOutput:
+        self.extension_calls.append("message-send")
+        return _action_output(
+            request,
+            action_type=ActionType.MESSAGE_SEND,
+            final_state="message_sent",
+        )
+
+    async def create_post(self, request: PostCreateInput) -> ActionOutput:
+        self.extension_calls.append("post-create")
+        return _action_output(
+            request,
+            action_type=ActionType.POST_CREATE,
+            final_state="post_published",
+        )
+
+    async def comment_on_post(self, request: PostCommentInput) -> ActionOutput:
+        self.extension_calls.append("post-comment")
+        return _action_output(
             request,
             action_type=ActionType.COMMENT_CREATE,
             final_state="comment_published",
         )
 
-    async def execute_post_reaction(
-        self,
-        request: ActionExecuteInput,
-    ) -> ActionExecuteOutput:
-        self.extension_calls.append("reaction-execute")
-        return _engagement_execute_output(
+    async def react_to_post(self, request: PostReactionInput) -> ActionOutput:
+        self.extension_calls.append("post-react")
+        return _action_output(
             request,
             action_type=ActionType.REACTION_SET,
             final_state="reaction_set:love",
         )
 
 
-class BlockingExecuteRunner(BlockingRunner):
+class BlockingActionRunner(BlockingRunner):
     def __init__(self) -> None:
         super().__init__()
         self.write_started = asyncio.Event()
@@ -457,15 +430,12 @@ class BlockingExecuteRunner(BlockingRunner):
         self.write_completed = asyncio.Event()
         self.write_calls = 0
 
-    async def execute_post_comment(
-        self,
-        request: ActionExecuteInput,
-    ) -> ActionExecuteOutput:
+    async def comment_on_post(self, request: PostCommentInput) -> ActionOutput:
         self.write_calls += 1
         self.write_started.set()
         await self.write_release.wait()
         self.write_completed.set()
-        return _engagement_execute_output(
+        return _action_output(
             request,
             action_type=ActionType.COMMENT_CREATE,
             final_state="comment_published",
@@ -629,58 +599,105 @@ async def test_worker_dispatches_post_read_capabilities() -> None:
 
 
 @pytest.mark.asyncio
-async def test_worker_dispatches_comment_and_reaction_prepare_execute_pairs() -> None:
+async def test_worker_dispatches_all_atomic_action_capabilities() -> None:
     runner = BlockingRunner()
     worker = CapabilityWorker(cast(CapabilityRunner, runner), queue_capacity=10)
     await worker.start()
     post_ref = "activity:7312345678901234567"
 
-    comment = await worker.prepare_post_comment(
-        PostCommentPrepareInput(
-            context_id="context-1",
-            request_id="comment-prepare-1",
-            post_ref=post_ref,
-            text="Exact queued comment.",
-        )
-    )
-    reaction = await worker.prepare_post_reaction(
-        PostReactionPrepareInput(
-            context_id="context-1",
-            request_id="reaction-prepare-1",
-            post_ref=post_ref,
-            desired_reaction=ReactionState.LOVE,
-        )
-    )
-    comment_result = await worker.execute_post_comment(
-        ActionExecuteInput(
-            context_id="context-1",
-            request_id="comment-execute-1",
-            action_id=comment.draft.action_id,
-            payload_hash=comment.draft.payload_hash,
-            approval_preview=comment.approval_preview,
-            idempotency_key="comment-action-1",
-        )
-    )
-    reaction_result = await worker.execute_post_reaction(
-        ActionExecuteInput(
-            context_id="context-1",
-            request_id="reaction-execute-1",
-            action_id=reaction.draft.action_id,
-            payload_hash=reaction.draft.payload_hash,
-            approval_preview=reaction.approval_preview,
-            idempotency_key="reaction-action-1",
-        )
+    outputs = (
+        await worker.send_invitation(
+            InvitationSendInput(
+                context_id="context-1",
+                request_id="invitation-send-1",
+                profile_slug="jane-doe",
+            )
+        ),
+        await worker.accept_invitation(
+            InvitationAcceptInput(
+                context_id="context-1",
+                request_id="invitation-accept-1",
+                profile_slug="jane-doe",
+            )
+        ),
+        await worker.ignore_invitation(
+            InvitationIgnoreInput(
+                context_id="context-1",
+                request_id="invitation-ignore-1",
+                profile_slug="jane-doe",
+            )
+        ),
+        await worker.send_message(
+            MessageSendInput(
+                context_id="context-1",
+                request_id="message-send-1",
+                profile_slug="jane-doe",
+                message="Exact queued message.",
+            )
+        ),
+        await worker.create_post(
+            PostCreateInput(
+                context_id="context-1",
+                request_id="post-create-1",
+                content=TextPostContent(text="Exact queued post."),
+            )
+        ),
+        await worker.comment_on_post(
+            PostCommentInput(
+                context_id="context-1",
+                request_id="post-comment-1",
+                post_ref=post_ref,
+                text="Exact queued comment.",
+            )
+        ),
+        await worker.react_to_post(
+            PostReactionInput(
+                context_id="context-1",
+                request_id="post-react-1",
+                post_ref=post_ref,
+                desired_reaction=ReactionState.LOVE,
+            )
+        ),
     )
     await worker.close()
 
-    assert comment_result.result.action_type is ActionType.COMMENT_CREATE
-    assert reaction_result.result.action_type is ActionType.REACTION_SET
+    assert tuple(output.result.action_type for output in outputs) == (
+        ActionType.INVITATION_SEND,
+        ActionType.INVITATION_ACCEPT,
+        ActionType.INVITATION_IGNORE,
+        ActionType.MESSAGE_SEND,
+        ActionType.POST_CREATE,
+        ActionType.COMMENT_CREATE,
+        ActionType.REACTION_SET,
+    )
     assert runner.extension_calls == [
-        "comment-prepare",
-        "reaction-prepare",
-        "comment-execute",
-        "reaction-execute",
+        "invitation-send",
+        "invitation-accept",
+        "invitation-ignore",
+        "message-send",
+        "post-create",
+        "post-comment",
+        "post-react",
     ]
+
+
+@pytest.mark.asyncio
+async def test_worker_does_not_coalesce_repeated_action_requests() -> None:
+    runner = BlockingRunner()
+    worker = CapabilityWorker(cast(CapabilityRunner, runner), queue_capacity=10)
+    await worker.start()
+    request = PostCommentInput(
+        context_id="context-1",
+        request_id="post-comment-repeat",
+        post_ref="activity:7312345678901234567",
+        text="Exact queued comment.",
+    )
+
+    await worker.comment_on_post(request)
+    await worker.comment_on_post(request)
+    await worker.close()
+
+    assert runner.extension_calls == ["post-comment", "post-comment"]
 
 
 @pytest.mark.asyncio
@@ -945,28 +962,18 @@ async def test_active_read_cancellation_releases_the_single_execution_lane() -> 
 
 
 @pytest.mark.asyncio
-async def test_active_execute_survives_caller_cancellation_until_terminal_result() -> None:
-    runner = BlockingExecuteRunner()
+async def test_active_action_survives_caller_cancellation_until_terminal_result() -> None:
+    runner = BlockingActionRunner()
     worker = CapabilityWorker(cast(CapabilityRunner, runner), queue_capacity=2)
     await worker.start()
-    prepared = _engagement_prepare_output(
-        PostCommentPrepareInput(
-            context_id="write-cancel",
-            request_id="prepare",
-            post_ref="activity:7312345678901234567",
-            text="Exact comment",
-        )
-    )
-    request = ActionExecuteInput(
+    request = PostCommentInput(
         context_id="write-cancel",
-        request_id="execute",
-        action_id=prepared.draft.action_id,
-        payload_hash=prepared.draft.payload_hash,
-        approval_preview=prepared.approval_preview,
-        idempotency_key="write-cancel-action",
+        request_id="comment",
+        post_ref="activity:7312345678901234567",
+        text="Exact comment",
     )
 
-    caller = asyncio.create_task(worker.execute_post_comment(request))
+    caller = asyncio.create_task(worker.comment_on_post(request))
     await runner.write_started.wait()
     caller.cancel()
     with pytest.raises(asyncio.CancelledError):
@@ -1053,22 +1060,6 @@ async def test_cursor_is_reserved_before_waiting_and_survives_queue_delay() -> N
 
 def _invalid_output_invocations() -> tuple[Callable[[CapabilityWorker], Awaitable[object]], ...]:
     post_ref = "activity:7312345678901234567"
-    prepared = _engagement_prepare_output(
-        PostCommentPrepareInput(
-            context_id="invalid-output",
-            request_id="comment-draft",
-            post_ref=post_ref,
-            text="Synthetic comment.",
-        )
-    )
-    execution = ActionExecuteInput(
-        context_id="invalid-output",
-        request_id="execute",
-        action_id=prepared.draft.action_id,
-        payload_hash=prepared.draft.payload_hash,
-        approval_preview=prepared.approval_preview,
-        idempotency_key="invalid-output-execute",
-    )
     return (
         lambda worker: worker.search_jobs(
             JobSearchInput(
@@ -1166,65 +1157,58 @@ def _invalid_output_invocations() -> tuple[Callable[[CapabilityWorker], Awaitabl
                 conversation_id="thread-123",
             )
         ),
-        lambda worker: worker.prepare_invitation_send(
-            InvitationSendPrepareInput(
+        lambda worker: worker.send_invitation(
+            InvitationSendInput(
                 context_id="invalid-output",
-                request_id="invite-prepare",
+                request_id="invitation-send",
                 profile_slug="jane-doe",
             )
         ),
-        lambda worker: worker.prepare_invitation_accept(
-            InvitationAcceptPrepareInput(
+        lambda worker: worker.accept_invitation(
+            InvitationAcceptInput(
                 context_id="invalid-output",
-                request_id="accept-prepare",
+                request_id="invitation-accept",
                 profile_slug="jane-doe",
             )
         ),
-        lambda worker: worker.prepare_invitation_ignore(
-            InvitationIgnorePrepareInput(
+        lambda worker: worker.ignore_invitation(
+            InvitationIgnoreInput(
                 context_id="invalid-output",
-                request_id="ignore-prepare",
+                request_id="invitation-ignore",
                 profile_slug="jane-doe",
             )
         ),
-        lambda worker: worker.prepare_message(
-            MessagePrepareInput(
+        lambda worker: worker.send_message(
+            MessageSendInput(
                 context_id="invalid-output",
-                request_id="message-prepare",
+                request_id="message-send",
                 conversation_id="thread-123",
                 message="Synthetic message.",
             )
         ),
-        lambda worker: worker.prepare_post_create(
-            PostCreatePrepareInput(
+        lambda worker: worker.create_post(
+            PostCreateInput(
                 context_id="invalid-output",
-                request_id="post-prepare",
+                request_id="post-create",
                 content=TextPostContent(text="Synthetic post."),
             )
         ),
-        lambda worker: worker.prepare_post_comment(
-            PostCommentPrepareInput(
+        lambda worker: worker.comment_on_post(
+            PostCommentInput(
                 context_id="invalid-output",
-                request_id="comment-prepare",
+                request_id="post-comment",
                 post_ref=post_ref,
                 text="Synthetic comment.",
             )
         ),
-        lambda worker: worker.prepare_post_reaction(
-            PostReactionPrepareInput(
+        lambda worker: worker.react_to_post(
+            PostReactionInput(
                 context_id="invalid-output",
-                request_id="reaction-prepare",
+                request_id="post-react",
                 post_ref=post_ref,
                 desired_reaction=ReactionState.LIKE,
             )
         ),
-        lambda worker: worker.execute_invitation_send(execution),
-        lambda worker: worker.execute_invitation_accept(execution),
-        lambda worker: worker.execute_invitation_ignore(execution),
-        lambda worker: worker.execute_message(execution),
-        lambda worker: worker.execute_post_create(execution),
-        lambda worker: worker.execute_post_comment(execution),
-        lambda worker: worker.execute_post_reaction(execution),
     )
 
 

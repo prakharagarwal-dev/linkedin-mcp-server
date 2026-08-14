@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Effective date: August 2, 2026
+Effective date: August 14, 2026
 
 This policy describes how the standalone, open-source LinkedIn MCP Server
 processes data when you run it. The project is local software, not a hosted
@@ -15,8 +15,7 @@ The server processes only data needed for the typed MCP capability you invoke:
   companies, posts, invitations, connections, and messages;
 - LinkedIn source URLs, capture times, visible evidence, and typed operation
   results;
-- the target and exact payload of an account-changing action that you prepare
-  and approve;
+- the target and exact payload of an account-changing tool you invoke;
 - local files that you explicitly place under the configured asset directory
   and reference for a post, comment, or message; and
 - non-secret configuration and operational metadata needed to run the local
@@ -30,16 +29,15 @@ profile.
 ## How data is used and stored
 
 Data is used only to perform the requested MCP capability, return typed results
-and evidence to your MCP client, pace visible-UI navigation, enforce policy,
-and verify account-changing actions.
+and evidence to your MCP client, pace visible-UI navigation, enforce the typed
+browser boundary, and verify account-changing actions.
 
 The server has no analytics, advertising, telemetry, database, or external
-application-state service. Calls, evidence, continuation state, action drafts,
-attempts, and idempotency records remain in process memory. The Chromium
-profile and user-managed asset directory are the only locations where the
-server intentionally keeps user data across restarts. Your MCP client may
-retain tool inputs or results under that client's own settings and privacy
-policy.
+application-state service. Read-call replay, evidence, continuation state, and
+internal action call records remain in process memory. The Chromium profile and
+user-managed asset directory are the only locations where the server
+intentionally keeps user data across restarts. Your MCP client may retain tool
+inputs or results under that client's own settings and privacy policy.
 
 ## Third-party sharing
 
@@ -47,8 +45,8 @@ The server communicates with LinkedIn only through the visible web UI. LinkedIn
 receives the same page requests and, for a client-authorized write, the same
 content that a user would submit in the web interface. Tool results and
 evidence are returned to the MCP client that invoked the server. Local assets
-are sent to LinkedIn only when the specifically prepared action that references
-them is executed.
+are sent to LinkedIn only during the exact account-changing action that
+references them.
 
 The project does not sell personal data or send LinkedIn content, cookies,
 credentials, messages, or local assets to the maintainer, advertisers, data
@@ -81,8 +79,8 @@ application-data directory and can be overridden with
 
 You can revoke the saved LinkedIn session with `linkedin-mcp logout`, delete the
 local browser profile and its archives, remove local assets at any time,
-restrict surfaces, scopes, or effects, and stop the process to clear its
-in-memory state.
+disable tools in your MCP client, and stop the process to clear its in-memory
+state.
 
 ## Contact
 

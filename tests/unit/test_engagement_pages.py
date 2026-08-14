@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import cast
 
@@ -15,16 +13,15 @@ from linkedin_mcp.assets import LocalAssetStore
 from linkedin_mcp.browser import BrowserManager
 from linkedin_mcp.browser.pages import PostEngagementPage
 from linkedin_mcp.domain.models import (
-    ActionDraft,
+    ActionCommand,
     ActionOutcome,
-    ActionStatus,
     ActionType,
     CommentCreatePayload,
     CommentGifAttachment,
     CommentPhotoAttachment,
-    PostCommentPrepareInput,
+    PostCommentInput,
     PostMentionInput,
-    PostReactionPrepareInput,
+    PostReactionInput,
     ReactionSetPayload,
     ReactionState,
 )
@@ -90,13 +87,11 @@ class EngagementFixtureBrowser:
 
 async def _comment_draft(
     adapter: PostEngagementPage,
-    request: PostCommentPrepareInput,
-) -> ActionDraft:
-    capture = await adapter.prepare_comment(request)
-    assets = await adapter.prepare_comment_assets(request)
-    now = datetime.now(UTC)
-    return ActionDraft(
-        action_id=str(uuid.uuid4()),
+    request: PostCommentInput,
+) -> ActionCommand:
+    capture = await adapter.inspect_comment(request)
+    assets = await adapter.snapshot_comment_assets(request)
+    return ActionCommand(
         action_type=ActionType.COMMENT_CREATE,
         target=capture.target,
         payload=CommentCreatePayload(
@@ -106,22 +101,16 @@ async def _comment_draft(
             attachment=request.attachment,
             assets=assets,
         ),
-        payload_hash="a" * 64,
-        status=ActionStatus.EXECUTING,
-        created_at=now,
-        expires_at=now + timedelta(hours=1),
     )
 
 
 async def _reaction_draft(
     adapter: PostEngagementPage,
-    request: PostReactionPrepareInput,
-) -> ActionDraft:
-    capture = await adapter.prepare_reaction(request)
+    request: PostReactionInput,
+) -> ActionCommand:
+    capture = await adapter.inspect_reaction(request)
     assert capture.existing_reaction is not None
-    now = datetime.now(UTC)
-    return ActionDraft(
-        action_id=str(uuid.uuid4()),
+    return ActionCommand(
         action_type=ActionType.REACTION_SET,
         target=capture.target,
         payload=ReactionSetPayload(
@@ -129,10 +118,6 @@ async def _reaction_draft(
             existing_reaction=capture.existing_reaction,
             desired_reaction=request.desired_reaction,
         ),
-        payload_hash="b" * 64,
-        status=ActionStatus.EXECUTING,
-        created_at=now,
-        expires_at=now + timedelta(hours=1),
     )
 
 
@@ -141,9 +126,9 @@ async def test_top_level_comment_preserves_text_link_emoji_mention_and_target(
     tmp_path: Path,
 ) -> None:
     text = "Thanks @Alex — useful! 🚀 https://example.com/guide"
-    request = PostCommentPrepareInput(
+    request = PostCommentInput(
         context_id="engagement-context",
-        request_id="prepare-top-level-comment",
+        request_id="action-top-level-comment",
         post_ref=POST_REF,
         text=text,
         mentions=(PostMentionInput(token="@Alex", profile_slug="alex-ray"),),
@@ -156,15 +141,15 @@ async def test_top_level_comment_preserves_text_link_emoji_mention_and_target(
             LocalAssetStore(tmp_path),
         )
         try:
-            draft = await _comment_draft(adapter, request)
-            result = await adapter.execute_comment(draft)
+            command = await _comment_draft(adapter, request)
+            result = await adapter.perform_comment(command)
         finally:
             await browser.close()
 
-    assert draft.target.actor_profile_slug == "current-member"
-    assert draft.target.content_author_name == "Jane Doe"
-    assert draft.target.post_ref == POST_REF
-    assert draft.target.post_ref == POST_REF
+    assert command.target.actor_profile_slug == "current-member"
+    assert command.target.content_author_name == "Jane Doe"
+    assert command.target.post_ref == POST_REF
+    assert command.target.post_ref == POST_REF
     assert result.outcome is ActionOutcome.VERIFIED
     assert result.performed is True
     assert result.final_state.startswith("comment_published:comment:ugc-post:7312345678901234566:")
@@ -180,9 +165,9 @@ async def test_comment_submit_ignores_visible_comment_count_control(tmp_path: Pa
             '        <div\n          id="top-level-composer"'
         ),
     )
-    request = PostCommentPrepareInput(
+    request = PostCommentInput(
         context_id="engagement-context",
-        request_id="prepare-comment-with-count-control",
+        request_id="action-comment-with-count-control",
         post_ref=POST_REF,
         text="thanks",
     )
@@ -194,7 +179,7 @@ async def test_comment_submit_ignores_visible_comment_count_control(tmp_path: Pa
             LocalAssetStore(tmp_path),
         )
         try:
-            result = await adapter.execute_comment(await _comment_draft(adapter, request))
+            result = await adapter.perform_comment(await _comment_draft(adapter, request))
         finally:
             await browser.close()
 
@@ -215,9 +200,9 @@ async def test_comment_waits_for_async_composer_after_count_control(tmp_path: Pa
             '        <div hidden\n          id="top-level-composer"'
         ),
     )
-    request = PostCommentPrepareInput(
+    request = PostCommentInput(
         context_id="engagement-context",
-        request_id="prepare-comment-with-async-composer",
+        request_id="action-comment-with-async-composer",
         post_ref=POST_REF,
         text="thanks",
     )
@@ -229,7 +214,7 @@ async def test_comment_waits_for_async_composer_after_count_control(tmp_path: Pa
             LocalAssetStore(tmp_path),
         )
         try:
-            result = await adapter.execute_comment(await _comment_draft(adapter, request))
+            result = await adapter.perform_comment(await _comment_draft(adapter, request))
         finally:
             await browser.close()
 
@@ -246,9 +231,9 @@ async def test_comment_verifies_native_ugc_discussion_alias_for_activity_url(
         "urn:li:comment:(ugcPost:7312345678901234566,",
         "urn:li:comment:(ugcPost:7999999999999999998,",
     )
-    request = PostCommentPrepareInput(
+    request = PostCommentInput(
         context_id="engagement-context",
-        request_id="prepare-comment-with-native-discussion-alias",
+        request_id="action-comment-with-native-discussion-alias",
         post_ref=POST_REF,
         text="thanks",
     )
@@ -260,7 +245,7 @@ async def test_comment_verifies_native_ugc_discussion_alias_for_activity_url(
             LocalAssetStore(tmp_path),
         )
         try:
-            result = await adapter.execute_comment(await _comment_draft(adapter, request))
+            result = await adapter.perform_comment(await _comment_draft(adapter, request))
         finally:
             await browser.close()
 
@@ -285,9 +270,9 @@ async def test_comment_photo_and_gif_are_exact_and_verifiable(
             visible_result_label="Celebration confetti GIF",
         )
         expected = "Celebration confetti GIF"
-    request = PostCommentPrepareInput(
+    request = PostCommentInput(
         context_id="engagement-context",
-        request_id=f"prepare-{attachment_kind}-comment",
+        request_id=f"action-{attachment_kind}-comment",
         post_ref=POST_REF,
         attachment=attachment,
     )
@@ -299,13 +284,13 @@ async def test_comment_photo_and_gif_are_exact_and_verifiable(
             LocalAssetStore(tmp_path),
         )
         try:
-            draft = await _comment_draft(adapter, request)
-            result = await adapter.execute_comment(draft)
+            command = await _comment_draft(adapter, request)
+            result = await adapter.perform_comment(command)
         finally:
             await browser.close()
 
-    assert isinstance(draft.payload, CommentCreatePayload)
-    assert len(draft.payload.assets) == (1 if attachment_kind == "photo" else 0)
+    assert isinstance(command.payload, CommentCreatePayload)
+    assert len(command.payload.assets) == (1 if attachment_kind == "photo" else 0)
     assert result.outcome is ActionOutcome.VERIFIED
     assert expected in result.captured_text
 
@@ -326,9 +311,9 @@ async def test_post_supports_every_visible_linkedin_reaction(
     tmp_path: Path,
     desired: ReactionState,
 ) -> None:
-    request = PostReactionPrepareInput(
+    request = PostReactionInput(
         context_id="engagement-context",
-        request_id=f"prepare-post-{desired.value}",
+        request_id=f"action-post-{desired.value}",
         post_ref=POST_REF,
         desired_reaction=desired,
     )
@@ -340,25 +325,25 @@ async def test_post_supports_every_visible_linkedin_reaction(
             LocalAssetStore(tmp_path),
         )
         try:
-            draft = await _reaction_draft(adapter, request)
-            result = await adapter.execute_reaction(draft)
+            command = await _reaction_draft(adapter, request)
+            result = await adapter.perform_reaction(command)
         finally:
             await browser.close()
 
-    assert isinstance(draft.payload, ReactionSetPayload)
-    assert draft.payload.existing_reaction is ReactionState.NONE
+    assert isinstance(command.payload, ReactionSetPayload)
+    assert command.payload.existing_reaction is ReactionState.NONE
     assert result.outcome is ActionOutcome.VERIFIED
     assert result.performed is True
     assert result.final_state == f"reaction_set:{desired.value}"
 
 
 @pytest.mark.timeout(30)
-async def test_current_portaled_reaction_control_is_prepared_and_verified(
+async def test_current_portaled_reaction_control_is_inspected_and_verified(
     tmp_path: Path,
 ) -> None:
-    request = PostReactionPrepareInput(
+    request = PostReactionInput(
         context_id="engagement-context",
-        request_id="prepare-current-portaled-reaction",
+        request_id="action-current-portaled-reaction",
         post_ref=POST_REF,
         desired_reaction=ReactionState.FUNNY,
     )
@@ -373,13 +358,13 @@ async def test_current_portaled_reaction_control_is_prepared_and_verified(
             LocalAssetStore(tmp_path),
         )
         try:
-            draft = await _reaction_draft(adapter, request)
-            result = await adapter.execute_reaction(draft)
+            command = await _reaction_draft(adapter, request)
+            result = await adapter.perform_reaction(command)
         finally:
             await browser.close()
 
-    assert isinstance(draft.payload, ReactionSetPayload)
-    assert draft.payload.existing_reaction is ReactionState.NONE
+    assert isinstance(command.payload, ReactionSetPayload)
+    assert command.payload.existing_reaction is ReactionState.NONE
     assert result.outcome is ActionOutcome.VERIFIED
     assert result.performed is True
     assert result.final_state == "reaction_set:funny"
@@ -403,9 +388,9 @@ async def test_post_reaction_removal_noop_and_change(
     initially_liked = ENGAGEMENT_HTML.replace(
         'data-current-reaction="none"', 'data-current-reaction="like"', 1
     ).replace('aria-pressed="false"', 'aria-pressed="true"', 1)
-    request = PostReactionPrepareInput(
+    request = PostReactionInput(
         context_id="engagement-context",
-        request_id=f"prepare-post-{desired.value}",
+        request_id=f"action-post-{desired.value}",
         post_ref=POST_REF,
         desired_reaction=desired,
     )
@@ -417,20 +402,20 @@ async def test_post_reaction_removal_noop_and_change(
             LocalAssetStore(tmp_path),
         )
         try:
-            draft = await _reaction_draft(adapter, request)
-            result = await adapter.execute_reaction(draft)
+            command = await _reaction_draft(adapter, request)
+            result = await adapter.perform_reaction(command)
         finally:
             await browser.close()
 
-    assert isinstance(draft.payload, ReactionSetPayload)
-    assert draft.payload.existing_reaction is ReactionState.LIKE
+    assert isinstance(command.payload, ReactionSetPayload)
+    assert command.payload.existing_reaction is ReactionState.LIKE
     assert result.outcome is ActionOutcome.VERIFIED
     assert result.performed is performed
     assert result.final_state == final_state
 
 
 @pytest.mark.timeout(30)
-async def test_reaction_refuses_state_drift_after_approval(tmp_path: Path) -> None:
+async def test_reaction_refuses_state_drift_after_inspection(tmp_path: Path) -> None:
     changed = (
         ENGAGEMENT_HTML.replace(
             'data-current-reaction="none"',
@@ -444,9 +429,9 @@ async def test_reaction_refuses_state_drift_after_approval(tmp_path: Path) -> No
         )
         .replace('aria-pressed="false"', 'aria-pressed="true"', 1)
     )
-    request = PostReactionPrepareInput(
+    request = PostReactionInput(
         context_id="engagement-context",
-        request_id="prepare-state-drift",
+        request_id="action-state-drift",
         post_ref=POST_REF,
         desired_reaction=ReactionState.LOVE,
     )
@@ -461,7 +446,7 @@ async def test_reaction_refuses_state_drift_after_approval(tmp_path: Path) -> No
             LocalAssetStore(tmp_path),
         )
         try:
-            result = await adapter.execute_reaction(await _reaction_draft(adapter, request))
+            result = await adapter.perform_reaction(await _reaction_draft(adapter, request))
         finally:
             await browser.close()
 
@@ -479,9 +464,9 @@ async def test_reaction_reports_missing_preclick_control_as_not_changed(
         "data-unavailable-reaction-control",
         1,
     )
-    request = PostReactionPrepareInput(
+    request = PostReactionInput(
         context_id="engagement-context",
-        request_id="prepare-missing-execution-control",
+        request_id="action-missing-action-control",
         post_ref=POST_REF,
         desired_reaction=ReactionState.LOVE,
     )
@@ -496,7 +481,7 @@ async def test_reaction_reports_missing_preclick_control_as_not_changed(
             LocalAssetStore(tmp_path),
         )
         try:
-            result = await adapter.execute_reaction(await _reaction_draft(adapter, request))
+            result = await adapter.perform_reaction(await _reaction_draft(adapter, request))
         finally:
             await browser.close()
 
@@ -512,9 +497,9 @@ async def test_comment_refuses_actor_or_content_target_drift(tmp_path: Path) -> 
         "/in/other-member/",
         2,
     ).replace("Current Member", "Other Member", 1)
-    request = PostCommentPrepareInput(
+    request = PostCommentInput(
         context_id="engagement-context",
-        request_id="prepare-target-drift",
+        request_id="action-target-drift",
         post_ref=POST_REF,
         text="This must not be submitted.",
     )
@@ -529,7 +514,7 @@ async def test_comment_refuses_actor_or_content_target_drift(tmp_path: Path) -> 
             LocalAssetStore(tmp_path),
         )
         try:
-            result = await adapter.execute_comment(await _comment_draft(adapter, request))
+            result = await adapter.perform_comment(await _comment_draft(adapter, request))
         finally:
             await browser.close()
 
@@ -541,9 +526,9 @@ async def test_comment_refuses_actor_or_content_target_drift(tmp_path: Path) -> 
 
 @pytest.mark.timeout(30)
 async def test_interrupted_final_comment_click_is_uncertain(tmp_path: Path) -> None:
-    request = PostCommentPrepareInput(
+    request = PostCommentInput(
         context_id="engagement-context",
-        request_id="prepare-interrupted-comment",
+        request_id="action-interrupted-comment",
         post_ref=POST_REF,
         text="An interrupted final action.",
     )
@@ -558,7 +543,7 @@ async def test_interrupted_final_comment_click_is_uncertain(tmp_path: Path) -> N
             LocalAssetStore(tmp_path),
         )
         try:
-            result = await adapter.execute_comment(await _comment_draft(adapter, request))
+            result = await adapter.perform_comment(await _comment_draft(adapter, request))
         finally:
             await browser.close()
 
@@ -567,11 +552,11 @@ async def test_interrupted_final_comment_click_is_uncertain(tmp_path: Path) -> N
     assert result.final_state == "comment_outcome_unknown"
 
 
-async def test_comment_asset_hash_is_revalidated_after_approval(tmp_path: Path) -> None:
+async def test_comment_asset_hash_is_revalidated_before_upload(tmp_path: Path) -> None:
     (tmp_path / "comment.png").write_bytes(b"confirmed")
-    request = PostCommentPrepareInput(
+    request = PostCommentInput(
         context_id="engagement-context",
-        request_id="prepare-hash-locked-comment",
+        request_id="action-hash-locked-comment",
         post_ref=POST_REF,
         attachment=CommentPhotoAttachment(asset_ref="comment.png"),
     )
@@ -583,23 +568,23 @@ async def test_comment_asset_hash_is_revalidated_after_approval(tmp_path: Path) 
             LocalAssetStore(tmp_path),
         )
         try:
-            draft = await _comment_draft(adapter, request)
+            command = await _comment_draft(adapter, request)
             (tmp_path / "comment.png").write_bytes(b"changed")
-            with pytest.raises(InvalidTargetError, match="changed after confirmation"):
-                await adapter.execute_comment(draft)
+            with pytest.raises(InvalidTargetError, match="changed during the action"):
+                await adapter.perform_comment(command)
         finally:
             await browser.close()
 
 
 def test_engagement_contract_rejects_empty_inputs_and_allows_native_discussion_aliases() -> None:
     with pytest.raises(ValidationError, match="requires text, a photo, or a GIF"):
-        PostCommentPrepareInput(
+        PostCommentInput(
             context_id="engagement-context",
             request_id="empty-comment",
             post_ref=POST_REF,
         )
     with pytest.raises(ValidationError, match="mentions require comment text"):
-        PostCommentPrepareInput(
+        PostCommentInput(
             context_id="engagement-context",
             request_id="mention-without-text",
             post_ref=POST_REF,
@@ -610,7 +595,7 @@ def test_engagement_contract_rejects_empty_inputs_and_allows_native_discussion_a
             ),
         )
     with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
-        PostCommentPrepareInput.model_validate(
+        PostCommentInput.model_validate(
             {
                 "context_id": "engagement-context",
                 "request_id": "threaded-reply-not-supported",
@@ -620,7 +605,7 @@ def test_engagement_contract_rejects_empty_inputs_and_allows_native_discussion_a
             }
         )
     with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
-        PostReactionPrepareInput.model_validate(
+        PostReactionInput.model_validate(
             {
                 "context_id": "engagement-context",
                 "request_id": "comment-reaction-not-supported",

@@ -15,9 +15,9 @@ account.
 ┌───────────────────────────────────▼────────────────────────────────┐
 │ One shared local runtime for one configured LinkedIn account       │
 │                                                                    │
-│ session identity -> registry/policy -> fair asyncio queue           │
+│ session identity -> typed registry -> fair asyncio queue            │
 │                                          │                         │
-│ client-scoped calls/cursors/drafts        ▼                         │
+│ client-scoped read calls/cursors           ▼                         │
 │                              one atomic browser operation           │
 │                                          │                         │
 │                    typed page objects + global navigation pacer     │
@@ -61,18 +61,16 @@ individual stdio or HTTP client disconnects. `linkedin-mcp stop` gracefully
 ends the exact elected owner. The lock is runtime election and maintenance
 coordination; normal MCP clients do not compete for browser-profile ownership.
 The lock's SHA-256 configuration fingerprint also prevents a client with
-different profile, policy, browser, pacing, or endpoint settings from silently
+different profile, browser, pacing, or endpoint settings from silently
 inheriting the first client's runtime configuration.
 
 The runtime uses stateful MCP sessions. It assigns each server session an
 opaque internal identity; callers cannot provide or override it. That identity
-scopes request replay, in-flight coalescing, cursor ownership, progress, and
-prepared actions.
+scopes read replay, in-flight read coalescing, cursor ownership, and progress.
 
-Tool annotations describe read, prepare, and destructive execution behavior.
-They request confirmation for execute tools by default, but the MCP client's
-durable per-tool policy may explicitly pre-approve selected tools. Neither mode
-authorizes a scope on the server.
+Tool annotations distinguish read-only and destructive behavior. The MCP client
+may prompt for a destructive call or durably pre-approve an exact tool. The
+server receives the call only after that client-side boundary.
 
 ### Domain contracts
 
@@ -83,7 +81,7 @@ authorizes a scope on the server.
 - stable LinkedIn identifiers and bounded filter values;
 - observations, coverage, and evidence;
 - shared collection `page_size`/`cursor` inputs and pagination metadata;
-- action payloads, drafts, previews, attempts, and outcomes.
+- internal action commands, visible inspections, and terminal outcomes.
 
 Undeclared fields are rejected. IDs, slugs, URLs, tuple sizes, text lengths,
 time windows, and enumerated choices are bounded before browser access.
@@ -101,25 +99,19 @@ The public networking namespaces follow the resource lifecycle:
 The executor binds its shared People-search adapter to first degree and rejects
 any returned card that is not visibly first-degree.
 
-### Capability registry and policy
+### Capability registry
 
 The capability registry maps every public capability to:
 
 - version;
 - input and output model;
-- effect: `read`, `prepare`, or `write`;
-- required visible LinkedIn surfaces;
-- required server scopes.
+- effect: `read` or `write`; and
+- required visible LinkedIn surfaces.
 
-Authorization requires all of the following:
-
-1. the exact capability is registered;
-2. every required surface is configured;
-3. every required scope is configured;
-4. the effect class is configured.
-
-Enabling one capability does not grant generic access to related LinkedIn
-features.
+The server registers every implemented capability. Tool availability and
+approval belong to the MCP client. Required surfaces are implementation
+metadata used to keep each page adapter narrow; they are not a second
+permission system.
 
 ### Fair queue and atomic worker
 
@@ -136,10 +128,10 @@ A paginated workflow can interleave with other clients only when it returns a
 page and the client later submits its next cursor call.
 
 The queue is not durable. A runtime exit rejects queued work. If a caller
-cancels its last waiter, queued work is removed; an active read or prepare is
-cancelled; an active execute continues in the background until it records a
-verified, failed, or uncertain result. This avoids retrying a LinkedIn write
-whose external effect may already have started.
+cancels its last waiter, queued work is removed; an active read is cancelled;
+an active account-changing action continues in the background until it reaches
+a verified, failed, or uncertain result. This avoids interrupting a LinkedIn
+mutation whose external effect may already have started.
 
 `status` inspects non-secret owner and queue metadata without browser access.
 `stop` rechecks exact ownership, sends `SIGTERM`, and waits for release. Clean
@@ -151,14 +143,20 @@ never escalates to a force kill.
 
 The executor owns the common capability lifecycle:
 
-1. authorize the registered descriptor;
-2. validate session-scoped request replay;
+1. resolve the registered descriptor;
+2. validate session-scoped replay for reads;
 3. use the cursor lease reserved before queue admission for collection calls;
 4. call the narrow page-object provider with an internal traversal target;
 5. remove already-seen stable identities and retain one-item lookahead;
 6. normalize typed output, pagination metadata, and captured evidence;
-7. store replay/evidence in the current process;
+7. store read replay/evidence in the current process;
 8. return structured MCP output.
+
+For an action, the executor creates a unique internal call record, inspects the
+exact visible actor, target, and current state, snapshots any local assets,
+builds an internal typed command, performs the narrow mutation, and records the
+terminal result. The internal inspection and command are never separate public
+tools.
 
 Browser and page-object exceptions are projected as safe domain errors.
 Secrets, raw page dumps, subprocess output, and internal exception details are
@@ -177,21 +175,16 @@ visible UI and suppresses identities already returned by the scan.
 `MemoryRepository` implements the operation-store contract with dictionaries
 protected by one async lock. It retains only what a live process needs:
 
-- request fingerprint and completed result replay;
-- captured evidence resources;
-- immutable action drafts;
-- execution attempt reservation and terminal result;
-- idempotency conflicts.
+- read request fingerprints and completed result replay; and
+- captured evidence resources, including terminal action evidence.
 
 Nothing is serialized. A server restart creates a new empty store. This is an
 intentional local-runtime tradeoff, not an accidental loss of durability.
 
-Request replay and action drafts are scoped by the internal MCP-session
-identity. An execute call must come from the session that created its exact
-draft. Execution idempotency keys are deliberately account-global, preventing
-two clients from using the same key for different actions. Evidence remains an
-immutable runtime resource. The store is not workflow memory and cannot be
-used for cross-run tracking.
+Read replay is scoped by the internal MCP-session identity. Every
+account-changing invocation is new and bypasses read replay and coalescing.
+Evidence remains an immutable runtime resource. The store is not workflow
+memory and cannot be used for cross-run tracking or write deduplication.
 
 ### General collection cursor manager
 
@@ -336,7 +329,7 @@ probes, and no loader or tail control is visible. An unambiguous visible
 ```text
 client tool call (internal MCP-session identity)
   -> Pydantic input validation
-  -> surface/scope/effect authorization
+  -> registered typed capability resolution
   -> reserve collection cursor when applicable
   -> enqueue in the client's FIFO lane
   -> fair selection of the next client
@@ -355,60 +348,29 @@ The client can read returned evidence through
 
 ## Action lifecycle
 
-Account-changing capabilities are split into prepare and execute tools.
-
-### Prepare
-
-The page object reads the exact current visible target and actor, validates the
-typed payload and any local asset hashes, then creates:
-
-- random action ID;
-- exact action type;
-- exact target identity;
-- frozen typed payload;
-- canonical SHA-256 payload hash;
-- human-readable approval preview;
-- expiry time.
-
-The draft is stored in process memory for the originating MCP session and
-returned. No final LinkedIn action is performed.
-
-Invitation actions use exact member profiles rather than scanning invitation
-filters. Send preparation opens and validates the current invitation dialog
-and optional-note dialog without invoking Send. Accept and ignore preparation
-require the exact current paired request controls. This keeps action identity
-independent of LinkedIn's current invitation bucket and prevents a broad list
-scan from selecting the wrong member.
-
-### Client approval policy
-
-The matching execute tool is marked destructive, which requests interactive
-confirmation by default. A trusted MCP client may instead apply an explicit
-durable pre-approval for that exact named tool when the operator wants
-unattended execution. An interactive denial, a rejected unattended call, or a
-missing approval means the execute call never reaches this server.
-
-The server treats an arriving execute call as authorized by the client's
-configured policy, but it still independently checks scopes, effects, draft
-identity, hash, preview, expiry, account, action type, idempotency, and current
-visible target. It neither receives nor stores the client's approval mode.
-
-### Execute
+Each account-changing capability is one public tool call:
 
 ```text
-exact action_id + hash + preview + idempotency key
-  -> load the originating session's process-local draft
-  -> require byte-for-byte semantic preview equality
-  -> reserve the account-global idempotency key
-  -> revalidate actor, target, payload, assets, and visible precondition
+typed action input
+  -> client tool-availability / approval policy
+  -> fair queue and one uninterrupted browser operation
+  -> inspect exact visible actor, target, and precondition
+  -> snapshot and validate local assets when present
+  -> build an internal typed action command
+  -> recheck target, state, and attachment hashes
   -> perform one narrow final UI action
   -> verify visible postcondition
-  -> record verified | failed | uncertain in process memory
+  -> return verified | failed | uncertain with immutable evidence
 ```
 
-An uncertain in-process result is not automatically retried. A hard process
-exit loses the attempt record, so an operator or agent must inspect visible
-LinkedIn state before preparing any follow-up.
+Invitation actions resolve exact member profiles rather than selecting a member
+from a broad list scan. Message, post, comment, and reaction actions bind the
+exact visible destination in the same operation. There is no public draft,
+preview, scope grant, or idempotency key.
+
+An uncertain result is never automatically retried. Every new tool invocation
+is a new action, so an operator or agent must inspect visible LinkedIn state
+before deciding whether another invocation is safe.
 
 ## LangGraph integration
 
@@ -420,10 +382,8 @@ LangGraph connects as an MCP client. A graph typically:
 4. consumes structured observations and evidence;
 5. ranks or deduplicates in graph state;
 6. checkpoints graph state in the application's own checkpointer;
-7. calls a prepare tool when it wants to propose a write;
-8. passes the exact execute call through the configured MCP client approval
-   policy;
-9. continues based on the verified result or later read observations.
+7. calls an action tool through the configured MCP client policy; and
+8. continues based on the terminal result or later read observations.
 
 The LangGraph checkpointer is independent of the MCP server. It may use
 PostgreSQL, SQLite, Redis, or another backend without changing this server.
@@ -441,7 +401,7 @@ A new vertical slice normally requires:
 
 1. strict input, output, observation, and coverage models;
 2. a stable capability name and version;
-3. exact surfaces, scopes, and effect;
+3. exact required visible surfaces and read/write effect;
 4. a narrow page-object provider;
 5. bounded visible extraction or mutation;
 6. field evidence and safe error mapping;
@@ -449,6 +409,6 @@ A new vertical slice normally requires:
 8. executor and protocol tests;
 9. capability-matrix and build-status updates.
 
-A new write must additionally define separate prepare and execute tools,
-immutable preview contents, idempotency behavior, asset rules, visible
-preconditions, and a provable terminal postcondition.
+A new write must additionally define one direct typed tool, internal target
+inspection, asset-integrity rules, visible preconditions, cancellation
+behavior, and a provable terminal postcondition.

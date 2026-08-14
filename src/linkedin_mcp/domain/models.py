@@ -114,17 +114,6 @@ CommentReference = Annotated[
     str,
     StringConstraints(pattern=r"^comment:(?:activity|share|ugc-post):[0-9]{5,30}:[0-9]{1,30}$"),
 ]
-ActionId = Annotated[
-    str,
-    StringConstraints(
-        min_length=36,
-        max_length=36,
-        pattern=(
-            r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-"
-            r"[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-        ),
-    ),
-]
 PayloadHash = Annotated[
     str,
     StringConstraints(min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$"),
@@ -157,7 +146,6 @@ LinkedInFacetLabels = Annotated[
 
 class CapabilityEffect(StrEnum):
     READ = "read"
-    PREPARE = "prepare"
     WRITE = "write"
 
 
@@ -171,25 +159,18 @@ class CapabilityName(StrEnum):
     POSTS_SEARCH = "linkedin.posts.search"
     POSTS_GET = "linkedin.posts.get"
     POST_COMMENTS_LIST = "linkedin.posts.comments.list"
-    POSTS_CREATE_PREPARE = "linkedin.posts.create.prepare"
-    POSTS_CREATE_EXECUTE = "linkedin.posts.create.execute"
-    POST_COMMENT_PREPARE = "linkedin.posts.comment.prepare"
-    POST_COMMENT_EXECUTE = "linkedin.posts.comment.execute"
-    POST_REACTION_PREPARE = "linkedin.posts.reaction.prepare"
-    POST_REACTION_EXECUTE = "linkedin.posts.reaction.execute"
+    POSTS_CREATE = "linkedin.posts.create"
+    POST_COMMENT = "linkedin.posts.comment"
+    POST_REACT = "linkedin.posts.react"
     INVITATIONS_LIST = "linkedin.invitations.list"
     CONNECTIONS_LIST = "linkedin.connections.list"
     CONNECTIONS_SEARCH = "linkedin.connections.search"
-    INVITATION_SEND_PREPARE = "linkedin.invitations.send.prepare"
-    INVITATION_SEND_EXECUTE = "linkedin.invitations.send.execute"
-    INVITATION_ACCEPT_PREPARE = "linkedin.invitations.accept.prepare"
-    INVITATION_ACCEPT_EXECUTE = "linkedin.invitations.accept.execute"
-    INVITATION_IGNORE_PREPARE = "linkedin.invitations.ignore.prepare"
-    INVITATION_IGNORE_EXECUTE = "linkedin.invitations.ignore.execute"
+    INVITATION_SEND = "linkedin.invitations.send"
+    INVITATION_ACCEPT = "linkedin.invitations.accept"
+    INVITATION_IGNORE = "linkedin.invitations.ignore"
     MESSAGING_SEARCH = "linkedin.messaging.search"
     MESSAGING_CONVERSATION_GET = "linkedin.messaging.conversation.get"
-    MESSAGING_MESSAGE_PREPARE = "linkedin.messaging.message.prepare"
-    MESSAGING_MESSAGE_EXECUTE = "linkedin.messaging.message.execute"
+    MESSAGING_SEND = "linkedin.messaging.send"
 
 
 class LinkedInSurface(StrEnum):
@@ -223,7 +204,6 @@ class SourceType(StrEnum):
     CONNECTIONS = "linkedin_connections"
     MESSAGING_INBOX = "linkedin_messaging_inbox"
     MESSAGING_CONVERSATION = "linkedin_messaging_conversation"
-    ACTION_PREPARATION = "linkedin_action_preparation"
     ACTION_EXECUTION = "linkedin_action_execution"
 
 
@@ -561,15 +541,6 @@ class ActionType(StrEnum):
     POST_CREATE = "post_create"
     COMMENT_CREATE = "comment_create"
     REACTION_SET = "reaction_set"
-
-
-class ActionStatus(StrEnum):
-    READY_FOR_CONFIRMATION = "ready_for_confirmation"
-    EXECUTING = "executing"
-    VERIFIED = "verified"
-    FAILED = "failed"
-    UNCERTAIN = "uncertain"
-    EXPIRED = "expired"
 
 
 class ActionOutcome(StrEnum):
@@ -1490,7 +1461,7 @@ class PostCollaboratorInput(StrictModel):
         return self
 
 
-class PostCreatePrepareInput(StrictModel):
+class PostCreateInput(StrictModel):
     context_id: Identifier
     request_id: Identifier
     content: PostCreateContent
@@ -1502,7 +1473,7 @@ class PostCreatePrepareInput(StrictModel):
     scheduled_at: datetime | None = None
 
     @model_validator(mode="after")
-    def validate_schedule_shape(self) -> PostCreatePrepareInput:
+    def validate_schedule_shape(self) -> PostCreateInput:
         if self.scheduled_at is not None and self.scheduled_at.utcoffset() is None:
             raise ValueError("scheduled_at must include a timezone offset")
         if (self.audience is PostAudience.GROUP) != (self.group_target is not None):
@@ -1544,7 +1515,7 @@ CommentAttachment = Annotated[
 ]
 
 
-class PostCommentPrepareInput(StrictModel):
+class PostCommentInput(StrictModel):
     context_id: Identifier
     request_id: Identifier
     post_ref: PostReference
@@ -1553,7 +1524,7 @@ class PostCommentPrepareInput(StrictModel):
     attachment: CommentAttachment | None = None
 
     @model_validator(mode="after")
-    def validate_comment_content(self) -> PostCommentPrepareInput:
+    def validate_comment_content(self) -> PostCommentInput:
         if self.text is None and self.attachment is None:
             raise ValueError("A comment requires text, a photo, or a GIF")
         if self.mentions and self.text is None:
@@ -1570,7 +1541,7 @@ class PostCommentPrepareInput(StrictModel):
         return self
 
 
-class PostReactionPrepareInput(StrictModel):
+class PostReactionInput(StrictModel):
     context_id: Identifier
     request_id: Identifier
     post_ref: PostReference
@@ -1748,7 +1719,7 @@ class ConversationGetInput(ConversationTargetInput):
     ] = 50
 
 
-class InvitationSendPrepareInput(StrictModel):
+class InvitationSendInput(StrictModel):
     context_id: Identifier
     request_id: Identifier
     profile_slug: ProfileSlug
@@ -1768,13 +1739,13 @@ class InvitationSendPrepareInput(StrictModel):
     ) = None
 
 
-class InvitationAcceptPrepareInput(StrictModel):
+class InvitationAcceptInput(StrictModel):
     context_id: Identifier
     request_id: Identifier
     profile_slug: ProfileSlug
 
 
-class InvitationIgnorePrepareInput(StrictModel):
+class InvitationIgnoreInput(StrictModel):
     context_id: Identifier
     request_id: Identifier
     profile_slug: ProfileSlug
@@ -1798,7 +1769,7 @@ class MessageGifInput(StrictModel):
     ]
 
 
-class MessagePrepareInput(ConversationTargetInput):
+class MessageSendInput(ConversationTargetInput):
     context_id: Identifier
     request_id: Identifier
     message: (
@@ -1824,17 +1795,17 @@ class MessagePrepareInput(ConversationTargetInput):
         default=None,
         description=(
             "Optional exact message_ref from conversation.get. LinkedIn's visible reply "
-            "control is bound to this message before the confirmed content is sent."
+            "control is bound to this message before the requested content is sent."
         ),
     )
 
     @model_validator(mode="after")
-    def validate_message_content(self) -> MessagePrepareInput:
+    def validate_message_content(self) -> MessageSendInput:
         if self.message is None and not self.attachments and self.gif is None:
             raise ValueError("A message requires text, one or more attachments, or a GIF")
         if self.gif is not None and (self.message is not None or self.attachments):
             raise ValueError(
-                "A GIF is an immediate-send LinkedIn action and cannot share a draft "
+                "A GIF is an immediate-send LinkedIn action and cannot be combined "
                 "with text or file attachments"
             )
         refs = tuple(attachment.asset_ref for attachment in self.attachments)
@@ -3158,10 +3129,10 @@ class MessageSendPayload(StrictModel):
         ]
         | None
     ) = None
-    assets: Annotated[tuple[PreparedPostAsset, ...], Field(max_length=20)] = ()
+    assets: Annotated[tuple[ActionAssetSnapshot, ...], Field(max_length=20)] = ()
 
     @model_validator(mode="after")
-    def validate_prepared_message_content(self) -> MessageSendPayload:
+    def validate_message_asset_snapshots(self) -> MessageSendPayload:
         if self.message is None and not self.attachment_refs and self.gif is None:
             raise ValueError("A message payload requires text, attachments, or a GIF")
         if self.gif is not None and (
@@ -3171,15 +3142,15 @@ class MessageSendPayload(StrictModel):
         if len(set(self.attachment_refs)) != len(self.attachment_refs):
             raise ValueError("Message attachment references must be unique")
         if tuple(asset.asset_ref for asset in self.assets) != self.attachment_refs:
-            raise ValueError("Prepared message assets do not match the typed attachments")
+            raise ValueError("Message asset snapshots do not match the typed attachments")
         if any(asset.role is not PostAssetRole.MESSAGE_ATTACHMENT for asset in self.assets):
-            raise ValueError("A message payload contains an invalid prepared asset role")
+            raise ValueError("A message payload contains an invalid snapshotted asset role")
         if sum(asset.size_bytes for asset in self.assets) > 20 * 1024 * 1024:
             raise ValueError("Combined LinkedIn desktop message attachments exceed 20 MB")
         return self
 
 
-class PreparedPostAsset(StrictModel):
+class ActionAssetSnapshot(StrictModel):
     asset_ref: AssetReference
     role: PostAssetRole
     sha256: PayloadHash
@@ -3199,10 +3170,10 @@ class PostCreatePayload(StrictModel):
     brand_partnership: bool = False
     collaborators: Annotated[tuple[PostCollaboratorInput, ...], Field(max_length=5)] = ()
     scheduled_at: datetime | None = None
-    assets: Annotated[tuple[PreparedPostAsset, ...], Field(max_length=24)] = ()
+    assets: Annotated[tuple[ActionAssetSnapshot, ...], Field(max_length=24)] = ()
 
     @model_validator(mode="after")
-    def validate_prepared_assets(self) -> PostCreatePayload:
+    def validate_post_asset_snapshots(self) -> PostCreatePayload:
         expected: list[tuple[AssetReference, PostAssetRole]] = []
         if isinstance(self.content, ImagePostContent):
             expected.extend((image.asset_ref, PostAssetRole.IMAGE) for image in self.content.images)
@@ -3235,7 +3206,7 @@ class PostCreatePayload(StrictModel):
             )
         actual = [(asset.asset_ref, asset.role) for asset in self.assets]
         if actual != expected:
-            raise ValueError("Prepared post assets do not exactly match the typed content")
+            raise ValueError("Post asset snapshots do not exactly match the typed content")
         if self.scheduled_at is not None and self.scheduled_at.utcoffset() is None:
             raise ValueError("scheduled_at must include a timezone offset")
         if (self.audience is PostAudience.GROUP) != (self.group_target is not None):
@@ -3258,7 +3229,7 @@ class CommentCreatePayload(StrictModel):
     text: Annotated[str, Field(min_length=1, max_length=3_000)] | None = None
     mentions: Annotated[tuple[PostMentionInput, ...], Field(max_length=20)] = ()
     attachment: CommentAttachment | None = None
-    assets: Annotated[tuple[PreparedPostAsset, ...], Field(max_length=1)] = ()
+    assets: Annotated[tuple[ActionAssetSnapshot, ...], Field(max_length=1)] = ()
 
     @model_validator(mode="after")
     def validate_comment_payload(self) -> CommentCreatePayload:
@@ -3271,13 +3242,13 @@ class CommentCreatePayload(StrictModel):
         )
         if expected_ref is None:
             if self.assets:
-                raise ValueError("A non-photo comment cannot carry a prepared local asset")
+                raise ValueError("A non-photo comment cannot carry a snapshotted local asset")
         elif (
             len(self.assets) != 1
             or self.assets[0].asset_ref != expected_ref
             or self.assets[0].role is not PostAssetRole.COMMENT_IMAGE
         ):
-            raise ValueError("The prepared comment photo does not match the typed attachment")
+            raise ValueError("The snapshotted comment photo does not match the typed attachment")
         return self
 
 
@@ -3300,173 +3271,27 @@ ActionPayload = Annotated[
 ]
 
 
-class ActionApprovalPreview(StrictModel):
-    """Exact action details displayed by the MCP client before execution."""
+class ActionCommand(StrictModel):
+    """Resolved action data used only during one queued tool invocation."""
 
-    action_id: ActionId
-    action_type: ActionType
-    summary: Annotated[
-        str,
-        Field(
-            min_length=1,
-            max_length=1_000,
-            description="Human-readable description of the exact LinkedIn action.",
-        ),
-    ]
-    external_effect: Annotated[
-        str,
-        Field(
-            min_length=1,
-            max_length=1_000,
-            description="The persistent LinkedIn account change caused by this action.",
-        ),
-    ]
-    target: ActionTarget
-    payload: ActionPayload
-    payload_hash: PayloadHash
-    expires_at: datetime
-
-    @model_validator(mode="after")
-    def payload_matches_action_type(self) -> ActionApprovalPreview:
-        if self.payload.action_type is not self.action_type:
-            raise ValueError("Approval preview payload type does not match action_type")
-        return self
-
-
-class ActionDraft(StrictModel):
-    action_id: ActionId
     action_type: ActionType
     target: ActionTarget
     payload: ActionPayload
-    payload_hash: PayloadHash
-    status: ActionStatus
-    created_at: datetime
-    expires_at: datetime
 
     @model_validator(mode="after")
-    def payload_matches_action_type(self) -> ActionDraft:
+    def payload_matches_action_type(self) -> ActionCommand:
         if self.payload.action_type is not self.action_type:
             raise ValueError("Action payload type does not match action_type")
         return self
 
 
-def action_approval_preview(draft: ActionDraft) -> ActionApprovalPreview:
-    """Build the canonical, human-readable confirmation envelope for a draft."""
-
-    target_name = draft.target.display_name
-    payload = draft.payload
-    if isinstance(payload, InvitationSendPayload):
-        summary = f"Send a LinkedIn connection invitation to {target_name}."
-        external_effect = (
-            "Creates a pending connection invitation and includes the exact optional note."
-        )
-    elif isinstance(payload, InvitationAcceptPayload):
-        summary = f"Accept {target_name}'s LinkedIn connection invitation."
-        external_effect = "Accepts the pending invitation and creates a first-degree connection."
-    elif isinstance(payload, InvitationIgnorePayload):
-        summary = f"Ignore {target_name}'s LinkedIn connection invitation."
-        external_effect = "Removes the pending incoming invitation without creating a connection."
-    elif isinstance(payload, MessageSendPayload):
-        if payload.gif is not None:
-            summary = f"Send the selected LinkedIn GIF to {target_name}."
-        else:
-            summary = f"Send a LinkedIn message to {target_name}."
-        external_effect = "Adds one outgoing message to the exact one-to-one LinkedIn conversation."
-    elif isinstance(payload, PostCreatePayload):
-        mode_label = payload.content.mode.value.replace("_", " ")
-        if payload.scheduled_at is None:
-            summary = f"Publish the prepared personal LinkedIn {mode_label} post."
-            effects = ["Publishes one post from the configured personal LinkedIn account."]
-        else:
-            summary = f"Schedule the prepared personal LinkedIn {mode_label} post."
-            effects = [
-                "Schedules one post from the configured personal LinkedIn account "
-                f"for {payload.scheduled_at.isoformat()}."
-            ]
-        if isinstance(payload.content, EventPostContent):
-            effects.append(
-                "Creates the configured LinkedIn Event when the final post is published."
-            )
-        elif isinstance(payload.content, HiringPostContent):
-            effects.append(
-                "Shares the exact existing job; LinkedIn may add hiring profile treatment, "
-                "Meet the Team context, or network notifications."
-            )
-        elif isinstance(payload.content, ExpertRequestPostContent):
-            effects.append("Publishes the configured expert-request category and location.")
-        if payload.brand_partnership:
-            effects.append("Marks the post as a brand partnership.")
-        if payload.collaborators:
-            names = ", ".join(
-                collaborator.display_name[:100] for collaborator in payload.collaborators
-            )
-            effects.append(f"Invites the confirmed collaborators: {names}.")
-        if payload.group_target is not None:
-            effects.append(f"Targets the exact group {payload.group_target.display_name}.")
-        external_effect = " ".join(effects)
-    elif isinstance(payload, CommentCreatePayload):
-        summary = "Publish the prepared LinkedIn comment."
-        external_effect = "Adds one top-level comment from the configured personal account."
-    else:
-        if payload.desired_reaction is ReactionState.NONE:
-            summary = "Remove the prepared LinkedIn reaction."
-        else:
-            summary = f"Set the LinkedIn reaction to {payload.desired_reaction.value}."
-        external_effect = (
-            "Changes the configured personal account's visible reaction on the exact target."
-        )
-    return ActionApprovalPreview(
-        action_id=draft.action_id,
-        action_type=draft.action_type,
-        summary=summary,
-        external_effect=external_effect,
-        target=draft.target,
-        payload=draft.payload,
-        payload_hash=draft.payload_hash,
-        expires_at=draft.expires_at,
-    )
-
-
-class ActionExecuteInput(StrictModel):
-    context_id: Identifier
-    request_id: Identifier
-    action_id: ActionId
-    payload_hash: PayloadHash
-    approval_preview: ActionApprovalPreview
-    idempotency_key: Identifier
-
-    @model_validator(mode="after")
-    def preview_matches_execution_identity(self) -> ActionExecuteInput:
-        if self.approval_preview.action_id != self.action_id:
-            raise ValueError("Approval preview action_id does not match action_id")
-        if self.approval_preview.payload_hash != self.payload_hash:
-            raise ValueError("Approval preview payload_hash does not match payload_hash")
-        return self
-
-
-class ActionPreparationCapture(StrictModel):
+class ActionInspection(StrictModel):
     target: ActionTarget
     current_state: Annotated[str, Field(min_length=1, max_length=200)]
     source_url: HttpUrl
     captured_text: Annotated[str, Field(min_length=1)]
     captured_at: datetime
     existing_reaction: ReactionState | None = None
-
-
-class ActionPrepareOutput(StrictModel):
-    status: Literal["ready_for_confirmation"] = "ready_for_confirmation"
-    context_id: Identifier
-    request_id: Identifier
-    draft: ActionDraft
-    approval_preview: ActionApprovalPreview
-    sources: tuple[SourceReference, ...]
-    replayed: bool = False
-
-    @model_validator(mode="after")
-    def preview_matches_draft(self) -> ActionPrepareOutput:
-        if self.approval_preview != action_approval_preview(self.draft):
-            raise ValueError("Approval preview does not match the immutable action draft")
-        return self
 
 
 class ActionPageResult(StrictModel):
@@ -3479,11 +3304,8 @@ class ActionPageResult(StrictModel):
     captured_at: datetime
 
 
-class ActionExecutionResult(StrictModel):
-    action_id: ActionId
+class ActionResult(StrictModel):
     action_type: ActionType
-    attempt_id: ActionId
-    idempotency_key: Identifier
     outcome: ActionOutcome
     performed: bool | None
     final_state: Annotated[str, Field(min_length=1, max_length=200)]
@@ -3492,13 +3314,12 @@ class ActionExecutionResult(StrictModel):
     completed_at: datetime
 
 
-class ActionExecuteOutput(StrictModel):
+class ActionOutput(StrictModel):
     status: Literal["completed"] = "completed"
     context_id: Identifier
     request_id: Identifier
-    result: ActionExecutionResult
+    result: ActionResult
     sources: tuple[SourceReference, ...]
-    replayed: bool = False
 
 
 class CapabilityInfo(StrictModel):
@@ -3506,9 +3327,7 @@ class CapabilityInfo(StrictModel):
     version: str
     effect: CapabilityEffect
     required_surfaces: tuple[LinkedInSurface, ...]
-    required_scopes: tuple[str, ...]
-    enabled: bool
-    disabled_reason: str | None = None
+    enabled: Literal[True] = True
 
 
 class CapabilityListOutput(StrictModel):

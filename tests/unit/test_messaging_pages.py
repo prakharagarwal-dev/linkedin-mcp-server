@@ -3,7 +3,6 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import cast
 
@@ -20,9 +19,9 @@ from linkedin_mcp.browser.pages import (
 )
 from linkedin_mcp.domain.evidence import source_from_conversation
 from linkedin_mcp.domain.models import (
-    ActionDraft,
+    ActionAssetSnapshot,
+    ActionCommand,
     ActionOutcome,
-    ActionStatus,
     ActionTarget,
     ActionType,
     ConversationCategory,
@@ -34,10 +33,9 @@ from linkedin_mcp.domain.models import (
     MessageDirection,
     MessageFileInput,
     MessageGifInput,
-    MessagePrepareInput,
+    MessageSendInput,
     MessageSendPayload,
     PostAssetRole,
-    PreparedPostAsset,
 )
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
 
@@ -130,10 +128,8 @@ def _message_draft(
     message: str = "Thanks for reaching out.",
     display_name: str = "Jane Doe",
     conversation_id: str | None = "thread-123",
-) -> ActionDraft:
-    now = datetime.now(UTC)
-    return ActionDraft(
-        action_id=str(uuid.uuid4()),
+) -> ActionCommand:
+    return ActionCommand(
         action_type=ActionType.MESSAGE_SEND,
         target=ActionTarget(
             profile_slug="jane-doe",
@@ -142,10 +138,6 @@ def _message_draft(
             conversation_id=conversation_id,
         ),
         payload=MessageSendPayload(message=message),
-        payload_hash="c" * 64,
-        status=ActionStatus.EXECUTING,
-        created_at=now,
-        expires_at=now + timedelta(hours=1),
     )
 
 
@@ -645,8 +637,8 @@ async def test_current_linkless_inbox_cards_are_readable_by_visible_reference() 
                     conversation_ref=reference,
                 )
             )
-            capture = await adapter.prepare_message(
-                MessagePrepareInput(
+            capture = await adapter.inspect_message(
+                MessageSendInput(
                     context_id="messaging-context",
                     request_id="current-linkless-message",
                     conversation_ref=reference,
@@ -760,25 +752,23 @@ async def test_conversation_read_is_direct_by_visible_conversation_id() -> None:
 
 
 @pytest.mark.timeout(20)
-async def test_message_prepare_and_execute_verify_a_new_exact_outgoing_bubble() -> None:
+async def test_message_action_verifies_a_new_exact_outgoing_bubble() -> None:
     html = (FIXTURES / "messaging-action.html").read_text()
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         adapter = ConversationPage(cast(BrowserManager, MessagingFixtureBrowser(page, html)))
         try:
-            capture = await adapter.prepare_message(
-                MessagePrepareInput(
+            capture = await adapter.inspect_message(
+                MessageSendInput(
                     context_id="context-1",
-                    request_id="prepare-message-1",
+                    request_id="action-message-1",
                     conversation_id="thread-123",
                     message="Thanks for reaching out.",
                 )
             )
-            now = datetime.now(UTC)
-            result = await adapter.execute_message(
-                ActionDraft(
-                    action_id=str(uuid.uuid4()),
+            result = await adapter.perform_message(
+                ActionCommand(
                     action_type=ActionType.MESSAGE_SEND,
                     target=ActionTarget(
                         profile_slug=capture.target.profile_slug,
@@ -787,10 +777,6 @@ async def test_message_prepare_and_execute_verify_a_new_exact_outgoing_bubble() 
                         conversation_id="thread-123",
                     ),
                     payload=MessageSendPayload(message="Thanks for reaching out."),
-                    payload_hash="c" * 64,
-                    status=ActionStatus.EXECUTING,
-                    created_at=now,
-                    expires_at=now + timedelta(hours=1),
                 )
             )
         finally:
@@ -822,29 +808,23 @@ async def test_message_reply_is_bound_to_the_exact_history_message_and_postcondi
                 )
             )
             replied_to = observation.messages[0]
-            capture = await adapter.prepare_message(
-                MessagePrepareInput(
+            capture = await adapter.inspect_message(
+                MessageSendInput(
                     context_id="messaging-context",
-                    request_id="reply-prepare",
+                    request_id="reply-action",
                     conversation_id="thread-123",
                     message="Yes, let us discuss it.",
                     reply_to_message_ref=replied_to.message_ref,
                 )
             )
-            now = datetime.now(UTC)
-            result = await adapter.execute_message(
-                ActionDraft(
-                    action_id=str(uuid.uuid4()),
+            result = await adapter.perform_message(
+                ActionCommand(
                     action_type=ActionType.MESSAGE_SEND,
                     target=capture.target,
                     payload=MessageSendPayload(
                         message="Yes, let us discuss it.",
                         reply_to_message_ref=replied_to.message_ref,
                     ),
-                    payload_hash="c" * 64,
-                    status=ActionStatus.EXECUTING,
-                    created_at=now,
-                    expires_at=now + timedelta(hours=1),
                 )
             )
         finally:
@@ -885,28 +865,22 @@ async def test_message_reply_never_claims_success_for_a_plain_outgoing_bubble() 
                 )
             )
             replied_to = observation.messages[0]
-            request = MessagePrepareInput(
+            request = MessageSendInput(
                 context_id="messaging-context",
-                request_id="plain-reply-prepare",
+                request_id="plain-reply-action",
                 conversation_id="thread-123",
                 message="This must remain a reply.",
                 reply_to_message_ref=replied_to.message_ref,
             )
-            capture = await adapter.prepare_message(request)
-            now = datetime.now(UTC)
-            result = await adapter.execute_message(
-                ActionDraft(
-                    action_id=str(uuid.uuid4()),
+            capture = await adapter.inspect_message(request)
+            result = await adapter.perform_message(
+                ActionCommand(
                     action_type=ActionType.MESSAGE_SEND,
                     target=capture.target,
                     payload=MessageSendPayload(
                         message=request.message,
                         reply_to_message_ref=request.reply_to_message_ref,
                     ),
-                    payload_hash="c" * 64,
-                    status=ActionStatus.EXECUTING,
-                    created_at=now,
-                    expires_at=now + timedelta(hours=1),
                 )
             )
         finally:
@@ -946,10 +920,10 @@ async def test_message_reply_fails_closed_for_a_visible_nonreplyable_message() -
                 )
             )
             with pytest.raises(InvalidTargetError, match="no unique Reply control"):
-                await adapter.prepare_message(
-                    MessagePrepareInput(
+                await adapter.inspect_message(
+                    MessageSendInput(
                         context_id="messaging-context",
-                        request_id="nonreplyable-prepare",
+                        request_id="nonreplyable-action",
                         conversation_id="thread-123",
                         message="This reply is unavailable.",
                         reply_to_message_ref=observation.messages[0].message_ref,
@@ -960,7 +934,7 @@ async def test_message_reply_fails_closed_for_a_visible_nonreplyable_message() -
 
 
 @pytest.mark.timeout(20)
-async def test_message_execution_accepts_exact_thread_when_profile_link_is_absent() -> None:
+async def test_message_action_accepts_exact_thread_when_profile_link_is_absent() -> None:
     html = (
         (FIXTURES / "messaging-action.html")
         .read_text()
@@ -975,7 +949,7 @@ async def test_message_execution_accepts_exact_thread_when_profile_link_is_absen
         try:
             result = await ConversationPage(
                 cast(BrowserManager, MessagingFixtureBrowser(page, html))
-            ).execute_message(_message_draft())
+            ).perform_message(_message_draft())
         finally:
             await browser.close()
 
@@ -985,7 +959,7 @@ async def test_message_execution_accepts_exact_thread_when_profile_link_is_absen
 
 
 @pytest.mark.timeout(60)
-async def test_message_execution_revalidates_exact_profile_after_stale_compose_overlay() -> None:
+async def test_message_action_revalidates_exact_profile_after_stale_compose_overlay() -> None:
     thread_html = (
         (FIXTURES / "messaging-action.html")
         .read_text()
@@ -1021,7 +995,7 @@ async def test_message_execution_revalidates_exact_profile_after_stale_compose_o
                         },
                     ),
                 )
-            ).execute_message(_message_draft())
+            ).perform_message(_message_draft())
         finally:
             await browser.close()
 
@@ -1041,25 +1015,19 @@ async def test_profile_message_does_not_fallback_when_exact_overlay_disappears()
         page = await browser.new_page()
         adapter = ConversationPage(cast(BrowserManager, MessagingFixtureBrowser(page, html)))
         try:
-            capture = await adapter.prepare_message(
-                MessagePrepareInput(
+            capture = await adapter.inspect_message(
+                MessageSendInput(
                     context_id="context-profile-overlay",
-                    request_id="prepare-profile-overlay",
+                    request_id="action-profile-overlay",
                     profile_slug="jane-doe",
                     message="One bounded send.",
                 )
             )
-            now = datetime.now(UTC)
-            result = await adapter.execute_message(
-                ActionDraft(
-                    action_id=str(uuid.uuid4()),
+            result = await adapter.perform_message(
+                ActionCommand(
                     action_type=ActionType.MESSAGE_SEND,
                     target=capture.target,
                     payload=MessageSendPayload(message="One bounded send."),
-                    payload_hash="c" * 64,
-                    status=ActionStatus.EXECUTING,
-                    created_at=now,
-                    expires_at=now + timedelta(hours=1),
                 )
             )
         finally:
@@ -1078,9 +1046,9 @@ async def test_message_read_and_hash_locked_file_send_cover_visible_attachments(
     html = (MESSAGING_FIXTURES / "current.html").read_text()
     asset = tmp_path / "candidate-brief.pdf"
     asset.write_bytes(b"%PDF-1.4 fixture")
-    request = MessagePrepareInput(
+    request = MessageSendInput(
         context_id="messaging-context",
-        request_id="attachment-prepare",
+        request_id="attachment-action",
         conversation_id="thread-123",
         message="Here is the brief.",
         attachments=(MessageFileInput(asset_ref=asset.name),),
@@ -1107,12 +1075,10 @@ async def test_message_read_and_hash_locked_file_send_cover_visible_attachments(
                 max_messages=50,
             )
             source_from_conversation(observation)
-            capture = await adapter.prepare_message(request)
-            assets = await adapter.prepare_message_assets(request)
-            now = datetime.now(UTC)
-            result = await adapter.execute_message(
-                ActionDraft(
-                    action_id=str(uuid.uuid4()),
+            capture = await adapter.inspect_message(request)
+            assets = await adapter.snapshot_message_assets(request)
+            result = await adapter.perform_message(
+                ActionCommand(
                     action_type=ActionType.MESSAGE_SEND,
                     target=capture.target,
                     payload=MessageSendPayload(
@@ -1120,10 +1086,6 @@ async def test_message_read_and_hash_locked_file_send_cover_visible_attachments(
                         attachment_refs=(asset.name,),
                         assets=assets,
                     ),
-                    payload_hash="c" * 64,
-                    status=ActionStatus.EXECUTING,
-                    created_at=now,
-                    expires_at=now + timedelta(hours=1),
                 )
             )
         finally:
@@ -1145,9 +1107,9 @@ async def test_image_send_verifies_with_duplicate_dom_wrappers_and_generic_previ
     html = (MESSAGING_FIXTURES / "sent-image-duplicate-dom.html").read_text()
     asset = tmp_path / "candidate-photo.png"
     asset.write_bytes(b"PNG fixture")
-    request = MessagePrepareInput(
+    request = MessageSendInput(
         context_id="messaging-context",
-        request_id="image-prepare",
+        request_id="image-action",
         conversation_id="thread-123",
         message="Here is the image.",
         attachments=(MessageFileInput(asset_ref=asset.name),),
@@ -1161,12 +1123,10 @@ async def test_image_send_verifies_with_duplicate_dom_wrappers_and_generic_previ
             asset_store=asset_store,
         )
         try:
-            capture = await adapter.prepare_message(request)
-            assets = await adapter.prepare_message_assets(request)
-            now = datetime.now(UTC)
-            result = await adapter.execute_message(
-                ActionDraft(
-                    action_id=str(uuid.uuid4()),
+            capture = await adapter.inspect_message(request)
+            assets = await adapter.snapshot_message_assets(request)
+            result = await adapter.perform_message(
+                ActionCommand(
                     action_type=ActionType.MESSAGE_SEND,
                     target=capture.target,
                     payload=MessageSendPayload(
@@ -1174,10 +1134,6 @@ async def test_image_send_verifies_with_duplicate_dom_wrappers_and_generic_previ
                         attachment_refs=(asset.name,),
                         assets=assets,
                     ),
-                    payload_hash="c" * 64,
-                    status=ActionStatus.EXECUTING,
-                    created_at=now,
-                    expires_at=now + timedelta(hours=1),
                 )
             )
         finally:
@@ -1190,11 +1146,11 @@ async def test_image_send_verifies_with_duplicate_dom_wrappers_and_generic_previ
 
 
 @pytest.mark.timeout(30)
-async def test_message_gif_is_prepared_then_verified_as_one_immediate_send() -> None:
+async def test_message_gif_is_verified_as_one_immediate_send() -> None:
     html = (MESSAGING_FIXTURES / "current.html").read_text()
-    request = MessagePrepareInput(
+    request = MessageSendInput(
         context_id="messaging-context",
-        request_id="gif-prepare",
+        request_id="gif-action",
         conversation_id="thread-123",
         gif=MessageGifInput(
             search_query="celebration",
@@ -1206,22 +1162,16 @@ async def test_message_gif_is_prepared_then_verified_as_one_immediate_send() -> 
         page = await browser.new_page()
         try:
             adapter = ConversationPage(cast(BrowserManager, MessagingFixtureBrowser(page, html)))
-            capture = await adapter.prepare_message(request)
-            now = datetime.now(UTC)
-            draft = ActionDraft(
-                action_id=str(uuid.uuid4()),
+            capture = await adapter.inspect_message(request)
+            command = ActionCommand(
                 action_type=ActionType.MESSAGE_SEND,
                 target=capture.target,
                 payload=MessageSendPayload(gif=request.gif),
-                payload_hash="c" * 64,
-                status=ActionStatus.EXECUTING,
-                created_at=now,
-                expires_at=now + timedelta(hours=1),
             )
-            result = await adapter.execute_message(draft)
+            result = await adapter.perform_message(command)
             uncertain = await ConversationPage(
                 cast(BrowserManager, FailingGifClickBrowser(page, html))
-            ).execute_message(draft)
+            ).perform_message(command)
         finally:
             await browser.close()
 
@@ -1266,13 +1216,13 @@ async def test_every_document_image_and_video_message_format_is_hash_locked(
     for index, extension in enumerate(extensions):
         path = tmp_path / f"asset-{index}{extension}"
         path.write_bytes(b"fixture")
-        request = MessagePrepareInput(
+        request = MessageSendInput(
             context_id="messaging-context",
             request_id=f"desktop-format-{index}",
             conversation_id="thread-123",
             attachments=(MessageFileInput(asset_ref=path.name),),
         )
-        assets = await LocalAssetStore(tmp_path).prepare_message(request)
+        assets = await LocalAssetStore(tmp_path).snapshot_message(request)
         assert len(assets) == 1
         assert assets[0].role is PostAssetRole.MESSAGE_ATTACHMENT
 
@@ -1283,18 +1233,16 @@ async def test_message_attachment_hash_drift_fails_before_browser_access(
 ) -> None:
     path = tmp_path / "brief.pdf"
     path.write_bytes(b"confirmed")
-    request = MessagePrepareInput(
+    request = MessageSendInput(
         context_id="messaging-context",
         request_id="hash-lock",
         conversation_id="thread-123",
         attachments=(MessageFileInput(asset_ref=path.name),),
     )
     asset_store = LocalAssetStore(tmp_path)
-    assets = await asset_store.prepare_message(request)
+    assets = await asset_store.snapshot_message(request)
     path.write_bytes(b"changed")
-    now = datetime.now(UTC)
-    draft = ActionDraft(
-        action_id=str(uuid.uuid4()),
+    command = ActionCommand(
         action_type=ActionType.MESSAGE_SEND,
         target=ActionTarget(
             profile_slug="jane-doe",
@@ -1306,28 +1254,24 @@ async def test_message_attachment_hash_drift_fails_before_browser_access(
             attachment_refs=(path.name,),
             assets=assets,
         ),
-        payload_hash="c" * 64,
-        status=ActionStatus.EXECUTING,
-        created_at=now,
-        expires_at=now + timedelta(hours=1),
     )
 
-    with pytest.raises(InvalidTargetError, match="changed after confirmation"):
+    with pytest.raises(InvalidTargetError, match="changed during the action"):
         await ConversationPage(
             cast(BrowserManager, object()),
             asset_store=asset_store,
-        ).execute_message(draft)
+        ).perform_message(command)
 
 
 def test_message_content_modes_are_exact_and_mutually_safe() -> None:
     with pytest.raises(ValidationError, match="requires text"):
-        MessagePrepareInput(
+        MessageSendInput(
             context_id="messaging-context",
             request_id="empty-message",
             conversation_id="thread-123",
         )
     with pytest.raises(ValidationError, match="immediate-send"):
-        MessagePrepareInput(
+        MessageSendInput(
             context_id="messaging-context",
             request_id="mixed-gif",
             conversation_id="thread-123",
@@ -1338,7 +1282,7 @@ def test_message_content_modes_are_exact_and_mutually_safe() -> None:
             ),
         )
     oversized = tuple(
-        PreparedPostAsset(
+        ActionAssetSnapshot(
             asset_ref=f"asset-{index}.pdf",
             role=PostAssetRole.MESSAGE_ATTACHMENT,
             sha256=f"{index + 1:x}" * 64,
@@ -1355,7 +1299,7 @@ def test_message_content_modes_are_exact_and_mutually_safe() -> None:
 
 
 @pytest.mark.timeout(20)
-async def test_message_prepare_rejects_groups_missing_identity_and_inmail() -> None:
+async def test_message_inspection_rejects_groups_missing_identity_and_inmail() -> None:
     base = (FIXTURES / "messaging-action.html").read_text()
     group_html = base.replace(
         '<a href="/in/jane-doe/">Jane Doe</a>',
@@ -1379,8 +1323,8 @@ async def test_message_prepare_rejects_groups_missing_identity_and_inmail() -> N
                     cast(BrowserManager, MessagingFixtureBrowser(page, html))
                 )
                 with pytest.raises(InvalidTargetError, match=message):
-                    await adapter.prepare_message(
-                        MessagePrepareInput(
+                    await adapter.inspect_message(
+                        MessageSendInput(
                             context_id="messaging-context",
                             request_id=f"reject-{uuid.uuid4().hex}",
                             conversation_id="thread-123",
@@ -1399,15 +1343,15 @@ async def test_profile_target_uses_exact_visible_message_button_and_same_overlay
         page = await browser.new_page()
         adapter = ConversationPage(cast(BrowserManager, MessagingFixtureBrowser(page, html)))
         try:
-            capture = await adapter.prepare_message(
-                MessagePrepareInput(
+            capture = await adapter.inspect_message(
+                MessageSendInput(
                     context_id="messaging-context",
-                    request_id="profile-message-prepare",
+                    request_id="profile-message-action",
                     profile_slug="jane-doe",
                     message="Hello from the profile.",
                 )
             )
-            result = await adapter.execute_message(
+            result = await adapter.perform_message(
                 _message_draft(
                     message="Hello from the profile.",
                     conversation_id=None,
@@ -1434,15 +1378,15 @@ async def test_profile_target_accepts_same_window_exact_thread_after_message_cli
         page = await browser.new_page()
         adapter = ConversationPage(cast(BrowserManager, MessagingFixtureBrowser(page, html)))
         try:
-            capture = await adapter.prepare_message(
-                MessagePrepareInput(
+            capture = await adapter.inspect_message(
+                MessageSendInput(
                     context_id="messaging-context",
-                    request_id="profile-message-thread-prepare",
+                    request_id="profile-message-thread-action",
                     profile_slug="jane-doe",
                     message="Hello from the profile thread.",
                 )
             )
-            result = await adapter.execute_message(
+            result = await adapter.perform_message(
                 _message_draft(
                     message="Hello from the profile thread.",
                     conversation_id=None,
@@ -1473,15 +1417,15 @@ async def test_profile_target_follows_exact_message_href_in_current_page() -> No
             )
         )
         try:
-            capture = await adapter.prepare_message(
-                MessagePrepareInput(
+            capture = await adapter.inspect_message(
+                MessageSendInput(
                     context_id="messaging-context",
-                    request_id="profile-message-popup-prepare",
+                    request_id="profile-message-popup-action",
                     profile_slug="jane-doe",
                     message="Hello from the profile popup.",
                 )
             )
-            result = await adapter.execute_message(
+            result = await adapter.perform_message(
                 _message_draft(
                     message="Hello from the profile popup.",
                     conversation_id=None,
@@ -1553,10 +1497,10 @@ async def test_profile_target_leaves_named_blank_page_unchanged() -> None:
             )
         )
         try:
-            capture = await adapter.prepare_message(
-                MessagePrepareInput(
+            capture = await adapter.inspect_message(
+                MessageSendInput(
                     context_id="messaging-context",
-                    request_id="profile-message-named-page-prepare",
+                    request_id="profile-message-named-page-action",
                     profile_slug="jane-doe",
                     message="Draft only.",
                 )
@@ -1585,8 +1529,8 @@ async def test_profile_target_accepts_a_visible_message_link_action() -> None:
         try:
             capture = await ConversationPage(
                 cast(BrowserManager, MessagingFixtureBrowser(page, html))
-            ).prepare_message(
-                MessagePrepareInput(
+            ).inspect_message(
+                MessageSendInput(
                     context_id="messaging-context",
                     request_id="profile-message-link",
                     profile_slug="jane-doe",
@@ -1663,8 +1607,8 @@ async def test_profile_message_fails_closed_for_ambiguous_button_or_existing_dra
                         cast(BrowserManager, MessagingFixtureBrowser(page, html))
                     )
                     with pytest.raises(InvalidTargetError, match=error):
-                        await adapter.prepare_message(
-                            MessagePrepareInput(
+                        await adapter.inspect_message(
+                            MessageSendInput(
                                 context_id="messaging-context",
                                 request_id=f"compose-reject-{uuid.uuid4().hex}",
                                 profile_slug="jane-doe",
@@ -1693,8 +1637,8 @@ async def test_profile_target_rejects_nonconnection() -> None:
                 cast(BrowserManager, MessagingFixtureBrowser(page, nonconnection_html))
             )
             with pytest.raises(InvalidTargetError, match="first-degree"):
-                await adapter.prepare_message(
-                    MessagePrepareInput(
+                await adapter.inspect_message(
+                    MessageSendInput(
                         context_id="messaging-context",
                         request_id=f"profile-reject-{uuid.uuid4().hex}",
                         profile_slug="jane-doe",
@@ -1742,8 +1686,8 @@ async def test_profile_message_rejects_missing_or_conflicting_identity_evidence(
                 cast(BrowserManager, MessagingFixtureBrowser(page, missing_heading))
             )
             with pytest.raises(ParserDriftError, match="member heading"):
-                await missing_adapter.prepare_message(
-                    MessagePrepareInput(
+                await missing_adapter.inspect_message(
+                    MessageSendInput(
                         context_id="messaging-context",
                         request_id="missing-profile-heading",
                         profile_slug="jane-doe",
@@ -1767,8 +1711,8 @@ async def test_profile_message_rejects_missing_or_conflicting_identity_evidence(
                     cast(BrowserManager, MessagingFixtureBrowser(page, html))
                 )
                 with pytest.raises(exception, match=error):
-                    await adapter.prepare_message(
-                        MessagePrepareInput(
+                    await adapter.inspect_message(
+                        MessageSendInput(
                             context_id="messaging-context",
                             request_id=f"identity-reject-{uuid.uuid4().hex}",
                             profile_slug="jane-doe",
@@ -1790,7 +1734,7 @@ def test_recipient_name_matching_is_case_insensitive_and_boundary_safe() -> None
 
 
 @pytest.mark.timeout(20)
-async def test_message_execution_fails_closed_for_changed_target_limits_and_controls() -> None:
+async def test_message_action_fails_closed_for_changed_target_limits_and_controls() -> None:
     base = (FIXTURES / "messaging-action.html").read_text()
     cases = (
         (
@@ -1837,10 +1781,10 @@ async def test_message_execution_fails_closed_for_changed_target_limits_and_cont
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         try:
-            for html, draft, expected_state, expected_outcome, expected_detail in cases:
+            for html, command, expected_state, expected_outcome, expected_detail in cases:
                 result = await ConversationPage(
                     cast(BrowserManager, MessagingFixtureBrowser(page, html))
-                ).execute_message(draft)
+                ).perform_message(command)
                 assert result.final_state == expected_state
                 assert result.outcome is expected_outcome
                 if expected_detail is not None:
@@ -1848,7 +1792,7 @@ async def test_message_execution_fails_closed_for_changed_target_limits_and_cont
 
             uncertain = await ConversationPage(
                 cast(BrowserManager, FailingMessageClickBrowser(page, base))
-            ).execute_message(_message_draft())
+            ).perform_message(_message_draft())
         finally:
             await browser.close()
 
@@ -1933,9 +1877,7 @@ async def test_composer_fallbacks_and_message_extraction_remain_bounded() -> Non
 
 @pytest.mark.asyncio
 async def test_message_action_payload_type_is_enforced_before_browser_access() -> None:
-    now = datetime.now(UTC)
-    wrong = ActionDraft(
-        action_id=str(uuid.uuid4()),
+    wrong = ActionCommand(
         action_type=ActionType.INVITATION_SEND,
         target=ActionTarget(
             profile_slug="jane-doe",
@@ -1943,14 +1885,10 @@ async def test_message_action_payload_type_is_enforced_before_browser_access() -
             display_name="Jane Doe",
         ),
         payload=InvitationSendPayload(note=None),
-        payload_hash="d" * 64,
-        status=ActionStatus.EXECUTING,
-        created_at=now,
-        expires_at=now + timedelta(hours=1),
     )
 
     with pytest.raises(InvalidTargetError, match="message action payload"):
-        await ConversationPage(cast(BrowserManager, object())).execute_message(wrong)
+        await ConversationPage(cast(BrowserManager, object())).perform_message(wrong)
 
 
 @pytest.mark.timeout(20)
@@ -1979,7 +1917,7 @@ def test_conversation_inputs_require_exactly_one_target() -> None:
             request_id="missing-target",
         )
     with pytest.raises(ValidationError, match="Exactly one"):
-        MessagePrepareInput(
+        MessageSendInput(
             context_id="messaging-context",
             request_id="two-targets",
             profile_slug="jane-doe",
@@ -2011,7 +1949,7 @@ def test_action_draft_rejects_a_payload_from_another_action_type() -> None:
     valid = _message_draft()
 
     with pytest.raises(ValidationError, match="does not match"):
-        ActionDraft.model_validate(
+        ActionCommand.model_validate(
             {
                 **valid.model_dump(mode="json"),
                 "action_type": ActionType.INVITATION_SEND.value,

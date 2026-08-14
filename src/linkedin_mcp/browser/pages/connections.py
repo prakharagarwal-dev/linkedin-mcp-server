@@ -23,21 +23,21 @@ from linkedin_mcp.browser.convergence import (
 )
 from linkedin_mcp.browser.manager import BrowserManager
 from linkedin_mcp.domain.models import (
-    ActionDraft,
+    ActionCommand,
+    ActionInspection,
     ActionOutcome,
     ActionPageResult,
-    ActionPreparationCapture,
     ActionTarget,
     ConnectionsListCoverage,
     ConnectionsListInput,
     ConnectionsSortBy,
     ConnectionSummary,
+    InvitationAcceptInput,
     InvitationAcceptPayload,
-    InvitationAcceptPrepareInput,
+    InvitationIgnoreInput,
     InvitationIgnorePayload,
-    InvitationIgnorePrepareInput,
+    InvitationSendInput,
     InvitationSendPayload,
-    InvitationSendPrepareInput,
     StopReason,
 )
 from linkedin_mcp.errors import InvalidTargetError, LinkedInMCPError, ParserDriftError
@@ -771,10 +771,10 @@ class InvitationActionPage:
     def __init__(self, browser: BrowserManager) -> None:
         self._browser = browser
 
-    async def prepare_send(
+    async def inspect_send(
         self,
-        request: InvitationSendPrepareInput,
-    ) -> ActionPreparationCapture:
+        request: InvitationSendInput,
+    ) -> ActionInspection:
         async with self._browser.page() as page:
             await self._browser.navigate(page, canonical_profile_url(request.profile_slug))
             main, name = await self._profile_identity(page)
@@ -791,13 +791,13 @@ class InvitationActionPage:
                 page.get_by_role("dialog"),
                 "invitation confirmation dialog",
             )
-            dialog = await self._validate_prepared_invitation_dialog(
+            dialog = await self._validate_invitation_dialog(
                 page,
                 dialog,
                 request.note,
             )
             captured_text = f"{await _visible_text(page)}\n{await dialog.inner_text()}".strip()
-            return ActionPreparationCapture(
+            return ActionInspection(
                 target=ActionTarget(
                     profile_slug=request.profile_slug,
                     profile_url=HttpUrl(canonical_profile_url(request.profile_slug)),
@@ -809,22 +809,22 @@ class InvitationActionPage:
                 captured_at=datetime.now(UTC),
             )
 
-    async def prepare_accept(
+    async def inspect_accept(
         self,
-        request: InvitationAcceptPrepareInput,
-    ) -> ActionPreparationCapture:
-        return await self._prepare_received_request(request.profile_slug)
+        request: InvitationAcceptInput,
+    ) -> ActionInspection:
+        return await self._inspect_received_request(request.profile_slug)
 
-    async def prepare_ignore(
+    async def inspect_ignore(
         self,
-        request: InvitationIgnorePrepareInput,
-    ) -> ActionPreparationCapture:
-        return await self._prepare_received_request(request.profile_slug)
+        request: InvitationIgnoreInput,
+    ) -> ActionInspection:
+        return await self._inspect_received_request(request.profile_slug)
 
-    async def _prepare_received_request(
+    async def _inspect_received_request(
         self,
         profile_slug: str,
-    ) -> ActionPreparationCapture:
+    ) -> ActionInspection:
         async with self._browser.page() as page:
             await self._browser.navigate(page, canonical_profile_url(profile_slug))
             main, name = await self._profile_identity(page)
@@ -835,7 +835,7 @@ class InvitationActionPage:
                 )
             captured_text = await _visible_text(page)
             reference = _received_invitation_ref(profile_slug)
-            return ActionPreparationCapture(
+            return ActionInspection(
                 target=ActionTarget(
                     profile_slug=profile_slug,
                     profile_url=HttpUrl(canonical_profile_url(profile_slug)),
@@ -848,7 +848,7 @@ class InvitationActionPage:
                 captured_at=datetime.now(UTC),
             )
 
-    async def _validate_prepared_invitation_dialog(
+    async def _validate_invitation_dialog(
         self,
         page: Page,
         dialog: Locator,
@@ -867,7 +867,7 @@ class InvitationActionPage:
                 raise ParserDriftError(
                     "The current invitation dialog has no unique Send without a note control."
                 )
-            await self._validate_prepared_send_control(send_without_note)
+            await self._validate_send_control(send_without_note)
             return dialog
 
         add_note = dialog.get_by_role("button", name=re.compile(r"^add a note$", re.I))
@@ -901,11 +901,11 @@ class InvitationActionPage:
         )
         if await send.count() != 1:
             raise ParserDriftError("The current note dialog has no unique Send invitation control.")
-        await self._validate_prepared_send_control(send)
+        await self._validate_send_control(send)
         return note_dialog
 
     @staticmethod
-    async def _validate_prepared_send_control(send: Locator) -> None:
+    async def _validate_send_control(send: Locator) -> None:
         if not await send.is_visible() or not await send.is_enabled():
             raise ParserDriftError("The current invitation Send control is not actionable.")
         try:
@@ -915,19 +915,19 @@ class InvitationActionPage:
                 "The current invitation Send control did not pass actionability checks."
             ) from error
 
-    async def execute_send(self, draft: ActionDraft) -> ActionPageResult:
-        if not isinstance(draft.payload, InvitationSendPayload):
+    async def perform_send(self, command: ActionCommand) -> ActionPageResult:
+        if not isinstance(command.payload, InvitationSendPayload):
             raise InvalidTargetError("The invitation action payload is invalid.")
         async with self._browser.page() as page:
-            await self._browser.navigate(page, canonical_profile_url(draft.target.profile_slug))
+            await self._browser.navigate(page, canonical_profile_url(command.target.profile_slug))
             main, name = await self._profile_identity(page)
-            if name.casefold() != draft.target.display_name.casefold():
+            if name.casefold() != command.target.display_name.casefold():
                 return await self._result(
                     page,
                     ActionOutcome.FAILED,
                     False,
                     "target_identity_changed",
-                    "The visible profile name changed after confirmation; prepare a new action.",
+                    "The visible profile name changed during the action; review before retrying.",
                 )
             state, connect = await self._wait_for_connect_control(page, main, name)
             if state in {"already_connected", "pending_sent"}:
@@ -944,7 +944,7 @@ class InvitationActionPage:
                     ActionOutcome.FAILED,
                     False,
                     state,
-                    "The confirmed profile no longer exposes a visible Connect action.",
+                    "The requested profile no longer exposes a visible Connect action.",
                 )
             await self._browser.click_visible_control(page, connect)
             try:
@@ -969,7 +969,7 @@ class InvitationActionPage:
                     "relationship_confirmation_required",
                     "LinkedIn requires a relationship choice; no relationship was inferred.",
                 )
-            if draft.payload.note:
+            if command.payload.note:
                 add_note = dialog.get_by_role("button", name=re.compile(r"^add a note$", re.I))
                 if await add_note.count() != 1:
                     return await self._result(
@@ -989,20 +989,20 @@ class InvitationActionPage:
                 if await dialog.count() != 1 or not await dialog.is_visible():
                     raise ParserDriftError("Invitation note textbox has no unique visible dialog.")
                 maximum = await self._invitation_note_limit(textbox, dialog)
-                if len(draft.payload.note) > maximum:
+                if len(command.payload.note) > maximum:
                     return await self._result(
                         page,
                         ActionOutcome.FAILED,
                         False,
                         "invitation_note_too_long",
-                        "The confirmed note exceeds LinkedIn's current visible field limit.",
+                        "The requested note exceeds LinkedIn's current visible field limit.",
                     )
-                await textbox.fill(draft.payload.note)
+                await textbox.fill(command.payload.note)
                 note_value = await textbox.input_value()
                 note_count, note_limit = await self._invitation_note_counter(dialog)
                 if (
-                    note_value != draft.payload.note
-                    or note_count != len(draft.payload.note)
+                    note_value != command.payload.note
+                    or note_count != len(command.payload.note)
                     or note_limit != maximum
                 ):
                     return await self._result(
@@ -1011,7 +1011,7 @@ class InvitationActionPage:
                         False,
                         "invitation_note_not_committed",
                         (
-                            "The exact confirmed note was not visibly committed to LinkedIn's "
+                            "The exact requested note was not visibly committed to LinkedIn's "
                             "textbox and character counter."
                         ),
                     )
@@ -1019,7 +1019,7 @@ class InvitationActionPage:
                 "button",
                 name=(
                     re.compile(r"^send invitation$", re.I)
-                    if draft.payload.note
+                    if command.payload.note
                     else re.compile(r"^send without a note$", re.I)
                 ),
             )
@@ -1084,7 +1084,7 @@ class InvitationActionPage:
             try:
                 await self._browser.navigate(
                     page,
-                    canonical_profile_url(draft.target.profile_slug),
+                    canonical_profile_url(command.target.profile_slug),
                 )
                 main, fresh_name = await self._profile_identity(page)
                 state, _ = await self._wait_for_connect_control(page, main, fresh_name)
@@ -1113,13 +1113,13 @@ class InvitationActionPage:
                     captured_text=verification_captured_text,
                     captured_at=verification_captured_at,
                 )
-            if fresh_name.casefold() != draft.target.display_name.casefold():
+            if fresh_name.casefold() != command.target.display_name.casefold():
                 return await self._result(
                     page,
                     ActionOutcome.UNCERTAIN,
                     None,
                     "invitation_outcome_unknown",
-                    "The fresh profile identity did not match the confirmed invitation target.",
+                    "The fresh profile identity did not match the requested invitation target.",
                 )
             if state == "pending_sent":
                 return await self._result(
@@ -1151,25 +1151,25 @@ class InvitationActionPage:
                 ),
             )
 
-    async def execute_accept(self, draft: ActionDraft) -> ActionPageResult:
-        if not isinstance(draft.payload, InvitationAcceptPayload):
+    async def perform_accept(self, command: ActionCommand) -> ActionPageResult:
+        if not isinstance(command.payload, InvitationAcceptPayload):
             raise InvalidTargetError("The acceptance action payload is invalid.")
-        expected_ref = _received_invitation_ref(draft.target.profile_slug)
-        if draft.payload.invitation_ref != expected_ref:
+        expected_ref = _received_invitation_ref(command.target.profile_slug)
+        if command.payload.invitation_ref != expected_ref:
             raise InvalidTargetError("The acceptance payload does not match the target invitation.")
         async with self._browser.page() as page:
             await self._browser.navigate(
                 page,
-                canonical_profile_url(draft.target.profile_slug),
+                canonical_profile_url(command.target.profile_slug),
             )
             main, name = await self._profile_identity(page)
-            if name.casefold() != draft.target.display_name.casefold():
+            if name.casefold() != command.target.display_name.casefold():
                 return await self._result(
                     page,
                     ActionOutcome.FAILED,
                     False,
                     "target_identity_changed",
-                    "The exact profile name changed after confirmation.",
+                    "The exact profile name changed after inspection.",
                 )
             accept, ignore = await self._incoming_request_controls(main, name)
             if accept is None or ignore is None:
@@ -1187,7 +1187,7 @@ class InvitationActionPage:
                     ActionOutcome.FAILED,
                     False,
                     "invitation_no_longer_pending",
-                    "The exact profile no longer exposes the confirmed incoming request.",
+                    "The exact profile no longer exposes the requested incoming request.",
                 )
             try:
                 await self._browser.click_visible_control(page, accept)
@@ -1220,7 +1220,7 @@ class InvitationActionPage:
                 await page.wait_for_timeout(250)
             await self._browser.navigate(
                 page,
-                canonical_profile_url(draft.target.profile_slug),
+                canonical_profile_url(command.target.profile_slug),
             )
             main, visible_name = await self._profile_identity(page)
             current_accept, current_ignore = await self._incoming_request_controls(
@@ -1229,7 +1229,7 @@ class InvitationActionPage:
             )
             state, _ = await self._wait_for_connect_control(page, main, visible_name)
             if (
-                visible_name.casefold() == draft.target.display_name.casefold()
+                visible_name.casefold() == command.target.display_name.casefold()
                 and current_accept is None
                 and current_ignore is None
                 and state == "already_connected"
@@ -1255,25 +1255,25 @@ class InvitationActionPage:
                 ),
             )
 
-    async def execute_ignore(self, draft: ActionDraft) -> ActionPageResult:
-        if not isinstance(draft.payload, InvitationIgnorePayload):
+    async def perform_ignore(self, command: ActionCommand) -> ActionPageResult:
+        if not isinstance(command.payload, InvitationIgnorePayload):
             raise InvalidTargetError("The ignore action payload is invalid.")
-        expected_ref = _received_invitation_ref(draft.target.profile_slug)
-        if draft.payload.invitation_ref != expected_ref:
+        expected_ref = _received_invitation_ref(command.target.profile_slug)
+        if command.payload.invitation_ref != expected_ref:
             raise InvalidTargetError("The ignore payload does not match the target invitation.")
         async with self._browser.page() as page:
             await self._browser.navigate(
                 page,
-                canonical_profile_url(draft.target.profile_slug),
+                canonical_profile_url(command.target.profile_slug),
             )
             main, name = await self._profile_identity(page)
-            if name.casefold() != draft.target.display_name.casefold():
+            if name.casefold() != command.target.display_name.casefold():
                 return await self._result(
                     page,
                     ActionOutcome.FAILED,
                     False,
                     "target_identity_changed",
-                    "The exact profile name changed after confirmation.",
+                    "The exact profile name changed after inspection.",
                 )
             accept, ignore = await self._incoming_request_controls(main, name)
             if accept is None or ignore is None:
@@ -1282,7 +1282,7 @@ class InvitationActionPage:
                     ActionOutcome.FAILED,
                     False,
                     "invitation_no_longer_pending",
-                    "The exact profile no longer exposes the confirmed incoming request.",
+                    "The exact profile no longer exposes the requested incoming request.",
                 )
             try:
                 await self._browser.click_visible_control(page, ignore)
@@ -1301,7 +1301,7 @@ class InvitationActionPage:
                 await page.wait_for_timeout(250)
             await self._browser.navigate(
                 page,
-                canonical_profile_url(draft.target.profile_slug),
+                canonical_profile_url(command.target.profile_slug),
             )
             main, visible_name = await self._profile_identity(page)
             current_accept, current_ignore = await self._incoming_request_controls(
@@ -1310,7 +1310,7 @@ class InvitationActionPage:
             )
             state, _ = await self._wait_for_connect_control(page, main, visible_name)
             if (
-                visible_name.casefold() == draft.target.display_name.casefold()
+                visible_name.casefold() == command.target.display_name.casefold()
                 and current_accept is None
                 and current_ignore is None
                 and state not in {"already_connected", "pending_sent"}

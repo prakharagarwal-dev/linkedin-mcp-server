@@ -10,10 +10,9 @@ from datetime import datetime
 from pydantic import HttpUrl
 
 from linkedin_mcp.domain.models import (
-    ActionDraft,
-    ActionExecutionResult,
+    ActionCommand,
     ActionPageResult,
-    ActionPreparationCapture,
+    ActionResult,
     CapturedSource,
     CommentThread,
     CompanyProfileObservation,
@@ -39,7 +38,6 @@ from linkedin_mcp.domain.models import (
     PostSearchCoverage,
     PostSummary,
     SourceType,
-    StrictModel,
 )
 from linkedin_mcp.errors import ParserDriftError
 from linkedin_mcp.policy import (
@@ -356,26 +354,9 @@ def source_from_conversation(observation: ConversationObservation) -> CapturedSo
     )
 
 
-def source_from_action_preparation(
-    action_type: str,
-    capture: ActionPreparationCapture,
-) -> CapturedSource:
-    return _source_from_collection(
-        source_type=SourceType.ACTION_PREPARATION,
-        source_url=str(capture.source_url),
-        captured_at=capture.captured_at,
-        captured_text=capture.captured_text,
-        content={
-            "action_type": action_type,
-            "target": capture.target.model_dump(mode="json"),
-            "current_state": capture.current_state,
-        },
-    )
-
-
 def source_from_action_execution(
-    draft: ActionDraft,
-    result: ActionExecutionResult,
+    command: ActionCommand,
+    result: ActionResult,
     page_result: ActionPageResult,
 ) -> CapturedSource:
     return _source_from_collection(
@@ -384,7 +365,7 @@ def source_from_action_execution(
         captured_at=page_result.captured_at,
         captured_text=page_result.captured_text,
         content={
-            "draft": draft.model_dump(mode="json"),
+            "action": command.model_dump(mode="json"),
             "result": result.model_dump(mode="json"),
         },
     )
@@ -525,18 +506,3 @@ def canonical_input_fingerprint(value: object) -> str:
         value = value.model_dump(mode="json")  # type: ignore[union-attr]
     encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(encoded).hexdigest()
-
-
-def canonical_action_payload_hash(
-    *,
-    action_type: str,
-    target: StrictModel,
-    payload: StrictModel,
-) -> str:
-    return canonical_input_fingerprint(
-        {
-            "action_type": action_type,
-            "target": target.model_dump(mode="json"),
-            "payload": payload.model_dump(mode="json"),
-        }
-    )

@@ -107,30 +107,27 @@ sensitive and is not deleted automatically.
 
 ## A tool is installed but disabled
 
-Call `linkedin.capabilities.list`. Its response identifies missing surfaces,
-scopes, or effects. Add only the required values to the MCP server's `env`
-configuration, then restart the client. Ready-made presets are in
-[Configuration](CONFIGURATION.md).
-
-Client approval never grants a missing server scope. Conversely, granting a
-server scope does not pre-approve a write in the MCP client.
+Call `linkedin.capabilities.list` to confirm the installed server version
+contains the capability. If it does, enable the exact tool in the MCP client's
+tool configuration and restart that client. The server has no separate scope
+or effect allowlist.
 
 ## A scheduled action stops for confirmation
 
-Account-changing execute tools request interactive confirmation by default, and
+Account-changing tools are annotated destructive, and
 an unattended run cannot answer that prompt. Explicitly pre-approve only the
-required execute tool in the MCP client's durable configuration. For example,
+required tool in the MCP client's durable configuration. For example,
 Codex recurring post publishing uses:
 
 ```toml
-[mcp_servers."linkedin-mcp".tools."linkedin.posts.create.execute"]
+[mcp_servers."linkedin-mcp".tools."linkedin.posts.create"]
 approval_mode = "approve"
 ```
 
 Restart Codex after changing the configuration. Do not use a chat message as a
 persistent approval and do not approve the entire server unless all LinkedIn
-writes are intentionally unattended. Server scopes, immutable drafts, hashes,
-idempotency, visible revalidation, and postcondition checks remain mandatory.
+writes are intentionally unattended. Exact target inspection, attachment hash
+rechecks, visible revalidation, and postcondition checks still run.
 
 ## A collection stops at a safety bound
 
@@ -148,8 +145,8 @@ new scan after reconnecting, runtime restart, cursor expiry, or filter change.
 Do not immediately retry. An uncertain result means the server could not prove
 the visible postcondition within its bound; it does not prove that LinkedIn
 rejected the action. Read the exact profile, conversation, post, or invitation
-state first, then prepare a new action only if that visible state proves the
-effect did not occur.
+state first, then invoke the tool again only if that visible state proves the
+effect did not occur. Every later invocation is a new action.
 
 ## An attachment is rejected
 
@@ -157,8 +154,8 @@ The file must be below `LINKEDIN_MCP_ASSET_ROOT_PATH` and referenced by a
 relative `asset_ref`. It must also satisfy the capability's visible media type
 and size constraints. Do not pass a raw Downloads/Desktop path to a tool.
 
-Preparation hash-locks the current file. If the file changes before execute,
-prepare a new action.
+The action snapshots and rechecks the current file before upload. If the bytes
+change during the operation, correct the file and invoke a new action.
 
 ## Claude Desktop extension problems
 

@@ -8,20 +8,18 @@ uses its own bridge and stateful MCP session, but all attach to that runtime.
 
 Trust is split between:
 
-- the operator, who configures allowed hosts, surfaces, scopes, and effects;
-- the MCP client, which applies the operator's configured approval policy to
-  each account-changing tool call;
-- the server, which validates capability authorization and exact prepared
-  action data;
+- the operator, who selects the LinkedIn account, profile, and trusted MCP
+  clients;
+- the MCP client, which controls tool availability and approval for each
+  account-changing call;
+- the server, which validates typed inputs, exact visible targets, attachment
+  integrity, and action postconditions;
 - LinkedIn's visible web UI, which supplies identity, current state, data, and
   postconditions.
 
-A client approval policy does not grant a LinkedIn scope. A server scope does
-not prove that a client prompted the user or held an explicit durable per-tool
-approval. Both boundaries are required for account-changing actions.
-
-The server has no database or application-secret service. Capability calls,
-evidence, action drafts, attempts, and idempotency live only in process memory.
+The server has no database, application-secret service, scope allowlist, or
+server-side approval ledger. Read-call replay, cursors, and evidence live only
+in process memory.
 
 ## Authentication profile
 
@@ -89,22 +87,18 @@ An explicit `PLAYWRIGHT_BROWSERS_PATH` is treated as an operator-managed cache
 override. No browser executable is downloaded from application-controlled
 URLs.
 
-## Authorization
+## Tool boundary
 
-Runtime authorization requires:
+The server registers only narrow typed tools. It does not implement an
+additional scope, effect, or per-tool permission system. Tool availability is
+configured in the MCP client. If a trusted client exposes and invokes a tool,
+the server treats the call as authorized for the configured account.
 
-1. a registered capability;
-2. every required `ALLOWED_SURFACES` entry;
-3. every required `ALLOWED_SCOPES` entry;
-4. the required `ALLOWED_EFFECTS` entry.
-
-Read, prepare, and write effects are distinct. The default allowlists contain
-every currently implemented capability so a normal installation works without
-additional permission configuration. Operators can replace those allowlists
-with a narrower set. Final write tools remain destructive MCP operations and
-still require an exact prepared action. Their annotations request interactive
-confirmation by default, while an explicit durable per-tool client policy may
-authorize unattended execution.
+Read tools are annotated read-only; account-changing tools are annotated
+destructive. A client may prompt, reject, disable, or durably approve an exact
+tool. Those annotations and client choices determine whether the call reaches
+the server. They do not weaken target validation, host restrictions, bounded
+browser execution, attachment rechecks, or visible postcondition verification.
 
 The server constructs canonical targets from validated identifiers. It never
 accepts arbitrary URLs for LinkedIn navigation and never exposes a general
@@ -155,68 +149,51 @@ the worker round-robins lanes between atomic calls. It never interrupts one
 browser call to serve another. Queue entries and pacing history are not
 durable.
 
-The process-local operation store retains request replay, evidence, action
-drafts, attempts, and idempotency only while the shared runtime is alive.
-Request replay and drafts are scoped to the internal MCP-session identity;
-write idempotency keys remain account-global. This limits local data retention
-and removes database credentials and services, but it also narrows safety
-guarantees across hard restarts:
+The process-local operation store retains read request replay and evidence only
+while the shared runtime is alive. Read replay is scoped to the internal MCP
+session. Every account-changing invocation gets a unique internal call record
+and is not replayed or deduplicated. This limits local data retention and
+removes database credentials and services, but it also means:
 
 - request IDs do not deduplicate after restart;
 - evidence resources disappear after restart;
-- prepared writes cannot execute after restart;
-- execution reservations and uncertain outcomes disappear after restart.
+- write request IDs never deduplicate, even within one runtime; and
+- uncertain action outcomes are not durable across restart.
 
 Collection cursors are also process-local authentication-adjacent state. They
 contain no cookies, URLs, or captured content, only random tokens plus a client,
-account, capability, hashed semantic binding, and stable identities. They are
+account, capability, semantic binding, and stable identities. They are
 reserved before queue waiting, single-use, expiring, and bounded. They never
-authorize a capability or broaden its configured account, surface, scope, or
-effect.
+authorize a capability or broaden its configured account.
 
 Therefore, a write interrupted by a hard process exit must never be blindly
 retried. The caller must inspect the visible LinkedIn target, determine whether
-the effect occurred, and create a new prepared action only when safe.
+the effect occurred, and invoke a new action only when safe.
 
 Workflow checkpointing and cross-run deduplication belong to the agent
 application, not this MCP server.
 
 ## Account-changing actions
 
-Every write family has separate prepare and execute capabilities.
+Every write family is one direct typed tool. Within that single queued browser
+operation, the server:
 
-Prepare:
-
-- reads the exact visible actor and target;
-- validates the typed payload and configured effect;
-- hashes local assets where applicable;
-- constructs a canonical SHA-256 payload hash;
-- creates a human-readable exact approval preview;
-- records an expiring immutable draft in process memory;
-- binds that draft to the originating MCP session;
-- performs no final LinkedIn account change.
-
-Execute:
-
-- is annotated as destructive;
-- requires the exact action ID, payload hash, approval preview, and a fresh
-  idempotency key;
-- reloads the process-local draft;
-- rejects any preview, target, payload, actor, action-type, or expiry drift;
-- revalidates current visible preconditions and asset hashes;
+- reads the exact visible actor, target, and current state;
+- validates the typed payload;
+- snapshots local asset metadata and SHA-256 when applicable;
+- builds an internal typed command;
+- revalidates the target, visible precondition, and asset bytes;
 - performs only the capability's one narrow final action;
-- requires a visible postcondition;
-- records `verified`, `failed`, or `uncertain` while the process remains alive.
+- requires a visible postcondition; and
+- returns `verified`, `failed`, or `uncertain` with immutable evidence.
 
-MCP annotations request interactive client confirmation by default but cannot
-attest how a specific call was approved. Writes should use stdio or an
-equivalently trusted local client that enforces the operator's configured tool
-approval policy. That policy may prompt interactively or explicitly pre-approve
-one named execute tool for unattended operation.
+MCP annotations identify these tools as destructive but cannot attest how a
+specific call was approved. Writes should use stdio or an equivalently trusted
+local client that enforces the operator's tool policy. That policy may prompt
+interactively or explicitly pre-approve one named tool for unattended use.
 
-No execute capability interprets conversational text such as “yes” as a durable
-approval policy or server authorization. The client either invokes the exact
-execute tool after its configured approval boundary or it does not invoke it.
+The server does not interpret conversational text such as “yes” as a durable
+policy. It receives a direct action call only after the client permits it.
 
 ## Evidence and client-visible data
 
@@ -242,8 +219,8 @@ secrets, local attachment contents, or full private message bodies.
 
 Post, comment, and message files are constrained to the configured asset root.
 References are validated relative paths; traversal and arbitrary filesystem
-paths are rejected. Preparation records hashes and metadata, and execution
-rechecks them before use.
+paths are rejected. The action snapshots hashes and metadata, then rechecks
+them immediately before use.
 
 The asset directory is user managed and may contain sensitive files. Grant it
 only the minimum filesystem access required by the server process.
@@ -255,8 +232,8 @@ stdio is the recommended local transport.
 Streamable HTTP is restricted to `127.0.0.1`, `::1`, or `localhost`. This
 release has no HTTP authentication and must not be exposed on a LAN or public
 interface. Stdio bridges and direct HTTP clients share the same account,
-browser context, pacing, and fair queue, but request IDs, cursors, and prepared
-actions remain isolated by their server-assigned MCP-session identities.
+browser context, pacing, and fair queue. Read request IDs and cursors remain
+isolated by their server-assigned MCP-session identities.
 
 ## Reporting a vulnerability
 

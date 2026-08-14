@@ -13,13 +13,13 @@ of done.
 `mock_verified` means the capability has:
 
 - strict input/output and MCP schema coverage;
-- real policy, scope, queue, executor, evidence, action-draft, hash, expiry,
-  and idempotency coverage;
+- real registry, queue, executor, evidence, direct-action, target-inspection,
+  attachment-integrity, and terminal-outcome coverage;
 - cursor lifecycle, filter binding, single-use continuation, expiry, capacity,
   stable-identity deduplication, and terminal truncation coverage;
 - multi-client runtime election, fair scheduling, same-client FIFO ordering,
-  session-scoped replay/cursors/drafts, account-global write idempotency,
-  disconnect survival, cancellation, and graceful stop coverage;
+  session-scoped read replay/cursors, non-coalesced writes, disconnect survival,
+  cancellation, and graceful stop coverage;
 - shared raw-DOM convergence coverage proving that timed idleness is not
   completion and that progress is parsed before a simultaneously rendered end
   marker;
@@ -37,7 +37,7 @@ not be described as `live_verified` based only on this suite.
 ```text
 official MCP test client
   -> production FastMCP tools and resources
-  -> production policy and process-local operation store
+  -> production typed registry and process-local read/evidence store
   -> production fair asyncio scheduler and one worker
   -> production executor
   -> stateful typed simulator providers
@@ -63,8 +63,8 @@ The test-only simulator lives under `tests/simulator/`:
 - `browser.py` runs official Playwright Chromium and fulfills document
   requests locally;
 - `providers.py` applies client-authorized writes to typed simulator state;
-- `harness.py` composes the production executor, repository, worker, and
-  policy around those providers; and
+- `harness.py` composes the production executor, repository, and worker around
+  those providers; and
 - `mcp.py` connects the official MCP client to that container.
 
 Most general simulator fixtures have this provenance:
@@ -79,7 +79,7 @@ The invitation fixtures under `tests/fixtures/linkedin/invitations/latest/`
 are separately marked `mock_verified`. Their synthetic identities and content
 preserve the sanitized Received and Sent card-root and filter structure
 inspected on 2026-07-29: the Focused/Other picker, four received radio filters,
-and exact sent People target. They contain no real account content, authentication
+and exact sent People target. They contain no live content, authentication
 state, raw DOM dump, trace, or personal data.
 
 The invitation-action fixtures under
@@ -88,7 +88,7 @@ current exact-profile Connect link, invitation confirmation and note dialogs,
 visible `0/200` counter, paired incoming Accept/Ignore controls, and their
 fresh-profile postconditions. Invitation send has only two synthetic terminal
 states: a fresh profile showing Pending succeeds, while one still showing
-Connect fails. They contain no real identity or account state.
+Connect fails. They contain no live identity or account state.
 
 The Jobs fixtures under `tests/fixtures/linkedin/jobs/latest/` are also
 `mock_verified`. They preserve the current virtualized card shell and
@@ -101,7 +101,7 @@ synthetic identities and text only—no raw
 live DOM, authentication state, trace, or account data.
 
 The Company fixtures under `tests/fixtures/linkedin/companies/latest/` are
-`mock_verified` against the current visible-UI contract.
+`mock_verified` from the authenticated visible UI inspected on 2026-08-05.
 They preserve the current side-panel filter mechanics, all five filter
 families, all eight size choices, exact location/industry typeaheads, submitted
 query parameters, result identity and pagination, compact counts and social
@@ -111,7 +111,7 @@ separate from company-size and compact top-card employee counts. They contain
 synthetic identities and text only.
 
 The sanitized `person-profile-self-current.html` fixture is `mock_verified`
-against the current self-profile contract. It preserves
+from the authenticated self-profile UI inspected on 2026-08-05. It preserves
 the nested introduction section, self-verification link, auxiliary guidance
 detail link, separator-only location line, and semantic company/school button
 icons using synthetic identity and profile text only.
@@ -124,26 +124,27 @@ their accessible `Endorse <skill>` control, and About-section expansion and
 collection boundary used by licenses, honors, languages, and other generic
 member-owned sections, while keeping recommendation rails outside the member
 result. Legacy combined organization/employment and visible location cards
-remain covered separately. No real identity or profile text is retained.
+remain covered separately. No live identity or profile text is retained.
 
 The Posts fixtures under `tests/fixtures/linkedin/posts/latest/` are
-`mock_verified` against the current visible search and detail contracts. Search variants preserve current compact author
+`mock_verified` from authenticated visible search and detail surfaces
+inspected through 2026-08-05. Search variants preserve current compact author
 headers, trailing-bullet edited ages, pointer-intercepted expansion controls,
 numeric engagement buttons, content-card classification, virtualized prefix
 inventory, dynamic card-text evidence, and cursor behavior. Detail variants
 preserve current exact-menu identity, body expansion, typed
 media/link/document/poll structures, engagement controls, and bounded
-repost-original behavior. They contain no real post, author, raw DOM,
+repost-original behavior. They contain no live post, author, raw DOM,
 authentication state, trace, or account data.
 
 The sanitized `personal-post-composer.html` fixture additionally preserves the
 current visible `Post successful. View post` alert contract and a visible
 publishing-rejection state observed on 2026-08-05; the synthetic fixture never
-contains the real post or account identity.
+contains the live post or account identity.
 
 The sanitized `personal-post-composer.html` and `post-engagement.html` fixtures
 are also `mock_verified` from the
-current visible-UI contract. They preserve the
+authenticated visible UI inspected through 2026-08-05. They preserve the
 bounded composer loader, disabled Save and
 Done controls for unchanged settings, all nine personal composer modes, nested
 image/video/document/poll/celebration/event/hiring/expert controls, settings,
@@ -165,10 +166,10 @@ and valid trailing-hyphen profile slugs. Invitation-specific fixtures add
 every supported entity type, every current filter, Received/Sent root
 differences, zero inventory, recommendations, count mismatch, one count-change
 restart, repeated count change, identity ambiguity, duplicate identity, old
-layout rejection, result bounds, exact-count-only completion, six-view union
+layout rejection, live result bounds, exact-count-only completion, six-view union
 deduplication, and cross-view conflict rejection.
 
-Invitation cursor tests cover bounded collection prefixes, disjoint page identities,
+Invitation cursor tests cover bounded live prefixes, disjoint page identities,
 page-size changes, canonical direction/filter binding, provider revisits,
 cumulative traversal targets, terminal exact reconciliation, honest safety
 bounds, reservation, abort, single use, capacity eviction, and process-restart
@@ -176,7 +177,7 @@ invalidation.
 
 ## Coverage ownership
 
-`tests/verification_manifest.py` owns the explicit offline mapping for all 31 tools.
+`tests/verification_manifest.py` owns the explicit mapping for all 24 tools.
 The manifest test fails when:
 
 - the public tool registry and verification inventory differ;
@@ -187,25 +188,112 @@ The manifest test fails when:
 - a generic browser, click, JavaScript, network, navigation, queue, or pacing
   control appears in the public MCP schema.
 
-All seven prepare/execute families share a conformance suite that verifies
-payload-hash tampering, preview tampering, one verified effect, and
-idempotent replay.
+All seven direct action tools share a compact conformance suite that verifies
+one atomic call, one typed terminal result, and immutable action evidence.
 
 ## Network isolation
 
 `tests/conftest.py` blocks non-loopback Python socket connections for every
-pytest test. Unix sockets and loopback connections remain available for
-Playwright and Streamable HTTP protocol tests. The complete default suite is
-offline.
+test. Unix sockets and loopback connections remain available for Playwright
+and Streamable HTTP protocol tests. The repository has no live LinkedIn tests;
+the complete suite is offline.
 
 The semantic browser also aborts any document route not registered by the
 simulator.
+
+## Live acceptance
+
+The former one-off live-acceptance runners have been removed. The repository
+contains no executable live LinkedIn test scripts, and `pytest` remains fully
+offline and network-blocked.
+
+When current-UI validation is needed, use a trusted MCP client with the minimum
+required tools enabled and an explicit approval policy. Convert
+only the sanitized behavior into offline fixtures; never retain live identities,
+content, raw DOM, traces, cookies, or browser state. Fixture manifests record
+only sanitized provenance and the UI behaviors represented by each fixture.
+
+### Aggregate live-acceptance ledger
+
+- 2026-08-05: Jobs search returned two disjoint five-result cursor pages and a
+  five-result query combining recency, sort, workplace, experience, employment,
+  and Easy Apply filters. Exact-detail readback returned a fully expanded JD,
+  application method, metadata, and one current composite hiring-team profile
+  card with separately typed name, degree, headline, and role. No account state
+  changed.
+
+- 2026-08-05: before the threaded-reply and comment-reaction mutation contracts
+  were removed, the authorized Test Bot published one bounded validation post,
+  added one root comment and three exact threaded replies, set and read back a
+  post reaction, and set and read back `Celebrate` on the root comment. No
+  duplicate post or blind action retry was performed.
+
+- 2026-08-05: account-changing threaded comment replies were removed from the
+  public schema. Offline contract tests reject the former
+  `parent_comment_ref` input, while discussion fixtures continue to verify
+  read-only reply ancestry and expansion.
+
+- 2026-08-05: comment-targeted reaction changes were removed from the public
+  schema. Offline contract tests reject the former `comment_ref` reaction
+  target while preserving read-only comment reaction-count observations.
+
+- 2026-08-05: a full member-profile replay traversed one overview and seven
+  discovered detail pages. It excluded the self-only guidance destination,
+  returned the visible headline and location from the nearest introduction
+  card, retained both semantic top-card organization summaries, and completed
+  without truncation. The replay also exposed the current standalone
+  employment-type experience layout, accessible skill-card identity, and
+  About-section UI suffixes; sanitized fixture coverage now locks those
+  behaviors. Current roleless licenses, honors, and languages cards were then
+  verified against their bounded semantic collection container, while
+  recommendation rails remained outside the member result. No account state
+  changed.
+
+- 2026-08-05: People search resolved an exact first-degree member with current
+  company criteria. Company search combined size, hiring, and network filters,
+  while exact company readback returned the fixed Overview-plus-About contract.
+  Connections inventory produced two disjoint recently-added cursor pages, and
+  exact connection search enforced first degree. No account state changed.
+
+- 2026-08-05: received and sent invitation inventories returned bounded typed
+  pages with continuation state. One exact received invitation was accepted,
+  another was ignored, and one alternate outbound target received a noted
+  invitation from the authorized Test Bot account. Every action result was
+  verified against its exact visible LinkedIn postcondition; no action was
+  blindly retried.
+
+- 2026-08-05: Posts search returned two disjoint three-result cursor pages from
+  a cumulative live rescan. Current cards retained exact author headline and
+  relationship degree, simple and edited trailing-bullet ages, fully expanded
+  text, numeric reaction/comment/repost counts, and article/job/text content
+  types without misclassifying author avatars. Exact Post detail readback
+  independently matched one result's stable identity, full text, attachment,
+  engagement, and evidence. No account state changed.
+
+- 2026-08-05: both current comment sort orders returned two root threads with
+  every visually indented reply attached to its nearest preceding root. The
+  current actor-description card's `Author` badge remained UI metadata while
+  the following visible line was retained as the comment author's headline.
+  No account state changed during these read-only replays.
+
+- 2026-08-05: exact-profile conversation lookup opened the authorized Test Bot
+  one-to-one surface. One uniquely marked message was sent from
+  the configured member account, execution verified the newly visible outgoing
+  bubble, and independent conversation readback returned exactly that message.
+  Searching its unique content then returned the Test Bot conversation. No
+  duplicate send or blind retry was performed.
+
+- 2026-08-04: a non-publishing personal-composer replay observed a bounded
+  loading dialog, restored the exact personal composer, traversed unchanged
+  audience/comment settings through their enabled Back controls, and did not
+  invoke Post. A one-page read-only Posts search returned six typed cards; all
+  six exact card snapshots reconciled with the immutable captured source.
 
 ## Test groups
 
 | Group | Responsibility |
 | --- | --- |
-| `tests/unit/` | Models, URLs, policy, client identity, fair queue, repository, pacing, cursor state, cancellation, browser lifecycle, page objects |
+| `tests/unit/` | Models, URLs, registry, client identity, fair queue, repository, pacing, cursor state, cancellation, browser lifecycle, page objects |
 | `tests/contract/` | MCP discovery, schemas, annotations, evidence, write conformance, stateful sessions, stdio proxying, shared-runtime election, and transports |
 | `tests/simulator/` | Typed state, synthetic site, faults, real Playwright routing |
 | `tests/workflows/` | Multi-page job scan, job/referral, connection/message, and post-engagement journeys |
@@ -225,11 +313,8 @@ uv build
 The package test also performs an offline wheel build and proves that tests,
 simulator code, profiles, secrets, and other repositories are not shipped.
 
-The enforced whole-repository branch floor is 85%. The accepted public-release
-run reached 85.24% across 11,953 production statements and 4,078 branches. The
-safety-critical executor, operation/action store, capability registry, and MCP
-server modules are individually at 96–98%; strict domain contracts are at 91%.
-Dynamic LinkedIn layout adapters retain lower numeric coverage because the
+The enforced whole-repository branch floor is 85%. Dynamic LinkedIn layout
+adapters retain lower numeric coverage than core orchestration because the
 suite prioritizes meaningful semantic variants over invoking unreachable
 defensive branches solely to increase a percentage.
 
@@ -238,7 +323,7 @@ defensive branches solely to increase a percentage.
 A new tool is not `mock_verified` until it has:
 
 1. a manifest entry;
-2. strict schema and policy tests;
+2. strict schema and registry tests;
 3. synthetic page fixtures or an explicit non-browser operational boundary;
 4. normal, empty, malformed, ambiguous, and bounded cases;
 5. evidence assertions for reads;

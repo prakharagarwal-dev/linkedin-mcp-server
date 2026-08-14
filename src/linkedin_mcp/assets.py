@@ -9,17 +9,17 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from linkedin_mcp.domain.models import (
+    ActionAssetSnapshot,
     CelebrationPostContent,
     CommentPhotoAttachment,
     DocumentPostContent,
     EventPostContent,
     ImagePostContent,
-    MessagePrepareInput,
+    MessageSendInput,
     PostAssetRole,
-    PostCommentPrepareInput,
+    PostCommentInput,
     PostCreateContent,
     PostCreatePayload,
-    PreparedPostAsset,
     VideoPostContent,
 )
 from linkedin_mcp.errors import InvalidTargetError
@@ -98,13 +98,13 @@ class LocalAssetStore:
     def __init__(self, root: Path) -> None:
         self._root = root
 
-    async def prepare(self, content: PostCreateContent) -> tuple[PreparedPostAsset, ...]:
+    async def snapshot(self, content: PostCreateContent) -> tuple[ActionAssetSnapshot, ...]:
         requests = tuple(self._asset_requests(content))
         return tuple(
             await asyncio.gather(
                 *(
                     asyncio.to_thread(
-                        self._prepare_one,
+                        self._snapshot_one,
                         asset_ref,
                         role,
                         alt_text,
@@ -128,15 +128,15 @@ class LocalAssetStore:
     ) -> dict[str, Path]:
         return await self.verify_assets(payload.assets)
 
-    async def prepare_comment(
+    async def snapshot_comment(
         self,
-        request: PostCommentPrepareInput,
-    ) -> tuple[PreparedPostAsset, ...]:
+        request: PostCommentInput,
+    ) -> tuple[ActionAssetSnapshot, ...]:
         if not isinstance(request.attachment, CommentPhotoAttachment):
             return ()
         return (
             await asyncio.to_thread(
-                self._prepare_one,
+                self._snapshot_one,
                 request.attachment.asset_ref,
                 PostAssetRole.COMMENT_IMAGE,
                 None,
@@ -145,15 +145,15 @@ class LocalAssetStore:
             ),
         )
 
-    async def prepare_message(
+    async def snapshot_message(
         self,
-        request: MessagePrepareInput,
-    ) -> tuple[PreparedPostAsset, ...]:
+        request: MessageSendInput,
+    ) -> tuple[ActionAssetSnapshot, ...]:
         assets = tuple(
             await asyncio.gather(
                 *(
                     asyncio.to_thread(
-                        self._prepare_one,
+                        self._snapshot_one,
                         attachment.asset_ref,
                         PostAssetRole.MESSAGE_ATTACHMENT,
                         None,
@@ -170,7 +170,7 @@ class LocalAssetStore:
 
     async def verify_assets(
         self,
-        assets: tuple[PreparedPostAsset, ...],
+        assets: tuple[ActionAssetSnapshot, ...],
     ) -> dict[str, Path]:
         verified = await asyncio.gather(
             *(asyncio.to_thread(self._verify_one, asset) for asset in assets)
@@ -250,14 +250,14 @@ class LocalAssetStore:
                 (),
             )
 
-    def _prepare_one(
+    def _snapshot_one(
         self,
         asset_ref: str,
         role: PostAssetRole,
         alt_text: str | None,
         tagged_profile_slugs: tuple[str, ...],
         tagged_company_slugs: tuple[str, ...],
-    ) -> PreparedPostAsset:
+    ) -> ActionAssetSnapshot:
         path = self._resolve(asset_ref)
         size = path.stat().st_size
         minimum, maximum = _ROLE_LIMITS[role]
@@ -271,7 +271,7 @@ class LocalAssetStore:
                 f"The {role.value} asset file type is outside the accepted LinkedIn contract."
             )
         media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
-        return PreparedPostAsset(
+        return ActionAssetSnapshot(
             asset_ref=asset_ref,
             role=role,
             sha256=self._sha256(path),
@@ -282,7 +282,7 @@ class LocalAssetStore:
             tagged_company_slugs=tagged_company_slugs,
         )
 
-    def _verify_one(self, expected: PreparedPostAsset) -> tuple[str, Path]:
+    def _verify_one(self, expected: ActionAssetSnapshot) -> tuple[str, Path]:
         path = self._resolve(expected.asset_ref)
         size = path.stat().st_size
         digest = self._sha256(path)
@@ -293,7 +293,7 @@ class LocalAssetStore:
             or media_type != expected.media_type
         ):
             raise InvalidTargetError(
-                f"Local asset {expected.asset_ref!r} changed after confirmation."
+                f"Local asset {expected.asset_ref!r} changed during the action."
             )
         return expected.asset_ref, path
 
