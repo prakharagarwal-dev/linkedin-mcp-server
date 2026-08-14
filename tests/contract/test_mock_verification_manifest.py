@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from linkedin_mcp.capabilities import create_default_registry
@@ -220,6 +221,15 @@ def test_manifest_matches_the_exact_public_tool_surface() -> None:
         }
     }
     assert {name.value for name in CapabilityName} <= registered_names
+
+
+def test_readme_tools_table_matches_the_exact_public_tool_surface() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    tools_section = readme.partition("## Tools")[2].partition("## Installation")[0]
+    documented_names = set(re.findall(r"`(linkedin\.[a-z0-9_.]+)`", tools_section))
+
+    assert tools_section
+    assert documented_names == set(MOCK_VERIFICATION)
 
 
 def test_public_tools_do_not_expose_browser_queue_or_pacing_controls() -> None:
