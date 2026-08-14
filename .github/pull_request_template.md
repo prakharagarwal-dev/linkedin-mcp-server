@@ -11,7 +11,7 @@ implications. State “none” where appropriate.
 
 - [ ] Fixtures are synthetic and contain no credentials, account data, raw authenticated DOM, or traces.
 - [ ] New behavior has positive, negative, ambiguity, and bounded cases as applicable.
-- [ ] Write behavior has exact-target, asset-integrity, interruption, uncertainty, and postcondition coverage as applicable.
+- [ ] Write behavior has exact-target, attachment-boundary, interruption, uncertainty, and postcondition coverage as applicable.
 - [ ] `uv run ruff format --check .`
 - [ ] `uv run ruff check .`
 - [ ] `uv run pyright`

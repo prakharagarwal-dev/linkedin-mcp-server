@@ -6,7 +6,7 @@ Security fixes are applied to the latest release and `main`.
 
 | Version | Supported |
 | --- | --- |
-| 0.14.x | Yes |
+| Latest release | Yes |
 | Earlier versions | No |
 
 ## Report a vulnerability privately
@@ -28,8 +28,8 @@ investigation and a coordinated fix before public disclosure.
 
 Examples of in-scope security issues include:
 
-- scope or effect authorization bypass;
-- preview, payload-hash, target-identity, or idempotency bypass;
+- target-identity or visible-postcondition bypass;
+- attachment-root escape or unsafe local-file disclosure;
 - arbitrary navigation, network, JavaScript, click, or filesystem access;
 - credential, browser-profile, attachment, or private-message disclosure;
 - non-loopback HTTP exposure; and

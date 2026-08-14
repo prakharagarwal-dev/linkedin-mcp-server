@@ -25,11 +25,10 @@ from linkedin_mcp.domain.models import (
     ReactionSetPayload,
     ReactionState,
 )
-from linkedin_mcp.errors import InvalidTargetError
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
-ENGAGEMENT_HTML = (FIXTURES / "post-engagement.html").read_text()
-CURRENT_REACTION_HTML = (FIXTURES / "post-reaction-current.html").read_text()
+ENGAGEMENT_HTML = (FIXTURES / "posts/latest/engagement.html").read_text()
+CURRENT_REACTION_HTML = (FIXTURES / "posts/latest/reaction.html").read_text()
 POST_REF = "activity:7312345678901234567"
 COMMENT_REF = "comment:ugc-post:7312345678901234566:111"
 
@@ -85,12 +84,11 @@ class EngagementFixtureBrowser:
         await control.click()
 
 
-async def _comment_draft(
+async def _comment_command(
     adapter: PostEngagementPage,
     request: PostCommentInput,
 ) -> ActionCommand:
     capture = await adapter.inspect_comment(request)
-    assets = await adapter.snapshot_comment_assets(request)
     return ActionCommand(
         action_type=ActionType.COMMENT_CREATE,
         target=capture.target,
@@ -99,12 +97,11 @@ async def _comment_draft(
             text=request.text,
             mentions=request.mentions,
             attachment=request.attachment,
-            assets=assets,
         ),
     )
 
 
-async def _reaction_draft(
+async def _reaction_command(
     adapter: PostEngagementPage,
     request: PostReactionInput,
 ) -> ActionCommand:
@@ -141,7 +138,7 @@ async def test_top_level_comment_preserves_text_link_emoji_mention_and_target(
             LocalAssetStore(tmp_path),
         )
         try:
-            command = await _comment_draft(adapter, request)
+            command = await _comment_command(adapter, request)
             result = await adapter.perform_comment(command)
         finally:
             await browser.close()
@@ -179,7 +176,7 @@ async def test_comment_submit_ignores_visible_comment_count_control(tmp_path: Pa
             LocalAssetStore(tmp_path),
         )
         try:
-            result = await adapter.perform_comment(await _comment_draft(adapter, request))
+            result = await adapter.perform_comment(await _comment_command(adapter, request))
         finally:
             await browser.close()
 
@@ -214,7 +211,7 @@ async def test_comment_waits_for_async_composer_after_count_control(tmp_path: Pa
             LocalAssetStore(tmp_path),
         )
         try:
-            result = await adapter.perform_comment(await _comment_draft(adapter, request))
+            result = await adapter.perform_comment(await _comment_command(adapter, request))
         finally:
             await browser.close()
 
@@ -245,7 +242,7 @@ async def test_comment_verifies_native_ugc_discussion_alias_for_activity_url(
             LocalAssetStore(tmp_path),
         )
         try:
-            result = await adapter.perform_comment(await _comment_draft(adapter, request))
+            result = await adapter.perform_comment(await _comment_command(adapter, request))
         finally:
             await browser.close()
 
@@ -284,13 +281,13 @@ async def test_comment_photo_and_gif_are_exact_and_verifiable(
             LocalAssetStore(tmp_path),
         )
         try:
-            command = await _comment_draft(adapter, request)
+            command = await _comment_command(adapter, request)
             result = await adapter.perform_comment(command)
         finally:
             await browser.close()
 
     assert isinstance(command.payload, CommentCreatePayload)
-    assert len(command.payload.assets) == (1 if attachment_kind == "photo" else 0)
+    assert command.payload.attachment == attachment
     assert result.outcome is ActionOutcome.VERIFIED
     assert expected in result.captured_text
 
@@ -325,7 +322,7 @@ async def test_post_supports_every_visible_linkedin_reaction(
             LocalAssetStore(tmp_path),
         )
         try:
-            command = await _reaction_draft(adapter, request)
+            command = await _reaction_command(adapter, request)
             result = await adapter.perform_reaction(command)
         finally:
             await browser.close()
@@ -358,7 +355,7 @@ async def test_current_portaled_reaction_control_is_inspected_and_verified(
             LocalAssetStore(tmp_path),
         )
         try:
-            command = await _reaction_draft(adapter, request)
+            command = await _reaction_command(adapter, request)
             result = await adapter.perform_reaction(command)
         finally:
             await browser.close()
@@ -402,7 +399,7 @@ async def test_post_reaction_removal_noop_and_change(
             LocalAssetStore(tmp_path),
         )
         try:
-            command = await _reaction_draft(adapter, request)
+            command = await _reaction_command(adapter, request)
             result = await adapter.perform_reaction(command)
         finally:
             await browser.close()
@@ -446,7 +443,7 @@ async def test_reaction_refuses_state_drift_after_inspection(tmp_path: Path) -> 
             LocalAssetStore(tmp_path),
         )
         try:
-            result = await adapter.perform_reaction(await _reaction_draft(adapter, request))
+            result = await adapter.perform_reaction(await _reaction_command(adapter, request))
         finally:
             await browser.close()
 
@@ -481,7 +478,7 @@ async def test_reaction_reports_missing_preclick_control_as_not_changed(
             LocalAssetStore(tmp_path),
         )
         try:
-            result = await adapter.perform_reaction(await _reaction_draft(adapter, request))
+            result = await adapter.perform_reaction(await _reaction_command(adapter, request))
         finally:
             await browser.close()
 
@@ -514,7 +511,7 @@ async def test_comment_refuses_actor_or_content_target_drift(tmp_path: Path) -> 
             LocalAssetStore(tmp_path),
         )
         try:
-            result = await adapter.perform_comment(await _comment_draft(adapter, request))
+            result = await adapter.perform_comment(await _comment_command(adapter, request))
         finally:
             await browser.close()
 
@@ -543,7 +540,7 @@ async def test_interrupted_final_comment_click_is_uncertain(tmp_path: Path) -> N
             LocalAssetStore(tmp_path),
         )
         try:
-            result = await adapter.perform_comment(await _comment_draft(adapter, request))
+            result = await adapter.perform_comment(await _comment_command(adapter, request))
         finally:
             await browser.close()
 
@@ -552,11 +549,11 @@ async def test_interrupted_final_comment_click_is_uncertain(tmp_path: Path) -> N
     assert result.final_state == "comment_outcome_unknown"
 
 
-async def test_comment_asset_hash_is_revalidated_before_upload(tmp_path: Path) -> None:
+async def test_comment_upload_uses_current_attachment_file(tmp_path: Path) -> None:
     (tmp_path / "comment.png").write_bytes(b"confirmed")
     request = PostCommentInput(
         context_id="engagement-context",
-        request_id="action-hash-locked-comment",
+        request_id="action-direct-comment-attachment",
         post_ref=POST_REF,
         attachment=CommentPhotoAttachment(asset_ref="comment.png"),
     )
@@ -568,12 +565,13 @@ async def test_comment_asset_hash_is_revalidated_before_upload(tmp_path: Path) -
             LocalAssetStore(tmp_path),
         )
         try:
-            command = await _comment_draft(adapter, request)
+            command = await _comment_command(adapter, request)
             (tmp_path / "comment.png").write_bytes(b"changed")
-            with pytest.raises(InvalidTargetError, match="changed during the action"):
-                await adapter.perform_comment(command)
+            result = await adapter.perform_comment(command)
         finally:
             await browser.close()
+
+    assert result.outcome is ActionOutcome.VERIFIED
 
 
 def test_engagement_contract_rejects_empty_inputs_and_allows_native_discussion_aliases() -> None:

@@ -51,7 +51,7 @@ from linkedin_mcp.domain.models import (
 from linkedin_mcp.errors import InvalidTargetError
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
-COMPOSER_HTML = (FIXTURES / "personal-post-composer.html").read_text()
+COMPOSER_HTML = (FIXTURES / "posts/latest/composer.html").read_text()
 
 
 class PublishingFixtureBrowser:
@@ -100,7 +100,6 @@ async def _action_command(
     request: PostCreateInput,
 ) -> ActionCommand:
     capture = await adapter.inspect_post(request)
-    assets = await adapter.snapshot_assets(request)
     return ActionCommand(
         action_type=ActionType.POST_CREATE,
         target=capture.target,
@@ -112,7 +111,6 @@ async def _action_command(
             brand_partnership=request.brand_partnership,
             collaborators=request.collaborators,
             scheduled_at=request.scheduled_at,
-            assets=assets,
         ),
     )
 
@@ -276,7 +274,7 @@ async def test_visible_failure_alert_returns_verified_non_publish(
 
 
 @pytest.mark.timeout(40)
-async def test_photo_post_hashes_assets_and_applies_alt_text_and_exact_member_tag(
+async def test_photo_post_uses_direct_asset_and_applies_alt_text_and_exact_member_tag(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "diagram.png").write_bytes(b"fixture-image")
@@ -330,12 +328,7 @@ async def test_photo_post_hashes_assets_and_applies_alt_text_and_exact_member_ta
             await browser.close()
 
     assert isinstance(command.payload, PostCreatePayload)
-    assert len(command.payload.assets) == 1
-    assert command.payload.assets[0].asset_ref == "diagram.png"
-    assert command.payload.assets[0].sha256 != "0" * 64
-    assert command.payload.assets[0].alt_text == "A reliable architecture diagram"
-    assert command.payload.assets[0].tagged_profile_slugs == ("alex-ray",)
-    assert command.payload.assets[0].tagged_company_slugs == ("acme-cloud",)
+    assert command.payload.content == content
     assert result.outcome is ActionOutcome.VERIFIED
 
 
@@ -383,7 +376,7 @@ async def test_video_document_and_poll_modes_cover_all_structured_composer_optio
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         results: list[ActionPageResult] = []
-        drafts: list[ActionCommand] = []
+        commands: list[ActionCommand] = []
         try:
             for request in requests:
                 page = await browser.new_page()
@@ -392,17 +385,13 @@ async def test_video_document_and_poll_modes_cover_all_structured_composer_optio
                     LocalAssetStore(tmp_path),
                 )
                 command = await _action_command(adapter, request)
-                drafts.append(command)
+                commands.append(command)
                 results.append(await adapter.perform_post(command))
                 await page.close()
         finally:
             await browser.close()
 
-    payloads = [command.payload for command in drafts]
-    assert all(isinstance(payload, PostCreatePayload) for payload in payloads)
-    assert [
-        len(payload.assets) for payload in payloads if isinstance(payload, PostCreatePayload)
-    ] == [3, 1, 0]
+    assert all(isinstance(command.payload, PostCreatePayload) for command in commands)
     assert all(result.outcome is ActionOutcome.VERIFIED for result in results)
     assert all(result.final_state.startswith("post_published:") for result in results)
 
@@ -472,7 +461,7 @@ async def test_celebration_event_hiring_and_expert_modes_follow_current_visible_
 
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
-        drafts: list[ActionCommand] = []
+        commands: list[ActionCommand] = []
         results: list[ActionPageResult] = []
         try:
             for request in requests:
@@ -482,22 +471,13 @@ async def test_celebration_event_hiring_and_expert_modes_follow_current_visible_
                     LocalAssetStore(tmp_path),
                 )
                 command = await _action_command(adapter, request)
-                drafts.append(command)
+                commands.append(command)
                 results.append(await adapter.perform_post(command))
                 await page.close()
         finally:
             await browser.close()
 
-    assert [
-        tuple(asset.role.value for asset in command.payload.assets)
-        for command in drafts
-        if isinstance(command.payload, PostCreatePayload)
-    ] == [
-        ("celebration_image",),
-        ("event_cover_image",),
-        (),
-        (),
-    ]
+    assert all(isinstance(command.payload, PostCreatePayload) for command in commands)
     assert all(result.outcome is ActionOutcome.VERIFIED for result in results)
     assert all(result.final_state.startswith("post_published:") for result in results)
 
@@ -537,7 +517,7 @@ async def test_group_brand_partnership_and_collaborators_are_exactly_bound(
         browser = await playwright.chromium.launch(headless=True)
         try:
             results: list[ActionPageResult] = []
-            drafts: list[ActionCommand] = []
+            commands: list[ActionCommand] = []
             for item in (request, collaborative):
                 page = await browser.new_page()
                 adapter = PostPublishingPage(
@@ -545,17 +525,17 @@ async def test_group_brand_partnership_and_collaborators_are_exactly_bound(
                     LocalAssetStore(tmp_path),
                 )
                 command = await _action_command(adapter, item)
-                drafts.append(command)
+                commands.append(command)
                 results.append(await adapter.perform_post(command))
                 await page.close()
         finally:
             await browser.close()
 
-    assert isinstance(drafts[0].payload, PostCreatePayload)
-    assert drafts[0].payload.group_target == request.group_target
-    assert isinstance(drafts[1].payload, PostCreatePayload)
-    assert drafts[1].payload.brand_partnership is True
-    assert drafts[1].payload.collaborators == collaborative.collaborators
+    assert isinstance(commands[0].payload, PostCreatePayload)
+    assert commands[0].payload.group_target == request.group_target
+    assert isinstance(commands[1].payload, PostCreatePayload)
+    assert commands[1].payload.brand_partnership is True
+    assert commands[1].payload.collaborators == collaborative.collaborators
     assert all(result.outcome is ActionOutcome.VERIFIED for result in results)
 
 
@@ -600,7 +580,7 @@ async def test_link_preview_removal_and_scheduling_have_visible_postconditions(
     assert "Post scheduled" in results[1].captured_text
 
 
-async def test_asset_store_rejects_traversal_type_drift_and_changed_bytes(
+async def test_asset_store_uses_current_file_and_rejects_wrong_type(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "safe.png").write_bytes(b"first")
@@ -610,25 +590,66 @@ async def test_asset_store_rejects_traversal_type_drift_and_changed_bytes(
         text="Safe asset",
         images=(PostImageInput(asset_ref="safe.png"),),
     )
-    snapshots = await store.snapshot(content)
-    payload = PostCreatePayload(
-        content=content,
-        audience=PostAudience.ANYONE,
-        comment_control=PostCommentControl.ANYONE,
-        assets=snapshots,
-    )
-    assert (await store.verify(payload))["safe.png"] == tmp_path / "safe.png"
+    assert (await store.resolve_post(content))["safe.png"] == tmp_path / "safe.png"
 
     (tmp_path / "safe.png").write_bytes(b"changed")
-    with pytest.raises(InvalidTargetError, match="changed during the action"):
-        await store.verify(payload)
+    assert (await store.resolve_post(content))["safe.png"] == tmp_path / "safe.png"
     with pytest.raises(InvalidTargetError, match="file type"):
-        await store.snapshot(
+        await store.resolve_post(
             ImagePostContent(
                 text="Wrong type",
                 images=(PostImageInput(asset_ref="notes.txt"),),
             )
         )
+
+
+async def test_asset_store_rejects_unsafe_or_unavailable_files(tmp_path: Path) -> None:
+    store = LocalAssetStore(tmp_path)
+
+    def image_content(asset_ref: str) -> ImagePostContent:
+        return ImagePostContent(
+            text="Attachment boundary",
+            images=(PostImageInput(asset_ref=asset_ref),),
+        )
+
+    (tmp_path / "empty.png").touch()
+    with pytest.raises(InvalidTargetError, match="asset size"):
+        await store.resolve_post(image_content("empty.png"))
+
+    with pytest.raises(InvalidTargetError, match="safe relative paths"):
+        await store.resolve_post(image_content("nested/../escape.png"))
+
+    with pytest.raises(InvalidTargetError, match="unavailable"):
+        await store.resolve_post(image_content("missing.png"))
+
+    (tmp_path / "folder.png").mkdir()
+    with pytest.raises(InvalidTargetError, match="regular files"):
+        await store.resolve_post(image_content("folder.png"))
+
+    outside = tmp_path.parent / f"{tmp_path.name}-outside.png"
+    outside.write_bytes(b"outside")
+    (tmp_path / "outside.png").symlink_to(outside)
+    with pytest.raises(InvalidTargetError, match="regular files"):
+        await store.resolve_post(image_content("outside.png"))
+
+
+async def test_asset_store_handles_content_without_optional_local_assets(tmp_path: Path) -> None:
+    video = tmp_path / "video.mp4"
+    video.write_bytes(b"v" * (75 * 1024))
+    store = LocalAssetStore(tmp_path)
+
+    assert await store.resolve_post(VideoPostContent(text="Video", video_asset_ref=video.name)) == {
+        video.name: video
+    }
+    assert (
+        await store.resolve_post(
+            CelebrationPostContent(
+                text="Celebration",
+                celebration_type=CelebrationType.PROJECT_LAUNCH,
+            )
+        )
+        == {}
+    )
 
 
 def test_post_create_contract_rejects_ambiguous_or_unverifiable_options() -> None:

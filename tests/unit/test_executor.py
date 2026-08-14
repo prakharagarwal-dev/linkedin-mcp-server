@@ -14,7 +14,6 @@ from linkedin_mcp.capabilities import create_default_registry
 from linkedin_mcp.config import Settings
 from linkedin_mcp.domain.models import (
     CURRENT_RECEIVED_INVITATION_VIEWS,
-    ActionAssetSnapshot,
     ActionCommand,
     ActionInspection,
     ActionOutcome,
@@ -76,7 +75,6 @@ from linkedin_mcp.domain.models import (
     PersonProfilePageCapture,
     PersonProfileSectionSelector,
     PersonSummary,
-    PostAssetRole,
     PostAuthor,
     PostAuthorType,
     PostCommentInput,
@@ -137,7 +135,7 @@ class FakeJobSearch:
                 freshness_hours=request.freshness_hours,
                 pages_visited=1,
                 result_count=1,
-                max_results=request.max_results,
+                max_results=request.page_size,
                 stop_reason=StopReason.VISIBLE_PAGE_COMPLETE,
                 captured_at=now,
             ),
@@ -244,11 +242,10 @@ class FakePeopleSearch:
             (person,),
             PeopleSearchCoverage(
                 query=request.query,
-                title_keywords=request.title_keywords,
                 filters=request.filters,
                 pages_visited=1,
                 result_count=1,
-                max_results=request.max_results,
+                max_results=request.page_size,
                 stop_reason=StopReason.VISIBLE_PAGE_COMPLETE,
                 captured_at=now,
             ),
@@ -372,7 +369,7 @@ class FakeCompanySearch:
                 filters=request.filters,
                 pages_visited=1,
                 result_count=1,
-                max_results=request.max_results,
+                max_results=request.page_size,
                 stop_reason=StopReason.VISIBLE_PAGE_COMPLETE,
                 captured_at=now,
             ),
@@ -496,7 +493,7 @@ class FakePostSearch:
                 filters=request.filters,
                 pages_visited=1,
                 result_count=1,
-                max_results=request.max_results,
+                max_results=request.page_size,
                 stop_reason=StopReason.VISIBLE_PAGE_COMPLETE,
                 captured_at=now,
             ),
@@ -610,7 +607,7 @@ class FakePostComments:
                 top_level_returned=1,
                 replies_visible=1,
                 replies_returned=1,
-                max_comments=request.max_comments,
+                max_comments=request.page_size,
                 max_replies_per_comment=request.max_replies_per_comment,
                 truncated=False,
                 captured_at=now,
@@ -827,7 +824,7 @@ class FakeConnectionsList:
                 sort_by=request.sort_by,
                 rounds_visited=1,
                 result_count=1,
-                max_results=request.max_results,
+                max_results=request.page_size,
                 stop_reason=StopReason.VISIBLE_PAGE_COMPLETE,
                 captured_at=now,
             ),
@@ -864,7 +861,7 @@ class FakeConversationSearch:
                 filter=request.filter,
                 rounds_visited=1,
                 result_count=1,
-                max_results=request.max_results,
+                max_results=request.page_size,
                 stop_reason=StopReason.VISIBLE_PAGE_COMPLETE,
                 captured_at=now,
             ),
@@ -926,16 +923,7 @@ class FakeInvitationActions:
 
 class FakePostPublishing:
     def __init__(self) -> None:
-        self.asset_snapshots = 0
         self.post_actions = 0
-
-    async def snapshot_assets(
-        self,
-        request: PostCreateInput,
-    ) -> tuple[ActionAssetSnapshot, ...]:
-        del request
-        self.asset_snapshots += 1
-        return ()
 
     async def inspect_post(
         self,
@@ -965,17 +953,8 @@ class FakePostPublishing:
 
 class FakePostEngagement:
     def __init__(self) -> None:
-        self.asset_snapshots = 0
         self.comment_actions = 0
         self.reaction_actions = 0
-
-    async def snapshot_comment_assets(
-        self,
-        request: PostCommentInput,
-    ) -> tuple[ActionAssetSnapshot, ...]:
-        del request
-        self.asset_snapshots += 1
-        return ()
 
     async def inspect_comment(
         self,
@@ -1129,21 +1108,6 @@ class FakeConversation:
                 "current_state": "message_composer_available",
                 "source_url": HttpUrl("https://www.linkedin.com/messaging/thread/thread-123/"),
             }
-        )
-
-    async def snapshot_message_assets(
-        self,
-        request: MessageSendInput,
-    ) -> tuple[ActionAssetSnapshot, ...]:
-        return tuple(
-            ActionAssetSnapshot(
-                asset_ref=attachment.asset_ref,
-                role=PostAssetRole.MESSAGE_ATTACHMENT,
-                sha256="e" * 64,
-                size_bytes=128,
-                media_type="application/pdf",
-            )
-            for attachment in request.attachments
         )
 
     async def perform_message(self, command: ActionCommand) -> ActionPageResult:
@@ -1626,8 +1590,7 @@ async def test_people_search_is_persisted_and_replayed_without_provider_call() -
     request = PeopleSearchInput(
         context_id="context-1",
         request_id="people-search-1",
-        query='"distributed systems" AND Python',
-        title_keywords="staff engineer",
+        query='"distributed systems" AND Python staff engineer',
         page_size=10,
     )
 
@@ -1974,11 +1937,8 @@ async def test_all_seven_actions_run_directly_with_typed_evidence() -> None:
     assert all(
         output.sources[0].source_type.value == "linkedin_action_execution" for output in outputs
     )
-    assert (publishing.asset_snapshots, publishing.post_actions) == (1, 1)
-    assert (engagement.asset_snapshots, engagement.comment_actions) == (
-        1,
-        1,
-    )
+    assert publishing.post_actions == 1
+    assert engagement.comment_actions == 1
     assert engagement.reaction_actions == 1
     assert (actions.invite_actions, actions.accept_actions, actions.ignore_actions) == (
         1,

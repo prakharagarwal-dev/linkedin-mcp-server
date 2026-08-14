@@ -34,9 +34,8 @@ Contributions must preserve these boundaries:
 - Expose typed capabilities, never generic browser, selector, JavaScript,
   click, network, or navigation tools.
 - Keep read and account-changing capabilities separate.
-- Require scopes, immutable hash-locked previews, idempotency, and a trusted MCP
-  client approval policy for writes. Keep interactive confirmation as the
-  default while permitting explicit durable per-tool client approval.
+- Keep each write as one exact-target, bounded operation with an observable
+  terminal result. MCP clients own tool availability and approval policy.
 - Do not add CAPTCHA bypass, proxy rotation, fingerprint spoofing, stealth
   plugins, credential collection, private endpoint access, or bulk-spam
   features.
@@ -44,8 +43,8 @@ Contributions must preserve these boundaries:
   on another repository.
 
 Propose a new capability in an issue before doing substantial implementation
-work. Include its exact visible surface, inputs, outputs, authorization scope,
-effect, bounds, postcondition, and failure behavior.
+work. Include its exact visible surface, inputs, outputs, effect, bounds,
+postcondition, and failure behavior.
 
 ## Fixtures and live UI observations
 
@@ -73,8 +72,8 @@ uv build
 
 Use `uv run ruff format .` to apply formatting. New behavior needs positive,
 empty, malformed, ambiguous, bounded, and relevant failure cases. New write
-operations also need tamper, expiry, idempotency, interruption, and visible
-postcondition coverage.
+operations also need target-change, attachment-boundary, interruption,
+uncertainty, and visible-postcondition coverage.
 
 Update durable public documentation when a contract, configuration option,
 security property, or accepted behavior changes. Add a concise entry under

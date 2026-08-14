@@ -13,7 +13,7 @@ Trust is split between:
 - the MCP client, which controls tool availability and approval for each
   account-changing call;
 - the server, which validates typed inputs, exact visible targets, attachment
-  integrity, and action postconditions;
+  boundaries, and action postconditions;
 - LinkedIn's visible web UI, which supplies identity, current state, data, and
   postconditions.
 
@@ -98,7 +98,7 @@ Read tools are annotated read-only; account-changing tools are annotated
 destructive. A client may prompt, reject, disable, or durably approve an exact
 tool. Those annotations and client choices determine whether the call reaches
 the server. They do not weaken target validation, host restrictions, bounded
-browser execution, attachment rechecks, or visible postcondition verification.
+browser execution, attachment validation, or visible postcondition verification.
 
 The server constructs canonical targets from validated identifiers. It never
 accepts arbitrary URLs for LinkedIn navigation and never exposes a general
@@ -180,9 +180,9 @@ operation, the server:
 
 - reads the exact visible actor, target, and current state;
 - validates the typed payload;
-- snapshots local asset metadata and SHA-256 when applicable;
+- resolves local attachments directly at upload time when applicable;
 - builds an internal typed command;
-- revalidates the target, visible precondition, and asset bytes;
+- revalidates the target and visible precondition;
 - performs only the capability's one narrow final action;
 - requires a visible postcondition; and
 - returns `verified`, `failed`, or `uncertain` with immutable evidence.
@@ -219,8 +219,8 @@ secrets, local attachment contents, or full private message bodies.
 
 Post, comment, and message files are constrained to the configured asset root.
 References are validated relative paths; traversal and arbitrary filesystem
-paths are rejected. The action snapshots hashes and metadata, then rechecks
-them immediately before use.
+paths are rejected. Immediately before upload, the server resolves the current
+file and validates its supported extension and LinkedIn size limit.
 
 The asset directory is user managed and may contain sensitive files. Grant it
 only the minimum filesystem access required by the server process.

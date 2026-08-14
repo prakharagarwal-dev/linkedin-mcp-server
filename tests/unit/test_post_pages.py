@@ -843,7 +843,7 @@ async def test_comments_open_and_parse_modern_stable_ids_and_nested_replies() ->
         page = await browser.new_page()
         fixture_browser = StaticPostFixtureBrowser(
             page,
-            (FIXTURES / "post-comments-modern.html").read_text(),
+            (FIXTURES / "posts/latest/comments.html").read_text(),
         )
         reader = PostCommentsPage(
             cast(BrowserManager, fixture_browser),
@@ -918,7 +918,7 @@ async def test_comments_bind_current_flattened_replies_to_nearest_root() -> None
 @pytest.mark.timeout(20)
 async def test_comments_wait_for_discussion_after_async_sort_rerender() -> None:
     html = (
-        (FIXTURES / "post-comments-modern.html")
+        (FIXTURES / "posts/latest/comments.html")
         .read_text()
         .replace(
             '<section id="discussion" aria-label="Comments" hidden>',
@@ -986,7 +986,7 @@ async def test_comments_wait_for_discussion_after_async_sort_rerender() -> None:
 @pytest.mark.timeout(20)
 async def test_comments_wait_for_async_load_more_render() -> None:
     html = (
-        (FIXTURES / "post-comments-modern.html")
+        (FIXTURES / "posts/latest/comments.html")
         .read_text()
         .replace(
             """
@@ -1070,7 +1070,7 @@ async def test_comments_wait_for_async_load_more_render() -> None:
 @pytest.mark.timeout(20)
 async def test_comments_expand_current_see_previous_replies_control() -> None:
     html = (
-        (FIXTURES / "post-comments-modern.html")
+        (FIXTURES / "posts/latest/comments.html")
         .read_text()
         .replace(
             '<section aria-label="Replies">',
@@ -1126,7 +1126,7 @@ async def test_comments_expand_current_see_previous_replies_control() -> None:
 async def test_comments_preserve_native_ugc_discussion_alias_for_activity_url() -> None:
     native_post_ref = "ugc-post:7999999999999999998"
     html = (
-        (FIXTURES / "post-comments-modern.html")
+        (FIXTURES / "posts/latest/comments.html")
         .read_text()
         .replace(
             "urn:li:comment:(urn:li:activity:7312345678901234567,",

@@ -89,7 +89,7 @@ def create_default_registry() -> CapabilityRegistry:
         (
             CapabilityDescriptor(
                 name=CapabilityName.JOBS_SEARCH,
-                version="2.1.0",
+                version="3.0.0",
                 effect=CapabilityEffect.READ,
                 input_model=JobSearchInput,
                 output_model=JobSearchOutput,
@@ -105,7 +105,7 @@ def create_default_registry() -> CapabilityRegistry:
             ),
             CapabilityDescriptor(
                 name=CapabilityName.PEOPLE_SEARCH,
-                version="2.1.0",
+                version="3.0.0",
                 effect=CapabilityEffect.READ,
                 input_model=PeopleSearchInput,
                 output_model=PeopleSearchOutput,
@@ -121,7 +121,7 @@ def create_default_registry() -> CapabilityRegistry:
             ),
             CapabilityDescriptor(
                 name=CapabilityName.COMPANIES_SEARCH,
-                version="2.0.0",
+                version="3.0.0",
                 effect=CapabilityEffect.READ,
                 input_model=CompanySearchInput,
                 output_model=CompanySearchOutput,
@@ -142,7 +142,7 @@ def create_default_registry() -> CapabilityRegistry:
             ),
             CapabilityDescriptor(
                 name=CapabilityName.POSTS_SEARCH,
-                version="2.0.0",
+                version="3.0.0",
                 effect=CapabilityEffect.READ,
                 input_model=PostSearchInput,
                 output_model=PostSearchOutput,
@@ -158,7 +158,7 @@ def create_default_registry() -> CapabilityRegistry:
             ),
             CapabilityDescriptor(
                 name=CapabilityName.POST_COMMENTS_LIST,
-                version="1.1.1",
+                version="2.0.0",
                 effect=CapabilityEffect.READ,
                 input_model=PostCommentsListInput,
                 output_model=PostCommentsListOutput,
@@ -168,7 +168,7 @@ def create_default_registry() -> CapabilityRegistry:
             ),
             CapabilityDescriptor(
                 name=CapabilityName.POSTS_CREATE,
-                version="3.0.0",
+                version="4.0.0",
                 effect=CapabilityEffect.WRITE,
                 input_model=PostCreateInput,
                 output_model=ActionOutput,
@@ -196,7 +196,7 @@ def create_default_registry() -> CapabilityRegistry:
             ),
             CapabilityDescriptor(
                 name=CapabilityName.INVITATIONS_LIST,
-                version="4.0.0",
+                version="5.0.0",
                 effect=CapabilityEffect.READ,
                 input_model=InvitationListInput,
                 output_model=InvitationListOutput,
@@ -204,7 +204,7 @@ def create_default_registry() -> CapabilityRegistry:
             ),
             CapabilityDescriptor(
                 name=CapabilityName.CONNECTIONS_LIST,
-                version="2.0.0",
+                version="3.0.0",
                 effect=CapabilityEffect.READ,
                 input_model=ConnectionsListInput,
                 output_model=ConnectionsListOutput,
@@ -212,7 +212,7 @@ def create_default_registry() -> CapabilityRegistry:
             ),
             CapabilityDescriptor(
                 name=CapabilityName.CONNECTIONS_SEARCH,
-                version="2.0.0",
+                version="3.0.0",
                 effect=CapabilityEffect.READ,
                 input_model=ConnectionsSearchInput,
                 output_model=ConnectionsSearchOutput,
@@ -244,7 +244,7 @@ def create_default_registry() -> CapabilityRegistry:
             ),
             CapabilityDescriptor(
                 name=CapabilityName.MESSAGING_SEARCH,
-                version="2.0.0",
+                version="3.0.0",
                 effect=CapabilityEffect.READ,
                 input_model=ConversationSearchInput,
                 output_model=ConversationSearchOutput,

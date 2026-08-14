@@ -22,7 +22,6 @@ from linkedin_mcp.browser.pages.posts import (
     region_for_post,
 )
 from linkedin_mcp.domain.models import (
-    ActionAssetSnapshot,
     ActionCommand,
     ActionInspection,
     ActionOutcome,
@@ -124,12 +123,6 @@ class PostEngagementPage:
         self._browser = browser
         self._assets = assets
 
-    async def snapshot_comment_assets(
-        self,
-        request: PostCommentInput,
-    ) -> tuple[ActionAssetSnapshot, ...]:
-        return await self._assets.snapshot_comment(request)
-
     async def inspect_comment(
         self,
         request: PostCommentInput,
@@ -152,7 +145,7 @@ class PostEngagementPage:
         if not isinstance(command.payload, CommentCreatePayload):
             raise InvalidTargetError("The comment action payload is invalid.")
         payload = command.payload
-        paths = await self._assets.verify_assets(payload.assets)
+        paths = await self._assets.resolve_comment(payload.attachment)
         target_url = canonical_post_url(payload.post_ref)
         async with self._browser.page() as page:
             await self._browser.navigate(page, target_url)

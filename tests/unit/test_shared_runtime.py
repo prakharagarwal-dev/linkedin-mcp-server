@@ -119,7 +119,7 @@ async def test_runtime_wait_rejects_exclusive_profile_maintenance(
 
     monkeypatch.setattr(shared_runtime, "_healthy_endpoint", unavailable)
 
-    with pytest.raises(ConfigurationError, match=r"maintenance or a legacy runtime \(login\)"):
+    with pytest.raises(ConfigurationError, match=r"profile maintenance \(login\)"):
         await shared_runtime.wait_for_shared_runtime(settings)
 
 

@@ -20,10 +20,9 @@ classifiers = [
 ]
 dependencies = [
   "anyio>=4.5,<5",
-  "mcp[cli]>=1.27,<2",
+  "mcp>=1.27,<2",
   "platformdirs>=4,<5",
   "playwright>=1.54,<2",
-  "prometheus-client>=0.22,<1",
   "pyrate-limiter>=4.4,<5",
   "pydantic>=2.12,<3",
   "pydantic-settings>=2.10,<3",
@@ -43,7 +42,6 @@ linkedin-mcp = "linkedin_mcp.__main__:main"
 
 [dependency-groups]
 dev = [
-  "httpx>=0.28,<1",
   "pyright>=1.1.400,<2",
   "pytest>=8.4,<10",
   "pytest-asyncio>=1,<2",

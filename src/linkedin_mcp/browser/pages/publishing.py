@@ -16,7 +16,6 @@ from pydantic import HttpUrl
 from linkedin_mcp.assets import LocalAssetStore
 from linkedin_mcp.browser.manager import BrowserManager
 from linkedin_mcp.domain.models import (
-    ActionAssetSnapshot,
     ActionCommand,
     ActionInspection,
     ActionOutcome,
@@ -162,12 +161,6 @@ class PostPublishingPage:
         self._browser = browser
         self._assets = assets
 
-    async def snapshot_assets(
-        self,
-        request: PostCreateInput,
-    ) -> tuple[ActionAssetSnapshot, ...]:
-        return await self._assets.snapshot(request.content)
-
     async def inspect_post(
         self,
         request: PostCreateInput,
@@ -203,7 +196,7 @@ class PostPublishingPage:
             raise InvalidTargetError("The personal-post action payload is invalid.")
         payload = command.payload
         self._validate_schedule(payload.scheduled_at)
-        paths = await self._assets.verify(payload)
+        paths = await self._assets.resolve_post(payload.content)
         async with self._browser.page() as page:
             try:
                 await self._browser.navigate(page, _HOME_URL)
@@ -760,7 +753,7 @@ class PostPublishingPage:
             if image.alt_text is not None:
                 await self._add_image_alt_text(page, editor, image.alt_text)
                 editor = await self._media_editor(page)
-            if image.tagged_members:
+            if image.tags:
                 await self._tag_image(page, editor, image)
                 editor = await self._media_editor(page)
         next_control = await _unique_visible(
@@ -979,7 +972,7 @@ class PostPublishingPage:
             tag_dialog.get_by_placeholder(re.compile(r"type a name or names", re.I)),
             "image-tag search field",
         )
-        for identity in image.tagged_members:
+        for identity in image.tags:
             await search.fill(identity.display_name)
             target = self._image_tag_result(tag_dialog, identity)
             await self._browser.click_visible_control(

@@ -34,7 +34,6 @@ from linkedin_mcp.capabilities import create_default_registry
 from linkedin_mcp.config import Settings
 from linkedin_mcp.container import AppContainer
 from linkedin_mcp.domain.models import (
-    ActionAssetSnapshot,
     ActionCommand,
     ActionInspection,
     ActionOutcome,
@@ -92,7 +91,6 @@ from linkedin_mcp.domain.models import (
     PersonProfileObservation,
     PersonProfilePageCapture,
     PersonSummary,
-    PostAssetRole,
     PostAuthor,
     PostAuthorType,
     PostCommentInput,
@@ -184,7 +182,6 @@ class ProtocolPeopleSearch:
             (person,),
             PeopleSearchCoverage(
                 query=request.query,
-                title_keywords=request.title_keywords,
                 filters=request.filters,
                 pages_visited=1,
                 result_count=1,
@@ -585,27 +582,9 @@ class ProtocolNetwork:
             }
         )
 
-    async def snapshot_message_assets(
-        self, request: MessageSendInput
-    ) -> tuple[ActionAssetSnapshot, ...]:
-        return tuple(
-            ActionAssetSnapshot(
-                asset_ref=attachment.asset_ref,
-                role=PostAssetRole.MESSAGE_ATTACHMENT,
-                sha256="e" * 64,
-                size_bytes=128,
-                media_type="application/pdf",
-            )
-            for attachment in request.attachments
-        )
-
     async def perform_message(self, command: ActionCommand) -> ActionPageResult:
         assert isinstance(command.payload, MessageSendPayload)
         return self._result("message_sent")
-
-    async def snapshot_assets(self, request: PostCreateInput) -> tuple[ActionAssetSnapshot, ...]:
-        del request
-        return ()
 
     async def inspect_post(self, request: PostCreateInput) -> ActionInspection:
         del request
@@ -614,12 +593,6 @@ class ProtocolNetwork:
     async def perform_post(self, command: ActionCommand) -> ActionPageResult:
         assert isinstance(command.payload, PostCreatePayload)
         return self._result("post_published:activity:7312345678901234567")
-
-    async def snapshot_comment_assets(
-        self, request: PostCommentInput
-    ) -> tuple[ActionAssetSnapshot, ...]:
-        del request
-        return ()
 
     async def inspect_comment(self, request: PostCommentInput) -> ActionInspection:
         inspection = self._inspection("current-member", "comment_composer_ready")
@@ -780,16 +753,12 @@ async def test_mcp_exposes_current_tools_and_runs_core_read(tmp_path: Path) -> N
             "linkedin.messaging.send",
         }
         assert action_names.issubset(names)
-        assert not any(name.endswith((".prepare", ".execute")) for name in names)
         for name in action_names:
             tool = next(item for item in listed.tools if item.name == name)
             assert tool.annotations is not None
             assert tool.annotations.readOnlyHint is False
             assert tool.annotations.destructiveHint is True
             assert tool.annotations.idempotentHint is False
-            assert "action_id" not in tool.inputSchema["properties"]
-            assert "approval_preview" not in tool.inputSchema["properties"]
-            assert "idempotency_key" not in tool.inputSchema["properties"]
 
         result = await session.call_tool(
             "linkedin.jobs.search",

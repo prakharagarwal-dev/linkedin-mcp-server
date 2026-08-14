@@ -16,7 +16,7 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Remove server capability scopes, effect allowlists, draft previews, action
   IDs, write idempotency keys, and write replay. MCP clients now own tool
   availability and approval; the server retains exact visible target/state
-  inspection, attachment-integrity checks, pacing, bounded execution, terminal
+  inspection, attachment path/type/size checks, pacing, bounded execution, terminal
   postcondition verification, and immutable evidence.
 - Limit `linkedin.posts.comment` to top-level post comments. Read-only
   discussion results continue to include visible replies and their exact parent
@@ -27,6 +27,10 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Consolidate accumulated action lifecycle tests into current atomic protocol,
   worker, executor, simulator, and workflow coverage while retaining the latest
   semantic page fixtures and safety cases.
+- Remove deprecated pagination, title-keyword, and image-tag aliases, unused
+  dependencies and helpers, stale publishing-status documentation, and legacy
+  runtime-lock parsing. Reorganize fixtures and documentation around the
+  current public contract.
 
 ### Fixed
 

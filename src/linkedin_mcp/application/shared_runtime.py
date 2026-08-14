@@ -236,7 +236,7 @@ def _validate_running_owner(status: AccountRuntimeStatus, settings: Settings) ->
         )
     if owner.command != _RUNTIME_COMMAND:
         raise ConfigurationError(
-            f"LinkedIn profile maintenance or a legacy runtime ({owner.command or 'unknown'}) "
+            f"LinkedIn profile maintenance ({owner.command or 'unknown'}) "
             "currently owns the browser profile. Retry after it completes, or run "
             "`linkedin-mcp stop`."
         )

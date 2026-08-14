@@ -7,7 +7,6 @@ from enum import StrEnum
 from typing import Annotated, Literal
 
 from pydantic import (
-    AliasChoices,
     BaseModel,
     ConfigDict,
     Field,
@@ -49,12 +48,7 @@ class PaginatedInput(StrictModel):
         Field(
             ge=1,
             le=100,
-            validation_alias=AliasChoices("page_size", "max_results"),
-            serialization_alias="page_size",
-            description=(
-                "Maximum items returned in this page. The legacy max_results name remains "
-                "accepted but is no longer advertised."
-            ),
+            description="Maximum unique items returned in this page.",
         ),
     ] = 25
     cursor: (
@@ -69,12 +63,6 @@ class PaginatedInput(StrictModel):
         ]
         | None
     ) = None
-
-    @property
-    def max_results(self) -> int:
-        """Compatibility accessor for internal code during the pagination transition."""
-
-        return self.page_size
 
 
 Identifier = Annotated[
@@ -113,10 +101,6 @@ PostReference = Annotated[
 CommentReference = Annotated[
     str,
     StringConstraints(pattern=r"^comment:(?:activity|share|ugc-post):[0-9]{5,30}:[0-9]{1,30}$"),
-]
-PayloadHash = Annotated[
-    str,
-    StringConstraints(min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$"),
 ]
 ConversationId = Annotated[
     str,
@@ -800,20 +784,6 @@ class PeopleSearchInput(PaginatedInput):
         ]
         | None
     ) = None
-    title_keywords: (
-        Annotated[
-            str,
-            Field(
-                min_length=1,
-                max_length=300,
-                description=(
-                    "Compatibility role/title terms appended to People-search keywords. "
-                    "Use filters.title for LinkedIn's current visible Title keyword field."
-                ),
-            ),
-        ]
-        | None
-    ) = None
     filters: PeopleSearchFilters = Field(
         default_factory=PeopleSearchFilters,
         description="Optional structured filters from LinkedIn's visible People search.",
@@ -821,13 +791,9 @@ class PeopleSearchInput(PaginatedInput):
 
     @model_validator(mode="after")
     def require_a_search_criterion(self) -> PeopleSearchInput:
-        if not self.query and not self.title_keywords and not self.filters.has_constraints():
-            raise ValueError("People search requires query, title_keywords, or at least one filter")
+        if not self.query and not self.filters.has_constraints():
+            raise ValueError("People search requires query or at least one filter")
         return self
-
-    def combined_keywords(self) -> str | None:
-        values = tuple(value for value in (self.query, self.title_keywords) if value)
-        return " ".join(values) if values else None
 
 
 class PeopleGetInput(StrictModel):
@@ -1129,12 +1095,7 @@ class PostCommentsListInput(PaginatedInput):
         Field(
             ge=1,
             le=100,
-            validation_alias=AliasChoices("page_size", "max_comments"),
-            serialization_alias="page_size",
-            description=(
-                "Maximum top-level comment threads returned in this page. "
-                "The legacy max_comments name remains accepted."
-            ),
+            description="Maximum top-level comment threads returned in this page.",
         ),
     ] = 25
     context_id: Identifier
@@ -1142,10 +1103,6 @@ class PostCommentsListInput(PaginatedInput):
     post_ref: PostReference
     sort_by: CommentSort = CommentSort.MOST_RELEVANT
     max_replies_per_comment: Annotated[int, Field(ge=0, le=100)] = 25
-
-    @property
-    def max_comments(self) -> int:
-        return self.page_size
 
 
 class PostMentionInput(StrictModel):
@@ -1241,11 +1198,7 @@ class PostImageInput(StrictModel):
     alt_text: Annotated[str, Field(min_length=1, max_length=1_000)] | None = None
     tags: Annotated[
         tuple[PostImageTagInput, ...],
-        Field(
-            max_length=30,
-            validation_alias=AliasChoices("tags", "tagged_members"),
-            serialization_alias="tags",
-        ),
+        Field(max_length=30),
     ] = ()
     edit: PostImageEditInput | None = None
 
@@ -1263,12 +1216,6 @@ class PostImageInput(StrictModel):
         if len(set(identities)) != len(identities):
             raise ValueError("Image tags must be unique")
         return self
-
-    @property
-    def tagged_members(self) -> tuple[PostImageTagInput, ...]:
-        """Compatibility accessor for the pre-v2 member-only field name."""
-
-        return self.tags
 
 
 class ImagePostContent(PostCreateContentBase):
@@ -1600,20 +1547,6 @@ class ConnectionsSearchInput(PaginatedInput):
         ]
         | None
     ) = None
-    title_keywords: (
-        Annotated[
-            str,
-            Field(
-                min_length=1,
-                max_length=300,
-                description=(
-                    "Compatibility role/title terms appended to connection-search keywords. "
-                    "Use filters.title for LinkedIn's current visible Title keyword field."
-                ),
-            ),
-        ]
-        | None
-    ) = None
     filters: ConnectionsSearchFilters = Field(
         default_factory=ConnectionsSearchFilters,
         description=(
@@ -1624,10 +1557,8 @@ class ConnectionsSearchInput(PaginatedInput):
 
     @model_validator(mode="after")
     def require_a_search_criterion(self) -> ConnectionsSearchInput:
-        if not self.query and not self.title_keywords and not self.filters.has_constraints():
-            raise ValueError(
-                "Connection search requires query, title_keywords, or at least one filter"
-            )
+        if not self.query and not self.filters.has_constraints():
+            raise ValueError("Connection search requires query or at least one filter")
         return self
 
     def as_people_search_input(self) -> PeopleSearchInput:
@@ -1635,7 +1566,6 @@ class ConnectionsSearchInput(PaginatedInput):
             context_id=self.context_id,
             request_id=self.request_id,
             query=self.query,
-            title_keywords=self.title_keywords,
             filters=self.filters.as_people_search_filters(),
             page_size=self.page_size,
         )
@@ -2219,7 +2149,6 @@ class PersonSummary(StrictModel):
 
 class PeopleSearchCoverage(StrictModel):
     query: str | None
-    title_keywords: str | None
     filters: PeopleSearchFilters = Field(default_factory=PeopleSearchFilters)
     pages_visited: Annotated[int, Field(ge=1)]
     result_count: Annotated[int, Field(ge=0)]
@@ -3129,36 +3058,16 @@ class MessageSendPayload(StrictModel):
         ]
         | None
     ) = None
-    assets: Annotated[tuple[ActionAssetSnapshot, ...], Field(max_length=20)] = ()
 
     @model_validator(mode="after")
-    def validate_message_asset_snapshots(self) -> MessageSendPayload:
+    def validate_message_content(self) -> MessageSendPayload:
         if self.message is None and not self.attachment_refs and self.gif is None:
             raise ValueError("A message payload requires text, attachments, or a GIF")
-        if self.gif is not None and (
-            self.message is not None or self.attachment_refs or self.assets
-        ):
+        if self.gif is not None and (self.message is not None or self.attachment_refs):
             raise ValueError("A GIF immediate-send payload cannot include text or file attachments")
         if len(set(self.attachment_refs)) != len(self.attachment_refs):
             raise ValueError("Message attachment references must be unique")
-        if tuple(asset.asset_ref for asset in self.assets) != self.attachment_refs:
-            raise ValueError("Message asset snapshots do not match the typed attachments")
-        if any(asset.role is not PostAssetRole.MESSAGE_ATTACHMENT for asset in self.assets):
-            raise ValueError("A message payload contains an invalid snapshotted asset role")
-        if sum(asset.size_bytes for asset in self.assets) > 20 * 1024 * 1024:
-            raise ValueError("Combined LinkedIn desktop message attachments exceed 20 MB")
         return self
-
-
-class ActionAssetSnapshot(StrictModel):
-    asset_ref: AssetReference
-    role: PostAssetRole
-    sha256: PayloadHash
-    size_bytes: Annotated[int, Field(ge=1, le=5 * 1024 * 1024 * 1024)]
-    media_type: Annotated[str, Field(min_length=3, max_length=200)]
-    alt_text: Annotated[str, Field(min_length=1, max_length=1_000)] | None = None
-    tagged_profile_slugs: Annotated[tuple[ProfileSlug, ...], Field(max_length=30)] = ()
-    tagged_company_slugs: Annotated[tuple[CompanySlug, ...], Field(max_length=30)] = ()
 
 
 class PostCreatePayload(StrictModel):
@@ -3170,43 +3079,9 @@ class PostCreatePayload(StrictModel):
     brand_partnership: bool = False
     collaborators: Annotated[tuple[PostCollaboratorInput, ...], Field(max_length=5)] = ()
     scheduled_at: datetime | None = None
-    assets: Annotated[tuple[ActionAssetSnapshot, ...], Field(max_length=24)] = ()
 
     @model_validator(mode="after")
-    def validate_post_asset_snapshots(self) -> PostCreatePayload:
-        expected: list[tuple[AssetReference, PostAssetRole]] = []
-        if isinstance(self.content, ImagePostContent):
-            expected.extend((image.asset_ref, PostAssetRole.IMAGE) for image in self.content.images)
-        elif isinstance(self.content, VideoPostContent):
-            expected.append((self.content.video_asset_ref, PostAssetRole.VIDEO))
-            if self.content.thumbnail_asset_ref is not None:
-                expected.append((self.content.thumbnail_asset_ref, PostAssetRole.VIDEO_THUMBNAIL))
-            if self.content.caption_asset_ref is not None:
-                expected.append((self.content.caption_asset_ref, PostAssetRole.VIDEO_CAPTIONS))
-        elif isinstance(self.content, DocumentPostContent):
-            expected.append((self.content.document_asset_ref, PostAssetRole.DOCUMENT))
-        elif (
-            isinstance(self.content, CelebrationPostContent)
-            and self.content.image_asset_ref is not None
-        ):
-            expected.append(
-                (
-                    self.content.image_asset_ref,
-                    PostAssetRole.CELEBRATION_IMAGE,
-                )
-            )
-        elif (
-            isinstance(self.content, EventPostContent) and self.content.cover_asset_ref is not None
-        ):
-            expected.append(
-                (
-                    self.content.cover_asset_ref,
-                    PostAssetRole.EVENT_COVER_IMAGE,
-                )
-            )
-        actual = [(asset.asset_ref, asset.role) for asset in self.assets]
-        if actual != expected:
-            raise ValueError("Post asset snapshots do not exactly match the typed content")
+    def validate_post_payload(self) -> PostCreatePayload:
         if self.scheduled_at is not None and self.scheduled_at.utcoffset() is None:
             raise ValueError("scheduled_at must include a timezone offset")
         if (self.audience is PostAudience.GROUP) != (self.group_target is not None):
@@ -3229,26 +3104,11 @@ class CommentCreatePayload(StrictModel):
     text: Annotated[str, Field(min_length=1, max_length=3_000)] | None = None
     mentions: Annotated[tuple[PostMentionInput, ...], Field(max_length=20)] = ()
     attachment: CommentAttachment | None = None
-    assets: Annotated[tuple[ActionAssetSnapshot, ...], Field(max_length=1)] = ()
 
     @model_validator(mode="after")
     def validate_comment_payload(self) -> CommentCreatePayload:
         if self.text is None and self.attachment is None:
             raise ValueError("A comment payload requires text, a photo, or a GIF")
-        expected_ref = (
-            self.attachment.asset_ref
-            if isinstance(self.attachment, CommentPhotoAttachment)
-            else None
-        )
-        if expected_ref is None:
-            if self.assets:
-                raise ValueError("A non-photo comment cannot carry a snapshotted local asset")
-        elif (
-            len(self.assets) != 1
-            or self.assets[0].asset_ref != expected_ref
-            or self.assets[0].role is not PostAssetRole.COMMENT_IMAGE
-        ):
-            raise ValueError("The snapshotted comment photo does not match the typed attachment")
         return self
 
 

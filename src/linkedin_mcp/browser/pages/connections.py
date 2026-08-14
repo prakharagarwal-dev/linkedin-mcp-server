@@ -724,38 +724,6 @@ class ConnectionsListPage:
             raise ParserDriftError("The requested visible Connections sort option is unavailable.")
         await self._browser.click_visible_control(page, visible_options[0])
 
-    async def find_exact(
-        self,
-        page: Page,
-        *,
-        profile_slug: str,
-        query: str,
-    ) -> tuple[ConnectionSummary, str | None]:
-        """Find one exact visible connection card after a bounded name search."""
-
-        await self._browser.navigate(page, _CONNECTIONS_URL)
-        await page.locator("main").first.wait_for(state="visible")
-        await self._apply_query(page, query)
-        terminal_tracker = _MemberListTerminalTracker()
-        for round_index in range(self._max_scroll_rounds):
-            for card in await _raw_member_cards(page):
-                connection = _connection_from_card(card)
-                if connection is None or connection.profile_slug != profile_slug:
-                    continue
-                raw_image = card.get("image_src")
-                image_src = raw_image if isinstance(raw_image, str) and raw_image else None
-                return connection, image_src
-            if round_index + 1 >= self._max_scroll_rounds:
-                break
-            settled = await _settle_scroll(page)
-            if settled.outcome is CollectionSettleOutcome.EXPLICIT_END:
-                break
-            if await terminal_tracker.observe(page, settled):
-                break
-        raise InvalidTargetError(
-            "The exact profile was not visible in a bounded Connections name search."
-        )
-
     @staticmethod
     async def extract_visible_connections(page: Page) -> tuple[ConnectionSummary, ...]:
         results: dict[str, ConnectionSummary] = {}

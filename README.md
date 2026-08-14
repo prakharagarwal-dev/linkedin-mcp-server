@@ -212,18 +212,6 @@ See the [Roo Code MCP documentation](https://docs.roocode.com/features/mcp/using
 </details>
 
 <details>
-<summary>Kiro</summary>
-
-[![Add to Kiro](https://kiro.dev/images/add-to-kiro.svg)](https://kiro.dev/launch/mcp/add?name=linkedin-mcp&config=%7B%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22--from%22%2C%22linkedin-mcp-local%22%2C%22linkedin-mcp%22%2C%22serve%22%2C%22--transport%22%2C%22stdio%22%5D%7D)
-
-Or add a local server named `linkedin-mcp` to
-`~/.kiro/settings/mcp.json` with command `uvx` and arguments
-`--from linkedin-mcp-local linkedin-mcp serve --transport stdio`.
-See the [Kiro MCP documentation](https://kiro.dev/docs/mcp/configuration/).
-
-</details>
-
-<details>
 <summary>Zed</summary>
 
 Add this to Zed settings:
@@ -240,18 +228,6 @@ Add this to Zed settings:
 ```
 
 See the [Zed MCP documentation](https://zed.dev/docs/ai/mcp).
-
-</details>
-
-<details>
-<summary>LM Studio</summary>
-
-[![Add to LM Studio](https://files.lmstudio.ai/deeplink/mcp-install-light.svg)](https://lmstudio.ai/install-mcp?name=linkedin-mcp&config=eyJjb21tYW5kIjoidXZ4IiwiYXJncyI6WyItLWZyb20iLCJsaW5rZWRpbi1tY3AtbG9jYWwiLCJsaW5rZWRpbi1tY3AiLCJzZXJ2ZSIsIi0tdHJhbnNwb3J0Iiwic3RkaW8iXX0%3D)
-
-Or open **Program → Install → Edit mcp.json** and
-add a local server named `linkedin-mcp` with command `uvx` and arguments
-`--from linkedin-mcp-local linkedin-mcp serve --transport stdio`.
-See the [LM Studio MCP documentation](https://lmstudio.ai/docs/app/mcp).
 
 </details>
 
@@ -408,9 +384,9 @@ approval_mode = "approve"
 ```
 
 Restart Codex after changing its configuration. The tool still resolves the
-exact visible target, snapshots and rechecks local attachments, performs one
-narrow UI action, and verifies the visible postcondition. Avoid approving the
-entire server when only one action is needed. See
+exact visible target, validates any local attachment path, type, and size,
+performs one narrow UI action, and verifies the visible postcondition. Avoid
+approving the entire server when only one action is needed. See
 [Configuration](docs/CONFIGURATION.md#client-tool-policy) for the full model.
 
 ## Architecture

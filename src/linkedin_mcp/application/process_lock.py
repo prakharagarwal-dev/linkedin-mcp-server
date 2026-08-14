@@ -224,9 +224,6 @@ def _parse_owner(value: str) -> AccountRuntimeOwner | None:
     text = value.strip()
     if not text:
         return None
-    if text.isdigit():
-        pid = int(text)
-        return AccountRuntimeOwner(pid=pid) if pid > 1 else None
     try:
         payload = json.loads(text)
     except json.JSONDecodeError:

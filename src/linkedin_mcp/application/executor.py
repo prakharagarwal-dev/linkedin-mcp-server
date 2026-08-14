@@ -40,7 +40,6 @@ from linkedin_mcp.domain.evidence import (
     sources_from_person_profile,
 )
 from linkedin_mcp.domain.models import (
-    ActionAssetSnapshot,
     ActionCommand,
     ActionInspection,
     ActionOutcome,
@@ -202,11 +201,6 @@ class PostCommentsProvider(Protocol):
 
 
 class PostPublishingProvider(Protocol):
-    async def snapshot_assets(
-        self,
-        request: PostCreateInput,
-    ) -> tuple[ActionAssetSnapshot, ...]: ...
-
     async def inspect_post(
         self,
         request: PostCreateInput,
@@ -216,11 +210,6 @@ class PostPublishingProvider(Protocol):
 
 
 class PostEngagementProvider(Protocol):
-    async def snapshot_comment_assets(
-        self,
-        request: PostCommentInput,
-    ) -> tuple[ActionAssetSnapshot, ...]: ...
-
     async def inspect_comment(
         self,
         request: PostCommentInput,
@@ -309,11 +298,6 @@ class ConversationProvider(Protocol):
         self,
         request: MessageSendInput,
     ) -> ActionInspection: ...
-
-    async def snapshot_message_assets(
-        self,
-        request: MessageSendInput,
-    ) -> tuple[ActionAssetSnapshot, ...]: ...
 
     async def perform_message(self, command: ActionCommand) -> ActionPageResult: ...
 
@@ -1266,33 +1250,26 @@ class CapabilityExecutor:
         )
 
     async def send_message(self, request: MessageSendInput) -> ActionOutput:
-        async def payload_factory(
-            _: ActionInspection,
-        ) -> ActionPayload:
-            assets = await self._conversation.snapshot_message_assets(request)
-            return MessageSendPayload(
-                message=request.message,
-                attachment_refs=tuple(attachment.asset_ref for attachment in request.attachments),
-                gif=request.gif,
-                reply_to_message_ref=request.reply_to_message_ref,
-                assets=assets,
-            )
-
         return await self._run_action(
             capability_name=CapabilityName.MESSAGING_SEND,
             request=request,
             action_type=ActionType.MESSAGE_SEND,
-            async_payload_factory=payload_factory,
+            payload=MessageSendPayload(
+                message=request.message,
+                attachment_refs=tuple(attachment.asset_ref for attachment in request.attachments),
+                gif=request.gif,
+                reply_to_message_ref=request.reply_to_message_ref,
+            ),
             inspect=lambda: self._conversation.inspect_message(request),
             perform=self._conversation.perform_message,
         )
 
     async def create_post(self, request: PostCreateInput) -> ActionOutput:
-        async def payload_factory(
-            _: ActionInspection,
-        ) -> ActionPayload:
-            assets = await self._post_publishing.snapshot_assets(request)
-            return PostCreatePayload(
+        return await self._run_action(
+            capability_name=CapabilityName.POSTS_CREATE,
+            request=request,
+            action_type=ActionType.POST_CREATE,
+            payload=PostCreatePayload(
                 content=request.content,
                 audience=request.audience,
                 group_target=request.group_target,
@@ -1300,36 +1277,22 @@ class CapabilityExecutor:
                 brand_partnership=request.brand_partnership,
                 collaborators=request.collaborators,
                 scheduled_at=request.scheduled_at,
-                assets=assets,
-            )
-
-        return await self._run_action(
-            capability_name=CapabilityName.POSTS_CREATE,
-            request=request,
-            action_type=ActionType.POST_CREATE,
-            async_payload_factory=payload_factory,
+            ),
             inspect=lambda: self._post_publishing.inspect_post(request),
             perform=self._post_publishing.perform_post,
         )
 
     async def comment_on_post(self, request: PostCommentInput) -> ActionOutput:
-        async def payload_factory(
-            _: ActionInspection,
-        ) -> ActionPayload:
-            assets = await self._post_engagement.snapshot_comment_assets(request)
-            return CommentCreatePayload(
-                post_ref=request.post_ref,
-                text=request.text,
-                mentions=request.mentions,
-                attachment=request.attachment,
-                assets=assets,
-            )
-
         return await self._run_action(
             capability_name=CapabilityName.POST_COMMENT,
             request=request,
             action_type=ActionType.COMMENT_CREATE,
-            async_payload_factory=payload_factory,
+            payload=CommentCreatePayload(
+                post_ref=request.post_ref,
+                text=request.text,
+                mentions=request.mentions,
+                attachment=request.attachment,
+            ),
             inspect=lambda: self._post_engagement.inspect_comment(request),
             perform=self._post_engagement.perform_comment,
         )
@@ -1371,9 +1334,6 @@ class CapabilityExecutor:
         perform: Callable[[ActionCommand], Awaitable[ActionPageResult]],
         payload: ActionPayload | None = None,
         payload_factory: Callable[[ActionInspection], ActionPayload] | None = None,
-        async_payload_factory: (
-            Callable[[ActionInspection], Awaitable[ActionPayload]] | None
-        ) = None,
     ) -> ActionOutput:
         descriptor = self._registry.get(capability_name)
         value = request.model_dump(mode="json")
@@ -1389,12 +1349,9 @@ class CapabilityExecutor:
         started_at = datetime.now(UTC)
         try:
             inspection = await inspect()
-            if async_payload_factory is not None:
-                resolved_payload = await async_payload_factory(inspection)
-            else:
-                resolved_payload = (
-                    payload_factory(inspection) if payload_factory is not None else payload
-                )
+            resolved_payload = (
+                payload_factory(inspection) if payload_factory is not None else payload
+            )
             if resolved_payload is None:
                 raise RuntimeError("Action inspection produced no typed payload.")
             command = ActionCommand(

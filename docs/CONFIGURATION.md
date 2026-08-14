@@ -22,7 +22,7 @@ Enable, disable, or restrict tools in the MCP client. If a client makes a tool
 available and invokes it, the server treats that invocation as authorized for
 the configured LinkedIn account. The server still validates typed input,
 canonical targets, LinkedIn authentication, exact visible preconditions,
-attachment integrity, bounded execution, and visible postconditions.
+attachment path/type/size validation, bounded execution, and visible postconditions.
 
 ## Client tool policy
 
@@ -161,8 +161,8 @@ separate accounts distinct profile and lock paths.
 
 Posts, comments, and messages never accept an arbitrary desktop path. Place an
 attachment below `LINKEDIN_MCP_ASSET_ROOT_PATH` and pass its relative
-`asset_ref`. The action snapshots the file's media type, size, and SHA-256,
-then rechecks the unchanged file immediately before browser upload.
+`asset_ref`. The action resolves that current file directly when it uploads,
+after checking its safe path, supported extension, and LinkedIn size limit.
 
 ## Transports
 

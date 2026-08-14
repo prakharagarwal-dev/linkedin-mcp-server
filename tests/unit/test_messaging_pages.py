@@ -19,7 +19,6 @@ from linkedin_mcp.browser.pages import (
 )
 from linkedin_mcp.domain.evidence import source_from_conversation
 from linkedin_mcp.domain.models import (
-    ActionAssetSnapshot,
     ActionCommand,
     ActionOutcome,
     ActionTarget,
@@ -35,7 +34,6 @@ from linkedin_mcp.domain.models import (
     MessageGifInput,
     MessageSendInput,
     MessageSendPayload,
-    PostAssetRole,
 )
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
 
@@ -123,7 +121,7 @@ class FailingGifClickBrowser(MessagingFixtureBrowser):
         await super().click_visible_control(page, control)
 
 
-def _message_draft(
+def _message_command(
     *,
     message: str = "Thanks for reaching out.",
     display_name: str = "Jane Doe",
@@ -730,7 +728,7 @@ async def test_malformed_conversation_cards_are_ignored_without_identity_guessin
 
 @pytest.mark.timeout(20)
 async def test_conversation_read_is_direct_by_visible_conversation_id() -> None:
-    html = (FIXTURES / "messaging-action.html").read_text()
+    html = (FIXTURES / "messaging/latest/action.html").read_text()
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -753,7 +751,7 @@ async def test_conversation_read_is_direct_by_visible_conversation_id() -> None:
 
 @pytest.mark.timeout(20)
 async def test_message_action_verifies_a_new_exact_outgoing_bubble() -> None:
-    html = (FIXTURES / "messaging-action.html").read_text()
+    html = (FIXTURES / "messaging/latest/action.html").read_text()
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -936,7 +934,7 @@ async def test_message_reply_fails_closed_for_a_visible_nonreplyable_message() -
 @pytest.mark.timeout(20)
 async def test_message_action_accepts_exact_thread_when_profile_link_is_absent() -> None:
     html = (
-        (FIXTURES / "messaging-action.html")
+        (FIXTURES / "messaging/latest/action.html")
         .read_text()
         .replace(
             '<a href="/in/jane-doe/">Jane Doe</a>',
@@ -949,7 +947,7 @@ async def test_message_action_accepts_exact_thread_when_profile_link_is_absent()
         try:
             result = await ConversationPage(
                 cast(BrowserManager, MessagingFixtureBrowser(page, html))
-            ).perform_message(_message_draft())
+            ).perform_message(_message_command())
         finally:
             await browser.close()
 
@@ -961,7 +959,7 @@ async def test_message_action_accepts_exact_thread_when_profile_link_is_absent()
 @pytest.mark.timeout(60)
 async def test_message_action_revalidates_exact_profile_after_stale_compose_overlay() -> None:
     thread_html = (
-        (FIXTURES / "messaging-action.html")
+        (FIXTURES / "messaging/latest/action.html")
         .read_text()
         .replace(
             '<a href="/in/jane-doe/">Jane Doe</a>',
@@ -995,7 +993,7 @@ async def test_message_action_revalidates_exact_profile_after_stale_compose_over
                         },
                     ),
                 )
-            ).perform_message(_message_draft())
+            ).perform_message(_message_command())
         finally:
             await browser.close()
 
@@ -1040,7 +1038,7 @@ async def test_profile_message_does_not_fallback_when_exact_overlay_disappears()
 
 
 @pytest.mark.timeout(30)
-async def test_message_read_and_hash_locked_file_send_cover_visible_attachments(
+async def test_message_read_and_direct_file_send_cover_visible_attachments(
     tmp_path: Path,
 ) -> None:
     html = (MESSAGING_FIXTURES / "current.html").read_text()
@@ -1076,7 +1074,6 @@ async def test_message_read_and_hash_locked_file_send_cover_visible_attachments(
             )
             source_from_conversation(observation)
             capture = await adapter.inspect_message(request)
-            assets = await adapter.snapshot_message_assets(request)
             result = await adapter.perform_message(
                 ActionCommand(
                     action_type=ActionType.MESSAGE_SEND,
@@ -1084,7 +1081,6 @@ async def test_message_read_and_hash_locked_file_send_cover_visible_attachments(
                     payload=MessageSendPayload(
                         message=request.message,
                         attachment_refs=(asset.name,),
-                        assets=assets,
                     ),
                 )
             )
@@ -1124,7 +1120,6 @@ async def test_image_send_verifies_with_duplicate_dom_wrappers_and_generic_previ
         )
         try:
             capture = await adapter.inspect_message(request)
-            assets = await adapter.snapshot_message_assets(request)
             result = await adapter.perform_message(
                 ActionCommand(
                     action_type=ActionType.MESSAGE_SEND,
@@ -1132,7 +1127,6 @@ async def test_image_send_verifies_with_duplicate_dom_wrappers_and_generic_previ
                     payload=MessageSendPayload(
                         message=request.message,
                         attachment_refs=(asset.name,),
-                        assets=assets,
                     ),
                 )
             )
@@ -1183,7 +1177,7 @@ async def test_message_gif_is_verified_as_one_immediate_send() -> None:
 
 
 @pytest.mark.asyncio
-async def test_every_document_image_and_video_message_format_is_hash_locked(
+async def test_every_document_image_and_video_message_format_is_resolved_directly(
     tmp_path: Path,
 ) -> None:
     extensions = (
@@ -1216,51 +1210,20 @@ async def test_every_document_image_and_video_message_format_is_hash_locked(
     for index, extension in enumerate(extensions):
         path = tmp_path / f"asset-{index}{extension}"
         path.write_bytes(b"fixture")
-        request = MessageSendInput(
-            context_id="messaging-context",
-            request_id=f"desktop-format-{index}",
-            conversation_id="thread-123",
-            attachments=(MessageFileInput(asset_ref=path.name),),
-        )
-        assets = await LocalAssetStore(tmp_path).snapshot_message(request)
-        assert len(assets) == 1
-        assert assets[0].role is PostAssetRole.MESSAGE_ATTACHMENT
+        assets = await LocalAssetStore(tmp_path).resolve_message((path.name,))
+        assert assets[path.name] == path
 
 
 @pytest.mark.asyncio
-async def test_message_attachment_hash_drift_fails_before_browser_access(
+async def test_message_attachment_resolution_uses_current_file(
     tmp_path: Path,
 ) -> None:
     path = tmp_path / "brief.pdf"
     path.write_bytes(b"confirmed")
-    request = MessageSendInput(
-        context_id="messaging-context",
-        request_id="hash-lock",
-        conversation_id="thread-123",
-        attachments=(MessageFileInput(asset_ref=path.name),),
-    )
     asset_store = LocalAssetStore(tmp_path)
-    assets = await asset_store.snapshot_message(request)
+    assert (await asset_store.resolve_message((path.name,)))[path.name] == path
     path.write_bytes(b"changed")
-    command = ActionCommand(
-        action_type=ActionType.MESSAGE_SEND,
-        target=ActionTarget(
-            profile_slug="jane-doe",
-            profile_url=HttpUrl("https://www.linkedin.com/in/jane-doe/"),
-            display_name="Jane Doe",
-            conversation_id="thread-123",
-        ),
-        payload=MessageSendPayload(
-            attachment_refs=(path.name,),
-            assets=assets,
-        ),
-    )
-
-    with pytest.raises(InvalidTargetError, match="changed during the action"):
-        await ConversationPage(
-            cast(BrowserManager, object()),
-            asset_store=asset_store,
-        ).perform_message(command)
+    assert (await asset_store.resolve_message((path.name,)))[path.name] == path
 
 
 def test_message_content_modes_are_exact_and_mutually_safe() -> None:
@@ -1281,26 +1244,21 @@ def test_message_content_modes_are_exact_and_mutually_safe() -> None:
                 result_title="Dancing robot GIF",
             ),
         )
-    oversized = tuple(
-        ActionAssetSnapshot(
-            asset_ref=f"asset-{index}.pdf",
-            role=PostAssetRole.MESSAGE_ATTACHMENT,
-            sha256=f"{index + 1:x}" * 64,
-            size_bytes=11 * 1024 * 1024,
-            media_type="application/pdf",
-        )
-        for index in range(2)
-    )
-    with pytest.raises(ValidationError, match="exceed 20 MB"):
-        MessageSendPayload(
-            attachment_refs=tuple(asset.asset_ref for asset in oversized),
-            assets=oversized,
-        )
+
+
+@pytest.mark.asyncio
+async def test_message_attachments_reject_combined_size_over_20_mb(tmp_path: Path) -> None:
+    refs = ("asset-0.pdf", "asset-1.pdf")
+    for ref in refs:
+        with (tmp_path / ref).open("wb") as stream:
+            stream.truncate(11 * 1024 * 1024)
+    with pytest.raises(InvalidTargetError, match="exceed 20 MB"):
+        await LocalAssetStore(tmp_path).resolve_message(refs)
 
 
 @pytest.mark.timeout(20)
 async def test_message_inspection_rejects_groups_missing_identity_and_inmail() -> None:
-    base = (FIXTURES / "messaging-action.html").read_text()
+    base = (FIXTURES / "messaging/latest/action.html").read_text()
     group_html = base.replace(
         '<a href="/in/jane-doe/">Jane Doe</a>',
         '<a href="/in/jane-doe/">Jane Doe</a><a href="/in/alex-lee/">Alex Lee</a>',
@@ -1352,7 +1310,7 @@ async def test_profile_target_uses_exact_visible_message_button_and_same_overlay
                 )
             )
             result = await adapter.perform_message(
-                _message_draft(
+                _message_command(
                     message="Hello from the profile.",
                     conversation_id=None,
                 )
@@ -1387,7 +1345,7 @@ async def test_profile_target_accepts_same_window_exact_thread_after_message_cli
                 )
             )
             result = await adapter.perform_message(
-                _message_draft(
+                _message_command(
                     message="Hello from the profile thread.",
                     conversation_id=None,
                 )
@@ -1426,7 +1384,7 @@ async def test_profile_target_follows_exact_message_href_in_current_page() -> No
                 )
             )
             result = await adapter.perform_message(
-                _message_draft(
+                _message_command(
                     message="Hello from the profile popup.",
                     conversation_id=None,
                 )
@@ -1484,7 +1442,7 @@ async def test_profile_target_leaves_named_blank_page_unchanged() -> None:
         'target="_blank"',
         'target="messaging-window"',
     )
-    thread_html = (FIXTURES / "messaging-action.html").read_text()
+    thread_html = (FIXTURES / "messaging/latest/action.html").read_text()
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -1723,30 +1681,20 @@ async def test_profile_message_rejects_missing_or_conflicting_identity_evidence(
             await browser.close()
 
 
-def test_recipient_name_matching_is_case_insensitive_and_boundary_safe() -> None:
-    matches = ConversationPage._recipient_name_matches  # pyright: ignore[reportPrivateUsage]
-
-    assert matches("Jane Doe", "jane doe") is True
-    assert matches("Jane Doe • 1st degree connection", "Jane Doe") is True
-    assert matches("Jane Doe (she/her)", "Jane Doe") is True
-    assert matches("Jane Doeson", "Jane Doe") is False
-    assert matches("Alex Doe", "Jane Doe") is False
-
-
 @pytest.mark.timeout(20)
 async def test_message_action_fails_closed_for_changed_target_limits_and_controls() -> None:
-    base = (FIXTURES / "messaging-action.html").read_text()
+    base = (FIXTURES / "messaging/latest/action.html").read_text()
     cases = (
         (
             base,
-            _message_draft(display_name="Jane Roe"),
+            _message_command(display_name="Jane Roe"),
             "target_identity_changed",
             ActionOutcome.FAILED,
             "display_name_changed",
         ),
         (
             base.replace("/in/jane-doe/", "/in/jane-roe/"),
-            _message_draft(),
+            _message_command(),
             "target_identity_changed",
             ActionOutcome.FAILED,
             "profile_slug_changed",
@@ -1757,21 +1705,21 @@ async def test_message_action_fails_closed_for_changed_target_limits_and_control
                 '<body><script>history.replaceState({}, "", '
                 '"/messaging/thread/thread-changed/");</script>',
             ),
-            _message_draft(),
+            _message_command(),
             "target_identity_changed",
             ActionOutcome.FAILED,
             "conversation_id_changed",
         ),
         (
             base.replace('maxlength="8000"', 'maxlength="1"'),
-            _message_draft(message="Too long"),
+            _message_command(message="Too long"),
             "message_too_long",
             ActionOutcome.FAILED,
             None,
         ),
         (
             base.replace('aria-label="Send"', 'aria-label="Archive"'),
-            _message_draft(),
+            _message_command(),
             "message_send_unavailable",
             ActionOutcome.FAILED,
             None,
@@ -1792,7 +1740,7 @@ async def test_message_action_fails_closed_for_changed_target_limits_and_control
 
             uncertain = await ConversationPage(
                 cast(BrowserManager, FailingMessageClickBrowser(page, base))
-            ).perform_message(_message_draft())
+            ).perform_message(_message_command())
         finally:
             await browser.close()
 
@@ -1945,8 +1893,8 @@ def test_message_search_requires_one_current_search_criterion() -> None:
     assert request.filter is ConversationFilter.JOBS
 
 
-def test_action_draft_rejects_a_payload_from_another_action_type() -> None:
-    valid = _message_draft()
+def test_action_command_rejects_a_payload_from_another_action_type() -> None:
+    valid = _message_command()
 
     with pytest.raises(ValidationError, match="does not match"):
         ActionCommand.model_validate(

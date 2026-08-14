@@ -25,7 +25,6 @@ from linkedin_mcp.browser.convergence import (
 )
 from linkedin_mcp.browser.manager import BrowserManager
 from linkedin_mcp.domain.models import (
-    ActionAssetSnapshot,
     ActionCommand,
     ActionInspection,
     ActionOutcome,
@@ -1265,29 +1264,17 @@ class ConversationPage:
                 captured_at=datetime.now(UTC),
             )
 
-    async def snapshot_message_assets(
-        self,
-        request: MessageSendInput,
-    ) -> tuple[ActionAssetSnapshot, ...]:
-        if not request.attachments:
-            return ()
-        if self._assets is None:
-            raise InvalidTargetError(
-                "Message attachments require the configured local asset store."
-            )
-        return await self._assets.snapshot_message(request)
-
     async def perform_message(self, command: ActionCommand) -> ActionPageResult:
         if not isinstance(command.payload, MessageSendPayload):
             raise InvalidTargetError("The message action payload is invalid.")
         payload = command.payload
         paths: dict[str, Path] = {}
-        if payload.assets:
+        if payload.attachment_refs:
             if self._assets is None:
                 raise InvalidTargetError(
                     "Message attachments require the configured local asset store."
                 )
-            paths = await self._assets.verify_assets(payload.assets)
+            paths = await self._assets.resolve_message(payload.attachment_refs)
         async with self._browser.page() as page:
             page, root, profile_slug, name, is_group = await self._open(
                 page,
@@ -2362,10 +2349,6 @@ class ConversationPage:
         )
 
     @staticmethod
-    def _recipient_name_matches(visible_name: str, expected_name: str) -> bool:
-        return _visible_name_matches(visible_name, expected_name)
-
-    @staticmethod
     async def _conversation_root(page: Page) -> Locator:
         dialogs = page.get_by_role("dialog")
         for index in range(await dialogs.count()):
@@ -2600,15 +2583,6 @@ class ConversationPage:
             previous_time = sent_at
             previous_direction = direction
         return tuple(messages)
-
-    @staticmethod
-    async def _message_body_count(root: Locator, text: str) -> int:
-        bodies = root.locator('[class*="event-listitem__body"],[data-test-message-body]')
-        count = 0
-        for index in range(await bodies.count()):
-            if (await bodies.nth(index).inner_text()).strip() == text:
-                count += 1
-        return count
 
     @staticmethod
     async def _composer_value(composer: Locator) -> str:

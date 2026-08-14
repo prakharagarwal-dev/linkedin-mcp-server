@@ -104,19 +104,6 @@ CursorArgument = Annotated[
         ),
     ),
 ]
-LegacyPageSizeArgument = Annotated[
-    int,
-    Field(
-        ge=1,
-        le=100,
-        description="Deprecated compatibility alias for page_size.",
-    ),
-]
-
-ACTION_POLICY_DESCRIPTION = (
-    "Account-changing action. The MCP client controls whether invocation requires interactive "
-    "confirmation or an explicit durable per-tool approval. Every invocation is a new action. "
-)
 
 
 async def _tool_result[ResultT](awaitable: Awaitable[ResultT]) -> ResultT:
@@ -125,10 +112,6 @@ async def _tool_result[ResultT](awaitable: Awaitable[ResultT]) -> ResultT:
     except Exception as error:
         safe = safe_capability_error(error)
         raise ToolError(f"{safe.code.value}: {safe.safe_message}") from error
-
-
-def _effective_page_size(page_size: int, legacy_page_size: int | None) -> int:
-    return legacy_page_size if legacy_page_size is not None else page_size
 
 
 def create_mcp_server(
@@ -149,11 +132,10 @@ def create_mcp_server(
     mcp: FastMCP[None] = FastMCP(
         "linkedin-mcp-server",
         instructions=(
-            "Each account-changing tool performs one complete LinkedIn action. The MCP client "
-            "controls interactive or durable per-tool approval. Every invocation is new, so do "
-            "not retry an uncertain action blindly. Use only registered typed LinkedIn "
-            "capabilities. Cursors belong to the MCP session that created them. Operation state "
-            "exists only for this server process; evidence is at "
+            "Each account-changing tool performs one complete LinkedIn action. Every invocation "
+            "is new, so do not retry an uncertain action blindly. Use only registered typed "
+            "LinkedIn capabilities. Cursors belong to the MCP session that created them. "
+            "Operation state exists only for this server process; evidence is at "
             "linkedin://sources/{source_id}."
         ),
         json_response=True,
@@ -292,7 +274,6 @@ def create_mcp_server(
         filters: JobSearchFilters | None = None,
         page_size: PageSizeArgument = 25,
         cursor: CursorArgument | None = None,
-        max_results: LegacyPageSizeArgument | None = None,
     ) -> JobSearchOutput:
         await ctx.report_progress(0, 100, "Queued LinkedIn job search")
         result = await _tool_result(
@@ -304,7 +285,7 @@ def create_mcp_server(
                     location=location,
                     freshness_hours=freshness_hours,
                     filters=filters or JobSearchFilters(),
-                    page_size=_effective_page_size(page_size, max_results),
+                    page_size=page_size,
                     cursor=cursor,
                 )
             )
@@ -369,24 +350,9 @@ def create_mcp_server(
             ]
             | None
         ) = None,
-        title_keywords: (
-            Annotated[
-                str,
-                Field(
-                    min_length=1,
-                    max_length=300,
-                    description=(
-                        "Role/title terms appended to People-search keywords; this is not "
-                        "represented as an exact-title facet by standard LinkedIn People search."
-                    ),
-                ),
-            ]
-            | None
-        ) = None,
         filters: PeopleSearchFilters | None = None,
         page_size: PageSizeArgument = 25,
         cursor: CursorArgument | None = None,
-        max_results: LegacyPageSizeArgument | None = None,
     ) -> PeopleSearchOutput:
         await ctx.report_progress(0, 100, "Queued LinkedIn People search")
         result = await _tool_result(
@@ -395,9 +361,8 @@ def create_mcp_server(
                     context_id=context_id,
                     request_id=request_id,
                     query=query,
-                    title_keywords=title_keywords,
                     filters=filters or PeopleSearchFilters(),
-                    page_size=_effective_page_size(page_size, max_results),
+                    page_size=page_size,
                     cursor=cursor,
                 )
             )
@@ -485,7 +450,6 @@ def create_mcp_server(
         filters: CompanySearchFilters | None = None,
         page_size: PageSizeArgument = 25,
         cursor: CursorArgument | None = None,
-        max_results: LegacyPageSizeArgument | None = None,
     ) -> CompanySearchOutput:
         await ctx.report_progress(0, 100, "Queued LinkedIn Company search")
         result = await _tool_result(
@@ -495,7 +459,7 @@ def create_mcp_server(
                     request_id=request_id,
                     query=query,
                     filters=filters or CompanySearchFilters(),
-                    page_size=_effective_page_size(page_size, max_results),
+                    page_size=page_size,
                     cursor=cursor,
                 )
             )
@@ -572,7 +536,6 @@ def create_mcp_server(
         filters: PostSearchFilters | None = None,
         page_size: PageSizeArgument = 25,
         cursor: CursorArgument | None = None,
-        max_results: LegacyPageSizeArgument | None = None,
     ) -> PostSearchOutput:
         await ctx.report_progress(0, 100, "Queued LinkedIn post search")
         result = await _tool_result(
@@ -582,7 +545,7 @@ def create_mcp_server(
                     request_id=request_id,
                     query=query,
                     filters=filters or PostSearchFilters(),
-                    page_size=_effective_page_size(page_size, max_results),
+                    page_size=page_size,
                     cursor=cursor,
                 )
             )
@@ -650,7 +613,6 @@ def create_mcp_server(
         page_size: PageSizeArgument = 25,
         cursor: CursorArgument | None = None,
         max_replies_per_comment: Annotated[int, Field(ge=0, le=100)] = 25,
-        max_comments: LegacyPageSizeArgument | None = None,
     ) -> PostCommentsListOutput:
         await ctx.report_progress(0, 100, "Opening visible LinkedIn post discussion")
         result = await _tool_result(
@@ -660,7 +622,7 @@ def create_mcp_server(
                     request_id=request_id,
                     post_ref=post_ref,
                     sort_by=sort_by,
-                    page_size=_effective_page_size(page_size, max_comments),
+                    page_size=page_size,
                     cursor=cursor,
                     max_replies_per_comment=max_replies_per_comment,
                 )
@@ -673,7 +635,7 @@ def create_mcp_server(
         name="linkedin.posts.create",
         title="Create Personal LinkedIn Post",
         description=(
-            f"{ACTION_POLICY_DESCRIPTION}Publish or schedule one personal-member post. Supports "
+            "Publish or schedule one personal-member post. Supports "
             "typed text/link, up to 20 edited photos with alt text and member/company tags, "
             "video with thumbnail/captions, document, poll, celebration, event, existing-job "
             "hiring, and expert-request content, plus audience/group, comment control, brand "
@@ -720,7 +682,7 @@ def create_mcp_server(
         name="linkedin.posts.comment",
         title="Comment on LinkedIn Post",
         description=(
-            f"{ACTION_POLICY_DESCRIPTION}Publish one top-level personal-member comment on an "
+            "Publish one top-level personal-member comment on an "
             "exact visible post. Supports text, links, emoji, exact member/company mentions, "
             "one local photo, or one exact visible GIF result."
         ),
@@ -758,7 +720,7 @@ def create_mcp_server(
         name="linkedin.posts.react",
         title="React to LinkedIn Post",
         description=(
-            f"{ACTION_POLICY_DESCRIPTION}Set, change, remove, or safely no-op the configured "
+            "Set, change, remove, or safely no-op the configured "
             "personal account's reaction on one exact visible post. Supported target states are "
             "none, like, celebrate, support, love, insightful, and funny."
         ),
@@ -848,7 +810,6 @@ def create_mcp_server(
         sort_by: ConnectionsSortBy = ConnectionsSortBy.RECENTLY_ADDED,
         page_size: PageSizeArgument = 25,
         cursor: CursorArgument | None = None,
-        max_results: LegacyPageSizeArgument | None = None,
     ) -> ConnectionsListOutput:
         await ctx.report_progress(0, 100, "Queued LinkedIn connections read")
         result = await _tool_result(
@@ -857,7 +818,7 @@ def create_mcp_server(
                     context_id=context_id,
                     request_id=request_id,
                     sort_by=sort_by,
-                    page_size=_effective_page_size(page_size, max_results),
+                    page_size=page_size,
                     cursor=cursor,
                 )
             )
@@ -894,21 +855,9 @@ def create_mcp_server(
             ]
             | None
         ) = None,
-        title_keywords: (
-            Annotated[
-                str,
-                Field(
-                    min_length=1,
-                    max_length=300,
-                    description=("Role/title terms appended to the first-degree connection query."),
-                ),
-            ]
-            | None
-        ) = None,
         filters: ConnectionsSearchFilters | None = None,
         page_size: PageSizeArgument = 25,
         cursor: CursorArgument | None = None,
-        max_results: LegacyPageSizeArgument | None = None,
     ) -> ConnectionsSearchOutput:
         await ctx.report_progress(0, 100, "Queued LinkedIn connection search")
         result = await _tool_result(
@@ -917,9 +866,8 @@ def create_mcp_server(
                     context_id=context_id,
                     request_id=request_id,
                     query=query,
-                    title_keywords=title_keywords,
                     filters=filters or ConnectionsSearchFilters(),
-                    page_size=_effective_page_size(page_size, max_results),
+                    page_size=page_size,
                     cursor=cursor,
                 )
             )
@@ -931,7 +879,7 @@ def create_mcp_server(
         name="linkedin.invitations.send",
         title="Send LinkedIn Connection Invitation",
         description=(
-            f"{ACTION_POLICY_DESCRIPTION}Send one connection invitation to an exact visible "
+            "Send one connection invitation to an exact visible "
             "profile, optionally with a personalized note of up to 200 characters. A fresh "
             "exact-profile read verifies Pending as success and Connect as LinkedIn failure."
         ),
@@ -969,7 +917,7 @@ def create_mcp_server(
         name="linkedin.invitations.accept",
         title="Accept LinkedIn Connection Invitation",
         description=(
-            f"{ACTION_POLICY_DESCRIPTION}Accept the current incoming connection invitation from "
+            "Accept the current incoming connection invitation from "
             "one exact member profile, then verify that the request controls disappear and the "
             "profile visibly becomes a first-degree connection."
         ),
@@ -1005,7 +953,7 @@ def create_mcp_server(
         name="linkedin.invitations.ignore",
         title="Ignore LinkedIn Connection Invitation",
         description=(
-            f"{ACTION_POLICY_DESCRIPTION}Ignore the current incoming connection invitation from "
+            "Ignore the current incoming connection invitation from "
             "one exact member profile, then verify that its request controls disappear without "
             "creating a connection or outgoing invitation."
         ),
@@ -1057,7 +1005,6 @@ def create_mcp_server(
         filter: ConversationFilter | None = None,
         page_size: PageSizeArgument = 25,
         cursor: CursorArgument | None = None,
-        max_results: LegacyPageSizeArgument | None = None,
     ) -> ConversationSearchOutput:
         await ctx.report_progress(0, 100, "Queued LinkedIn inbox read")
         result = await _tool_result(
@@ -1068,7 +1015,7 @@ def create_mcp_server(
                     query=query,
                     category=category,
                     filter=filter,
-                    page_size=_effective_page_size(page_size, max_results),
+                    page_size=page_size,
                     cursor=cursor,
                 )
             )
@@ -1135,7 +1082,7 @@ def create_mcp_server(
         name="linkedin.messaging.send",
         title="Send LinkedIn Message",
         description=(
-            f"{ACTION_POLICY_DESCRIPTION}Send one message in a visible one-to-one standard "
+            "Send one message in a visible one-to-one standard "
             "conversation, using the exact profile's "
             "Message button for profile targets and accepting its recipient-bound compact "
             "pane or following its exact visible Messaging href in the same operation page, "
@@ -1242,20 +1189,20 @@ def create_mcp_server(
         _captured_source,
     )
     del registered_handlers
-    _install_client_execution_scope(mcp, container)
+    _install_client_context_binding(mcp, container)
     return mcp
 
 
-def _install_client_execution_scope(mcp: FastMCP[None], container: AppContainer) -> None:
+def _install_client_context_binding(mcp: FastMCP[None], container: AppContainer) -> None:
     """Bind every protocol request to an opaque identity owned by its MCP session."""
 
     low_level = mcp._mcp_server  # pyright: ignore[reportPrivateUsage]
     for request_type, handler in tuple(low_level.request_handlers.items()):
 
-        async def scoped(request: Any, *, _handler: Any = handler) -> Any:
+        async def with_client_context(request: Any, *, _handler: Any = handler) -> Any:
             session = low_level.request_context.session
             client_id = container.clients.resolve(session)
             with bind_client_execution(client_id):
                 return await _handler(request)
 
-        low_level.request_handlers[request_type] = scoped
+        low_level.request_handlers[request_type] = with_client_context

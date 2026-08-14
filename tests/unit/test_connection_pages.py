@@ -134,7 +134,7 @@ class SequencedConnectionFixtureBrowser(ConnectionFixtureBrowser):
         await super().navigate(page, url)
 
 
-def _draft(
+def _command(
     action_type: ActionType,
     payload: InvitationSendPayload | InvitationAcceptPayload | InvitationIgnorePayload,
     *,
@@ -158,32 +158,32 @@ def _draft(
     )
 
 
-def _invite_draft(note: str | None = "Hello Jane", *, name: str = "Jane Doe") -> ActionCommand:
-    return _draft(
+def _invite_command(note: str | None = "Hello Jane", *, name: str = "Jane Doe") -> ActionCommand:
+    return _command(
         ActionType.INVITATION_SEND,
         InvitationSendPayload(note=note),
         name=name,
     )
 
 
-def _accept_draft(
+def _accept_command(
     invitation_ref: str = INVITATION_REF,
     *,
     name: str = "Jane Doe",
 ) -> ActionCommand:
-    return _draft(
+    return _command(
         ActionType.INVITATION_ACCEPT,
         InvitationAcceptPayload(invitation_ref=invitation_ref),
         name=name,
     )
 
 
-def _ignore_draft(
+def _ignore_command(
     invitation_ref: str = INVITATION_REF,
     *,
     name: str = "Jane Doe",
 ) -> ActionCommand:
-    return _draft(
+    return _command(
         ActionType.INVITATION_IGNORE,
         InvitationIgnorePayload(invitation_ref=invitation_ref),
         name=name,
@@ -191,44 +191,8 @@ def _ignore_draft(
 
 
 @pytest.mark.timeout(20)
-async def test_exact_connection_lookup_returns_visible_identity_and_image() -> None:
-    html = (FIXTURES / "connections-list-current.html").read_text()
-    async with async_playwright() as playwright:
-        browser = await playwright.chromium.launch(headless=True)
-        page = await browser.new_page()
-        adapter = ConnectionsListPage(
-            cast(
-                BrowserManager,
-                ConnectionFixtureBrowser(
-                    page,
-                    {"/mynetwork/invite-connect/connections/": html},
-                ),
-            ),
-            max_scroll_rounds=1,
-        )
-        try:
-            connection, image_src = await adapter.find_exact(
-                page,
-                profile_slug="jane-doe",
-                query="Jane Doe",
-            )
-            with pytest.raises(InvalidTargetError, match="bounded Connections"):
-                await adapter.find_exact(
-                    page,
-                    profile_slug="missing-person",
-                    query="Missing Person",
-                )
-        finally:
-            await browser.close()
-
-    assert connection.profile_slug == "jane-doe"
-    assert connection.headline == "Staff Engineer at Acme Cloud"
-    assert image_src == "https://media.example.com/jane.jpg"
-
-
-@pytest.mark.timeout(20)
 async def test_connections_read_delayed_tail_and_trailing_hyphen_slugs() -> None:
-    html = (FIXTURES / "connections-list-infinite-scroll-current.html").read_text()
+    html = (FIXTURES / "connections/latest/list-infinite-scroll.html").read_text()
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -268,7 +232,7 @@ async def test_connections_read_delayed_tail_and_trailing_hyphen_slugs() -> None
 
 @pytest.mark.timeout(20)
 async def test_connections_finish_at_live_stable_nested_bottom_without_end_copy() -> None:
-    html = (FIXTURES / "connections-list-live-terminal-current.html").read_text()
+    html = (FIXTURES / "connections/latest/list-terminal.html").read_text()
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -305,7 +269,7 @@ async def test_connections_finish_at_live_stable_nested_bottom_without_end_copy(
 
 @pytest.mark.timeout(20)
 async def test_connections_detect_virtualized_same_count_replacement() -> None:
-    html = (FIXTURES / "connections-list-virtualized-current.html").read_text()
+    html = (FIXTURES / "connections/latest/list-virtualized.html").read_text()
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -339,7 +303,7 @@ async def test_connections_detect_virtualized_same_count_replacement() -> None:
     assert "Tail Member" in captured_text
 
 
-def test_latest_connection_and_invitation_fixtures_record_live_selector_provenance() -> None:
+def test_latest_connection_and_invitation_fixtures_record_provenance() -> None:
     list_manifest = json.loads((FIXTURES / "connections" / "latest" / "manifest.json").read_text())
     action_manifest = json.loads((ACTION_FIXTURES / "manifest.json").read_text())
 
@@ -550,7 +514,7 @@ async def test_invite_action_uses_current_dialog_and_exact_pending_postcondition
         fixture_browser = ConnectionFixtureBrowser(page, {"/in/jane-doe/": html})
         adapter = InvitationActionPage(cast(BrowserManager, fixture_browser))
         try:
-            result = await adapter.perform_send(_invite_draft(note))
+            result = await adapter.perform_send(_invite_command(note))
         finally:
             await browser.close()
 
@@ -649,7 +613,7 @@ async def test_invite_fails_closed_for_current_dialog_drift_and_changed_target()
                         {"/in/jane-doe/": base.replace("<h1>Jane Doe</h1>", "<h1>Jane Roe</h1>")},
                     ),
                 )
-            ).perform_send(_invite_draft())
+            ).perform_send(_invite_command())
         finally:
             await browser.close()
 
@@ -774,13 +738,13 @@ async def test_invite_click_interruption_is_uncertain_and_fresh_connect_is_faile
                         fail_pattern="send invitation",
                     ),
                 )
-            ).perform_send(_invite_draft())
+            ).perform_send(_invite_command())
             failed = await InvitationActionPage(
                 cast(
                     BrowserManager,
                     ConnectionFixtureBrowser(page, {"/in/jane-doe/": not_sent}),
                 )
-            ).perform_send(_invite_draft(note=None))
+            ).perform_send(_invite_command(note=None))
         finally:
             await browser.close()
 
@@ -807,7 +771,7 @@ async def test_invite_action_reports_missing_dialog_and_typed_click_uncertainty(
                     BrowserManager,
                     ConnectionFixtureBrowser(page, {"/in/jane-doe/": missing_dialog}),
                 )
-            ).perform_send(_invite_draft())
+            ).perform_send(_invite_command())
             interrupted = await InvitationActionPage(
                 cast(
                     BrowserManager,
@@ -818,7 +782,7 @@ async def test_invite_action_reports_missing_dialog_and_typed_click_uncertainty(
                         error=BrowserUnavailableError("Synthetic typed click failure."),
                     ),
                 )
-            ).perform_send(_invite_draft())
+            ).perform_send(_invite_command())
         finally:
             await browser.close()
 
@@ -848,7 +812,7 @@ async def test_invite_final_click_authentication_failure_is_not_swallowed() -> N
                             error=AuthenticationRequiredError(),
                         ),
                     )
-                ).perform_send(_invite_draft())
+                ).perform_send(_invite_command())
         finally:
             await browser.close()
 
@@ -873,13 +837,13 @@ async def test_invite_action_rejects_disabled_send_and_uncommitted_note_before_c
                     BrowserManager,
                     ConnectionFixtureBrowser(page, {"/in/jane-doe/": disabled}),
                 )
-            ).perform_send(_invite_draft())
+            ).perform_send(_invite_command())
             stale_result = await InvitationActionPage(
                 cast(
                     BrowserManager,
                     ConnectionFixtureBrowser(page, {"/in/jane-doe/": stale_counter}),
                 )
-            ).perform_send(_invite_draft())
+            ).perform_send(_invite_command())
         finally:
             await browser.close()
 
@@ -972,7 +936,7 @@ async def test_invite_action_fails_before_dispatch_for_current_ui_safety_errors(
                     BrowserManager,
                     ConnectionFixtureBrowser(page, {"/in/jane-doe/": html}),
                 )
-            ).perform_send(_invite_draft(note))
+            ).perform_send(_invite_command(note))
         finally:
             await browser.close()
 
@@ -1011,7 +975,7 @@ async def test_invite_action_is_a_verified_noop_for_existing_terminal_state(
                     BrowserManager,
                     ConnectionFixtureBrowser(page, {"/in/jane-doe/": html}),
                 )
-            ).perform_send(_invite_draft())
+            ).perform_send(_invite_command())
         finally:
             await browser.close()
 
@@ -1053,7 +1017,7 @@ async def test_invite_post_click_reload_failure_is_uncertain_with_retained_evide
                         error=reload_error,
                     ),
                 )
-            ).perform_send(_invite_draft())
+            ).perform_send(_invite_command())
         finally:
             await browser.close()
 
@@ -1093,7 +1057,7 @@ async def test_invite_fresh_profile_ambiguous_state_is_uncertain(
         fixture_browser = SequencedConnectionFixtureBrowser(page, (initial, fresh))
         try:
             result = await InvitationActionPage(cast(BrowserManager, fixture_browser)).perform_send(
-                _invite_draft()
+                _invite_command()
             )
         finally:
             await browser.close()
@@ -1122,7 +1086,7 @@ async def test_invite_post_click_authentication_failure_is_not_swallowed() -> No
                             error=AuthenticationRequiredError(),
                         ),
                     )
-                ).perform_send(_invite_draft())
+                ).perform_send(_invite_command())
         finally:
             await browser.close()
 
@@ -1178,7 +1142,7 @@ async def test_accept_action_verifies_exact_profile_terminal_state_after_reload(
             )
         )
         try:
-            result = await adapter.perform_accept(_accept_draft())
+            result = await adapter.perform_accept(_accept_command())
         finally:
             await browser.close()
 
@@ -1201,7 +1165,7 @@ async def test_ignore_action_verifies_request_removed_without_connection_after_r
             )
         )
         try:
-            result = await adapter.perform_ignore(_ignore_draft())
+            result = await adapter.perform_ignore(_ignore_command())
         finally:
             await browser.close()
 
@@ -1245,7 +1209,7 @@ async def test_incoming_actions_fail_closed_for_missing_pair_identity_and_click_
                     BrowserManager,
                     ConnectionFixtureBrowser(page, {"/in/jane-doe/": changed_identity}),
                 )
-            ).perform_accept(_accept_draft())
+            ).perform_accept(_accept_command())
             interrupted_accept = await InvitationActionPage(
                 cast(
                     BrowserManager,
@@ -1255,7 +1219,7 @@ async def test_incoming_actions_fail_closed_for_missing_pair_identity_and_click_
                         fail_pattern="accept jane doe",
                     ),
                 )
-            ).perform_accept(_accept_draft())
+            ).perform_accept(_accept_command())
             interrupted_ignore = await InvitationActionPage(
                 cast(
                     BrowserManager,
@@ -1265,7 +1229,7 @@ async def test_incoming_actions_fail_closed_for_missing_pair_identity_and_click_
                         fail_pattern="ignore jane doe",
                     ),
                 )
-            ).perform_ignore(_ignore_draft())
+            ).perform_ignore(_ignore_command())
         finally:
             await browser.close()
 
@@ -1300,7 +1264,7 @@ async def test_incoming_actions_require_their_distinct_fresh_profile_postconditi
                         {"/in/jane-doe/": accept_removes_without_connecting},
                     ),
                 )
-            ).perform_accept(_accept_draft())
+            ).perform_accept(_accept_command())
             await page.evaluate("sessionStorage.clear()")
             ignored = await InvitationActionPage(
                 cast(
@@ -1310,7 +1274,7 @@ async def test_incoming_actions_require_their_distinct_fresh_profile_postconditi
                         {"/in/jane-doe/": ignore_creates_connection},
                     ),
                 )
-            ).perform_ignore(_ignore_draft())
+            ).perform_ignore(_ignore_command())
         finally:
             await browser.close()
 
@@ -1325,12 +1289,12 @@ async def test_connection_action_payload_types_and_references_are_enforced() -> 
     adapter = InvitationActionPage(cast(BrowserManager, object()))
 
     with pytest.raises(InvalidTargetError, match="invitation action payload"):
-        await adapter.perform_send(_accept_draft())
+        await adapter.perform_send(_accept_command())
     with pytest.raises(InvalidTargetError, match="acceptance action payload"):
-        await adapter.perform_accept(_invite_draft())
+        await adapter.perform_accept(_invite_command())
     with pytest.raises(InvalidTargetError, match="ignore action payload"):
-        await adapter.perform_ignore(_accept_draft())
+        await adapter.perform_ignore(_accept_command())
     with pytest.raises(InvalidTargetError, match="acceptance payload does not match"):
-        await adapter.perform_accept(_accept_draft("invitation:" + "f" * 24))
+        await adapter.perform_accept(_accept_command("invitation:" + "f" * 24))
     with pytest.raises(InvalidTargetError, match="ignore payload does not match"):
-        await adapter.perform_ignore(_ignore_draft("invitation:" + "f" * 24))
+        await adapter.perform_ignore(_ignore_command("invitation:" + "f" * 24))

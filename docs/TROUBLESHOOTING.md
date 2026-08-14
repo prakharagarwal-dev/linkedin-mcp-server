@@ -126,8 +126,8 @@ approval_mode = "approve"
 
 Restart Codex after changing the configuration. Do not use a chat message as a
 persistent approval and do not approve the entire server unless all LinkedIn
-writes are intentionally unattended. Exact target inspection, attachment hash
-rechecks, visible revalidation, and postcondition checks still run.
+writes are intentionally unattended. Exact target inspection, direct attachment
+validation, visible revalidation, and postcondition checks still run.
 
 ## A collection stops at a safety bound
 
@@ -154,8 +154,8 @@ The file must be below `LINKEDIN_MCP_ASSET_ROOT_PATH` and referenced by a
 relative `asset_ref`. It must also satisfy the capability's visible media type
 and size constraints. Do not pass a raw Downloads/Desktop path to a tool.
 
-The action snapshots and rechecks the current file before upload. If the bytes
-change during the operation, correct the file and invoke a new action.
+The server resolves the current file immediately before upload. Correct its
+path, extension, or size, then invoke a new action.
 
 ## Claude Desktop extension problems
 
