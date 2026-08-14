@@ -13,7 +13,6 @@ from pydantic import ValidationError
 
 from linkedin_mcp.browser import BrowserManager
 from linkedin_mcp.browser.pages import PeopleSearchPage, PersonProfilePage
-from linkedin_mcp.domain.evidence import sources_from_person_profile
 from linkedin_mcp.domain.models import (
     ConnectionsSearchFilters,
     ConnectionsSearchInput,
@@ -54,14 +53,14 @@ class PeopleFixtureBrowser:
             )
             return
         elif path.endswith("/details/experience/"):
-            fixture = "person-profile-experience.html"
+            fixture = "experience.html"
         elif path.endswith("/details/education/"):
-            fixture = "person-profile-education.html"
+            fixture = "education.html"
         elif path.endswith("/details/skills/"):
-            fixture = "person-profile-skills.html"
+            fixture = "skills.html"
         else:
-            fixture = "person-profile.html"
-        await page.set_content((FIXTURES / fixture).read_text())
+            fixture = "overview-complete.html"
+        await page.set_content((FIXTURES / "people" / "latest" / fixture).read_text())
 
 
 class StaticProfileBrowser:
@@ -128,12 +127,12 @@ class CurrentProfileFixtureBrowser:
         self.navigations.append(url)
         path = urlsplit(url).path
         if path.endswith("/details/experience/"):
-            fixture = "person-profile-experience-current.html"
+            fixture = "experience.html"
         elif path.endswith("/details/education/"):
-            fixture = "person-profile-education-current.html"
+            fixture = "education.html"
         else:
-            fixture = "person-profile-current.html"
-        await page.set_content((FIXTURES / fixture).read_text())
+            fixture = "overview.html"
+        await page.set_content((FIXTURES / "people" / "latest" / fixture).read_text())
 
 
 class SelfProfileFixtureBrowser:
@@ -147,7 +146,7 @@ class SelfProfileFixtureBrowser:
 
     async def navigate(self, page: Page, url: str) -> None:
         self.navigations.append(url)
-        await page.set_content((FIXTURES / "person-profile-self-current.html").read_text())
+        await page.set_content((FIXTURES / "people/latest/self-overview.html").read_text())
 
 
 class CurrentRolelessDetailFixtureBrowser:
@@ -162,11 +161,11 @@ class CurrentRolelessDetailFixtureBrowser:
     async def navigate(self, page: Page, url: str) -> None:
         self.navigations.append(url)
         fixture = (
-            "person-profile-honors-current.html"
+            "honors.html"
             if urlsplit(url).path.endswith("/details/honors/")
-            else "person-profile-roleless-detail-overview.html"
+            else "roleless-overview.html"
         )
-        await page.set_content((FIXTURES / fixture).read_text())
+        await page.set_content((FIXTURES / "people" / "latest" / fixture).read_text())
 
 
 class CurrentPeoplePaginationFixtureBrowser:
@@ -227,7 +226,7 @@ def test_people_fixture_manifest_locks_every_current_visible_filter() -> None:
     ]
 
 
-def test_people_get_section_selection_is_strict_and_default_compatible() -> None:
+def test_people_get_section_selection_is_strict_and_defaults_to_all() -> None:
     request = PeopleGetInput(
         context_id="context-1",
         request_id="profile-default-sections",
@@ -271,8 +270,7 @@ def test_people_search_url_encodes_every_exact_filter_category() -> None:
     request = PeopleSearchInput(
         context_id="context-1",
         request_id="people-all-filters",
-        query="distributed systems",
-        title_keywords="staff software engineer",
+        query="distributed systems staff software engineer",
         filters=PeopleSearchFilters(
             connection_degrees=tuple(PeopleSearchConnectionDegree),
             actively_hiring_job_title_ids=("101",),
@@ -372,8 +370,7 @@ async def test_people_search_resolves_all_visible_named_and_toggle_filters() -> 
         request = PeopleSearchInput(
             context_id="context-1",
             request_id="named-people-search",
-            query="AI leaders",
-            title_keywords="staff engineer",
+            query="AI leaders staff engineer",
             filters=PeopleSearchFilters(
                 connection_degrees=(
                     PeopleSearchConnectionDegree.SECOND,
@@ -585,8 +582,7 @@ async def test_people_search_supports_current_filter_panel_and_result_layout() -
         request = PeopleSearchInput(
             context_id="context-1",
             request_id="current-people-search",
-            query="distributed systems",
-            title_keywords="staff engineer",
+            query="distributed systems staff engineer",
             filters=PeopleSearchFilters(
                 connection_degrees=(PeopleSearchConnectionDegree.SECOND,),
                 actively_hiring_job_title_names=("Fixture Engineer",),
@@ -721,92 +717,6 @@ async def test_people_search_current_panel_fails_closed_when_submission_drops_to
                 )
         finally:
             await browser.close()
-
-
-@pytest.mark.timeout(30)
-async def test_person_profile_reads_core_fields_and_bounded_complete_sections() -> None:
-    async with async_playwright() as playwright:
-        browser = await playwright.chromium.launch(headless=True)
-        page = await browser.new_page()
-        fixture_browser = PeopleFixtureBrowser(page)
-        reader = PersonProfilePage(
-            cast(BrowserManager, fixture_browser),
-            max_detail_pages=2,
-        )
-        try:
-            person, captures = await reader.read(
-                PeopleGetInput(
-                    context_id="context-1",
-                    request_id="profile-1",
-                    profile_slug="jane-doe",
-                )
-            )
-        finally:
-            await browser.close()
-
-    assert person.profile_slug == "jane-doe"
-    assert person.name == "Jane Doe"
-    assert person.pronouns == "(she/her)"
-    assert person.headline == "Staff Software Engineer building reliable AI systems"
-    assert person.location == "Bengaluru, Karnataka, India"
-    assert person.connection_degree is PersonConnectionDegree.SECOND
-    assert person.connection_count_text == "500+ connections"
-    assert person.follower_count_text == "12,345 followers"
-    assert person.current_company_text == "Acme Cloud"
-    assert person.education_summary_text == "Stanford University"
-    assert person.about is not None
-    assert person.about.startswith("I build dependable distributed systems")
-    assert len(person.experiences) == 2
-    assert person.experiences[0].title == "Staff Software Engineer"
-    assert person.experiences[0].organization == "Acme Cloud"
-    assert person.experiences[0].employment_type == "Full-time"
-    assert person.experiences[0].is_current is True
-    assert person.experiences[1].is_current is False
-    assert len(person.education) == 2
-    assert person.education[0].school == "Stanford University"
-    assert person.education[0].degree == "Master of Science"
-    assert person.education[0].field_of_study == "Computer Science"
-    assert {section.key for section in person.sections} >= {
-        "about",
-        "experience",
-        "education",
-        "skills",
-        "licenses-certifications",
-        "languages",
-    }
-    assert person.coverage.pages_visited == 3
-    assert person.coverage.detail_pages_discovered == 3
-    assert person.coverage.detail_pages_visited == 2
-    assert person.coverage.truncated is True
-    assert person.coverage.requested_sections == (PersonProfileSectionSelector.ALL,)
-    assert person.coverage.returned_sections == (
-        "overview",
-        "about",
-        "experience",
-        "education",
-        "skills",
-        "licenses-certifications",
-        "languages",
-    )
-    assert person.coverage.detail_sections_discovered == (
-        "experience",
-        "education",
-        "skills",
-    )
-    assert person.coverage.detail_sections_visited == ("experience", "education")
-    assert person.coverage.unavailable_sections == ()
-    assert person.coverage.truncated_sections == ("skills",)
-    assert len(captures) == 3
-    assert len(sources_from_person_profile(person, captures)) == 3
-    captured_by_url = {str(capture.source_url): capture.captured_text for capture in captures}
-    assert all(
-        evidence.quote in captured_by_url[str(evidence.source_url)] for evidence in person.evidence
-    )
-    assert fixture_browser.navigations == [
-        "https://www.linkedin.com/in/jane-doe/",
-        "https://www.linkedin.com/in/jane-doe/details/experience/",
-        "https://www.linkedin.com/in/jane-doe/details/education/",
-    ]
 
 
 @pytest.mark.timeout(30)

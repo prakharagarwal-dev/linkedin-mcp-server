@@ -57,13 +57,13 @@ class SimulatorScenario:
         if path.startswith("/search/results/people"):
             return "people.search", "people/latest/search.html"
         if "/details/experience" in path:
-            return "people.experience", "person-profile-experience.html"
+            return "people.experience", "people/latest/experience.html"
         if "/details/education" in path:
-            return "people.education", "person-profile-education.html"
+            return "people.education", "people/latest/education.html"
         if "/details/skills" in path:
-            return "people.skills", "person-profile-skills.html"
+            return "people.skills", "people/latest/skills.html"
         if path.startswith("/in/"):
-            return "people.get", "person-profile.html"
+            return "people.get", "people/latest/overview-complete.html"
         if path.startswith("/search/results/companies"):
             return "companies.search", "companies/latest/search.html"
         if path.endswith("/about/"):
@@ -89,7 +89,7 @@ class SimulatorScenario:
         if path.startswith("/messaging"):
             return "messaging", "messaging/latest/current.html"
         if path in {"/feed", "/feed/"}:
-            return "posts.create", "personal-post-composer.html"
+            return "posts.create", "posts/latest/composer.html"
         raise ValueError(f"The simulator has no registered surface for {path!r}.")
 
 

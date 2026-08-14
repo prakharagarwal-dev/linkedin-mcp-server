@@ -192,7 +192,7 @@ def stop_account_runtime(
     confirmed = inspect_account_runtime(path)
     if not confirmed.running or confirmed.owner != owner:
         raise ConfigurationError(
-            "LinkedIn runtime ownership changed while stop was being prepared; retry status first."
+            "LinkedIn runtime ownership changed while stop was being requested; retry status first."
         )
     try:
         os.kill(owner.pid, signal.SIGTERM)
@@ -224,9 +224,6 @@ def _parse_owner(value: str) -> AccountRuntimeOwner | None:
     text = value.strip()
     if not text:
         return None
-    if text.isdigit():
-        pid = int(text)
-        return AccountRuntimeOwner(pid=pid) if pid > 1 else None
     try:
         payload = json.loads(text)
     except json.JSONDecodeError:

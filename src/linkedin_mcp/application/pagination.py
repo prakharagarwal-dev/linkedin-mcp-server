@@ -128,10 +128,6 @@ class PaginationManager:
         self._leases: dict[str, str | None] = {}
         self._lock = asyncio.Lock()
 
-    @property
-    def max_seen_items(self) -> int:
-        return self._max_seen_items
-
     async def acquire(
         self,
         *,

@@ -2617,12 +2617,6 @@ async def _comment_from_region(
     )
 
 
-async def post_summary_from_region(region: Locator) -> PostSummary | None:
-    """Parse one visible post region for another narrow page object."""
-
-    return await _post_summary_from_region(region)
-
-
 async def post_author_from_region(region: Locator) -> PostAuthor:
     """Parse the exact visible author header without parsing post engagement."""
 
@@ -2633,12 +2627,6 @@ async def region_for_post(page: Page, post_ref: str) -> Locator:
     """Resolve one exact visible post region by its stable reference."""
 
     return await _region_for_post(page, post_ref)
-
-
-async def comment_reference(region: Locator) -> str | None:
-    """Return the stable reference exposed by one visible comment region."""
-
-    return await _comment_reference(region)
 
 
 def comment_regions(page: Page) -> Locator:

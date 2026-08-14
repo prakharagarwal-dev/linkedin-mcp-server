@@ -24,33 +24,26 @@ from linkedin_mcp.errors import ConfigurationError
 async def test_production_container_composes_and_closes_without_connecting() -> None:
     container = create_production_container(Settings())
 
-    assert container.registry.get(CapabilityName.JOBS_SEARCH).version == "2.1.0"
-    assert container.registry.get(CapabilityName.PEOPLE_SEARCH).version == "2.1.0"
+    assert container.registry.get(CapabilityName.JOBS_SEARCH).version == "3.0.0"
+    assert container.registry.get(CapabilityName.PEOPLE_SEARCH).version == "3.0.0"
     assert container.registry.get(CapabilityName.PEOPLE_GET).version == "1.1.1"
-    assert container.registry.get(CapabilityName.COMPANIES_SEARCH).version == "2.0.0"
+    assert container.registry.get(CapabilityName.COMPANIES_SEARCH).version == "3.0.0"
     assert container.registry.get(CapabilityName.COMPANIES_GET).version == "2.0.0"
-    assert container.registry.get(CapabilityName.POSTS_SEARCH).version == "2.0.0"
+    assert container.registry.get(CapabilityName.POSTS_SEARCH).version == "3.0.0"
     assert container.registry.get(CapabilityName.POSTS_GET).version == "2.0.0"
-    assert container.registry.get(CapabilityName.POST_COMMENTS_LIST).version == "1.1.1"
-    assert container.registry.get(CapabilityName.INVITATIONS_LIST).version == "4.0.0"
-    assert container.registry.get(CapabilityName.CONNECTIONS_LIST).version == "2.0.0"
-    assert container.registry.get(CapabilityName.CONNECTIONS_SEARCH).version == "2.0.0"
-    assert container.registry.get(CapabilityName.POSTS_CREATE_PREPARE).version == "2.0.0"
-    assert container.registry.get(CapabilityName.POSTS_CREATE_EXECUTE).version == "2.0.0"
-    assert container.registry.get(CapabilityName.POST_COMMENT_PREPARE).version == "3.0.0"
-    assert container.registry.get(CapabilityName.POST_COMMENT_EXECUTE).version == "3.0.0"
-    assert container.registry.get(CapabilityName.POST_REACTION_PREPARE).version == "3.0.0"
-    assert container.registry.get(CapabilityName.POST_REACTION_EXECUTE).version == "3.0.0"
-    assert container.registry.get(CapabilityName.INVITATION_SEND_PREPARE).version == "1.1.0"
-    assert container.registry.get(CapabilityName.INVITATION_SEND_EXECUTE).version == "2.0.0"
-    assert container.registry.get(CapabilityName.INVITATION_ACCEPT_PREPARE).version == "1.0.0"
-    assert container.registry.get(CapabilityName.INVITATION_ACCEPT_EXECUTE).version == "1.0.0"
-    assert container.registry.get(CapabilityName.INVITATION_IGNORE_PREPARE).version == "1.0.0"
-    assert container.registry.get(CapabilityName.INVITATION_IGNORE_EXECUTE).version == "1.0.0"
+    assert container.registry.get(CapabilityName.POST_COMMENTS_LIST).version == "2.0.0"
+    assert container.registry.get(CapabilityName.INVITATIONS_LIST).version == "5.0.0"
+    assert container.registry.get(CapabilityName.CONNECTIONS_LIST).version == "3.0.0"
+    assert container.registry.get(CapabilityName.CONNECTIONS_SEARCH).version == "3.0.0"
+    assert container.registry.get(CapabilityName.POSTS_CREATE).version == "4.0.0"
+    assert container.registry.get(CapabilityName.POST_COMMENT).version == "4.0.0"
+    assert container.registry.get(CapabilityName.POST_REACT).version == "4.0.0"
+    assert container.registry.get(CapabilityName.INVITATION_SEND).version == "3.0.0"
+    assert container.registry.get(CapabilityName.INVITATION_ACCEPT).version == "2.0.0"
+    assert container.registry.get(CapabilityName.INVITATION_IGNORE).version == "2.0.0"
     assert container.registry.get(CapabilityName.MESSAGING_CONVERSATION_GET).version == "2.0.0"
-    assert container.registry.get(CapabilityName.MESSAGING_SEARCH).version == "2.0.0"
-    assert container.registry.get(CapabilityName.MESSAGING_MESSAGE_PREPARE).version == "2.0.0"
-    assert container.registry.get(CapabilityName.MESSAGING_MESSAGE_EXECUTE).version == "2.0.0"
+    assert container.registry.get(CapabilityName.MESSAGING_SEARCH).version == "3.0.0"
+    assert container.registry.get(CapabilityName.MESSAGING_SEND).version == "3.0.0"
     assert container.browser.started is False
 
     await container.close()
@@ -106,23 +99,6 @@ def test_account_process_lock_publishes_non_secret_runtime_metadata(tmp_path: Pa
         lock.release()
 
     assert inspect_account_runtime(path).running is False
-
-
-def test_runtime_inspection_supports_legacy_pid_lock_and_rejects_self_stop(
-    tmp_path: Path,
-) -> None:
-    path = tmp_path / "runtime.lock"
-    with path.open("w+", encoding="utf-8") as handle:
-        handle.write(f"{os.getpid()}\n")
-        handle.flush()
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-
-        status = inspect_account_runtime(path)
-        assert status.running is True
-        assert status.owner is not None
-        assert status.owner.pid == os.getpid()
-        with pytest.raises(ConfigurationError, match="cannot stop itself"):
-            stop_account_runtime(path, timeout_seconds=0.1)
 
 
 def test_runtime_stop_is_idempotent_and_refuses_unidentified_owner(tmp_path: Path) -> None:

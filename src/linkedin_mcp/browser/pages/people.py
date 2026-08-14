@@ -932,9 +932,8 @@ class PeopleSearchPage:
         resolved_facets: _ResolvedPeopleSearchFacets | None = None,
     ) -> str:
         parameters: dict[str, str | int] = {"origin": "FACETED_SEARCH"}
-        keywords = request.combined_keywords()
-        if keywords:
-            parameters["keywords"] = keywords
+        if request.query:
+            parameters["keywords"] = request.query
         _add_people_search_filters(parameters, request.filters, resolved_facets)
         if page_index:
             parameters["page"] = page_index + 1
@@ -1013,7 +1012,6 @@ class PeopleSearchPage:
         people = tuple(people_by_slug.values())
         coverage = PeopleSearchCoverage(
             query=request.query,
-            title_keywords=request.title_keywords,
             filters=request.filters,
             pages_visited=pages_visited,
             result_count=len(people),

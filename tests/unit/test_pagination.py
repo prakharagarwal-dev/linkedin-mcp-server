@@ -11,7 +11,6 @@ from linkedin_mcp.domain.models import (
     InvitationFilter,
     InvitationListInput,
     JobSearchInput,
-    PostCommentsListInput,
 )
 from linkedin_mcp.errors import InvalidCursorError
 
@@ -39,31 +38,6 @@ def _manager(
         max_seen_items_per_cursor=max_seen_items,
         clock=clock,
     )
-
-
-def test_paginated_models_accept_legacy_limits_but_advertise_canonical_fields() -> None:
-    jobs = JobSearchInput.model_validate(
-        {
-            "context_id": "pagination",
-            "request_id": "legacy-jobs",
-            "query": "python",
-            "max_results": 7,
-        }
-    )
-    comments = PostCommentsListInput.model_validate(
-        {
-            "context_id": "pagination",
-            "request_id": "legacy-comments",
-            "post_ref": "activity:7312345678901234567",
-            "max_comments": 9,
-        }
-    )
-
-    assert jobs.page_size == jobs.max_results == 7
-    assert comments.page_size == comments.max_comments == 9
-    assert {"page_size", "cursor"}.issubset(JobSearchInput.model_json_schema()["properties"])
-    assert "max_results" not in JobSearchInput.model_json_schema()["properties"]
-    assert "max_comments" not in PostCommentsListInput.model_json_schema()["properties"]
 
 
 @pytest.mark.asyncio

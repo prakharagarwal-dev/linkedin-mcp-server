@@ -80,8 +80,9 @@ covered by the offline simulator on every pull request.
 [status-linkedin-session-status]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Ftool-status%2Fbadges%2Flinkedin.session.status.json
 [status-linkedin-capabilities-list]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Ftool-status%2Fbadges%2Flinkedin.capabilities.list.json
 
-Actions that change LinkedIn use an immutable prepare-and-execute flow and
-request confirmation by default. Every capability is task-specific; the server
+Each account-changing tool performs one complete action. MCP clients can use
+the tool's destructive annotation to ask for confirmation or apply their own
+durable per-tool approval policy. Every capability is task-specific; the server
 does not expose unrestricted browser, click, navigation, JavaScript, or network
 access.
 
@@ -211,18 +212,6 @@ See the [Roo Code MCP documentation](https://docs.roocode.com/features/mcp/using
 </details>
 
 <details>
-<summary>Kiro</summary>
-
-[![Add to Kiro](https://kiro.dev/images/add-to-kiro.svg)](https://kiro.dev/launch/mcp/add?name=linkedin-mcp&config=%7B%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22--from%22%2C%22linkedin-mcp-local%22%2C%22linkedin-mcp%22%2C%22serve%22%2C%22--transport%22%2C%22stdio%22%5D%7D)
-
-Or add a local server named `linkedin-mcp` to
-`~/.kiro/settings/mcp.json` with command `uvx` and arguments
-`--from linkedin-mcp-local linkedin-mcp serve --transport stdio`.
-See the [Kiro MCP documentation](https://kiro.dev/docs/mcp/configuration/).
-
-</details>
-
-<details>
 <summary>Zed</summary>
 
 Add this to Zed settings:
@@ -239,18 +228,6 @@ Add this to Zed settings:
 ```
 
 See the [Zed MCP documentation](https://zed.dev/docs/ai/mcp).
-
-</details>
-
-<details>
-<summary>LM Studio</summary>
-
-[![Add to LM Studio](https://files.lmstudio.ai/deeplink/mcp-install-light.svg)](https://lmstudio.ai/install-mcp?name=linkedin-mcp&config=eyJjb21tYW5kIjoidXZ4IiwiYXJncyI6WyItLWZyb20iLCJsaW5rZWRpbi1tY3AtbG9jYWwiLCJsaW5rZWRpbi1tY3AiLCJzZXJ2ZSIsIi0tdHJhbnNwb3J0Iiwic3RkaW8iXX0%3D)
-
-Or open **Program → Install → Edit mcp.json** and
-add a local server named `linkedin-mcp` with command `uvx` and arguments
-`--from linkedin-mcp-local linkedin-mcp serve --transport stdio`.
-See the [LM Studio MCP documentation](https://lmstudio.ai/docs/app/mcp).
 
 </details>
 
@@ -393,23 +370,24 @@ Ask your MCP client naturally:
 
 > Send `<message>` to `<profile URL>`.
 
-### Approval modes
+### Action approval
 
-Account-changing execute tools request confirmation by default. Approval is a
-setting of the MCP client, not something an agent can grant itself. To let a
-Codex scheduled task publish posts unattended while every other LinkedIn action
-keeps its default behavior, add this explicit per-tool approval:
+Account-changing tools are marked destructive. Approval is controlled entirely
+by the MCP client: it may prompt, reject, or durably approve an exact tool. The
+server does not maintain a second scope or permission system. To let a Codex
+scheduled task publish posts unattended while every other LinkedIn action keeps
+its normal client behavior, approve only the direct post tool:
 
 ```toml
-[mcp_servers."linkedin-mcp".tools."linkedin.posts.create.execute"]
+[mcp_servers."linkedin-mcp".tools."linkedin.posts.create"]
 approval_mode = "approve"
 ```
 
-Restart Codex after changing its configuration. The post still goes through the
-same immutable draft, scope, payload-hash, idempotency, identity, and visible
-postcondition checks. Avoid approving the entire server when only one action is
-needed. See [Configuration](docs/CONFIGURATION.md#client-approval-policy) for
-the full policy model.
+Restart Codex after changing its configuration. The tool still resolves the
+exact visible target, validates any local attachment path, type, and size,
+performs one narrow UI action, and verifies the visible postcondition. Avoid
+approving the entire server when only one action is needed. See
+[Configuration](docs/CONFIGURATION.md#client-tool-policy) for the full model.
 
 ## Architecture
 
@@ -422,7 +400,7 @@ flowchart LR
     D --> E["One Atomic Browser Operation<br/>Fresh Page · Global Pacing"]
     E -->|"Visible UI only"| F["LinkedIn"]
     E <--> G["One Chromium Context<br/>Persistent Profile"]
-    C -. "Confirmation previews" .-> A
+    C -. "Tool annotations and results" .-> A
 ```
 
 Everything runs locally. There is no hosted backend, telemetry, database,
@@ -436,15 +414,14 @@ Read the full [architecture](docs/ARCHITECTURE.md) and [privacy policy](PRIVACY.
 
 Common settings control:
 
-- enabled LinkedIn surfaces, capability scopes, and effect classes;
-- client-side interactive or explicit per-tool approval behavior;
 - the persistent browser profile and headed/headless operation;
 - the local attachment directory;
 - internal pacing, queue capacity, and bounded collection traversal; and
 - stdio or loopback-only Streamable HTTP transport.
 
-See [Configuration](docs/CONFIGURATION.md) for ready-made permission presets,
-every environment variable, local HTTP sharing, and the container image.
+Tool availability and approval are configured in the MCP client. See
+[Configuration](docs/CONFIGURATION.md) for every server environment variable,
+client policy guidance, local HTTP sharing, and the container image.
 
 ## Privacy Policy
 

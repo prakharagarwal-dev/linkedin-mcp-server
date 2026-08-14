@@ -1,11 +1,11 @@
-"""Idempotent execution of registered LinkedIn capabilities."""
+"""Execution of registered LinkedIn capabilities."""
 
 from __future__ import annotations
 
 import asyncio
 import uuid
 from collections.abc import Awaitable, Callable
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Protocol
 
 import structlog
@@ -23,10 +23,8 @@ from linkedin_mcp.application.pagination import (
 from linkedin_mcp.capabilities import CapabilityRegistry
 from linkedin_mcp.config import Settings
 from linkedin_mcp.domain.evidence import (
-    canonical_action_payload_hash,
     canonical_input_fingerprint,
     source_from_action_execution,
-    source_from_action_preparation,
     source_from_company_search,
     source_from_connections,
     source_from_conversation,
@@ -42,16 +40,13 @@ from linkedin_mcp.domain.evidence import (
     sources_from_person_profile,
 )
 from linkedin_mcp.domain.models import (
-    ActionDraft,
-    ActionExecuteInput,
-    ActionExecuteOutput,
-    ActionExecutionResult,
+    ActionCommand,
+    ActionInspection,
     ActionOutcome,
+    ActionOutput,
     ActionPageResult,
     ActionPayload,
-    ActionPreparationCapture,
-    ActionPrepareOutput,
-    ActionStatus,
+    ActionResult,
     ActionType,
     CapabilityName,
     CommentCreatePayload,
@@ -77,15 +72,15 @@ from linkedin_mcp.domain.models import (
     ConversationSearchInput,
     ConversationSearchOutput,
     ConversationSummary,
+    InvitationAcceptInput,
     InvitationAcceptPayload,
-    InvitationAcceptPrepareInput,
+    InvitationIgnoreInput,
     InvitationIgnorePayload,
-    InvitationIgnorePrepareInput,
     InvitationListCoverage,
     InvitationListInput,
     InvitationListOutput,
+    InvitationSendInput,
     InvitationSendPayload,
-    InvitationSendPrepareInput,
     InvitationSummary,
     JobDetailInput,
     JobDetailObservation,
@@ -94,7 +89,7 @@ from linkedin_mcp.domain.models import (
     JobSearchInput,
     JobSearchOutput,
     JobSummary,
-    MessagePrepareInput,
+    MessageSendInput,
     MessageSendPayload,
     PaginatedInput,
     PeopleGetInput,
@@ -106,25 +101,23 @@ from linkedin_mcp.domain.models import (
     PersonProfileObservation,
     PersonProfilePageCapture,
     PersonSummary,
-    PostCommentPrepareInput,
+    PostCommentInput,
     PostCommentsCoverage,
     PostCommentsListInput,
     PostCommentsListOutput,
+    PostCreateInput,
     PostCreatePayload,
-    PostCreatePrepareInput,
     PostGetInput,
     PostGetOutput,
     PostObservation,
-    PostReactionPrepareInput,
+    PostReactionInput,
     PostSearchCoverage,
     PostSearchInput,
     PostSearchOutput,
     PostSummary,
-    PreparedPostAsset,
     ReactionSetPayload,
     StopReason,
     StrictModel,
-    action_approval_preview,
 )
 from linkedin_mcp.errors import (
     BrowserUnavailableError,
@@ -134,13 +127,7 @@ from linkedin_mcp.errors import (
     LinkedInMCPError,
     ParserDriftError,
 )
-from linkedin_mcp.persistence.contracts import (
-    ActionAttemptStart,
-    CallStart,
-    CallStatus,
-    Repository,
-)
-from linkedin_mcp.policy import AuthorizationPolicy
+from linkedin_mcp.persistence.contracts import CallStart, CallStatus, Repository
 
 logger = structlog.get_logger(__name__)
 ProgressReporter = Callable[[int, int, str], Awaitable[None]]
@@ -214,38 +201,28 @@ class PostCommentsProvider(Protocol):
 
 
 class PostPublishingProvider(Protocol):
-    async def prepare_assets(
+    async def inspect_post(
         self,
-        request: PostCreatePrepareInput,
-    ) -> tuple[PreparedPostAsset, ...]: ...
+        request: PostCreateInput,
+    ) -> ActionInspection: ...
 
-    async def prepare_post(
-        self,
-        request: PostCreatePrepareInput,
-    ) -> ActionPreparationCapture: ...
-
-    async def execute_post(self, draft: ActionDraft) -> ActionPageResult: ...
+    async def perform_post(self, command: ActionCommand) -> ActionPageResult: ...
 
 
 class PostEngagementProvider(Protocol):
-    async def prepare_comment_assets(
+    async def inspect_comment(
         self,
-        request: PostCommentPrepareInput,
-    ) -> tuple[PreparedPostAsset, ...]: ...
+        request: PostCommentInput,
+    ) -> ActionInspection: ...
 
-    async def prepare_comment(
+    async def perform_comment(self, command: ActionCommand) -> ActionPageResult: ...
+
+    async def inspect_reaction(
         self,
-        request: PostCommentPrepareInput,
-    ) -> ActionPreparationCapture: ...
+        request: PostReactionInput,
+    ) -> ActionInspection: ...
 
-    async def execute_comment(self, draft: ActionDraft) -> ActionPageResult: ...
-
-    async def prepare_reaction(
-        self,
-        request: PostReactionPrepareInput,
-    ) -> ActionPreparationCapture: ...
-
-    async def execute_reaction(self, draft: ActionDraft) -> ActionPageResult: ...
+    async def perform_reaction(self, command: ActionCommand) -> ActionPageResult: ...
 
 
 class InvitationListProvider(Protocol):
@@ -278,26 +255,26 @@ class ConnectionsListProvider(Protocol):
 
 
 class InvitationActionProvider(Protocol):
-    async def prepare_send(
+    async def inspect_send(
         self,
-        request: InvitationSendPrepareInput,
-    ) -> ActionPreparationCapture: ...
+        request: InvitationSendInput,
+    ) -> ActionInspection: ...
 
-    async def prepare_accept(
+    async def inspect_accept(
         self,
-        request: InvitationAcceptPrepareInput,
-    ) -> ActionPreparationCapture: ...
+        request: InvitationAcceptInput,
+    ) -> ActionInspection: ...
 
-    async def prepare_ignore(
+    async def inspect_ignore(
         self,
-        request: InvitationIgnorePrepareInput,
-    ) -> ActionPreparationCapture: ...
+        request: InvitationIgnoreInput,
+    ) -> ActionInspection: ...
 
-    async def execute_send(self, draft: ActionDraft) -> ActionPageResult: ...
+    async def perform_send(self, command: ActionCommand) -> ActionPageResult: ...
 
-    async def execute_accept(self, draft: ActionDraft) -> ActionPageResult: ...
+    async def perform_accept(self, command: ActionCommand) -> ActionPageResult: ...
 
-    async def execute_ignore(self, draft: ActionDraft) -> ActionPageResult: ...
+    async def perform_ignore(self, command: ActionCommand) -> ActionPageResult: ...
 
 
 class ConversationSearchProvider(Protocol):
@@ -317,17 +294,12 @@ class ConversationSearchProvider(Protocol):
 class ConversationProvider(Protocol):
     async def read(self, request: ConversationGetInput) -> ConversationObservation: ...
 
-    async def prepare_message(
+    async def inspect_message(
         self,
-        request: MessagePrepareInput,
-    ) -> ActionPreparationCapture: ...
+        request: MessageSendInput,
+    ) -> ActionInspection: ...
 
-    async def prepare_message_assets(
-        self,
-        request: MessagePrepareInput,
-    ) -> tuple[PreparedPostAsset, ...]: ...
-
-    async def execute_message(self, draft: ActionDraft) -> ActionPageResult: ...
+    async def perform_message(self, command: ActionCommand) -> ActionPageResult: ...
 
 
 CapabilityRequest = (
@@ -340,19 +312,18 @@ CapabilityRequest = (
     | PostSearchInput
     | PostGetInput
     | PostCommentsListInput
-    | PostCreatePrepareInput
-    | PostCommentPrepareInput
-    | PostReactionPrepareInput
+    | PostCreateInput
+    | PostCommentInput
+    | PostReactionInput
     | InvitationListInput
     | ConnectionsListInput
     | ConnectionsSearchInput
     | ConversationSearchInput
     | ConversationGetInput
-    | InvitationSendPrepareInput
-    | InvitationAcceptPrepareInput
-    | InvitationIgnorePrepareInput
-    | MessagePrepareInput
-    | ActionExecuteInput
+    | InvitationSendInput
+    | InvitationAcceptInput
+    | InvitationIgnoreInput
+    | MessageSendInput
 )
 
 
@@ -405,14 +376,12 @@ class CapabilityExecutor:
             max_active_cursors=settings.pagination_max_active_cursors,
             max_seen_items_per_cursor=settings.pagination_max_seen_items_per_cursor,
         )
-        self._authorization = AuthorizationPolicy(settings)
 
     async def close(self) -> None:
         await self._pagination.close()
 
     async def search_jobs(self, request: JobSearchInput) -> JobSearchOutput:
         descriptor = self._registry.get(CapabilityName.JOBS_SEARCH)
-        self._authorization.authorize(descriptor)
         call = await self._begin_call(descriptor.name, request)
         replay = self._replayed_output(call, JobSearchOutput)
         if replay is not None:
@@ -484,7 +453,6 @@ class CapabilityExecutor:
 
     async def get_job(self, request: JobDetailInput) -> JobDetailOutput:
         descriptor = self._registry.get(CapabilityName.JOBS_GET)
-        self._authorization.authorize(descriptor)
         call = await self._begin_call(descriptor.name, request)
         replay = self._replayed_output(call, JobDetailOutput)
         if replay is not None:
@@ -516,7 +484,6 @@ class CapabilityExecutor:
 
     async def search_people(self, request: PeopleSearchInput) -> PeopleSearchOutput:
         descriptor = self._registry.get(CapabilityName.PEOPLE_SEARCH)
-        self._authorization.authorize(descriptor)
         call = await self._begin_call(descriptor.name, request)
         replay = self._replayed_output(call, PeopleSearchOutput)
         if replay is not None:
@@ -591,7 +558,6 @@ class CapabilityExecutor:
         request: ConnectionsSearchInput,
     ) -> ConnectionsSearchOutput:
         descriptor = self._registry.get(CapabilityName.CONNECTIONS_SEARCH)
-        self._authorization.authorize(descriptor)
         call = await self._begin_call(descriptor.name, request)
         replay = self._replayed_output(call, ConnectionsSearchOutput)
         if replay is not None:
@@ -671,7 +637,6 @@ class CapabilityExecutor:
 
     async def get_person(self, request: PeopleGetInput) -> PeopleGetOutput:
         descriptor = self._registry.get(CapabilityName.PEOPLE_GET)
-        self._authorization.authorize(descriptor)
         call = await self._begin_call(descriptor.name, request)
         replay = self._replayed_output(call, PeopleGetOutput)
         if replay is not None:
@@ -703,7 +668,6 @@ class CapabilityExecutor:
 
     async def search_companies(self, request: CompanySearchInput) -> CompanySearchOutput:
         descriptor = self._registry.get(CapabilityName.COMPANIES_SEARCH)
-        self._authorization.authorize(descriptor)
         call = await self._begin_call(descriptor.name, request)
         replay = self._replayed_output(call, CompanySearchOutput)
         if replay is not None:
@@ -775,7 +739,6 @@ class CapabilityExecutor:
 
     async def get_company(self, request: CompanyGetInput) -> CompanyGetOutput:
         descriptor = self._registry.get(CapabilityName.COMPANIES_GET)
-        self._authorization.authorize(descriptor)
         call = await self._begin_call(descriptor.name, request)
         replay = self._replayed_output(call, CompanyGetOutput)
         if replay is not None:
@@ -807,7 +770,6 @@ class CapabilityExecutor:
 
     async def search_posts(self, request: PostSearchInput) -> PostSearchOutput:
         descriptor = self._registry.get(CapabilityName.POSTS_SEARCH)
-        self._authorization.authorize(descriptor)
         call = await self._begin_call(descriptor.name, request)
         replay = self._replayed_output(call, PostSearchOutput)
         if replay is not None:
@@ -879,7 +841,6 @@ class CapabilityExecutor:
 
     async def get_post(self, request: PostGetInput) -> PostGetOutput:
         descriptor = self._registry.get(CapabilityName.POSTS_GET)
-        self._authorization.authorize(descriptor)
         call = await self._begin_call(descriptor.name, request)
         replay = self._replayed_output(call, PostGetOutput)
         if replay is not None:
@@ -914,7 +875,6 @@ class CapabilityExecutor:
         request: PostCommentsListInput,
     ) -> PostCommentsListOutput:
         descriptor = self._registry.get(CapabilityName.POST_COMMENTS_LIST)
-        self._authorization.authorize(descriptor)
         call = await self._begin_call(descriptor.name, request)
         replay = self._replayed_output(call, PostCommentsListOutput)
         if replay is not None:
@@ -990,7 +950,6 @@ class CapabilityExecutor:
         progress: ProgressReporter | None = None,
     ) -> InvitationListOutput:
         descriptor = self._registry.get(CapabilityName.INVITATIONS_LIST)
-        self._authorization.authorize(descriptor)
         call = await self._begin_call(descriptor.name, request)
         replay = self._replayed_output(call, InvitationListOutput)
         if replay is not None:
@@ -1068,7 +1027,6 @@ class CapabilityExecutor:
 
     async def list_connections(self, request: ConnectionsListInput) -> ConnectionsListOutput:
         descriptor = self._registry.get(CapabilityName.CONNECTIONS_LIST)
-        self._authorization.authorize(descriptor)
         call = await self._begin_call(descriptor.name, request)
         replay = self._replayed_output(call, ConnectionsListOutput)
         if replay is not None:
@@ -1143,7 +1101,6 @@ class CapabilityExecutor:
         request: ConversationSearchInput,
     ) -> ConversationSearchOutput:
         descriptor = self._registry.get(CapabilityName.MESSAGING_SEARCH)
-        self._authorization.authorize(descriptor)
         call = await self._begin_call(descriptor.name, request)
         replay = self._replayed_output(call, ConversationSearchOutput)
         if replay is not None:
@@ -1225,7 +1182,6 @@ class CapabilityExecutor:
         request: ConversationGetInput,
     ) -> ConversationGetOutput:
         descriptor = self._registry.get(CapabilityName.MESSAGING_CONVERSATION_GET)
-        self._authorization.authorize(descriptor)
         call = await self._begin_call(descriptor.name, request)
         replay = self._replayed_output(call, ConversationGetOutput)
         if replay is not None:
@@ -1255,80 +1211,65 @@ class CapabilityExecutor:
             await self._record_failure(call.call_id, error)
             raise
 
-    async def prepare_invitation_send(
-        self,
-        request: InvitationSendPrepareInput,
-    ) -> ActionPrepareOutput:
-        return await self._prepare_action(
-            capability_name=CapabilityName.INVITATION_SEND_PREPARE,
+    async def send_invitation(self, request: InvitationSendInput) -> ActionOutput:
+        return await self._run_action(
+            capability_name=CapabilityName.INVITATION_SEND,
             request=request,
             action_type=ActionType.INVITATION_SEND,
             payload=InvitationSendPayload(note=request.note),
-            prepare=lambda: self._invitation_actions.prepare_send(request),
+            inspect=lambda: self._invitation_actions.inspect_send(request),
+            perform=self._invitation_actions.perform_send,
         )
 
-    async def prepare_invitation_accept(
-        self,
-        request: InvitationAcceptPrepareInput,
-    ) -> ActionPrepareOutput:
-        return await self._prepare_action(
-            capability_name=CapabilityName.INVITATION_ACCEPT_PREPARE,
+    async def accept_invitation(self, request: InvitationAcceptInput) -> ActionOutput:
+        return await self._run_action(
+            capability_name=CapabilityName.INVITATION_ACCEPT,
             request=request,
             action_type=ActionType.INVITATION_ACCEPT,
-            payload_factory=lambda capture: InvitationAcceptPayload(
+            payload_factory=lambda inspection: InvitationAcceptPayload(
                 invitation_ref=(
-                    capture.target.invitation_ref or self._missing_invitation_reference()
+                    inspection.target.invitation_ref or self._missing_invitation_reference()
                 )
             ),
-            prepare=lambda: self._invitation_actions.prepare_accept(request),
+            inspect=lambda: self._invitation_actions.inspect_accept(request),
+            perform=self._invitation_actions.perform_accept,
         )
 
-    async def prepare_invitation_ignore(
-        self,
-        request: InvitationIgnorePrepareInput,
-    ) -> ActionPrepareOutput:
-        return await self._prepare_action(
-            capability_name=CapabilityName.INVITATION_IGNORE_PREPARE,
+    async def ignore_invitation(self, request: InvitationIgnoreInput) -> ActionOutput:
+        return await self._run_action(
+            capability_name=CapabilityName.INVITATION_IGNORE,
             request=request,
             action_type=ActionType.INVITATION_IGNORE,
-            payload_factory=lambda capture: InvitationIgnorePayload(
+            payload_factory=lambda inspection: InvitationIgnorePayload(
                 invitation_ref=(
-                    capture.target.invitation_ref or self._missing_invitation_reference()
+                    inspection.target.invitation_ref or self._missing_invitation_reference()
                 )
             ),
-            prepare=lambda: self._invitation_actions.prepare_ignore(request),
+            inspect=lambda: self._invitation_actions.inspect_ignore(request),
+            perform=self._invitation_actions.perform_ignore,
         )
 
-    async def prepare_message(self, request: MessagePrepareInput) -> ActionPrepareOutput:
-        async def payload_factory(
-            _: ActionPreparationCapture,
-        ) -> ActionPayload:
-            assets = await self._conversation.prepare_message_assets(request)
-            return MessageSendPayload(
+    async def send_message(self, request: MessageSendInput) -> ActionOutput:
+        return await self._run_action(
+            capability_name=CapabilityName.MESSAGING_SEND,
+            request=request,
+            action_type=ActionType.MESSAGE_SEND,
+            payload=MessageSendPayload(
                 message=request.message,
                 attachment_refs=tuple(attachment.asset_ref for attachment in request.attachments),
                 gif=request.gif,
                 reply_to_message_ref=request.reply_to_message_ref,
-                assets=assets,
-            )
-
-        return await self._prepare_action(
-            capability_name=CapabilityName.MESSAGING_MESSAGE_PREPARE,
-            request=request,
-            action_type=ActionType.MESSAGE_SEND,
-            async_payload_factory=payload_factory,
-            prepare=lambda: self._conversation.prepare_message(request),
+            ),
+            inspect=lambda: self._conversation.inspect_message(request),
+            perform=self._conversation.perform_message,
         )
 
-    async def prepare_post_create(
-        self,
-        request: PostCreatePrepareInput,
-    ) -> ActionPrepareOutput:
-        async def payload_factory(
-            _: ActionPreparationCapture,
-        ) -> ActionPayload:
-            assets = await self._post_publishing.prepare_assets(request)
-            return PostCreatePayload(
+    async def create_post(self, request: PostCreateInput) -> ActionOutput:
+        return await self._run_action(
+            capability_name=CapabilityName.POSTS_CREATE,
+            request=request,
+            action_type=ActionType.POST_CREATE,
+            payload=PostCreatePayload(
                 content=request.content,
                 audience=request.audience,
                 group_target=request.group_target,
@@ -1336,287 +1277,137 @@ class CapabilityExecutor:
                 brand_partnership=request.brand_partnership,
                 collaborators=request.collaborators,
                 scheduled_at=request.scheduled_at,
-                assets=assets,
-            )
-
-        return await self._prepare_action(
-            capability_name=CapabilityName.POSTS_CREATE_PREPARE,
-            request=request,
-            action_type=ActionType.POST_CREATE,
-            async_payload_factory=payload_factory,
-            prepare=lambda: self._post_publishing.prepare_post(request),
+            ),
+            inspect=lambda: self._post_publishing.inspect_post(request),
+            perform=self._post_publishing.perform_post,
         )
 
-    async def prepare_post_comment(
-        self,
-        request: PostCommentPrepareInput,
-    ) -> ActionPrepareOutput:
-        async def payload_factory(
-            _: ActionPreparationCapture,
-        ) -> ActionPayload:
-            assets = await self._post_engagement.prepare_comment_assets(request)
-            return CommentCreatePayload(
+    async def comment_on_post(self, request: PostCommentInput) -> ActionOutput:
+        return await self._run_action(
+            capability_name=CapabilityName.POST_COMMENT,
+            request=request,
+            action_type=ActionType.COMMENT_CREATE,
+            payload=CommentCreatePayload(
                 post_ref=request.post_ref,
                 text=request.text,
                 mentions=request.mentions,
                 attachment=request.attachment,
-                assets=assets,
-            )
-
-        return await self._prepare_action(
-            capability_name=CapabilityName.POST_COMMENT_PREPARE,
-            request=request,
-            action_type=ActionType.COMMENT_CREATE,
-            async_payload_factory=payload_factory,
-            prepare=lambda: self._post_engagement.prepare_comment(request),
+            ),
+            inspect=lambda: self._post_engagement.inspect_comment(request),
+            perform=self._post_engagement.perform_comment,
         )
 
-    async def prepare_post_reaction(
-        self,
-        request: PostReactionPrepareInput,
-    ) -> ActionPrepareOutput:
-        def payload_factory(capture: ActionPreparationCapture) -> ActionPayload:
-            if capture.existing_reaction is None:
-                raise RuntimeError("Reaction preparation captured no visible reaction state.")
+    async def react_to_post(self, request: PostReactionInput) -> ActionOutput:
+        def payload_factory(inspection: ActionInspection) -> ActionPayload:
+            if inspection.existing_reaction is None:
+                raise RuntimeError("Reaction inspection captured no visible reaction state.")
             return ReactionSetPayload(
                 post_ref=request.post_ref,
-                existing_reaction=capture.existing_reaction,
+                existing_reaction=inspection.existing_reaction,
                 desired_reaction=request.desired_reaction,
             )
 
-        return await self._prepare_action(
-            capability_name=CapabilityName.POST_REACTION_PREPARE,
+        return await self._run_action(
+            capability_name=CapabilityName.POST_REACT,
             request=request,
             action_type=ActionType.REACTION_SET,
             payload_factory=payload_factory,
-            prepare=lambda: self._post_engagement.prepare_reaction(request),
+            inspect=lambda: self._post_engagement.inspect_reaction(request),
+            perform=self._post_engagement.perform_reaction,
         )
 
-    async def execute_invitation_send(
-        self,
-        request: ActionExecuteInput,
-    ) -> ActionExecuteOutput:
-        return await self._execute_action(
-            capability_name=CapabilityName.INVITATION_SEND_EXECUTE,
-            request=request,
-            action_type=ActionType.INVITATION_SEND,
-            execute=self._invitation_actions.execute_send,
-        )
-
-    async def execute_invitation_accept(
-        self,
-        request: ActionExecuteInput,
-    ) -> ActionExecuteOutput:
-        return await self._execute_action(
-            capability_name=CapabilityName.INVITATION_ACCEPT_EXECUTE,
-            request=request,
-            action_type=ActionType.INVITATION_ACCEPT,
-            execute=self._invitation_actions.execute_accept,
-        )
-
-    async def execute_invitation_ignore(
-        self,
-        request: ActionExecuteInput,
-    ) -> ActionExecuteOutput:
-        return await self._execute_action(
-            capability_name=CapabilityName.INVITATION_IGNORE_EXECUTE,
-            request=request,
-            action_type=ActionType.INVITATION_IGNORE,
-            execute=self._invitation_actions.execute_ignore,
-        )
-
-    async def execute_message(self, request: ActionExecuteInput) -> ActionExecuteOutput:
-        return await self._execute_action(
-            capability_name=CapabilityName.MESSAGING_MESSAGE_EXECUTE,
-            request=request,
-            action_type=ActionType.MESSAGE_SEND,
-            execute=self._conversation.execute_message,
-        )
-
-    async def execute_post_create(
-        self,
-        request: ActionExecuteInput,
-    ) -> ActionExecuteOutput:
-        return await self._execute_action(
-            capability_name=CapabilityName.POSTS_CREATE_EXECUTE,
-            request=request,
-            action_type=ActionType.POST_CREATE,
-            execute=self._post_publishing.execute_post,
-        )
-
-    async def execute_post_comment(
-        self,
-        request: ActionExecuteInput,
-    ) -> ActionExecuteOutput:
-        return await self._execute_action(
-            capability_name=CapabilityName.POST_COMMENT_EXECUTE,
-            request=request,
-            action_type=ActionType.COMMENT_CREATE,
-            execute=self._post_engagement.execute_comment,
-        )
-
-    async def execute_post_reaction(
-        self,
-        request: ActionExecuteInput,
-    ) -> ActionExecuteOutput:
-        return await self._execute_action(
-            capability_name=CapabilityName.POST_REACTION_EXECUTE,
-            request=request,
-            action_type=ActionType.REACTION_SET,
-            execute=self._post_engagement.execute_reaction,
-        )
-
-    async def _prepare_action(
+    async def _run_action(
         self,
         *,
         capability_name: CapabilityName,
         request: (
-            InvitationSendPrepareInput
-            | InvitationAcceptPrepareInput
-            | InvitationIgnorePrepareInput
-            | MessagePrepareInput
-            | PostCreatePrepareInput
-            | PostCommentPrepareInput
-            | PostReactionPrepareInput
+            InvitationSendInput
+            | InvitationAcceptInput
+            | InvitationIgnoreInput
+            | MessageSendInput
+            | PostCreateInput
+            | PostCommentInput
+            | PostReactionInput
         ),
         action_type: ActionType,
-        prepare: Callable[[], Awaitable[ActionPreparationCapture]],
+        inspect: Callable[[], Awaitable[ActionInspection]],
+        perform: Callable[[ActionCommand], Awaitable[ActionPageResult]],
         payload: ActionPayload | None = None,
-        payload_factory: Callable[[ActionPreparationCapture], ActionPayload] | None = None,
-        async_payload_factory: (
-            Callable[[ActionPreparationCapture], Awaitable[ActionPayload]] | None
-        ) = None,
-    ) -> ActionPrepareOutput:
+        payload_factory: Callable[[ActionInspection], ActionPayload] | None = None,
+    ) -> ActionOutput:
         descriptor = self._registry.get(capability_name)
-        self._authorization.authorize(descriptor)
-        call = await self._begin_call(descriptor.name, request)
-        replay = self._replayed_output(call, ActionPrepareOutput)
-        if replay is not None:
-            return replay
+        value = request.model_dump(mode="json")
+        call = await self._repository.begin_call(
+            account_id=self._settings.account_id,
+            client_id=current_client_id(),
+            context_id=request.context_id,
+            request_id=f"{request.request_id}:{uuid.uuid4()}",
+            capability_name=descriptor.name,
+            input_fingerprint=canonical_input_fingerprint(value),
+            input_value=value,
+        )
+        started_at = datetime.now(UTC)
         try:
-            capture = await prepare()
-            if async_payload_factory is not None:
-                resolved_payload = await async_payload_factory(capture)
-            else:
-                resolved_payload = (
-                    payload_factory(capture) if payload_factory is not None else payload
-                )
+            inspection = await inspect()
+            resolved_payload = (
+                payload_factory(inspection) if payload_factory is not None else payload
+            )
             if resolved_payload is None:
-                raise RuntimeError("Action preparation has no typed payload.")
-            created_at = datetime.now(UTC)
-            expires_at = created_at + timedelta(seconds=self._settings.action_draft_ttl_seconds)
-            payload_hash = canonical_action_payload_hash(
-                action_type=action_type.value,
-                target=capture.target,
-                payload=resolved_payload,
-            )
-            draft = ActionDraft(
-                action_id=str(uuid.uuid4()),
+                raise RuntimeError("Action inspection produced no typed payload.")
+            command = ActionCommand(
                 action_type=action_type,
-                target=capture.target,
+                target=inspection.target,
                 payload=resolved_payload,
-                payload_hash=payload_hash,
-                status=ActionStatus.READY_FOR_CONFIRMATION,
-                created_at=created_at,
-                expires_at=expires_at,
             )
-            source = source_from_action_preparation(action_type.value, capture)
-            output = ActionPrepareOutput(
-                context_id=request.context_id,
-                request_id=request.request_id,
-                draft=draft,
-                approval_preview=action_approval_preview(draft),
-                sources=(source.reference(),),
-            )
-            await self._repository.complete_preparation_call(
-                call_id=call.call_id,
-                draft=draft,
-                output=output.model_dump(mode="json"),
-                sources=(source,),
-            )
-            return output
-        except asyncio.CancelledError:
-            await self._record_failure(
-                call.call_id,
-                BrowserUnavailableError("The LinkedIn action preparation was interrupted."),
-            )
-            raise
-        except Exception as error:
-            await self._record_failure(call.call_id, error)
-            raise
-
-    async def _execute_action(
-        self,
-        *,
-        capability_name: CapabilityName,
-        request: ActionExecuteInput,
-        action_type: ActionType,
-        execute: Callable[[ActionDraft], Awaitable[ActionPageResult]],
-    ) -> ActionExecuteOutput:
-        descriptor = self._registry.get(capability_name)
-        self._authorization.authorize(descriptor)
-        call = await self._begin_call(descriptor.name, request)
-        replay = self._replayed_output(call, ActionExecuteOutput)
-        if replay is not None:
-            return replay
-        attempt: ActionAttemptStart | None = None
-        action_completed = False
-        try:
-            attempt = await self._repository.begin_action_attempt(
-                account_id=self._settings.account_id,
-                client_id=current_client_id(),
-                action_id=request.action_id,
-                expected_action_type=action_type,
-                expected_payload_hash=request.payload_hash,
-                approval_preview=request.approval_preview,
-                idempotency_key=request.idempotency_key,
-            )
-            if not attempt.created:
-                if attempt.result is None:
-                    raise IdempotencyConflictError(
-                        "The terminal action attempt has no process-local result."
-                    )
-                result = ActionExecutionResult.model_validate(attempt.result)
-                output = ActionExecuteOutput(
+            try:
+                page_result = await perform(command)
+            except asyncio.CancelledError:
+                raise
+            except LinkedInMCPError:
+                raise
+            except Exception as error:
+                logger.error(
+                    "action_execution_interrupted",
+                    capability_name=capability_name.value,
+                    error_type=type(error).__name__,
+                )
+                completed_at = datetime.now(UTC)
+                result = ActionResult(
+                    action_type=action_type,
+                    outcome=ActionOutcome.UNCERTAIN,
+                    performed=None,
+                    final_state="unknown_after_interruption",
+                    detail=(
+                        "Execution stopped without a verified visible outcome; "
+                        "operator review is required."
+                    ),
+                    started_at=started_at,
+                    completed_at=completed_at,
+                )
+                output = ActionOutput(
                     context_id=request.context_id,
                     request_id=request.request_id,
                     result=result,
-                    sources=tuple(source.reference() for source in attempt.sources),
-                    replayed=True,
+                    sources=(),
                 )
                 await self._repository.complete_call(
                     call_id=call.call_id,
                     output=output.model_dump(mode="json"),
-                    sources=attempt.sources,
+                    sources=(),
                 )
                 return output
 
-            page_result = await execute(attempt.action)
-            completed_at = datetime.now(UTC)
-            result = ActionExecutionResult(
-                action_id=attempt.action.action_id,
+            result = ActionResult(
                 action_type=action_type,
-                attempt_id=attempt.attempt_id,
-                idempotency_key=request.idempotency_key,
                 outcome=page_result.outcome,
                 performed=page_result.performed,
                 final_state=page_result.final_state,
                 detail=page_result.detail,
-                started_at=attempt.started_at,
-                completed_at=completed_at,
+                started_at=started_at,
+                completed_at=datetime.now(UTC),
             )
-            source = source_from_action_execution(attempt.action, result, page_result)
-            await self._repository.complete_action_attempt(
-                account_id=self._settings.account_id,
-                client_id=current_client_id(),
-                context_id=request.context_id,
-                attempt_id=attempt.attempt_id,
-                outcome=result.outcome,
-                result=result.model_dump(mode="json"),
-                sources=(source,),
-            )
-            action_completed = True
-            output = ActionExecuteOutput(
+            source = source_from_action_execution(command, result, page_result)
+            output = ActionOutput(
                 context_id=request.context_id,
                 request_id=request.request_id,
                 result=result,
@@ -1629,77 +1420,18 @@ class CapabilityExecutor:
             )
             return output
         except asyncio.CancelledError:
-            if attempt is not None and attempt.created and not action_completed:
-                await self._record_uncertain_attempt(request, attempt)
             await self._record_failure(
                 call.call_id,
-                BrowserUnavailableError("The LinkedIn write was interrupted."),
+                BrowserUnavailableError("The LinkedIn action was interrupted."),
             )
             raise
         except Exception as error:
-            if attempt is not None and attempt.created and not action_completed:
-                logger.error(
-                    "action_execution_interrupted",
-                    capability_name=capability_name.value,
-                    action_id=request.action_id,
-                    error_type=type(error).__name__,
-                )
-                try:
-                    output = await self._record_uncertain_attempt(request, attempt)
-                    await self._repository.complete_call(
-                        call_id=call.call_id,
-                        output=output.model_dump(mode="json"),
-                        sources=(),
-                    )
-                    return output
-                except Exception as recording_error:
-                    logger.error(
-                        "action_uncertain_recording_failed",
-                        action_id=request.action_id,
-                        error_type=type(recording_error).__name__,
-                    )
             await self._record_failure(call.call_id, error)
             raise
 
-    async def _record_uncertain_attempt(
-        self,
-        request: ActionExecuteInput,
-        attempt: ActionAttemptStart,
-    ) -> ActionExecuteOutput:
-        completed_at = datetime.now(UTC)
-        result = ActionExecutionResult(
-            action_id=attempt.action.action_id,
-            action_type=attempt.action.action_type,
-            attempt_id=attempt.attempt_id,
-            idempotency_key=request.idempotency_key,
-            outcome=ActionOutcome.UNCERTAIN,
-            performed=None,
-            final_state="unknown_after_interruption",
-            detail=(
-                "Execution stopped without a verified visible outcome; operator review is required."
-            ),
-            started_at=attempt.started_at,
-            completed_at=completed_at,
-        )
-        await self._repository.complete_action_attempt(
-            account_id=self._settings.account_id,
-            client_id=current_client_id(),
-            context_id=request.context_id,
-            attempt_id=attempt.attempt_id,
-            outcome=ActionOutcome.UNCERTAIN,
-            result=result.model_dump(mode="json"),
-            sources=(),
-        )
-        return ActionExecuteOutput(
-            context_id=request.context_id,
-            request_id=request.request_id,
-            result=result,
-            sources=(),
-        )
-
     @staticmethod
     def _missing_invitation_reference() -> str:
-        raise RuntimeError("Acceptance preparation did not return an invitation reference.")
+        raise RuntimeError("Invitation inspection did not return an invitation reference.")
 
     async def _begin_call(
         self,

@@ -97,7 +97,6 @@ class SimulatorComment:
     comment_ref: str
     author_slug: str
     text: str
-    parent_comment_ref: str | None = None
     reaction: ReactionState = ReactionState.NONE
 
 
@@ -357,21 +356,14 @@ class SimulatorState:
         self,
         post_ref: str,
         text: str,
-        *,
-        parent_comment_ref: str | None = None,
     ) -> SimulatorComment:
         post = self.posts.get(post_ref)
         if post is None:
             raise KeyError(post_ref)
-        if parent_comment_ref is not None and not any(
-            comment.comment_ref == parent_comment_ref for comment in post.comments
-        ):
-            raise ValueError("The exact parent comment is unavailable.")
         comment = SimulatorComment(
             comment_ref=f"comment:{post_ref}:{self._next_comment_id}",
             author_slug=self.actor_slug,
             text=text,
-            parent_comment_ref=parent_comment_ref,
         )
         self._next_comment_id += 1
         post.comments.append(comment)
@@ -382,30 +374,12 @@ class SimulatorState:
         self,
         post_ref: str,
         reaction: ReactionState,
-        *,
-        comment_ref: str | None = None,
     ) -> None:
         post = self.posts.get(post_ref)
         if post is None:
             raise KeyError(post_ref)
-        target_ref = post_ref
-        if comment_ref is None:
-            post.reaction = reaction
-        else:
-            matching = [comment for comment in post.comments if comment.comment_ref == comment_ref]
-            if len(matching) != 1:
-                raise ValueError("The exact comment is unavailable or ambiguous.")
-            comment = matching[0]
-            index = post.comments.index(comment)
-            post.comments[index] = SimulatorComment(
-                comment_ref=comment.comment_ref,
-                author_slug=comment.author_slug,
-                text=comment.text,
-                parent_comment_ref=comment.parent_comment_ref,
-                reaction=reaction,
-            )
-            target_ref = comment_ref
-        self._record("reaction_set", target_ref, reaction.value)
+        post.reaction = reaction
+        self._record("reaction_set", post_ref, reaction.value)
 
     def _record(self, action_type: str, target_ref: str, detail: str) -> None:
         self.actions.append(

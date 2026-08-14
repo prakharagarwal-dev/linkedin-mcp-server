@@ -236,7 +236,7 @@ def _validate_running_owner(status: AccountRuntimeStatus, settings: Settings) ->
         )
     if owner.command != _RUNTIME_COMMAND:
         raise ConfigurationError(
-            f"LinkedIn profile maintenance or a legacy runtime ({owner.command or 'unknown'}) "
+            f"LinkedIn profile maintenance ({owner.command or 'unknown'}) "
             "currently owns the browser profile. Retry after it completes, or run "
             "`linkedin-mcp stop`."
         )
@@ -254,7 +254,7 @@ def _validate_running_owner(status: AccountRuntimeStatus, settings: Settings) ->
     expected_fingerprint = runtime_configuration_fingerprint(settings)
     if owner.configuration_fingerprint != expected_fingerprint:
         raise ConfigurationError(
-            "The running LinkedIn MCP runtime uses different profile, authorization, browser, "
+            "The running LinkedIn MCP runtime uses different profile, browser, "
             "pacing, or transport settings. Make client configurations match, or run "
             "`linkedin-mcp stop` and restart with the intended settings."
         )

@@ -6,15 +6,15 @@
   depend on `startup-scanner` or another LinkedIn MCP server.
 - The server exposes typed LinkedIn capabilities. It does not contain agents,
   LangGraph, natural-language planning, ranking, scheduling, or an LLM runtime.
-- LinkedIn access is contract-driven and limited to configured hosts, surfaces,
+- LinkedIn access is contract-driven and limited to configured hosts, declared surfaces,
   accounts, one local process, one browser worker, and internal navigation timing.
 - Do not expose generic browser, JavaScript, network, click, or navigation tools.
-- Read and account-changing capabilities are separate. Write operations require
-  server-enforced scopes, immutable hash-locked previews, idempotency, and an MCP
-  client approval policy. Execute annotations request interactive confirmation by
-  default; explicit durable per-tool client configuration may authorize unattended
-  execution. Approval policy never grants a LinkedIn scope or bypasses server
-  authorization.
+- Read and account-changing capabilities are separate. Each account-changing tool is
+  one complete action call. Tool availability and the MCP client's approval policy
+  are the authorization boundary; the server does not maintain a second scope,
+  preview, or idempotency permission layer. Write annotations request interactive
+  confirmation by default, while explicit durable per-tool client configuration may
+  authorize unattended invocation.
 
 ## Access and secrets
 
@@ -31,15 +31,17 @@
 - Python 3.12+, strict Pyright, Ruff, Pydantic v2, and async I/O.
 - Use the official `mcp` Python SDK and official Playwright async API.
 - Use an in-process `asyncio.Queue` for local capability execution and
-  process-local memory for calls, observations, evidence, idempotency, action
-  drafts, and action attempts. The browser profile is the only server-owned
-  authentication persistence. Client approval choices are not stored as
-  server authorization records. Do not add a database or external work queue.
+  process-local memory for calls, observations, and evidence. The browser profile
+  is the only server-owned authentication persistence. Client approval choices are
+  not stored as server authorization records. Do not add a database or external
+  work queue.
 - Keep MCP transport wiring, policy, operation-state storage, browser mechanics, page
   extraction, and domain contracts in separate modules.
 - Store immutable field-level evidence with source URL and capture time.
 - Prefer accessible, user-facing Playwright locators.
-- Every operation must be bounded, idempotent where retryable, and observable.
+- Every operation must be bounded and observable. Read operations may replay safely.
+  Every write-tool invocation is a new action and must never be retried automatically
+  after its final LinkedIn control may have been invoked.
 
 ## Working style
 

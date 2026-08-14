@@ -17,8 +17,8 @@ from linkedin_mcp.browser import (
 from linkedin_mcp.browser.profile import BrowserProfileManager, BrowserProfileStatus
 from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import (
+    AccessPausedError,
     AuthenticationRequiredError,
-    AuthorizationDeniedError,
     BrowserUnavailableError,
     ConfigurationError,
     InvalidTargetError,
@@ -598,7 +598,7 @@ async def test_browser_manager_reuses_one_context_with_a_fresh_page_per_operatio
 async def test_browser_manager_fails_closed_when_paused(tmp_path: Path) -> None:
     paused = BrowserManager(_live_settings(tmp_path, profile_name="paused"))
     paused.pause("operator review")
-    with pytest.raises(AuthorizationDeniedError, match="operator review"):
+    with pytest.raises(AccessPausedError, match="operator review"):
         async with paused.page():
             pass
 

@@ -1,15 +1,19 @@
 {
-  "status": "mock_verified",
-  "surface": "linkedin-desktop-messaging",
-  "observed_at": "2026-07-31",
-  "source": "sanitized current-shape fixture current visible-UI contract",
-  "covers": [
-    "Focused/Other/Archived/Spam category dropdown",
-    "recipient-or-keyword Search messages submission",
-    "mutually exclusive Jobs/Unread/Connections/InMail/Starred pills",
-    "current conversation cards without thread anchors",
-    "reverse-column virtualized message history",
-    "incoming/outgoing, edited, reply, reaction, and attachment observations",
-    "text/emoji, image, general-file, KLIPY GIF, and reply composition"
-  ]
+  "provenance": "mock_verified",
+  "verified_at": "2026-07-31",
+  "source_surfaces": [
+    "visible LinkedIn desktop Messaging"
+  ],
+  "contains_live_data": false,
+  "contains_authentication_state": false,
+  "behaviors": [
+    "Focused, Other, Archived, and Spam categories",
+    "recipient or message-keyword search",
+    "mutually exclusive Jobs, Unread, Connections, InMail, and Starred filters",
+    "current linkless conversation cards",
+    "reverse-virtualized message history",
+    "incoming and outgoing messages, edits, replies, reactions, and attachments",
+    "text, emoji, image, file, GIF, and exact-message reply composition"
+  ],
+  "notes": "Synthetic identities and content preserve only current visible Messaging structure and behavior. No live identity, private message, raw DOM, cookie, credential, or browser state is retained."
 }

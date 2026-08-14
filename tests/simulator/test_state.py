@@ -60,29 +60,19 @@ def test_ignoring_an_invitation_removes_only_the_pending_request() -> None:
     assert state.actions[-1].target_ref == "alex-ray"
 
 
-def test_post_comment_reply_and_reaction_transitions_preserve_targets() -> None:
+def test_post_comment_and_reaction_transitions_preserve_post_targets() -> None:
     state = SimulatorState.standard()
     post = state.create_post("A synthetic personal post.")
-    top_level = state.create_comment(post.post_ref, "First comment.")
-    reply = state.create_comment(
-        post.post_ref,
-        "Threaded reply.",
-        parent_comment_ref=top_level.comment_ref,
-    )
-    state.set_reaction(
-        post.post_ref,
-        ReactionState.CELEBRATE,
-        comment_ref=reply.comment_ref,
-    )
+    comment = state.create_comment(post.post_ref, "First comment.")
+    state.set_reaction(post.post_ref, ReactionState.CELEBRATE)
 
     stored = state.posts[post.post_ref]
-    assert stored.comments[-1].parent_comment_ref == top_level.comment_ref
-    assert stored.comments[-1].reaction is ReactionState.CELEBRATE
+    assert stored.comments == [comment]
+    assert stored.reaction is ReactionState.CELEBRATE
     assert [action.target_ref for action in state.actions] == [
         post.post_ref,
-        top_level.comment_ref,
-        reply.comment_ref,
-        reply.comment_ref,
+        comment.comment_ref,
+        post.post_ref,
     ]
 
 
@@ -95,21 +85,17 @@ def test_state_fails_closed_for_ambiguous_or_stale_targets() -> None:
         state.accept_invitation("invitation:" + "f" * 24)
     with pytest.raises(KeyError):
         state.send_message("missing-thread", "Do not send")
-    with pytest.raises(ValueError, match="exact parent comment"):
-        state.create_comment(
-            "activity:7312345678901234567",
-            "Do not publish",
-            parent_comment_ref="comment:activity:7312345678901234567:999",
-        )
+    with pytest.raises(KeyError):
+        state.create_comment("activity:9999999999999999999", "Do not publish")
 
     assert state.actions == []
 
 
 def test_fault_plan_is_ordered_and_consumed_once() -> None:
     state = SimulatorState.standard()
-    state.queue_fault("messaging.execute", SimulatorFault.EFFECT_INTERRUPTED)
-    state.queue_fault("messaging.execute", SimulatorFault.VERIFICATION_TIMEOUT)
+    state.queue_fault("messaging.send", SimulatorFault.EFFECT_INTERRUPTED)
+    state.queue_fault("messaging.send", SimulatorFault.VERIFICATION_TIMEOUT)
 
-    assert state.take_fault("messaging.execute") is SimulatorFault.EFFECT_INTERRUPTED
-    assert state.take_fault("messaging.execute") is SimulatorFault.VERIFICATION_TIMEOUT
-    assert state.take_fault("messaging.execute") is None
+    assert state.take_fault("messaging.send") is SimulatorFault.EFFECT_INTERRUPTED
+    assert state.take_fault("messaging.send") is SimulatorFault.VERIFICATION_TIMEOUT
+    assert state.take_fault("messaging.send") is None

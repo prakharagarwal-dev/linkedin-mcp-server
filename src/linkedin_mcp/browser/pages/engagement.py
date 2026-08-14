@@ -1,4 +1,4 @@
-"""Narrow native-confirmation-gated comment and reaction interactions."""
+"""Narrow direct comment and reaction interactions through visible LinkedIn UI."""
 
 from __future__ import annotations
 
@@ -22,20 +22,19 @@ from linkedin_mcp.browser.pages.posts import (
     region_for_post,
 )
 from linkedin_mcp.domain.models import (
-    ActionDraft,
+    ActionCommand,
+    ActionInspection,
     ActionOutcome,
     ActionPageResult,
-    ActionPreparationCapture,
     ActionTarget,
     CommentAttachmentType,
     CommentCreatePayload,
     CommentGifAttachment,
     CommentObservation,
     CommentPhotoAttachment,
-    PostCommentPrepareInput,
+    PostCommentInput,
     PostMentionInput,
-    PostReactionPrepareInput,
-    PreparedPostAsset,
+    PostReactionInput,
     ReactionSetPayload,
     ReactionState,
 )
@@ -124,23 +123,17 @@ class PostEngagementPage:
         self._browser = browser
         self._assets = assets
 
-    async def prepare_comment_assets(
+    async def inspect_comment(
         self,
-        request: PostCommentPrepareInput,
-    ) -> tuple[PreparedPostAsset, ...]:
-        return await self._assets.prepare_comment(request)
-
-    async def prepare_comment(
-        self,
-        request: PostCommentPrepareInput,
-    ) -> ActionPreparationCapture:
+        request: PostCommentInput,
+    ) -> ActionInspection:
         target_url = canonical_post_url(request.post_ref)
         async with self._browser.page() as page:
             await self._browser.navigate(page, target_url)
             target = await self._resolve_target(page, request.post_ref)
             composer = await self._open_comment_composer(page, target.region)
             await self._assert_comment_options(page, composer, request)
-            return ActionPreparationCapture(
+            return ActionInspection(
                 target=self._action_target(target, request.post_ref),
                 current_state="comment_composer_ready",
                 source_url=HttpUrl(target_url),
@@ -148,22 +141,22 @@ class PostEngagementPage:
                 captured_at=datetime.now(UTC),
             )
 
-    async def execute_comment(self, draft: ActionDraft) -> ActionPageResult:
-        if not isinstance(draft.payload, CommentCreatePayload):
+    async def perform_comment(self, command: ActionCommand) -> ActionPageResult:
+        if not isinstance(command.payload, CommentCreatePayload):
             raise InvalidTargetError("The comment action payload is invalid.")
-        payload = draft.payload
-        paths = await self._assets.verify_assets(payload.assets)
+        payload = command.payload
+        paths = await self._assets.resolve_comment(payload.attachment)
         target_url = canonical_post_url(payload.post_ref)
         async with self._browser.page() as page:
             await self._browser.navigate(page, target_url)
             target = await self._resolve_target(page, payload.post_ref)
-            if not self._matches_confirmed_target(draft.target, target):
+            if not self._matches_inspected_target(command.target, target):
                 return await self._result(
                     page,
                     ActionOutcome.FAILED,
                     False,
                     "engagement_target_changed",
-                    "The active member or visible content target changed after confirmation.",
+                    "The active member or visible content target changed after inspection.",
                 )
             composer = await self._open_comment_composer(page, target.region)
             if payload.text is not None:
@@ -174,7 +167,7 @@ class PostEngagementPage:
                         ActionOutcome.FAILED,
                         False,
                         "comment_text_too_long",
-                        "The exact confirmed comment exceeds LinkedIn's visible field limit.",
+                        "The exact requested comment exceeds LinkedIn's visible field limit.",
                     )
                 await self._fill_text_with_mentions(
                     page,
@@ -230,7 +223,7 @@ class PostEngagementPage:
                         ActionOutcome.VERIFIED,
                         True,
                         f"comment_published:{created[0]}",
-                        "One new exact visible comment matched the confirmed payload.",
+                        "One new exact visible comment matched the requested payload.",
                     )
                 await page.wait_for_timeout(250)
             return await self._result(
@@ -241,10 +234,10 @@ class PostEngagementPage:
                 "No single new exact visible comment matched within the verification bound.",
             )
 
-    async def prepare_reaction(
+    async def inspect_reaction(
         self,
-        request: PostReactionPrepareInput,
-    ) -> ActionPreparationCapture:
+        request: PostReactionInput,
+    ) -> ActionInspection:
         target_url = canonical_post_url(request.post_ref)
         async with self._browser.page() as page:
             await self._browser.navigate(page, target_url)
@@ -259,7 +252,7 @@ class PostEngagementPage:
                     target.region,
                     request.desired_reaction,
                 )
-            return ActionPreparationCapture(
+            return ActionInspection(
                 target=self._action_target(target, request.post_ref),
                 current_state=f"reaction_ready:post:{existing.value}",
                 source_url=HttpUrl(target_url),
@@ -268,20 +261,20 @@ class PostEngagementPage:
                 existing_reaction=existing,
             )
 
-    async def execute_reaction(self, draft: ActionDraft) -> ActionPageResult:
-        if not isinstance(draft.payload, ReactionSetPayload):
+    async def perform_reaction(self, command: ActionCommand) -> ActionPageResult:
+        if not isinstance(command.payload, ReactionSetPayload):
             raise InvalidTargetError("The reaction action payload is invalid.")
-        payload = draft.payload
+        payload = command.payload
         async with self._browser.page() as page:
             await self._browser.navigate(page, canonical_post_url(payload.post_ref))
             target = await self._resolve_target(page, payload.post_ref)
-            if not self._matches_confirmed_target(draft.target, target):
+            if not self._matches_inspected_target(command.target, target):
                 return await self._result(
                     page,
                     ActionOutcome.FAILED,
                     False,
                     "engagement_target_changed",
-                    "The active member or visible reaction target changed after confirmation.",
+                    "The active member or visible reaction target changed after inspection.",
                 )
             controls = await self._wait_for_visible_reaction_controls(target.region)
             if len(controls) != 1:
@@ -290,7 +283,7 @@ class PostEngagementPage:
                     ActionOutcome.FAILED,
                     False,
                     "reaction_not_changed",
-                    "The exact visible reaction control did not load before execution.",
+                    "The exact visible reaction control did not load before the action.",
                 )
             current = await self._reaction_state(target.region)
             if current is not payload.existing_reaction:
@@ -299,7 +292,10 @@ class PostEngagementPage:
                     ActionOutcome.FAILED,
                     False,
                     "reaction_state_changed",
-                    "The visible reaction changed after confirmation; prepare a new action.",
+                    (
+                        "The visible reaction changed during the action; invoke it again "
+                        "only after review."
+                    ),
                 )
             if current is payload.desired_reaction:
                 return await self._result(
@@ -351,7 +347,7 @@ class PostEngagementPage:
                         ActionOutcome.VERIFIED,
                         True,
                         self._reaction_final_state(current),
-                        "LinkedIn visibly shows the exact confirmed reaction state.",
+                        "LinkedIn visibly shows the exact requested reaction state.",
                     )
                 await page.wait_for_timeout(250)
             return await self._result(
@@ -450,21 +446,21 @@ class PostEngagementPage:
         )
 
     @staticmethod
-    def _matches_confirmed_target(
-        confirmed: ActionTarget,
+    def _matches_inspected_target(
+        requested: ActionTarget,
         current: _VisibleTarget,
     ) -> bool:
         return (
-            (confirmed.actor_profile_slug or confirmed.profile_slug) == current.actor_slug
-            and (confirmed.actor_display_name or confirmed.display_name).casefold()
+            (requested.actor_profile_slug or requested.profile_slug) == current.actor_slug
+            and (requested.actor_display_name or requested.display_name).casefold()
             == current.actor_name.casefold()
-            and confirmed.content_author_name is not None
-            and confirmed.content_author_name.casefold() == current.content_author_name.casefold()
+            and requested.content_author_name is not None
+            and requested.content_author_name.casefold() == current.content_author_name.casefold()
             and (
-                confirmed.content_author_url is None
+                requested.content_author_url is None
                 or (
                     current.content_author_url is not None
-                    and str(confirmed.content_author_url) == str(current.content_author_url)
+                    and str(requested.content_author_url) == str(current.content_author_url)
                 )
             )
         )
@@ -511,7 +507,7 @@ class PostEngagementPage:
         self,
         page: Page,
         composer: Locator,
-        request: PostCommentPrepareInput,
+        request: PostCommentInput,
     ) -> None:
         region = await self._comment_composer_region(composer)
         if isinstance(request.attachment, CommentPhotoAttachment):

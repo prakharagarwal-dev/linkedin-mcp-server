@@ -10,6 +10,8 @@ from linkedin_mcp.application import (
     AccountProcessLock,
     CapabilityExecutor,
     CapabilityWorker,
+    CompanyProfileProvider,
+    CompanySearchProvider,
     ConnectionsListProvider,
     ConversationProvider,
     ConversationSearchProvider,
@@ -25,44 +27,14 @@ from linkedin_mcp.browser import BrowserManager
 from linkedin_mcp.capabilities import create_default_registry
 from linkedin_mcp.config import Settings
 from linkedin_mcp.container import AppContainer
-from linkedin_mcp.domain.models import CapabilityEffect, LinkedInSurface
 from linkedin_mcp.persistence import MemoryRepository
 from tests.contract.test_mcp_protocol import (
-    ProtocolCompanyProfile,
-    ProtocolCompanySearch,
     ProtocolJobDetail,
     ProtocolPeopleSearch,
     ProtocolPersonProfile,
-    ProtocolPostComments,
-    ProtocolPostDetail,
-    ProtocolPostSearch,
 )
 from tests.simulator.providers import StatefulProtocolJobSearch, StatefulProtocolNetwork
 from tests.simulator.state import SimulatorState
-
-ALL_SCOPES = frozenset(
-    {
-        "linkedin.jobs.search",
-        "linkedin.jobs.read",
-        "linkedin.people.search",
-        "linkedin.people.read",
-        "linkedin.companies.search",
-        "linkedin.companies.read",
-        "linkedin.posts.search",
-        "linkedin.posts.read",
-        "linkedin.posts.comments.read",
-        "linkedin.posts.comments.create",
-        "linkedin.posts.reactions.set",
-        "linkedin.posts.create",
-        "linkedin.connections.read",
-        "linkedin.invitations.read",
-        "linkedin.invitations.send",
-        "linkedin.invitations.accept",
-        "linkedin.invitations.ignore",
-        "linkedin.messaging.read",
-        "linkedin.messaging.send",
-    }
-)
 
 
 def create_simulator_container(
@@ -77,9 +49,6 @@ def create_simulator_container(
         asset_root_path=root / f"assets-{suffix}",
         minimum_navigation_interval_seconds=0,
         runtime_lock_path=root / f"runtime-{suffix}.lock",
-        allowed_surfaces=frozenset(LinkedInSurface),
-        allowed_scopes=ALL_SCOPES,
-        allowed_effects=frozenset(CapabilityEffect),
     )
     repository = MemoryRepository()
     registry = create_default_registry()
@@ -93,11 +62,11 @@ def create_simulator_container(
         job_detail=ProtocolJobDetail(),
         people_search=ProtocolPeopleSearch(),
         person_profile=ProtocolPersonProfile(),
-        company_search=ProtocolCompanySearch(),
-        company_profile=ProtocolCompanyProfile(),
-        post_search=cast(PostSearchProvider, ProtocolPostSearch()),
-        post_detail=cast(PostDetailProvider, ProtocolPostDetail()),
-        post_comments=cast(PostCommentsProvider, ProtocolPostComments()),
+        company_search=cast(CompanySearchProvider, object()),
+        company_profile=cast(CompanyProfileProvider, object()),
+        post_search=cast(PostSearchProvider, object()),
+        post_detail=cast(PostDetailProvider, object()),
+        post_comments=cast(PostCommentsProvider, object()),
         post_publishing=cast(PostPublishingProvider, network),
         post_engagement=cast(PostEngagementProvider, network),
         invitation_list=cast(InvitationListProvider, network),

@@ -14,22 +14,18 @@ def test_remote_unauthenticated_http_fails_closed() -> None:
         Settings(transport="streamable-http", http_host="0.0.0.0")
 
 
-def test_runtime_configuration_fingerprint_is_order_stable_and_policy_sensitive() -> None:
-    base = Settings(
-        transport="stdio",
-        allowed_scopes=frozenset({"linkedin.jobs.read", "linkedin.jobs.search"}),
-    )
+def test_runtime_configuration_fingerprint_ignores_proxy_transport_but_tracks_runtime() -> None:
+    base = Settings(transport="stdio")
     equivalent = base.model_copy(
         update={
             "transport": "streamable-http",
             "runtime_start_timeout_seconds": 120,
-            "allowed_scopes": frozenset({"linkedin.jobs.search", "linkedin.jobs.read"}),
         }
     )
-    restricted = base.model_copy(update={"allowed_scopes": frozenset({"linkedin.jobs.read"})})
+    changed = base.model_copy(update={"queue_capacity": base.queue_capacity + 1})
 
     assert runtime_configuration_fingerprint(base) == runtime_configuration_fingerprint(equivalent)
-    assert runtime_configuration_fingerprint(base) != runtime_configuration_fingerprint(restricted)
+    assert runtime_configuration_fingerprint(base) != runtime_configuration_fingerprint(changed)
 
 
 def test_local_paths_default_to_persistent_platform_locations(
@@ -99,9 +95,6 @@ def test_local_queue_and_internal_search_bound_are_validated() -> None:
 
     with pytest.raises(ValidationError, match="greater than or equal to 100"):
         Settings(pagination_max_seen_items_per_cursor=99)
-
-    with pytest.raises(ValidationError, match="greater than or equal to 300"):
-        Settings(action_draft_ttl_seconds=299)
 
     with pytest.raises(ValidationError, match="greater than or equal to 1"):
         Settings(runtime_start_timeout_seconds=0.5)

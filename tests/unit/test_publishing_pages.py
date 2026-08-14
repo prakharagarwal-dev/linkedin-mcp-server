@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
@@ -16,10 +15,9 @@ from linkedin_mcp.assets import LocalAssetStore
 from linkedin_mcp.browser import BrowserManager
 from linkedin_mcp.browser.pages import PostPublishingPage
 from linkedin_mcp.domain.models import (
-    ActionDraft,
+    ActionCommand,
     ActionOutcome,
     ActionPageResult,
-    ActionStatus,
     ActionType,
     CelebrationPostContent,
     CelebrationType,
@@ -37,8 +35,8 @@ from linkedin_mcp.domain.models import (
     PostAudience,
     PostCollaboratorInput,
     PostCommentControl,
+    PostCreateInput,
     PostCreatePayload,
-    PostCreatePrepareInput,
     PostGroupTarget,
     PostImageAspectRatio,
     PostImageEditInput,
@@ -53,7 +51,7 @@ from linkedin_mcp.domain.models import (
 from linkedin_mcp.errors import InvalidTargetError
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
-COMPOSER_HTML = (FIXTURES / "personal-post-composer.html").read_text()
+COMPOSER_HTML = (FIXTURES / "posts/latest/composer.html").read_text()
 
 
 class PublishingFixtureBrowser:
@@ -97,15 +95,12 @@ class PublishingFixtureBrowser:
             raise PlaywrightTimeoutError("fixture post-click timeout")
 
 
-async def _prepared_draft(
+async def _action_command(
     adapter: PostPublishingPage,
-    request: PostCreatePrepareInput,
-) -> ActionDraft:
-    capture = await adapter.prepare_post(request)
-    assets = await adapter.prepare_assets(request)
-    now = datetime.now(UTC)
-    return ActionDraft(
-        action_id=str(uuid.uuid4()),
+    request: PostCreateInput,
+) -> ActionCommand:
+    capture = await adapter.inspect_post(request)
+    return ActionCommand(
         action_type=ActionType.POST_CREATE,
         target=capture.target,
         payload=PostCreatePayload(
@@ -116,22 +111,17 @@ async def _prepared_draft(
             brand_partnership=request.brand_partnership,
             collaborators=request.collaborators,
             scheduled_at=request.scheduled_at,
-            assets=assets,
         ),
-        payload_hash="a" * 64,
-        status=ActionStatus.EXECUTING,
-        created_at=now,
-        expires_at=now + timedelta(hours=1),
     )
 
 
 @pytest.mark.timeout(15)
-async def test_prepare_waits_through_the_current_visible_composer_loader(
+async def test_inspection_waits_through_the_current_visible_composer_loader(
     tmp_path: Path,
 ) -> None:
-    request = PostCreatePrepareInput(
+    request = PostCreateInput(
         context_id="publishing-context",
-        request_id="prepare-delayed-composer",
+        request_id="action-delayed-composer",
         content=TextPostContent(text="A delayed fixture composer."),
     )
     async with async_playwright() as playwright:
@@ -145,7 +135,7 @@ async def test_prepare_waits_through_the_current_visible_composer_loader(
             LocalAssetStore(tmp_path),
         )
         try:
-            capture = await adapter.prepare_post(request)
+            capture = await adapter.inspect_post(request)
         finally:
             await browser.close()
 
@@ -154,12 +144,12 @@ async def test_prepare_waits_through_the_current_visible_composer_loader(
 
 
 @pytest.mark.timeout(30)
-async def test_personal_text_post_prepare_and_execute_verify_new_stable_post(
+async def test_personal_text_post_action_verifies_new_stable_post(
     tmp_path: Path,
 ) -> None:
-    request = PostCreatePrepareInput(
+    request = PostCreateInput(
         context_id="publishing-context",
-        request_id="prepare-text-post",
+        request_id="action-text-post",
         content=TextPostContent(
             text="A precise fixture post with @Alex.",
             mentions=(
@@ -180,16 +170,16 @@ async def test_personal_text_post_prepare_and_execute_verify_new_stable_post(
             LocalAssetStore(tmp_path),
         )
         try:
-            draft = await _prepared_draft(adapter, request)
-            result = await adapter.execute_post(draft)
+            command = await _action_command(adapter, request)
+            result = await adapter.perform_post(command)
         finally:
             await browser.close()
 
-    assert draft.target.actor_profile_slug == "current-member"
-    assert draft.target.actor_display_name == "Current Member"
-    assert isinstance(draft.payload, PostCreatePayload)
-    assert draft.payload.audience is PostAudience.CONNECTIONS_ONLY
-    assert draft.payload.comment_control is PostCommentControl.NO_ONE
+    assert command.target.actor_profile_slug == "current-member"
+    assert command.target.actor_display_name == "Current Member"
+    assert isinstance(command.payload, PostCreatePayload)
+    assert command.payload.audience is PostAudience.CONNECTIONS_ONLY
+    assert command.payload.comment_control is PostCommentControl.NO_ONE
     assert result.outcome is ActionOutcome.VERIFIED
     assert result.performed is True
     assert result.final_state.startswith("post_published:activity:")
@@ -200,9 +190,9 @@ async def test_personal_text_post_prepare_and_execute_verify_new_stable_post(
 async def test_pre_submit_timeout_is_a_verified_failure_not_an_uncertain_publish(
     tmp_path: Path,
 ) -> None:
-    request = PostCreatePrepareInput(
+    request = PostCreateInput(
         context_id="publishing-context",
-        request_id="prepare-pre-submit-timeout",
+        request_id="action-pre-submit-timeout",
         content=TextPostContent(text="A fixture post that is never submitted."),
     )
     async with async_playwright() as playwright:
@@ -214,9 +204,9 @@ async def test_pre_submit_timeout_is_a_verified_failure_not_an_uncertain_publish
             LocalAssetStore(tmp_path),
         )
         try:
-            draft = await _prepared_draft(adapter, request)
+            command = await _action_command(adapter, request)
             fixture_browser.fail_next_settings_click = True
-            result = await adapter.execute_post(draft)
+            result = await adapter.perform_post(command)
         finally:
             await browser.close()
 
@@ -229,9 +219,9 @@ async def test_pre_submit_timeout_is_a_verified_failure_not_an_uncertain_publish
 async def test_visible_success_alert_verifies_publish_after_post_click_timeout(
     tmp_path: Path,
 ) -> None:
-    request = PostCreatePrepareInput(
+    request = PostCreateInput(
         context_id="publishing-context",
-        request_id="prepare-post-click-timeout",
+        request_id="action-post-click-timeout",
         content=TextPostContent(text="A visibly confirmed fixture post."),
     )
     async with async_playwright() as playwright:
@@ -243,9 +233,9 @@ async def test_visible_success_alert_verifies_publish_after_post_click_timeout(
             LocalAssetStore(tmp_path),
         )
         try:
-            draft = await _prepared_draft(adapter, request)
+            command = await _action_command(adapter, request)
             fixture_browser.fail_after_post_click = True
-            result = await adapter.execute_post(draft)
+            result = await adapter.perform_post(command)
         finally:
             await browser.close()
 
@@ -258,9 +248,9 @@ async def test_visible_success_alert_verifies_publish_after_post_click_timeout(
 async def test_visible_failure_alert_returns_verified_non_publish(
     tmp_path: Path,
 ) -> None:
-    request = PostCreatePrepareInput(
+    request = PostCreateInput(
         context_id="publishing-context",
-        request_id="prepare-visible-publish-failure",
+        request_id="action-visible-publish-failure",
         content=TextPostContent(text="A fixture post that LinkedIn rejects."),
     )
     async with async_playwright() as playwright:
@@ -272,9 +262,9 @@ async def test_visible_failure_alert_returns_verified_non_publish(
             LocalAssetStore(tmp_path),
         )
         try:
-            draft = await _prepared_draft(adapter, request)
+            command = await _action_command(adapter, request)
             fixture_browser.publish_outcome = "failure"
-            result = await adapter.execute_post(draft)
+            result = await adapter.perform_post(command)
         finally:
             await browser.close()
 
@@ -284,7 +274,7 @@ async def test_visible_failure_alert_returns_verified_non_publish(
 
 
 @pytest.mark.timeout(40)
-async def test_photo_post_hashes_assets_and_applies_alt_text_and_exact_member_tag(
+async def test_photo_post_uses_direct_asset_and_applies_alt_text_and_exact_member_tag(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "diagram.png").write_bytes(b"fixture-image")
@@ -319,9 +309,9 @@ async def test_photo_post_hashes_assets_and_applies_alt_text_and_exact_member_ta
             ),
         ),
     )
-    request = PostCreatePrepareInput(
+    request = PostCreateInput(
         context_id="publishing-context",
-        request_id="prepare-photo-post",
+        request_id="action-photo-post",
         content=content,
     )
     async with async_playwright() as playwright:
@@ -332,18 +322,13 @@ async def test_photo_post_hashes_assets_and_applies_alt_text_and_exact_member_ta
             LocalAssetStore(tmp_path),
         )
         try:
-            draft = await _prepared_draft(adapter, request)
-            result = await adapter.execute_post(draft)
+            command = await _action_command(adapter, request)
+            result = await adapter.perform_post(command)
         finally:
             await browser.close()
 
-    assert isinstance(draft.payload, PostCreatePayload)
-    assert len(draft.payload.assets) == 1
-    assert draft.payload.assets[0].asset_ref == "diagram.png"
-    assert draft.payload.assets[0].sha256 != "0" * 64
-    assert draft.payload.assets[0].alt_text == "A reliable architecture diagram"
-    assert draft.payload.assets[0].tagged_profile_slugs == ("alex-ray",)
-    assert draft.payload.assets[0].tagged_company_slugs == ("acme-cloud",)
+    assert isinstance(command.payload, PostCreatePayload)
+    assert command.payload.content == content
     assert result.outcome is ActionOutcome.VERIFIED
 
 
@@ -356,9 +341,9 @@ async def test_video_document_and_poll_modes_cover_all_structured_composer_optio
     (tmp_path / "captions.srt").write_text("1\n00:00:00,000 --> 00:00:01,000\nFixture\n")
     (tmp_path / "guide.pdf").write_bytes(b"%PDF-fixture")
     requests = (
-        PostCreatePrepareInput(
+        PostCreateInput(
             context_id="publishing-context",
-            request_id="prepare-video-post",
+            request_id="action-video-post",
             content=VideoPostContent(
                 text="A fixture video",
                 video_asset_ref="demo.mp4",
@@ -367,18 +352,18 @@ async def test_video_document_and_poll_modes_cover_all_structured_composer_optio
                 caption_asset_ref="captions.srt",
             ),
         ),
-        PostCreatePrepareInput(
+        PostCreateInput(
             context_id="publishing-context",
-            request_id="prepare-document-post",
+            request_id="action-document-post",
             content=DocumentPostContent(
                 text="A fixture document",
                 document_asset_ref="guide.pdf",
                 document_title="Reliable Systems Guide",
             ),
         ),
-        PostCreatePrepareInput(
+        PostCreateInput(
             context_id="publishing-context",
-            request_id="prepare-poll-post",
+            request_id="action-poll-post",
             content=PollPostContent(
                 text="Choose one",
                 question="Which property matters most?",
@@ -391,7 +376,7 @@ async def test_video_document_and_poll_modes_cover_all_structured_composer_optio
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         results: list[ActionPageResult] = []
-        drafts: list[ActionDraft] = []
+        commands: list[ActionCommand] = []
         try:
             for request in requests:
                 page = await browser.new_page()
@@ -399,18 +384,14 @@ async def test_video_document_and_poll_modes_cover_all_structured_composer_optio
                     cast(BrowserManager, PublishingFixtureBrowser(page)),
                     LocalAssetStore(tmp_path),
                 )
-                draft = await _prepared_draft(adapter, request)
-                drafts.append(draft)
-                results.append(await adapter.execute_post(draft))
+                command = await _action_command(adapter, request)
+                commands.append(command)
+                results.append(await adapter.perform_post(command))
                 await page.close()
         finally:
             await browser.close()
 
-    payloads = [draft.payload for draft in drafts]
-    assert all(isinstance(payload, PostCreatePayload) for payload in payloads)
-    assert [
-        len(payload.assets) for payload in payloads if isinstance(payload, PostCreatePayload)
-    ] == [3, 1, 0]
+    assert all(isinstance(command.payload, PostCreatePayload) for command in commands)
     assert all(result.outcome is ActionOutcome.VERIFIED for result in results)
     assert all(result.final_state.startswith("post_published:") for result in results)
 
@@ -423,9 +404,9 @@ async def test_celebration_event_hiring_and_expert_modes_follow_current_visible_
     (tmp_path / "event-cover.png").write_bytes(b"event-cover")
     start_at = datetime.now(UTC) + timedelta(days=2)
     requests = (
-        PostCreatePrepareInput(
+        PostCreateInput(
             context_id="publishing-context",
-            request_id="prepare-celebration-post",
+            request_id="action-celebration-post",
             content=CelebrationPostContent(
                 text="We shipped the reliability project.",
                 celebration_type=CelebrationType.PROJECT_LAUNCH,
@@ -434,9 +415,9 @@ async def test_celebration_event_hiring_and_expert_modes_follow_current_visible_
                 image_alt_text="Team celebrating a project launch",
             ),
         ),
-        PostCreatePrepareInput(
+        PostCreateInput(
             context_id="publishing-context",
-            request_id="prepare-event-post",
+            request_id="action-event-post",
             content=EventPostContent(
                 text="Join our reliability event.",
                 event_type=EventType.ONLINE,
@@ -457,9 +438,9 @@ async def test_celebration_event_hiring_and_expert_modes_follow_current_visible_
                 cover_alt_text="Reliable Systems Live cover",
             ),
         ),
-        PostCreatePrepareInput(
+        PostCreateInput(
             context_id="publishing-context",
-            request_id="prepare-hiring-post",
+            request_id="action-hiring-post",
             content=HiringPostContent(
                 text="We are hiring a Staff Engineer.",
                 company_name="Acme Cloud",
@@ -467,9 +448,9 @@ async def test_celebration_event_hiring_and_expert_modes_follow_current_visible_
                 job_title="Staff Engineer",
             ),
         ),
-        PostCreatePrepareInput(
+        PostCreateInput(
             context_id="publishing-context",
-            request_id="prepare-expert-request",
+            request_id="action-expert-request",
             content=ExpertRequestPostContent(
                 text="Looking for an expert to review our service design.",
                 category=ExpertRequestCategory.DESIGN,
@@ -480,7 +461,7 @@ async def test_celebration_event_hiring_and_expert_modes_follow_current_visible_
 
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
-        drafts: list[ActionDraft] = []
+        commands: list[ActionCommand] = []
         results: list[ActionPageResult] = []
         try:
             for request in requests:
@@ -489,23 +470,14 @@ async def test_celebration_event_hiring_and_expert_modes_follow_current_visible_
                     cast(BrowserManager, PublishingFixtureBrowser(page)),
                     LocalAssetStore(tmp_path),
                 )
-                draft = await _prepared_draft(adapter, request)
-                drafts.append(draft)
-                results.append(await adapter.execute_post(draft))
+                command = await _action_command(adapter, request)
+                commands.append(command)
+                results.append(await adapter.perform_post(command))
                 await page.close()
         finally:
             await browser.close()
 
-    assert [
-        tuple(asset.role.value for asset in draft.payload.assets)
-        for draft in drafts
-        if isinstance(draft.payload, PostCreatePayload)
-    ] == [
-        ("celebration_image",),
-        ("event_cover_image",),
-        (),
-        (),
-    ]
+    assert all(isinstance(command.payload, PostCreatePayload) for command in commands)
     assert all(result.outcome is ActionOutcome.VERIFIED for result in results)
     assert all(result.final_state.startswith("post_published:") for result in results)
 
@@ -514,9 +486,9 @@ async def test_celebration_event_hiring_and_expert_modes_follow_current_visible_
 async def test_group_brand_partnership_and_collaborators_are_exactly_bound(
     tmp_path: Path,
 ) -> None:
-    request = PostCreatePrepareInput(
+    request = PostCreateInput(
         context_id="publishing-context",
-        request_id="prepare-group-collaboration-post",
+        request_id="action-group-collaboration-post",
         content=TextPostContent(text="A precisely targeted fixture post."),
         audience=PostAudience.GROUP,
         group_target=PostGroupTarget(
@@ -525,9 +497,9 @@ async def test_group_brand_partnership_and_collaborators_are_exactly_bound(
         ),
         brand_partnership=False,
     )
-    collaborative = PostCreatePrepareInput(
+    collaborative = PostCreateInput(
         context_id="publishing-context",
-        request_id="prepare-public-collaboration-post",
+        request_id="action-public-collaboration-post",
         content=TextPostContent(text="A public collaborative fixture post."),
         brand_partnership=True,
         collaborators=(
@@ -545,25 +517,25 @@ async def test_group_brand_partnership_and_collaborators_are_exactly_bound(
         browser = await playwright.chromium.launch(headless=True)
         try:
             results: list[ActionPageResult] = []
-            drafts: list[ActionDraft] = []
+            commands: list[ActionCommand] = []
             for item in (request, collaborative):
                 page = await browser.new_page()
                 adapter = PostPublishingPage(
                     cast(BrowserManager, PublishingFixtureBrowser(page)),
                     LocalAssetStore(tmp_path),
                 )
-                draft = await _prepared_draft(adapter, item)
-                drafts.append(draft)
-                results.append(await adapter.execute_post(draft))
+                command = await _action_command(adapter, item)
+                commands.append(command)
+                results.append(await adapter.perform_post(command))
                 await page.close()
         finally:
             await browser.close()
 
-    assert isinstance(drafts[0].payload, PostCreatePayload)
-    assert drafts[0].payload.group_target == request.group_target
-    assert isinstance(drafts[1].payload, PostCreatePayload)
-    assert drafts[1].payload.brand_partnership is True
-    assert drafts[1].payload.collaborators == collaborative.collaborators
+    assert isinstance(commands[0].payload, PostCreatePayload)
+    assert commands[0].payload.group_target == request.group_target
+    assert isinstance(commands[1].payload, PostCreatePayload)
+    assert commands[1].payload.brand_partnership is True
+    assert commands[1].payload.collaborators == collaborative.collaborators
     assert all(result.outcome is ActionOutcome.VERIFIED for result in results)
 
 
@@ -571,18 +543,18 @@ async def test_group_brand_partnership_and_collaborators_are_exactly_bound(
 async def test_link_preview_removal_and_scheduling_have_visible_postconditions(
     tmp_path: Path,
 ) -> None:
-    immediate = PostCreatePrepareInput(
+    immediate = PostCreateInput(
         context_id="publishing-context",
-        request_id="prepare-link-post",
+        request_id="action-link-post",
         content=TextPostContent(
             text="Read https://example.com/guide",
             link_url=HttpUrl("https://example.com/guide"),
             show_link_preview=False,
         ),
     )
-    scheduled = PostCreatePrepareInput(
+    scheduled = PostCreateInput(
         context_id="publishing-context",
-        request_id="prepare-scheduled-post",
+        request_id="action-scheduled-post",
         content=TextPostContent(text="A scheduled fixture post"),
         scheduled_at=datetime.now(UTC) + timedelta(days=1),
     )
@@ -597,7 +569,7 @@ async def test_link_preview_removal_and_scheduling_have_visible_postconditions(
                     cast(BrowserManager, PublishingFixtureBrowser(page)),
                     LocalAssetStore(tmp_path),
                 )
-                results.append(await adapter.execute_post(await _prepared_draft(adapter, request)))
+                results.append(await adapter.perform_post(await _action_command(adapter, request)))
                 await page.close()
         finally:
             await browser.close()
@@ -608,7 +580,7 @@ async def test_link_preview_removal_and_scheduling_have_visible_postconditions(
     assert "Post scheduled" in results[1].captured_text
 
 
-async def test_asset_store_rejects_traversal_type_drift_and_changed_bytes(
+async def test_asset_store_uses_current_file_and_rejects_wrong_type(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "safe.png").write_bytes(b"first")
@@ -618,25 +590,66 @@ async def test_asset_store_rejects_traversal_type_drift_and_changed_bytes(
         text="Safe asset",
         images=(PostImageInput(asset_ref="safe.png"),),
     )
-    prepared = await store.prepare(content)
-    payload = PostCreatePayload(
-        content=content,
-        audience=PostAudience.ANYONE,
-        comment_control=PostCommentControl.ANYONE,
-        assets=prepared,
-    )
-    assert (await store.verify(payload))["safe.png"] == tmp_path / "safe.png"
+    assert (await store.resolve_post(content))["safe.png"] == tmp_path / "safe.png"
 
     (tmp_path / "safe.png").write_bytes(b"changed")
-    with pytest.raises(InvalidTargetError, match="changed after confirmation"):
-        await store.verify(payload)
+    assert (await store.resolve_post(content))["safe.png"] == tmp_path / "safe.png"
     with pytest.raises(InvalidTargetError, match="file type"):
-        await store.prepare(
+        await store.resolve_post(
             ImagePostContent(
                 text="Wrong type",
                 images=(PostImageInput(asset_ref="notes.txt"),),
             )
         )
+
+
+async def test_asset_store_rejects_unsafe_or_unavailable_files(tmp_path: Path) -> None:
+    store = LocalAssetStore(tmp_path)
+
+    def image_content(asset_ref: str) -> ImagePostContent:
+        return ImagePostContent(
+            text="Attachment boundary",
+            images=(PostImageInput(asset_ref=asset_ref),),
+        )
+
+    (tmp_path / "empty.png").touch()
+    with pytest.raises(InvalidTargetError, match="asset size"):
+        await store.resolve_post(image_content("empty.png"))
+
+    with pytest.raises(InvalidTargetError, match="safe relative paths"):
+        await store.resolve_post(image_content("nested/../escape.png"))
+
+    with pytest.raises(InvalidTargetError, match="unavailable"):
+        await store.resolve_post(image_content("missing.png"))
+
+    (tmp_path / "folder.png").mkdir()
+    with pytest.raises(InvalidTargetError, match="regular files"):
+        await store.resolve_post(image_content("folder.png"))
+
+    outside = tmp_path.parent / f"{tmp_path.name}-outside.png"
+    outside.write_bytes(b"outside")
+    (tmp_path / "outside.png").symlink_to(outside)
+    with pytest.raises(InvalidTargetError, match="regular files"):
+        await store.resolve_post(image_content("outside.png"))
+
+
+async def test_asset_store_handles_content_without_optional_local_assets(tmp_path: Path) -> None:
+    video = tmp_path / "video.mp4"
+    video.write_bytes(b"v" * (75 * 1024))
+    store = LocalAssetStore(tmp_path)
+
+    assert await store.resolve_post(VideoPostContent(text="Video", video_asset_ref=video.name)) == {
+        video.name: video
+    }
+    assert (
+        await store.resolve_post(
+            CelebrationPostContent(
+                text="Celebration",
+                celebration_type=CelebrationType.PROJECT_LAUNCH,
+            )
+        )
+        == {}
+    )
 
 
 def test_post_create_contract_rejects_ambiguous_or_unverifiable_options() -> None:
@@ -658,21 +671,21 @@ def test_post_create_contract_rejects_ambiguous_or_unverifiable_options() -> Non
             options=("One", "one"),
         )
     with pytest.raises(ValidationError, match="timezone"):
-        PostCreatePrepareInput(
+        PostCreateInput(
             context_id="publishing-context",
             request_id="naive-schedule",
             content=TextPostContent(text="Schedule"),
             scheduled_at=datetime.now(),  # noqa: DTZ005 - intentionally naive validation case
         )
     with pytest.raises(ValidationError, match="group_target"):
-        PostCreatePrepareInput(
+        PostCreateInput(
             context_id="publishing-context",
             request_id="group-without-target",
             content=TextPostContent(text="Group post"),
             audience=PostAudience.GROUP,
         )
     with pytest.raises(ValidationError, match="Anyone"):
-        PostCreatePrepareInput(
+        PostCreateInput(
             context_id="publishing-context",
             request_id="private-brand-post",
             content=TextPostContent(text="Brand post"),
@@ -680,7 +693,7 @@ def test_post_create_contract_rejects_ambiguous_or_unverifiable_options() -> Non
             brand_partnership=True,
         )
     with pytest.raises(ValidationError, match="does not schedule"):
-        PostCreatePrepareInput(
+        PostCreateInput(
             context_id="publishing-context",
             request_id="scheduled-hiring-post",
             content=HiringPostContent(

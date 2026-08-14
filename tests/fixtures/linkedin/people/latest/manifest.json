@@ -65,7 +65,6 @@
   ],
   "profile_detail_behaviors": [
     "current experience cards with title, standalone employment type, date range, and description lines",
-    "legacy experience cards with combined organization and employment type plus a visible location",
     "current skill cards bound through an exact accessible Endorse control",
     "About expansion and Top skills UI suffix exclusion",
     "roleless profile-detail LazyColumn entity cards",

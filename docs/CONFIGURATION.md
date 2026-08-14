@@ -1,60 +1,45 @@
 # Configuration
 
 LinkedIn MCP Server is configured with environment variables using the
-`LINKEDIN_MCP_` prefix. The standard package configuration enables every
-currently implemented capability. Actions that change LinkedIn still use the
-prepare, client-approval-policy, and execute flow described in
-[Security](SECURITY.md).
+`LINKEDIN_MCP_` prefix. The package registers every currently implemented
+typed capability. Actions that change LinkedIn are single-call tools; the MCP
+client decides which tools are exposed and whether a destructive call requires
+confirmation.
 
 For `uvx` installations, put environment variables in the MCP client's server
 entry. A source checkout can also use an uncommitted `.env` file based on
-[`.env.example`](../.env.example). Values for surfaces, scopes, and effects are
-JSON arrays encoded as strings.
+[`.env.example`](../.env.example).
 
-## Authorization model
+## Tool availability
 
-A capability is enabled only when all four checks pass:
+The server does not maintain capability scopes, effect allowlists, or per-tool
+authorization records. `linkedin.capabilities.list` reports the complete
+installed capability set and its read/write effect plus required visible UI
+surfaces. Those surfaces document implementation boundaries; they are not
+operator permissions.
 
-1. the capability is registered by this server version;
-2. every required visible LinkedIn surface is allowed;
-3. every required named scope is allowed; and
-4. its `read`, `prepare`, or `write` effect is allowed.
+Enable, disable, or restrict tools in the MCP client. If a client makes a tool
+available and invokes it, the server treats that invocation as authorized for
+the configured LinkedIn account. The server still validates typed input,
+canonical targets, LinkedIn authentication, exact visible preconditions,
+attachment path/type/size validation, bounded execution, and visible postconditions.
 
-Client approval settings and tool annotations do not grant server permissions. Use
-`linkedin.capabilities.list` to see which installed tools are enabled and why
-another tool is disabled.
+## Client tool policy
 
-## Default capabilities
+Read tools are annotated read-only. The seven account-changing tools are
+annotated destructive:
 
-No permission environment variables are needed for a normal installation. The
-defaults cover every currently implemented surface and scope:
+- `linkedin.posts.create`
+- `linkedin.posts.comment`
+- `linkedin.posts.react`
+- `linkedin.invitations.send`
+- `linkedin.invitations.accept`
+- `linkedin.invitations.ignore`
+- `linkedin.messaging.send`
 
-```text
-surfaces: all currently implemented LinkedIn surfaces
-scopes:   all currently implemented capability scopes
-effects:  read, prepare, write
-```
-
-`linkedin.capabilities.list` therefore reports every installed capability as
-enabled. Execute tools remain destructive MCP operations and request interactive
-confirmation by default. A user may explicitly pre-approve an individual
-execute tool in the MCP client without changing server scopes or safeguards.
-
-## Client approval policy
-
-Tool availability and tool approval are separate:
-
-- server surfaces, scopes, and effects decide whether a capability is available;
-- MCP tool annotations request confirmation for account-changing execute tools;
-- the MCP client's durable configuration decides whether to prompt, reject, or
-  pre-approve a particular tool; and
-- an agent cannot broaden either the server authorization or client approval
-  policy through chat or tool arguments.
-
-Interactive confirmation is the safe default. Prepare tools may inspect and
-return an immutable draft but never perform the final LinkedIn action. Execute
-tools remain hash-locked, idempotent, and visibly revalidated regardless of the
-client's approval mode.
+Tool annotations are hints to the client, not a server-side approval protocol.
+The client's durable configuration decides whether to prompt, reject, or
+pre-approve a tool. Chat text does not change that configuration.
 
 Codex installations can make the default explicit:
 
@@ -72,47 +57,16 @@ Codex accepts these server-wide or per-tool modes:
 | `writes` | Ask for tools not marked read-only. |
 | `approve` | Treat the configured server or exact tool as pre-approved. |
 
-For an unattended recurring publisher, pre-approve only post execution:
+For an unattended recurring publisher, pre-approve only the direct post tool:
 
 ```toml
-[mcp_servers."linkedin-mcp".tools."linkedin.posts.create.execute"]
+[mcp_servers."linkedin-mcp".tools."linkedin.posts.create"]
 approval_mode = "approve"
 ```
 
-The scheduled run still calls `linkedin.posts.create.prepare` first and copies
-its exact `action_id`, `payload_hash`, and `approval_preview` into execute. Do
-not set the whole server to `approve` unless every available LinkedIn action is
-intentionally authorized for unattended use. Other MCP clients may expose the
-same choice through their own tool-permission interface.
-
-## Optional restriction presets
-
-Only add one of these `env` objects when you want to restrict the local server.
-
-### Read-only access
-
-```json
-"env": {
-  "LINKEDIN_MCP_ALLOWED_SURFACES": "[\"job-search\",\"job-detail\",\"people-search\",\"member-profile\",\"company-search\",\"company-profile\",\"company-about\",\"content-search\",\"post-detail\",\"post-discussion\",\"connections\",\"messaging\"]",
-  "LINKEDIN_MCP_ALLOWED_SCOPES": "[\"linkedin.jobs.search\",\"linkedin.jobs.read\",\"linkedin.people.search\",\"linkedin.people.read\",\"linkedin.companies.search\",\"linkedin.companies.read\",\"linkedin.posts.search\",\"linkedin.posts.read\",\"linkedin.posts.comments.read\",\"linkedin.invitations.read\",\"linkedin.connections.read\",\"linkedin.messaging.read\"]",
-  "LINKEDIN_MCP_ALLOWED_EFFECTS": "[\"read\"]"
-}
-```
-
-### Jobs and People only
-
-```json
-"env": {
-  "LINKEDIN_MCP_ALLOWED_SURFACES": "[\"job-search\",\"job-detail\",\"people-search\",\"member-profile\"]",
-  "LINKEDIN_MCP_ALLOWED_SCOPES": "[\"linkedin.jobs.search\",\"linkedin.jobs.read\",\"linkedin.people.search\",\"linkedin.people.read\"]",
-  "LINKEDIN_MCP_ALLOWED_EFFECTS": "[\"read\"]"
-}
-```
-
-You can also create a custom subset. `linkedin.capabilities.list` returns each
-capability's exact surface, scope, and effect requirements. The
-[capability matrix](CAPABILITY_MATRIX.md) describes the corresponding visible
-feature contracts.
+Do not approve the whole server unless every available action is intentionally
+authorized for unattended use. Other MCP clients expose equivalent controls
+through their own tool-permission interface.
 
 ## Settings reference
 
@@ -126,9 +80,6 @@ feature contracts.
 | `AUTO_LOGIN_ON_START` | `true` | Validate or recover login after MCP initialization |
 | `ASSET_ROOT_PATH` | per-user application data | Only local files below this directory may be attached |
 | `ALLOWED_HOSTS` | exact LinkedIn hosts | Navigation hostname allowlist |
-| `ALLOWED_SURFACES` | all implemented surfaces | Authorized visible LinkedIn UI surfaces |
-| `ALLOWED_SCOPES` | all implemented scopes | Authorized named capability scopes |
-| `ALLOWED_EFFECTS` | `read`, `prepare`, `write` | Authorized effect classes |
 | `QUEUE_CAPACITY` | `100` | Maximum waiting process-local capability calls |
 | `MINIMUM_NAVIGATION_INTERVAL_SECONDS` | `2` | Minimum internal delay between navigations |
 | `JOB_SEARCH_MAX_PAGES_PER_CALL` | `100` | Private job-search traversal safety bound |
@@ -143,7 +94,6 @@ feature contracts.
 | `PAGINATION_CURSOR_TTL_SECONDS` | `900` | Idle lifetime of a process-local continuation cursor |
 | `PAGINATION_MAX_ACTIVE_CURSORS` | `64` | Maximum active cursor states |
 | `PAGINATION_MAX_SEEN_ITEMS_PER_CURSOR` | `5000` | Stable identities retained by one live scan |
-| `ACTION_DRAFT_TTL_SECONDS` | `86400` | Maximum age of an unexecuted in-process draft |
 | `RUNTIME_LOCK_PATH` | per-user application data | Shared-runtime election and owner metadata file |
 | `RUNTIME_START_TIMEOUT_SECONDS` | `30` | Maximum wait for the elected shared runtime to become healthy |
 | `BROWSER_HEADLESS` | `true` | Capability browsing mode; human login remains headed |
@@ -211,8 +161,8 @@ separate accounts distinct profile and lock paths.
 
 Posts, comments, and messages never accept an arbitrary desktop path. Place an
 attachment below `LINKEDIN_MCP_ASSET_ROOT_PATH` and pass its relative
-`asset_ref`. Preparation records the file's media type, size, and SHA-256; the
-execute call must reference the same unchanged file.
+`asset_ref`. The action resolves that current file directly when it uploads,
+after checking its safe path, supported extension, and LinkedIn size limit.
 
 ## Transports
 
@@ -233,8 +183,8 @@ so other clients and queued work continue. Use `linkedin-mcp status` and
 The bridge keeps stdout reserved for MCP protocol messages. All clients that
 share an account must use the same effective runtime settings. The lock stores
 only a SHA-256 configuration fingerprint, so a later client fails safely
-instead of silently inheriting different profiles, permissions, browser
-behavior, pacing, or transport settings.
+instead of silently inheriting different profiles, browser behavior, pacing,
+or transport settings.
 
 ### Loopback Streamable HTTP
 
@@ -251,15 +201,16 @@ does not implement HTTP authentication.
 
 ## Process-local state
 
-Calls, evidence, request replay, action drafts, attempts, idempotency keys,
-queue state, and continuation cursors exist only in shared-runtime memory. A
-runtime restart clears them; disconnecting one client does not. Request replay,
-cursors, and prepared actions belong to the MCP session that created them,
-while execution idempotency keys remain account-wide. The persistent browser
-profile, managed browser cache, and explicitly selected local assets survive.
+Read-call replay, evidence, queue state, and continuation cursors exist only in
+shared-runtime memory. A runtime restart clears them; disconnecting one client
+does not. Read request identity and cursors belong to the MCP session that
+created them. Account-changing calls are deliberately new actions on every
+invocation and are not replayed or deduplicated by the server. The persistent
+browser profile, managed browser cache, and explicitly selected local assets
+survive.
 
-After a hard interruption during a write, inspect LinkedIn's visible state
-before preparing another action. Never blindly retry an old execute request.
+After an uncertain or hard-interrupted action, inspect LinkedIn's visible state
+before invoking the tool again. Never blindly retry an account-changing call.
 See the [security design](SECURITY.md) for the complete lifecycle.
 
 ## Container image

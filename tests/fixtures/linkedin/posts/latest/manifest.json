@@ -11,7 +11,7 @@
   "contains_live_data": false,
   "contains_authentication_state": false,
   "personal_post_creation_contract": {
-    "fixture": "../personal-post-composer.html",
+    "fixture": "composer.html",
     "actor": "personal member only",
     "modes": [
       "text",
@@ -52,7 +52,7 @@
     "company_page_publishing": false
   },
   "engagement_contract": {
-    "fixture": "../post-engagement.html",
+    "fixture": "engagement.html",
     "comment_controls": [
       "Show Emoji Picker",
       "Open GIF picker",

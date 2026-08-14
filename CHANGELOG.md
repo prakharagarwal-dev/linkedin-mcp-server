@@ -8,14 +8,29 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- Remove account-changing threaded comment replies from
-  `linkedin.posts.comment.prepare` and `linkedin.posts.comment.execute`. These
-  tools now create top-level post comments only; read-only discussion results
-  continue to include visible replies and their exact parent references.
-- Limit `linkedin.posts.reaction.prepare` and
-  `linkedin.posts.reaction.execute` to exact posts. Comment reaction counts
-  remain available through read-only post discussions, but setting reactions
-  on comments is no longer exposed.
+- Replace the fourteen public prepare/execute tools with seven direct atomic
+  action tools: `linkedin.posts.create`, `linkedin.posts.comment`,
+  `linkedin.posts.react`, `linkedin.invitations.send`,
+  `linkedin.invitations.accept`, `linkedin.invitations.ignore`, and
+  `linkedin.messaging.send`.
+- Remove server capability scopes, effect allowlists, draft previews, action
+  IDs, write idempotency keys, and write replay. MCP clients now own tool
+  availability and approval; the server retains exact visible target/state
+  inspection, attachment path/type/size checks, pacing, bounded execution, terminal
+  postcondition verification, and immutable evidence.
+- Limit `linkedin.posts.comment` to top-level post comments. Read-only
+  discussion results continue to include visible replies and their exact parent
+  references.
+- Limit `linkedin.posts.react` to exact posts. Comment reaction counts remain
+  available through read-only post discussions, but setting reactions on
+  comments is no longer exposed.
+- Consolidate accumulated action lifecycle tests into current atomic protocol,
+  worker, executor, simulator, and workflow coverage while retaining the latest
+  semantic page fixtures and safety cases.
+- Remove deprecated pagination, title-keyword, and image-tag aliases, unused
+  dependencies and helpers, stale publishing-status documentation, and legacy
+  runtime-lock parsing. Reorganize fixtures and documentation around the
+  current public contract.
 
 ### Fixed
 

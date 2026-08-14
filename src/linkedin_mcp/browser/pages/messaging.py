@@ -25,10 +25,10 @@ from linkedin_mcp.browser.convergence import (
 )
 from linkedin_mcp.browser.manager import BrowserManager
 from linkedin_mcp.domain.models import (
-    ActionDraft,
+    ActionCommand,
+    ActionInspection,
     ActionOutcome,
     ActionPageResult,
-    ActionPreparationCapture,
     ActionTarget,
     ConversationCategory,
     ConversationCoverage,
@@ -43,9 +43,8 @@ from linkedin_mcp.domain.models import (
     MessageDirection,
     MessageGifInput,
     MessageObservation,
-    MessagePrepareInput,
+    MessageSendInput,
     MessageSendPayload,
-    PreparedPostAsset,
     StopReason,
 )
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
@@ -1196,10 +1195,10 @@ class ConversationPage:
                 max_messages=request.max_messages,
             )
 
-    async def prepare_message(
+    async def inspect_message(
         self,
-        request: MessagePrepareInput,
-    ) -> ActionPreparationCapture:
+        request: MessageSendInput,
+    ) -> ActionInspection:
         async with self._browser.page() as page:
             page, root, profile_slug, name, is_group = await self._open(
                 page,
@@ -1232,7 +1231,7 @@ class ConversationPage:
                 if conversation_id
                 else canonical_profile_url(profile_slug)
             )
-            return ActionPreparationCapture(
+            return ActionInspection(
                 target=ActionTarget(
                     profile_slug=profile_slug,
                     profile_url=HttpUrl(canonical_profile_url(profile_slug)),
@@ -1265,38 +1264,28 @@ class ConversationPage:
                 captured_at=datetime.now(UTC),
             )
 
-    async def prepare_message_assets(
-        self,
-        request: MessagePrepareInput,
-    ) -> tuple[PreparedPostAsset, ...]:
-        if not request.attachments:
-            return ()
-        if self._assets is None:
-            raise InvalidTargetError(
-                "Message attachments require the configured local asset store."
-            )
-        return await self._assets.prepare_message(request)
-
-    async def execute_message(self, draft: ActionDraft) -> ActionPageResult:
-        if not isinstance(draft.payload, MessageSendPayload):
+    async def perform_message(self, command: ActionCommand) -> ActionPageResult:
+        if not isinstance(command.payload, MessageSendPayload):
             raise InvalidTargetError("The message action payload is invalid.")
-        payload = draft.payload
+        payload = command.payload
         paths: dict[str, Path] = {}
-        if payload.assets:
+        if payload.attachment_refs:
             if self._assets is None:
                 raise InvalidTargetError(
                     "Message attachments require the configured local asset store."
                 )
-            paths = await self._assets.verify_assets(payload.assets)
+            paths = await self._assets.resolve_message(payload.attachment_refs)
         async with self._browser.page() as page:
             page, root, profile_slug, name, is_group = await self._open(
                 page,
-                profile_slug=(None if draft.target.conversation_id else draft.target.profile_slug),
-                conversation_id=draft.target.conversation_id,
+                profile_slug=(
+                    None if command.target.conversation_id else command.target.profile_slug
+                ),
+                conversation_id=command.target.conversation_id,
                 conversation_ref=None,
             )
-            mismatch = self._confirmed_target_mismatch(
-                draft.target,
+            mismatch = self._inspected_target_mismatch(
+                command.target,
                 opened_conversation_id=conversation_id_from_url(page.url),
                 visible_profile_slug=profile_slug,
                 visible_name=name,
@@ -1304,17 +1293,17 @@ class ConversationPage:
             )
             if (
                 mismatch == "display_name_changed"
-                and draft.target.conversation_id is not None
+                and command.target.conversation_id is not None
                 and profile_slug is None
             ):
                 page, root, profile_slug, name, is_group = await self._open(
                     page,
-                    profile_slug=draft.target.profile_slug,
+                    profile_slug=command.target.profile_slug,
                     conversation_id=None,
                     conversation_ref=None,
                 )
-                mismatch = self._confirmed_target_mismatch(
-                    draft.target.model_copy(update={"conversation_id": None}),
+                mismatch = self._inspected_target_mismatch(
+                    command.target.model_copy(update={"conversation_id": None}),
                     opened_conversation_id=conversation_id_from_url(page.url),
                     visible_profile_slug=profile_slug,
                     visible_name=name,
@@ -1328,7 +1317,7 @@ class ConversationPage:
                     False,
                     "target_identity_changed",
                     (
-                        "The visible one-to-one conversation no longer matches the confirmed "
+                        "The visible one-to-one conversation no longer matches the requested "
                         f"target ({mismatch})."
                     ),
                 )
@@ -1369,7 +1358,7 @@ class ConversationPage:
                         ActionOutcome.FAILED,
                         False,
                         "message_too_long",
-                        "The confirmed message exceeds LinkedIn's current visible field limit.",
+                        "The requested message exceeds LinkedIn's current visible field limit.",
                     )
             before = await self._matching_payload_count(
                 page,
@@ -1436,7 +1425,7 @@ class ConversationPage:
                         True,
                         "message_sent",
                         (
-                            "The exact confirmed message content newly appeared in visible "
+                            "The exact requested message content newly appeared in visible "
                             "outgoing history."
                         ),
                     )
@@ -1455,13 +1444,13 @@ class ConversationPage:
                 None,
                 "message_outcome_unknown",
                 (
-                    "The same visible conversation overlay did not gain the exact confirmed "
+                    "The same visible conversation overlay did not gain the exact requested "
                     "outgoing payload within the verification bound."
                 ),
             )
 
     @staticmethod
-    def _confirmed_target_mismatch(
+    def _inspected_target_mismatch(
         target: ActionTarget,
         *,
         opened_conversation_id: str | None,
@@ -1527,7 +1516,7 @@ class ConversationPage:
                     ActionOutcome.VERIFIED,
                     True,
                     "message_sent",
-                    "The exact confirmed GIF newly appeared in visible outgoing history.",
+                    "The exact requested GIF newly appeared in visible outgoing history.",
                 )
             await page.wait_for_timeout(250)
         return await self._result(
@@ -1536,13 +1525,13 @@ class ConversationPage:
             ActionOutcome.UNCERTAIN,
             None,
             "message_outcome_unknown",
-            "The confirmed GIF did not gain a new visible bubble within the verification bound.",
+            "The requested GIF did not gain a new visible bubble within the verification bound.",
         )
 
     async def _validate_attachment_controls(
         self,
         root: Locator,
-        request: MessagePrepareInput,
+        request: MessageSendInput,
     ) -> None:
         for attachment in request.attachments:
             await self._attachment_input(root, attachment.asset_ref)
@@ -1654,7 +1643,7 @@ class ConversationPage:
             path = paths.get(asset_ref)
             if path is None:
                 raise InvalidTargetError(
-                    f"The confirmed message attachment {asset_ref!r} was not verified."
+                    f"The requested message attachment {asset_ref!r} was not verified."
                 )
             upload = await self._attachment_input(root, asset_ref)
             await upload.set_input_files(str(path))
@@ -1731,7 +1720,7 @@ class ConversationPage:
             if result is not None:
                 return result
         raise InvalidTargetError(
-            "The confirmed GIF search did not produce one unique exact visible result "
+            "The requested GIF search did not produce one unique exact visible result "
             "within the bounded current-result wait."
         )
 
@@ -1753,7 +1742,7 @@ class ConversationPage:
                     candidates.append(control)
         if len(candidates) > 1:
             raise InvalidTargetError(
-                "The confirmed GIF search produced multiple exact visible results."
+                "The requested GIF search produced multiple exact visible results."
             )
         if candidates:
             return candidates[0]
@@ -1765,7 +1754,7 @@ class ConversationPage:
         ]
         if len(visible_images) > 1:
             raise InvalidTargetError(
-                "The confirmed GIF search produced multiple exact visible result images."
+                "The requested GIF search produced multiple exact visible result images."
             )
         if visible_images:
             return visible_images[0]
@@ -1791,7 +1780,7 @@ class ConversationPage:
                 title_matches.append(result)
         if len(title_matches) > 1:
             raise InvalidTargetError(
-                "The confirmed GIF search produced multiple exact visible results."
+                "The requested GIF search produced multiple exact visible results."
             )
         return title_matches[0] if title_matches else None
 
@@ -2360,10 +2349,6 @@ class ConversationPage:
         )
 
     @staticmethod
-    def _recipient_name_matches(visible_name: str, expected_name: str) -> bool:
-        return _visible_name_matches(visible_name, expected_name)
-
-    @staticmethod
     async def _conversation_root(page: Page) -> Locator:
         dialogs = page.get_by_role("dialog")
         for index in range(await dialogs.count()):
@@ -2598,15 +2583,6 @@ class ConversationPage:
             previous_time = sent_at
             previous_direction = direction
         return tuple(messages)
-
-    @staticmethod
-    async def _message_body_count(root: Locator, text: str) -> int:
-        bodies = root.locator('[class*="event-listitem__body"],[data-test-message-body]')
-        count = 0
-        for index in range(await bodies.count()):
-            if (await bodies.nth(index).inner_text()).strip() == text:
-                count += 1
-        return count
 
     @staticmethod
     async def _composer_value(composer: Locator) -> str:

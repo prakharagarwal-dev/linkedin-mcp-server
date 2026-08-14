@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from dataclasses import dataclass
@@ -16,9 +17,7 @@ from linkedin_mcp.application.pagination import PaginationLease, PaginationManag
 from linkedin_mcp.application.scheduler import FairClientScheduler, SchedulerClosedError
 from linkedin_mcp.domain.evidence import canonical_input_fingerprint
 from linkedin_mcp.domain.models import (
-    ActionExecuteInput,
-    ActionExecuteOutput,
-    ActionPrepareOutput,
+    ActionOutput,
     CapabilityName,
     CompanyGetInput,
     CompanyGetOutput,
@@ -32,28 +31,28 @@ from linkedin_mcp.domain.models import (
     ConversationGetOutput,
     ConversationSearchInput,
     ConversationSearchOutput,
-    InvitationAcceptPrepareInput,
-    InvitationIgnorePrepareInput,
+    InvitationAcceptInput,
+    InvitationIgnoreInput,
     InvitationListInput,
     InvitationListOutput,
-    InvitationSendPrepareInput,
+    InvitationSendInput,
     JobDetailInput,
     JobDetailOutput,
     JobSearchInput,
     JobSearchOutput,
-    MessagePrepareInput,
+    MessageSendInput,
     PaginatedInput,
     PeopleGetInput,
     PeopleGetOutput,
     PeopleSearchInput,
     PeopleSearchOutput,
-    PostCommentPrepareInput,
+    PostCommentInput,
     PostCommentsListInput,
     PostCommentsListOutput,
-    PostCreatePrepareInput,
+    PostCreateInput,
     PostGetInput,
     PostGetOutput,
-    PostReactionPrepareInput,
+    PostReactionInput,
     PostSearchInput,
     PostSearchOutput,
 )
@@ -73,19 +72,18 @@ CapabilityRequest = (
     | PostSearchInput
     | PostGetInput
     | PostCommentsListInput
-    | PostCreatePrepareInput
-    | PostCommentPrepareInput
-    | PostReactionPrepareInput
+    | PostCreateInput
+    | PostCommentInput
+    | PostReactionInput
     | InvitationListInput
     | ConnectionsListInput
     | ConnectionsSearchInput
     | ConversationSearchInput
     | ConversationGetInput
-    | InvitationSendPrepareInput
-    | InvitationAcceptPrepareInput
-    | InvitationIgnorePrepareInput
-    | MessagePrepareInput
-    | ActionExecuteInput
+    | InvitationSendInput
+    | InvitationAcceptInput
+    | InvitationIgnoreInput
+    | MessageSendInput
 )
 CapabilityOutput = (
     JobSearchOutput
@@ -102,8 +100,7 @@ CapabilityOutput = (
     | ConnectionsSearchOutput
     | ConversationSearchOutput
     | ConversationGetOutput
-    | ActionPrepareOutput
-    | ActionExecuteOutput
+    | ActionOutput
 )
 WorkKey = tuple[str, CapabilityName, str]
 ProgressReporter = Callable[[int, int, str], Awaitable[None]]
@@ -165,69 +162,19 @@ class CapabilityRunner(Protocol):
         request: ConversationGetInput,
     ) -> ConversationGetOutput: ...
 
-    async def prepare_invitation_send(
-        self,
-        request: InvitationSendPrepareInput,
-    ) -> ActionPrepareOutput: ...
+    async def send_invitation(self, request: InvitationSendInput) -> ActionOutput: ...
 
-    async def prepare_invitation_accept(
-        self,
-        request: InvitationAcceptPrepareInput,
-    ) -> ActionPrepareOutput: ...
+    async def accept_invitation(self, request: InvitationAcceptInput) -> ActionOutput: ...
 
-    async def prepare_invitation_ignore(
-        self,
-        request: InvitationIgnorePrepareInput,
-    ) -> ActionPrepareOutput: ...
+    async def ignore_invitation(self, request: InvitationIgnoreInput) -> ActionOutput: ...
 
-    async def prepare_message(self, request: MessagePrepareInput) -> ActionPrepareOutput: ...
+    async def send_message(self, request: MessageSendInput) -> ActionOutput: ...
 
-    async def prepare_post_create(
-        self,
-        request: PostCreatePrepareInput,
-    ) -> ActionPrepareOutput: ...
+    async def create_post(self, request: PostCreateInput) -> ActionOutput: ...
 
-    async def prepare_post_comment(
-        self,
-        request: PostCommentPrepareInput,
-    ) -> ActionPrepareOutput: ...
+    async def comment_on_post(self, request: PostCommentInput) -> ActionOutput: ...
 
-    async def prepare_post_reaction(
-        self,
-        request: PostReactionPrepareInput,
-    ) -> ActionPrepareOutput: ...
-
-    async def execute_invitation_send(
-        self,
-        request: ActionExecuteInput,
-    ) -> ActionExecuteOutput: ...
-
-    async def execute_invitation_accept(
-        self,
-        request: ActionExecuteInput,
-    ) -> ActionExecuteOutput: ...
-
-    async def execute_invitation_ignore(
-        self,
-        request: ActionExecuteInput,
-    ) -> ActionExecuteOutput: ...
-
-    async def execute_message(self, request: ActionExecuteInput) -> ActionExecuteOutput: ...
-
-    async def execute_post_create(
-        self,
-        request: ActionExecuteInput,
-    ) -> ActionExecuteOutput: ...
-
-    async def execute_post_comment(
-        self,
-        request: ActionExecuteInput,
-    ) -> ActionExecuteOutput: ...
-
-    async def execute_post_reaction(
-        self,
-        request: ActionExecuteInput,
-    ) -> ActionExecuteOutput: ...
+    async def react_to_post(self, request: PostReactionInput) -> ActionOutput: ...
 
 
 @dataclass(slots=True)
@@ -257,21 +204,21 @@ def _observe_future(future: asyncio.Future[CapabilityOutput]) -> None:
     future.exception()
 
 
-_EXECUTE_CAPABILITIES = frozenset(
+_WRITE_CAPABILITIES = frozenset(
     {
-        CapabilityName.INVITATION_SEND_EXECUTE,
-        CapabilityName.INVITATION_ACCEPT_EXECUTE,
-        CapabilityName.INVITATION_IGNORE_EXECUTE,
-        CapabilityName.MESSAGING_MESSAGE_EXECUTE,
-        CapabilityName.POSTS_CREATE_EXECUTE,
-        CapabilityName.POST_COMMENT_EXECUTE,
-        CapabilityName.POST_REACTION_EXECUTE,
+        CapabilityName.INVITATION_SEND,
+        CapabilityName.INVITATION_ACCEPT,
+        CapabilityName.INVITATION_IGNORE,
+        CapabilityName.MESSAGING_SEND,
+        CapabilityName.POSTS_CREATE,
+        CapabilityName.POST_COMMENT,
+        CapabilityName.POST_REACT,
     }
 )
 
 
-def _is_execute_capability(capability_name: CapabilityName) -> bool:
-    return capability_name in _EXECUTE_CAPABILITIES
+def _is_write_capability(capability_name: CapabilityName) -> bool:
+    return capability_name in _WRITE_CAPABILITIES
 
 
 class CapabilityWorker:
@@ -447,124 +394,46 @@ class CapabilityWorker:
             raise RuntimeError("The capability worker returned an invalid conversation output.")
         return output
 
-    async def prepare_invitation_send(
-        self,
-        request: InvitationSendPrepareInput,
-    ) -> ActionPrepareOutput:
-        output = await self._submit(CapabilityName.INVITATION_SEND_PREPARE, request)
-        if not isinstance(output, ActionPrepareOutput):
-            raise RuntimeError("The capability worker returned an invalid invitation draft.")
+    async def send_invitation(self, request: InvitationSendInput) -> ActionOutput:
+        output = await self._submit(CapabilityName.INVITATION_SEND, request)
+        if not isinstance(output, ActionOutput):
+            raise RuntimeError("The capability worker returned an invalid invitation result.")
         return output
 
-    async def prepare_invitation_accept(
-        self,
-        request: InvitationAcceptPrepareInput,
-    ) -> ActionPrepareOutput:
-        output = await self._submit(CapabilityName.INVITATION_ACCEPT_PREPARE, request)
-        if not isinstance(output, ActionPrepareOutput):
-            raise RuntimeError("The capability worker returned an invalid acceptance draft.")
+    async def accept_invitation(self, request: InvitationAcceptInput) -> ActionOutput:
+        output = await self._submit(CapabilityName.INVITATION_ACCEPT, request)
+        if not isinstance(output, ActionOutput):
+            raise RuntimeError("The capability worker returned an invalid acceptance result.")
         return output
 
-    async def prepare_invitation_ignore(
-        self,
-        request: InvitationIgnorePrepareInput,
-    ) -> ActionPrepareOutput:
-        output = await self._submit(CapabilityName.INVITATION_IGNORE_PREPARE, request)
-        if not isinstance(output, ActionPrepareOutput):
-            raise RuntimeError("The capability worker returned an invalid ignore draft.")
+    async def ignore_invitation(self, request: InvitationIgnoreInput) -> ActionOutput:
+        output = await self._submit(CapabilityName.INVITATION_IGNORE, request)
+        if not isinstance(output, ActionOutput):
+            raise RuntimeError("The capability worker returned an invalid ignore result.")
         return output
 
-    async def prepare_message(self, request: MessagePrepareInput) -> ActionPrepareOutput:
-        output = await self._submit(CapabilityName.MESSAGING_MESSAGE_PREPARE, request)
-        if not isinstance(output, ActionPrepareOutput):
-            raise RuntimeError("The capability worker returned an invalid message draft.")
+    async def send_message(self, request: MessageSendInput) -> ActionOutput:
+        output = await self._submit(CapabilityName.MESSAGING_SEND, request)
+        if not isinstance(output, ActionOutput):
+            raise RuntimeError("The capability worker returned an invalid message result.")
         return output
 
-    async def prepare_post_create(
-        self,
-        request: PostCreatePrepareInput,
-    ) -> ActionPrepareOutput:
-        output = await self._submit(CapabilityName.POSTS_CREATE_PREPARE, request)
-        if not isinstance(output, ActionPrepareOutput):
-            raise RuntimeError("The capability worker returned an invalid post draft.")
+    async def create_post(self, request: PostCreateInput) -> ActionOutput:
+        output = await self._submit(CapabilityName.POSTS_CREATE, request)
+        if not isinstance(output, ActionOutput):
+            raise RuntimeError("The capability worker returned an invalid post result.")
         return output
 
-    async def prepare_post_comment(
-        self,
-        request: PostCommentPrepareInput,
-    ) -> ActionPrepareOutput:
-        output = await self._submit(CapabilityName.POST_COMMENT_PREPARE, request)
-        if not isinstance(output, ActionPrepareOutput):
-            raise RuntimeError("The capability worker returned an invalid comment draft.")
+    async def comment_on_post(self, request: PostCommentInput) -> ActionOutput:
+        output = await self._submit(CapabilityName.POST_COMMENT, request)
+        if not isinstance(output, ActionOutput):
+            raise RuntimeError("The capability worker returned an invalid comment result.")
         return output
 
-    async def prepare_post_reaction(
-        self,
-        request: PostReactionPrepareInput,
-    ) -> ActionPrepareOutput:
-        output = await self._submit(CapabilityName.POST_REACTION_PREPARE, request)
-        if not isinstance(output, ActionPrepareOutput):
-            raise RuntimeError("The capability worker returned an invalid reaction draft.")
-        return output
-
-    async def execute_invitation_send(
-        self,
-        request: ActionExecuteInput,
-    ) -> ActionExecuteOutput:
-        output = await self._submit(CapabilityName.INVITATION_SEND_EXECUTE, request)
-        if not isinstance(output, ActionExecuteOutput):
-            raise RuntimeError("The capability worker returned an invalid invitation execution.")
-        return output
-
-    async def execute_invitation_accept(
-        self,
-        request: ActionExecuteInput,
-    ) -> ActionExecuteOutput:
-        output = await self._submit(CapabilityName.INVITATION_ACCEPT_EXECUTE, request)
-        if not isinstance(output, ActionExecuteOutput):
-            raise RuntimeError("The capability worker returned an invalid acceptance execution.")
-        return output
-
-    async def execute_invitation_ignore(
-        self,
-        request: ActionExecuteInput,
-    ) -> ActionExecuteOutput:
-        output = await self._submit(CapabilityName.INVITATION_IGNORE_EXECUTE, request)
-        if not isinstance(output, ActionExecuteOutput):
-            raise RuntimeError("The capability worker returned an invalid ignore execution.")
-        return output
-
-    async def execute_message(self, request: ActionExecuteInput) -> ActionExecuteOutput:
-        output = await self._submit(CapabilityName.MESSAGING_MESSAGE_EXECUTE, request)
-        if not isinstance(output, ActionExecuteOutput):
-            raise RuntimeError("The capability worker returned an invalid message execution.")
-        return output
-
-    async def execute_post_create(
-        self,
-        request: ActionExecuteInput,
-    ) -> ActionExecuteOutput:
-        output = await self._submit(CapabilityName.POSTS_CREATE_EXECUTE, request)
-        if not isinstance(output, ActionExecuteOutput):
-            raise RuntimeError("The capability worker returned an invalid post execution.")
-        return output
-
-    async def execute_post_comment(
-        self,
-        request: ActionExecuteInput,
-    ) -> ActionExecuteOutput:
-        output = await self._submit(CapabilityName.POST_COMMENT_EXECUTE, request)
-        if not isinstance(output, ActionExecuteOutput):
-            raise RuntimeError("The capability worker returned an invalid comment execution.")
-        return output
-
-    async def execute_post_reaction(
-        self,
-        request: ActionExecuteInput,
-    ) -> ActionExecuteOutput:
-        output = await self._submit(CapabilityName.POST_REACTION_EXECUTE, request)
-        if not isinstance(output, ActionExecuteOutput):
-            raise RuntimeError("The capability worker returned an invalid reaction execution.")
+    async def react_to_post(self, request: PostReactionInput) -> ActionOutput:
+        output = await self._submit(CapabilityName.POST_REACT, request)
+        if not isinstance(output, ActionOutput):
+            raise RuntimeError("The capability worker returned an invalid reaction result.")
         return output
 
     async def _submit(
@@ -578,7 +447,10 @@ class CapabilityWorker:
             raise BrowserUnavailableError("The local LinkedIn worker is not running.")
 
         client_id = current_client_id()
-        key = (client_id, capability_name, request.request_id)
+        request_key = (
+            str(uuid.uuid4()) if _is_write_capability(capability_name) else request.request_id
+        )
+        key = (client_id, capability_name, request_key)
         fingerprint = canonical_input_fingerprint(request)
         item: _WorkItem | None = None
         async with self._inflight_lock:
@@ -698,7 +570,7 @@ class CapabilityWorker:
             item = inflight.item
             item.cancel_requested = True
             if self._active_item is item:
-                if not _is_execute_capability(item.capability_name):
+                if not _is_write_capability(item.capability_name):
                     active_task = self._active_task
             else:
                 removed = await self._scheduler.remove(item.client_id, item)
@@ -735,7 +607,7 @@ class CapabilityWorker:
                 if (
                     item.cancel_requested
                     and no_waiters
-                    and not _is_execute_capability(item.capability_name)
+                    and not _is_write_capability(item.capability_name)
                 ):
                     operation.cancel()
             try:
@@ -837,62 +709,34 @@ class CapabilityWorker:
             if not isinstance(item.request, ConversationGetInput):
                 raise RuntimeError("The queued conversation request has an invalid type.")
             return await self._runner.get_conversation(item.request)
-        if item.capability_name is CapabilityName.INVITATION_SEND_PREPARE:
-            if not isinstance(item.request, InvitationSendPrepareInput):
-                raise RuntimeError("The queued invitation-draft request has an invalid type.")
-            return await self._runner.prepare_invitation_send(item.request)
-        if item.capability_name is CapabilityName.INVITATION_ACCEPT_PREPARE:
-            if not isinstance(item.request, InvitationAcceptPrepareInput):
-                raise RuntimeError("The queued acceptance-draft request has an invalid type.")
-            return await self._runner.prepare_invitation_accept(item.request)
-        if item.capability_name is CapabilityName.INVITATION_IGNORE_PREPARE:
-            if not isinstance(item.request, InvitationIgnorePrepareInput):
-                raise RuntimeError("The queued ignore-draft request has an invalid type.")
-            return await self._runner.prepare_invitation_ignore(item.request)
-        if item.capability_name is CapabilityName.MESSAGING_MESSAGE_PREPARE:
-            if not isinstance(item.request, MessagePrepareInput):
-                raise RuntimeError("The queued message-draft request has an invalid type.")
-            return await self._runner.prepare_message(item.request)
-        if item.capability_name is CapabilityName.POSTS_CREATE_PREPARE:
-            if not isinstance(item.request, PostCreatePrepareInput):
-                raise RuntimeError("The queued post-draft request has an invalid type.")
-            return await self._runner.prepare_post_create(item.request)
-        if item.capability_name is CapabilityName.POST_COMMENT_PREPARE:
-            if not isinstance(item.request, PostCommentPrepareInput):
-                raise RuntimeError("The queued comment-draft request has an invalid type.")
-            return await self._runner.prepare_post_comment(item.request)
-        if item.capability_name is CapabilityName.POST_REACTION_PREPARE:
-            if not isinstance(item.request, PostReactionPrepareInput):
-                raise RuntimeError("The queued reaction-draft request has an invalid type.")
-            return await self._runner.prepare_post_reaction(item.request)
-        if item.capability_name is CapabilityName.INVITATION_SEND_EXECUTE:
-            if not isinstance(item.request, ActionExecuteInput):
-                raise RuntimeError("The queued invitation execution has an invalid type.")
-            return await self._runner.execute_invitation_send(item.request)
-        if item.capability_name is CapabilityName.INVITATION_ACCEPT_EXECUTE:
-            if not isinstance(item.request, ActionExecuteInput):
-                raise RuntimeError("The queued acceptance execution has an invalid type.")
-            return await self._runner.execute_invitation_accept(item.request)
-        if item.capability_name is CapabilityName.INVITATION_IGNORE_EXECUTE:
-            if not isinstance(item.request, ActionExecuteInput):
-                raise RuntimeError("The queued ignore execution has an invalid type.")
-            return await self._runner.execute_invitation_ignore(item.request)
-        if item.capability_name is CapabilityName.MESSAGING_MESSAGE_EXECUTE:
-            if not isinstance(item.request, ActionExecuteInput):
-                raise RuntimeError("The queued message execution has an invalid type.")
-            return await self._runner.execute_message(item.request)
-        if item.capability_name is CapabilityName.POSTS_CREATE_EXECUTE:
-            if not isinstance(item.request, ActionExecuteInput):
-                raise RuntimeError("The queued post execution has an invalid type.")
-            return await self._runner.execute_post_create(item.request)
-        if item.capability_name is CapabilityName.POST_COMMENT_EXECUTE:
-            if not isinstance(item.request, ActionExecuteInput):
-                raise RuntimeError("The queued comment execution has an invalid type.")
-            return await self._runner.execute_post_comment(item.request)
-        if item.capability_name is CapabilityName.POST_REACTION_EXECUTE:
-            if not isinstance(item.request, ActionExecuteInput):
-                raise RuntimeError("The queued reaction execution has an invalid type.")
-            return await self._runner.execute_post_reaction(item.request)
+        if item.capability_name is CapabilityName.INVITATION_SEND:
+            if not isinstance(item.request, InvitationSendInput):
+                raise RuntimeError("The queued invitation request has an invalid type.")
+            return await self._runner.send_invitation(item.request)
+        if item.capability_name is CapabilityName.INVITATION_ACCEPT:
+            if not isinstance(item.request, InvitationAcceptInput):
+                raise RuntimeError("The queued acceptance request has an invalid type.")
+            return await self._runner.accept_invitation(item.request)
+        if item.capability_name is CapabilityName.INVITATION_IGNORE:
+            if not isinstance(item.request, InvitationIgnoreInput):
+                raise RuntimeError("The queued ignore request has an invalid type.")
+            return await self._runner.ignore_invitation(item.request)
+        if item.capability_name is CapabilityName.MESSAGING_SEND:
+            if not isinstance(item.request, MessageSendInput):
+                raise RuntimeError("The queued message request has an invalid type.")
+            return await self._runner.send_message(item.request)
+        if item.capability_name is CapabilityName.POSTS_CREATE:
+            if not isinstance(item.request, PostCreateInput):
+                raise RuntimeError("The queued post request has an invalid type.")
+            return await self._runner.create_post(item.request)
+        if item.capability_name is CapabilityName.POST_COMMENT:
+            if not isinstance(item.request, PostCommentInput):
+                raise RuntimeError("The queued comment request has an invalid type.")
+            return await self._runner.comment_on_post(item.request)
+        if item.capability_name is CapabilityName.POST_REACT:
+            if not isinstance(item.request, PostReactionInput):
+                raise RuntimeError("The queued reaction request has an invalid type.")
+            return await self._runner.react_to_post(item.request)
         raise RuntimeError(f"Unsupported queued capability: {item.capability_name.value}")
 
     async def quiesce(self) -> None:
@@ -918,10 +762,10 @@ class CapabilityWorker:
         if (
             active_task is not None
             and active_item is not None
-            and not _is_execute_capability(active_item.capability_name)
+            and not _is_write_capability(active_item.capability_name)
         ):
             active_task.cancel()
-        if active_item is not None and _is_execute_capability(active_item.capability_name):
+        if active_item is not None and _is_write_capability(active_item.capability_name):
             await self._idle.wait()
 
         task = self._task

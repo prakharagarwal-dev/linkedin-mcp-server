@@ -15,7 +15,7 @@ body:
     id: contract
     attributes:
       label: Proposed contract
-      description: Describe the visible surface, typed inputs/outputs, scope, effect, bounds, and postcondition.
+      description: Describe the visible surface, typed inputs/outputs, read/write effect, bounds, and postcondition.
     validations:
       required: true
 
@@ -23,7 +23,7 @@ body:
     id: safety
     attributes:
       label: Safety and privacy considerations
-      description: Explain account risk, authorization, confirmation, idempotency, and fixture needs.
+      description: Explain account risk, client tool policy, target validation, retry behavior, and fixture needs.
     validations:
       required: true
 
