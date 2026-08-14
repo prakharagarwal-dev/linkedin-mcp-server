@@ -1,6 +1,6 @@
 {
-  "color": "red",
-  "label": "last tested",
-  "message": "failed \u00b7 2026-08-13",
+  "color": "brightgreen",
+  "label": "",
+  "message": "verified",
   "schemaVersion": 1
 }
