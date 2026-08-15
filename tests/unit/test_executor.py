@@ -801,6 +801,48 @@ class PaginatedFakeInvitationList(FakeInvitationList):
         )
 
 
+class ImplicitEmptyInvitationList(FakeInvitationList):
+    async def collect(
+        self,
+        request: InvitationListInput,
+        *,
+        result_limit: int | None = None,
+        progress: object | None = None,
+    ) -> tuple[tuple[InvitationSummary, ...], InvitationListCoverage, str, str]:
+        del progress
+        self.calls += 1
+        assert request.direction is InvitationDirection.SENT
+        assert request.resolved_filter is InvitationFilter.PEOPLE
+        limit = request.page_size if result_limit is None else result_limit
+        captured_at = datetime.now(UTC)
+        source_url = "https://www.linkedin.com/mynetwork/invitation-manager/sent/"
+        return (
+            (),
+            InvitationListCoverage(
+                direction=request.direction,
+                invitation_filter=request.resolved_filter,
+                advertised_count=None,
+                unique_count=0,
+                view_counts={InvitationFilter.PEOPLE: 0},
+                unadvertised_empty_views=(InvitationFilter.PEOPLE,),
+                view_source_urls={InvitationFilter.PEOPLE: HttpUrl(source_url)},
+                view_membership_count=0,
+                overlap_count=0,
+                result_count=0,
+                max_results=limit,
+                scroll_rounds=0,
+                collection_attempts=1,
+                neighboring_recommendation_count=0,
+                invitation_type_counts={},
+                entity_type_counts={},
+                stop_reason=StopReason.VISIBLE_PAGE_COMPLETE,
+                captured_at=captured_at,
+            ),
+            "Manage invitations",
+            source_url,
+        )
+
+
 class FakeConnectionsList:
     async def collect(
         self,
@@ -1557,6 +1599,35 @@ async def test_invitation_cursor_walks_live_prefix_without_duplicates() -> None:
     assert replay.pagination == second.pagination
     assert invitations.calls == 3
     assert invitations.result_limits == [3, 4, 6]
+
+
+@pytest.mark.asyncio
+async def test_unadvertised_empty_invitation_view_survives_executor_evidence() -> None:
+    repository = MemoryRepository()
+    invitations = ImplicitEmptyInvitationList()
+    executor = _executor(
+        repository,
+        FakeJobSearch(),
+        FakeJobDetail(),
+        invitation_list=invitations,
+    )
+
+    output = await executor.list_invitations(
+        InvitationListInput(
+            context_id="empty-sent-invitations",
+            request_id="empty-sent-invitations-1",
+            direction=InvitationDirection.SENT,
+            page_size=10,
+        )
+    )
+
+    assert output.invitations == ()
+    assert output.coverage.advertised_count is None
+    assert output.coverage.unadvertised_empty_views == (InvitationFilter.PEOPLE,)
+    assert output.coverage.stop_reason is StopReason.VISIBLE_PAGE_COMPLETE
+    assert output.pagination.has_more is False
+    assert output.pagination.truncated is False
+    assert len(output.sources) == 1
 
 
 @pytest.mark.asyncio

@@ -129,13 +129,17 @@ def test_fixture_manifest_records_sanitized_current_selector_provenance() -> Non
 
     assert manifest == {
         "provenance": "mock_verified",
-        "verified_at": "2026-07-29",
+        "verified_at": "2026-08-15",
         "source_surface": "visible LinkedIn invitation manager",
         "contains_live_data": False,
         "contains_authentication_state": False,
         "received_bucket_selector": ('main [role="button"]:has(input[type="checkbox"]:checked)'),
         "received_bucket_option_selector": 'main [role="menu"] [role="menuitem"]',
         "received_category_selector": 'main [role="radio"][aria-checked]',
+        "received_omitted_zero_filter_evidence": (
+            "A missing category control while the current Focused selector remains exact "
+            "represents that category's current zero-count state"
+        ),
         "received_card_selector": (
             'main [data-testid="lazy-column"] [data-display-contents] > [role="listitem"]'
         ),
@@ -144,12 +148,17 @@ def test_fixture_manifest_records_sanitized_current_selector_provenance() -> Non
             "Accept {name}\N{RIGHT SINGLE QUOTATION MARK}s invitation",
         ],
         "sent_count_selector": 'main a[href$="/sent/CONNECTION/"]',
+        "sent_omitted_people_empty_evidence": (
+            "One idle empty lazy-column, no People-shaped control, no sent card root, "
+            "no Withdraw action, and no tail control"
+        ),
         "sent_card_selector": ('main [data-testid="lazy-column"] > [role="listitem"]'),
         "sent_card_action": "Withdraw invitation sent to {name}",
         "notes": (
             "Synthetic identities and content preserve only the sanitized current "
-            "Focused/Other picker, four received radio filters, Received/Sent card roots, "
-            "and action-adjacent note structure."
+            "Focused/Other picker, conditionally rendered received radio filters, omitted "
+            "empty Sent People control, Received/Sent card roots, and action-adjacent note "
+            "structure."
         ),
     }
 
@@ -337,6 +346,138 @@ async def test_sent_people_uses_the_distinct_current_direct_card_root(
     assert coverage.invitation_filter is InvitationFilter.PEOPLE
     assert coverage.view_counts == {InvitationFilter.PEOPLE: 2}
     assert coverage.unique_count == 2
+
+
+@pytest.mark.asyncio
+async def test_received_all_reconciles_category_controls_omitted_at_zero(
+    invitation_page: Page,
+) -> None:
+    values, coverage, captured_text, _ = await _collect(
+        invitation_page,
+        html=_fixture("received-omitted-zero-filters.html"),
+        request=_request(),
+        path="/mynetwork/invitation-manager/received/",
+    )
+
+    assert [item.primary_entity.slug for item in values] == ["current-member"]
+    assert coverage.view_counts == {
+        InvitationFilter.FOCUSED: 1,
+        InvitationFilter.OTHER: 0,
+        InvitationFilter.VERIFIED: 0,
+        InvitationFilter.MUTUAL_CONNECTIONS: 0,
+        InvitationFilter.SAME_COMPANY: 0,
+        InvitationFilter.SAME_SCHOOL: 0,
+    }
+    assert coverage.unadvertised_empty_views == (
+        InvitationFilter.VERIFIED,
+        InvitationFilter.MUTUAL_CONNECTIONS,
+        InvitationFilter.SAME_COMPANY,
+        InvitationFilter.SAME_SCHOOL,
+    )
+    assert coverage.advertised_count is None
+    assert coverage.view_membership_count == coverage.unique_count == 1
+    assert coverage.stop_reason is StopReason.VISIBLE_PAGE_COMPLETE
+    assert "Focused (1)" in captured_text
+    assert "Other (0)" in captured_text
+    assert "Verified (0)" not in captured_text
+
+
+@pytest.mark.parametrize(
+    "invitation_filter",
+    [
+        InvitationFilter.VERIFIED,
+        InvitationFilter.MUTUAL_CONNECTIONS,
+        InvitationFilter.SAME_COMPANY,
+        InvitationFilter.SAME_SCHOOL,
+    ],
+)
+@pytest.mark.asyncio
+async def test_explicit_omitted_received_category_returns_proved_empty_view(
+    invitation_page: Page,
+    invitation_filter: InvitationFilter,
+) -> None:
+    values, coverage, captured_text, _ = await _collect(
+        invitation_page,
+        html=_fixture("received-omitted-zero-filters.html"),
+        request=_request(invitation_filter=invitation_filter),
+        path="/mynetwork/invitation-manager/received/",
+    )
+
+    assert values == ()
+    assert coverage.advertised_count is None
+    assert coverage.view_counts == {invitation_filter: 0}
+    assert coverage.unadvertised_empty_views == (invitation_filter,)
+    assert coverage.view_membership_count == coverage.unique_count == 0
+    assert coverage.stop_reason is StopReason.VISIBLE_PAGE_COMPLETE
+    assert captured_text == "Focused (1)"
+
+
+@pytest.mark.asyncio
+async def test_sent_people_control_omission_requires_stable_empty_column_evidence(
+    invitation_page: Page,
+) -> None:
+    values, coverage, captured_text, _ = await _collect(
+        invitation_page,
+        html=_fixture("sent-omitted-empty-people.html"),
+        request=_request(direction=InvitationDirection.SENT),
+        path="/mynetwork/invitation-manager/sent/",
+    )
+
+    assert values == ()
+    assert coverage.advertised_count is None
+    assert coverage.view_counts == {InvitationFilter.PEOPLE: 0}
+    assert coverage.unadvertised_empty_views == (InvitationFilter.PEOPLE,)
+    assert coverage.view_membership_count == coverage.unique_count == 0
+    assert coverage.stop_reason is StopReason.VISIBLE_PAGE_COMPLETE
+    assert captured_text == "Manage invitations"
+
+
+@pytest.mark.asyncio
+async def test_sent_people_control_omission_with_a_card_fails_closed(
+    invitation_page: Page,
+) -> None:
+    html = _fixture("sent-omitted-empty-people.html").replace(
+        '<div data-testid="lazy-column" data-component-type="LazyColumn"></div>',
+        """
+        <div data-testid="lazy-column" data-component-type="LazyColumn">
+          <div role="listitem">
+            <a href="/in/unadvertised-sent/">Unadvertised Sent</a>
+            <button aria-label="Withdraw invitation sent to Unadvertised Sent">
+              Withdraw
+            </button>
+          </div>
+        </div>
+        """,
+    )
+
+    with pytest.raises(ParserDriftError, match=r"cannot prove.*People view empty"):
+        await _collect(
+            invitation_page,
+            html=html,
+            request=_request(direction=InvitationDirection.SENT),
+            path="/mynetwork/invitation-manager/sent/",
+        )
+
+
+@pytest.mark.asyncio
+async def test_omitted_category_with_changed_control_shape_fails_closed(
+    invitation_page: Page,
+) -> None:
+    html = _fixture("received-omitted-zero-filters.html").replace(
+        '<div id="focused-column" data-testid="lazy-column">',
+        """
+        <div role="radio" aria-checked="false">Verified</div>
+        <div id="focused-column" data-testid="lazy-column">
+        """,
+    )
+
+    with pytest.raises(ParserDriftError, match="changed verified filter shape"):
+        await _collect(
+            invitation_page,
+            html=html,
+            request=_request(invitation_filter=InvitationFilter.VERIFIED),
+            path="/mynetwork/invitation-manager/received/",
+        )
 
 
 @pytest.mark.parametrize(

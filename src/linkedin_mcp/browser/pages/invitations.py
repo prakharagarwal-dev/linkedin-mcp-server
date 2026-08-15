@@ -35,6 +35,7 @@ InvitationProgressReporter = Callable[[int, int, str], Awaitable[None]]
 
 _RECEIVED_ROOT_URL = "https://www.linkedin.com/mynetwork/invitation-manager/received/"
 _SENT_ROOT_URL = "https://www.linkedin.com/mynetwork/invitation-manager/sent/"
+_SENT_ROOT_PATH = "/mynetwork/invitation-manager/sent"
 _SENT_PEOPLE_PATH = "/mynetwork/invitation-manager/sent/CONNECTION"
 _MAX_RAW_CARDS = 5_000
 _SETTLE_ATTEMPTS = 8
@@ -138,6 +139,28 @@ _CONTROL_NAME_PATTERNS: dict[InvitationFilter, re.Pattern[str]] = {
     InvitationFilter.SAME_SCHOOL: re.compile(r"^your school\s*\(\d[\d,]*\)(?:\s|$)", re.IGNORECASE),
     InvitationFilter.PEOPLE: re.compile(r"^people\s*\(\d[\d,]*\)(?:\s|$)", re.IGNORECASE),
 }
+_CONTROL_OMISSION_GUARD_PATTERNS: dict[InvitationFilter, re.Pattern[str]] = {
+    InvitationFilter.VERIFIED: re.compile(
+        r"^(?:verified$|verified\s*\([^)]*\)(?:\s|$))",
+        re.IGNORECASE,
+    ),
+    InvitationFilter.MUTUAL_CONNECTIONS: re.compile(
+        r"^(?:mutual connections$|mutual connections\s*\([^)]*\)(?:\s|$))",
+        re.IGNORECASE,
+    ),
+    InvitationFilter.SAME_COMPANY: re.compile(
+        r"^(?:your company$|your company\s*\([^)]*\)(?:\s|$))",
+        re.IGNORECASE,
+    ),
+    InvitationFilter.SAME_SCHOOL: re.compile(
+        r"^(?:your school$|your school\s*\([^)]*\)(?:\s|$))",
+        re.IGNORECASE,
+    ),
+    InvitationFilter.PEOPLE: re.compile(
+        r"^(?:people$|people\s*\([^)]*\)(?:\s|$))",
+        re.IGNORECASE,
+    ),
+}
 _BUCKET_PICKER_PATTERN = re.compile(
     r"^(?:focused|other)\s*\(\d[\d,]*\)$",
     re.IGNORECASE,
@@ -188,6 +211,7 @@ class _VisibleInventory:
     invitation_filter: InvitationFilter
     count: int
     label: str
+    advertised: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -1089,15 +1113,151 @@ async def _unique_visible_role_control(
     name: re.Pattern[str],
     description: str,
 ) -> Locator:
+    visible = await _visible_role_controls(page, role=role, name=name)
+    if len(visible) != 1:
+        raise ParserDriftError(f"LinkedIn Invitations has no unique current {description} control.")
+    return visible[0]
+
+
+async def _visible_role_controls(
+    page: Page,
+    *,
+    role: Literal["button", "link", "menuitem", "radio"],
+    name: re.Pattern[str],
+) -> tuple[Locator, ...]:
     controls = page.get_by_role(role, name=name)
     visible: list[Locator] = []
     for index in range(await controls.count()):
         control = controls.nth(index)
         if await control.is_visible():
             visible.append(control)
-    if len(visible) != 1:
-        raise ParserDriftError(f"LinkedIn Invitations has no unique current {description} control.")
-    return visible[0]
+    return tuple(visible)
+
+
+async def _has_visible_filter_shape(
+    page: Page,
+    invitation_filter: InvitationFilter,
+) -> bool:
+    mains = page.locator("main")
+    if await mains.count() != 1:
+        raise ParserDriftError("LinkedIn Invitations has no unique current main surface.")
+    pattern = _CONTROL_OMISSION_GUARD_PATTERNS[invitation_filter]
+    for role in ("button", "link", "menuitem", "radio"):
+        controls = mains.first.get_by_role(role, name=pattern)
+        for index in range(await controls.count()):
+            if await controls.nth(index).is_visible():
+                return True
+    return False
+
+
+async def _implicit_category_empty_inventory(
+    page: Page,
+    invitation_filter: InvitationFilter,
+) -> _VisibleInventory:
+    if invitation_filter not in _CATEGORY_FILTERS:
+        raise ValueError("Only current received category views may use omission-as-zero.")
+    if await _has_visible_filter_shape(page, invitation_filter):
+        raise ParserDriftError(
+            f"LinkedIn Invitations exposed a changed {invitation_filter.value} filter shape."
+        )
+    focused = await _visible_inventory(page, InvitationFilter.FOCUSED)
+    return _VisibleInventory(
+        invitation_filter=invitation_filter,
+        count=0,
+        label=focused.label,
+        advertised=False,
+    )
+
+
+async def _read_implicit_sent_empty_evidence(page: Page) -> str | None:
+    path = urlsplit(page.url).path.rstrip("/")
+    if path not in {_SENT_ROOT_PATH, _SENT_PEOPLE_PATH}:
+        raise ParserDriftError("LinkedIn Invitations exposed an unexpected empty Sent target.")
+    if await _has_visible_filter_shape(page, InvitationFilter.PEOPLE):
+        raise ParserDriftError("LinkedIn Invitations exposed a changed People filter shape.")
+    mains = page.locator("main")
+    if await mains.count() != 1:
+        raise ParserDriftError("LinkedIn Invitations has no unique current main surface.")
+    raw = await mains.first.evaluate(
+        """
+        element => {
+          const visible = candidate => candidate.getClientRects().length > 0;
+          const labelOf = control => (
+            control.getAttribute("aria-label") || control.innerText || ""
+          ).trim();
+          const columns = Array.from(
+            element.querySelectorAll('[data-testid="lazy-column"]')
+          ).filter(visible);
+          const roots = columns.flatMap(column =>
+            Array.from(column.querySelectorAll(':scope > [role="listitem"]')).filter(visible)
+          );
+          const controls = Array.from(element.querySelectorAll("button,a")).filter(visible);
+          const lines = (element.innerText || "")
+            .split(/\\n+/)
+            .map(line => line.trim())
+            .filter(Boolean);
+          return {
+            busy: (
+              element.getAttribute("aria-busy") === "true" ||
+              Boolean(element.querySelector('[aria-busy="true"]'))
+            ),
+            columnCount: columns.length,
+            rootCount: roots.length,
+            withdrawalCount: controls.filter(control =>
+              /^withdraw(?:\\s|$)/i.test(labelOf(control))
+            ).length,
+            loadMoreCount: controls.filter(control =>
+              /^(?:load more|show more(?: results)?|see more)$/i.test(labelOf(control))
+            ).length,
+            headingCount: lines.filter(line => line === "Manage invitations").length
+          };
+        }
+        """
+    )
+    if not isinstance(raw, dict):
+        raise ParserDriftError("LinkedIn Invitations returned invalid empty Sent diagnostics.")
+    result = cast(dict[str, object], raw)
+    if result.get("busy") is True or result.get("loadMoreCount") != 0:
+        return None
+    if (
+        result.get("columnCount") != 1
+        or result.get("rootCount") != 0
+        or result.get("withdrawalCount") != 0
+        or result.get("headingCount") != 1
+    ):
+        raise ParserDriftError(
+            "LinkedIn Invitations cannot prove the current omitted People view empty."
+        )
+    return "Manage invitations"
+
+
+async def _implicit_sent_empty_inventory(page: Page) -> _VisibleInventory:
+    stable_rounds = 0
+    evidence: str | None = None
+    for attempt_index in range(_SETTLE_ATTEMPTS):
+        if attempt_index:
+            await page.wait_for_timeout(_SETTLE_DELAY_MS)
+        try:
+            advertised = await _visible_inventory(page, InvitationFilter.PEOPLE)
+        except ParserDriftError:
+            advertised = None
+        if advertised is not None:
+            return advertised
+        current_evidence = await _read_implicit_sent_empty_evidence(page)
+        if current_evidence is None:
+            stable_rounds = 0
+            evidence = None
+        else:
+            evidence = current_evidence
+            stable_rounds += 1
+    if evidence is not None and stable_rounds >= 2:
+        return _VisibleInventory(
+            invitation_filter=InvitationFilter.PEOPLE,
+            count=0,
+            label=evidence,
+            advertised=False,
+        )
+    raise ParserDriftError("LinkedIn Invitations did not establish stable empty Sent evidence.")
 
 
 async def _select_visible_view(
@@ -1154,30 +1314,37 @@ async def _select_visible_view(
                 direction,
                 InvitationFilter.FOCUSED,
             )
-            control = await _unique_visible_role_control(
+            category_controls = await _visible_role_controls(
                 page,
                 role="radio",
                 name=_CONTROL_NAME_PATTERNS[invitation_filter],
-                description=f"{invitation_filter.value} filter",
             )
+            if not category_controls:
+                return await _implicit_category_empty_inventory(page, invitation_filter)
+            if len(category_controls) != 1:
+                raise ParserDriftError(
+                    "LinkedIn Invitations has no unique current "
+                    f"{invitation_filter.value} filter control."
+                ) from None
+            control = category_controls[0]
         await browser.click_visible_control(page, control)
     elif invitation_filter is InvitationFilter.PEOPLE:
-        failures: list[ParserDriftError] = []
+        controls: list[Locator] = []
         for role in ("link", "radio", "button"):
-            try:
-                control = await _unique_visible_role_control(
+            controls.extend(
+                await _visible_role_controls(
                     page,
                     role=role,
                     name=_CONTROL_NAME_PATTERNS[invitation_filter],
-                    description="People filter",
                 )
-            except ParserDriftError as error:
-                failures.append(error)
-                continue
-            await browser.click_visible_control(page, control)
-            break
-        else:
-            raise failures[-1]
+            )
+        if not controls:
+            return await _implicit_sent_empty_inventory(page)
+        if len(controls) != 1:
+            raise ParserDriftError(
+                "LinkedIn Invitations has no unique current People filter control."
+            )
+        await browser.click_visible_control(page, controls[0])
     else:
         raise ValueError("The synthetic All filter cannot be selected directly.")
     inventory = await _wait_for_inventory(page, invitation_filter)
@@ -1308,6 +1475,13 @@ class InvitationListPage:
                 if inventory != expected:
                     raise _CollectionChanged
                 view_source_urls[invitation_filter] = page.url
+                if not expected.advertised:
+                    if expected.count != 0:
+                        raise ParserDriftError(
+                            "An unadvertised invitation view cannot have visible members."
+                        )
+                    completed_views += 1
+                    continue
                 (
                     view_items,
                     view_recommendations,
@@ -1377,13 +1551,20 @@ class InvitationListPage:
                 direction=request.direction,
                 invitation_filter=selected,
                 advertised_count=(
-                    None if selected is InvitationFilter.ALL else inventories[selected].count
+                    None
+                    if selected is InvitationFilter.ALL or not inventories[selected].advertised
+                    else inventories[selected].count
                 ),
                 unique_count=len(invitations),
                 view_counts={
                     invitation_filter: inventory.count
                     for invitation_filter, inventory in inventories.items()
                 },
+                unadvertised_empty_views=tuple(
+                    invitation_filter
+                    for invitation_filter, inventory in inventories.items()
+                    if not inventory.advertised
+                ),
                 view_source_urls={
                     invitation_filter: HttpUrl(source_url)
                     for invitation_filter, source_url in view_source_urls.items()
@@ -1400,7 +1581,9 @@ class InvitationListPage:
                 stop_reason=stop_reason,
                 captured_at=captured_at,
             )
-            advertised_label = "\n".join(inventory.label for inventory in inventories.values())
+            advertised_label = "\n".join(
+                dict.fromkeys(inventory.label for inventory in inventories.values())
+            )
             captured_text = "\n\n".join(
                 (advertised_label, *(item.visible_text for item in invitations))
             )

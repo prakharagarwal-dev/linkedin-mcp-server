@@ -1,0 +1,63 @@
+<!doctype html>
+<!-- Sanitized current layout where LinkedIn omits zero-count received category controls. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Current received invitations with omitted empty filters</title>
+  </head>
+  <body>
+    <main>
+      <p>Manage invitations</p>
+      <nav aria-label="Invitation direction">
+        <a aria-current="page" href="/mynetwork/invitation-manager/received">Received</a>
+        <a href="/mynetwork/invitation-manager/sent">Sent</a>
+      </nav>
+      <div id="bucket-picker" role="button" aria-expanded="false" tabindex="0">
+        <input aria-hidden="true" type="checkbox" checked />
+        <span id="bucket-label">Focused (1)</span>
+      </div>
+      <div id="bucket-menu" role="menu" hidden>
+        <div role="menuitem" data-bucket="focused" tabindex="0">
+          <p>Focused (1)</p>
+          <p>Priority invitations</p>
+        </div>
+        <div role="menuitem" data-bucket="other" tabindex="0">
+          <p>Other (0)</p>
+          <p>Other invitations to review</p>
+        </div>
+      </div>
+      <div id="focused-column" data-testid="lazy-column">
+        <div><div><div data-display-contents="true">
+          <div role="listitem">
+            <a href="/in/current-member/"><strong>Current Member</strong></a>
+            <p>Software Engineer at Example Systems</p>
+            <button aria-label="Ignore an invitation from Current Member">Ignore</button>
+            <button aria-label="Accept Current Member’s invitation">Accept</button>
+          </div>
+        </div></div></div>
+      </div>
+      <div id="other-column" data-testid="lazy-column" hidden></div>
+      <script>
+        const picker = document.querySelector("#bucket-picker");
+        const menu = document.querySelector("#bucket-menu");
+        const label = document.querySelector("#bucket-label");
+        const focused = document.querySelector("#focused-column");
+        const other = document.querySelector("#other-column");
+        picker.addEventListener("click", () => {
+          menu.hidden = !menu.hidden;
+          picker.setAttribute("aria-expanded", String(!menu.hidden));
+        });
+        for (const option of menu.querySelectorAll('[role="menuitem"]')) {
+          option.addEventListener("click", () => {
+            const selected = option.dataset.bucket;
+            label.textContent = selected === "focused" ? "Focused (1)" : "Other (0)";
+            focused.hidden = selected !== "focused";
+            other.hidden = selected !== "other";
+            menu.hidden = true;
+            picker.setAttribute("aria-expanded", "false");
+          });
+        }
+      </script>
+    </main>
+  </body>
+</html>
