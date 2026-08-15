@@ -53,18 +53,20 @@ def test_visible_comment_text_match_only_ignores_expansion_affordance() -> None:
     assert not matches(f"{text}\n… more context", text)
 
 
-def _optimistic_comment_html(
+def _comment_result_html(
     *,
+    stable_reference: bool,
     clear_composer: bool,
-    existing_own_comment_text: str | None = None,
     expansion_suffix: bool = False,
 ) -> str:
-    html = ENGAGEMENT_HTML.replace(
-        """          comment.dataset.commentUrn =
+    html = ENGAGEMENT_HTML
+    if not stable_reference:
+        html = html.replace(
+            """          comment.dataset.commentUrn =
             `urn:li:comment:(ugcPost:7312345678901234566,${commentId})`;""",
-        '          comment.className = "comments-comment-entity";',
-        1,
-    )
+            '          comment.className = "comments-comment-entity";',
+            1,
+        )
     if clear_composer:
         html = html.replace(
             '          document.querySelector("#discussion").append(comment);',
@@ -82,12 +84,6 @@ def _optimistic_comment_html(
             expansion.style.display = "block";
             body.append(expansion);""",
             1,
-        )
-    if existing_own_comment_text is not None:
-        html = (
-            html.replace("/in/alex-ray/", "/in/current-member/", 1)
-            .replace("Alex Ray", "Current Member", 1)
-            .replace("Helpful breakdown.", existing_own_comment_text, 1)
         )
     return html
 
@@ -213,13 +209,16 @@ async def test_top_level_comment_preserves_text_link_emoji_mention_and_target(
 
 
 @pytest.mark.timeout(30)
-async def test_comment_verifies_exact_visible_delta_while_reference_is_delayed(
+async def test_comment_requires_stable_reference_despite_visible_delta_and_cleared_composer(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    text = "A duplicate-safe optimistic comment."
+    monkeypatch.setattr(engagement_page, "_COMMENT_VERIFICATION_ATTEMPTS", 2)
+    monkeypatch.setattr(engagement_page, "_COMMENT_VERIFICATION_DELAY_MS", 1)
+    text = "A visible comment without a stable reference."
     request = PostCommentInput(
         context_id="engagement-context",
-        request_id="action-optimistic-comment",
+        request_id="action-comment-without-stable-reference",
         post_ref=POST_REF,
         text=text,
     )
@@ -229,9 +228,9 @@ async def test_comment_verifies_exact_visible_delta_while_reference_is_delayed(
         page = await browser.new_page()
         fixture_browser = EngagementFixtureBrowser(
             page,
-            html=_optimistic_comment_html(
+            html=_comment_result_html(
+                stable_reference=False,
                 clear_composer=True,
-                existing_own_comment_text=text,
             ),
         )
         adapter = PostEngagementPage(
@@ -243,37 +242,30 @@ async def test_comment_verifies_exact_visible_delta_while_reference_is_delayed(
         finally:
             await browser.close()
 
-    assert result.outcome is ActionOutcome.VERIFIED
-    assert result.performed is True
-    assert result.final_state == "comment_published"
-    assert "composer cleared" in result.detail
+    assert result.outcome is ActionOutcome.UNCERTAIN
+    assert result.performed is None
+    assert result.final_state == "comment_outcome_unknown"
+    assert "stable comment reference" in result.detail
+    assert text in result.captured_text
     assert fixture_browser.navigations == 2
 
 
 @pytest.mark.timeout(30)
-@pytest.mark.parametrize("stable_reference", [True, False])
-async def test_comment_verifies_text_with_visible_expansion_affordance(
+async def test_comment_verifies_stable_reference_with_visible_expansion_affordance(
     tmp_path: Path,
-    stable_reference: bool,
 ) -> None:
     text = "A long exact comment that LinkedIn truncates in the visible discussion."
     request = PostCommentInput(
         context_id="engagement-context",
-        request_id=f"action-truncated-comment-{stable_reference}",
+        request_id="action-truncated-stable-comment",
         post_ref=POST_REF,
         text=text,
     )
-    html = _optimistic_comment_html(
-        clear_composer=not stable_reference,
+    html = _comment_result_html(
+        stable_reference=True,
+        clear_composer=False,
         expansion_suffix=True,
     )
-    if stable_reference:
-        html = html.replace(
-            '          comment.className = "comments-comment-entity";',
-            """          comment.dataset.commentUrn =
-            `urn:li:comment:(ugcPost:7312345678901234566,${commentId})`;""",
-            1,
-        )
 
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
@@ -289,46 +281,7 @@ async def test_comment_verifies_text_with_visible_expansion_affordance(
 
     assert result.outcome is ActionOutcome.VERIFIED
     assert result.performed is True
-    if stable_reference:
-        assert result.final_state.startswith("comment_published:comment:")
-    else:
-        assert result.final_state == "comment_published"
-
-
-@pytest.mark.timeout(30)
-async def test_comment_does_not_accept_visible_delta_while_composer_retains_payload(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(engagement_page, "_COMMENT_VERIFICATION_ATTEMPTS", 2)
-    monkeypatch.setattr(engagement_page, "_COMMENT_VERIFICATION_DELAY_MS", 1)
-    request = PostCommentInput(
-        context_id="engagement-context",
-        request_id="action-optimistic-comment-with-stale-composer",
-        post_ref=POST_REF,
-        text="A locally rendered but uncommitted comment.",
-    )
-    fixture_browser: EngagementFixtureBrowser
-    async with async_playwright() as playwright:
-        browser = await playwright.chromium.launch(headless=True)
-        page = await browser.new_page()
-        fixture_browser = EngagementFixtureBrowser(
-            page,
-            html=_optimistic_comment_html(clear_composer=False),
-        )
-        adapter = PostEngagementPage(
-            cast(BrowserManager, fixture_browser),
-            LocalAssetStore(tmp_path),
-        )
-        try:
-            result = await adapter.perform_comment(await _comment_command(adapter, request))
-        finally:
-            await browser.close()
-
-    assert result.outcome is ActionOutcome.UNCERTAIN
-    assert result.performed is None
-    assert result.final_state == "comment_outcome_unknown"
-    assert fixture_browser.navigations == 2
+    assert result.final_state.startswith("comment_published:comment:")
 
 
 @pytest.mark.timeout(30)

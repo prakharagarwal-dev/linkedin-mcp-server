@@ -42,7 +42,7 @@ Profile section selectors are `all`, `overview`, `about`, `experience`,
 | `linkedin.posts.get` | Activity, share, or UGC post reference | Expanded post, author, text, media, links, mentions, hashtags, poll/repost data, engagement, coverage, and evidence |
 | `linkedin.posts.comments.list` | Post reference, sort, page size, and bounded replies per root | Typed root comments and visible nested replies with pagination and coverage |
 | `linkedin.posts.create` | Typed content, audience, comment control, optional group/collaborators/brand partnership/schedule | One terminal action result plus evidence |
-| `linkedin.posts.comment` | Post reference, text, mentions, or one photo/GIF attachment | One top-level comment action result, verified by one new exact stable reference or by one new exact visible own comment plus a cleared composer, with evidence |
+| `linkedin.posts.comment` | Post reference, text, mentions, or one photo/GIF attachment | One top-level comment action result, verified only by exactly one new stable comment reference matching the requested payload, with evidence |
 | `linkedin.posts.react` | Post reference and `none`, `like`, `celebrate`, `support`, `love`, `insightful`, or `funny` | Verified reaction state, failure, or uncertainty plus evidence |
 
 Post creation modes are `text`, `images`, `video`, `document`, `poll`,
