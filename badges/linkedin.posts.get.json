@@ -1,6 +1,6 @@
 {
-  "color": "brightgreen",
+  "color": "lightgrey",
   "label": "",
-  "message": "verified",
+  "message": "not checked",
   "schemaVersion": 1
 }
