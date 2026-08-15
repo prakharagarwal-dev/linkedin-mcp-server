@@ -45,6 +45,7 @@ PUBLIC_REPOSITORY_FILES = {
     "PRIVACY.md",
     "README.md",
     "SECURITY.md",
+    "docs/DISTRIBUTION.md",
     "docs/PUBLISHING.md",
     "packaging/mcpb/manifest.json",
     "server.json",
@@ -101,6 +102,19 @@ def test_release_workflow_has_a_non_mutating_pypi_retry_target() -> None:
     assert all_surfaces_gate not in pypi_job
 
 
+def test_registry_workflow_publishes_immutable_oci_and_mcpb_packages() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "publish-registries.yml").read_text()
+
+    assert 'MCPB_FILENAME="linkedin-mcp-server-$VERSION.mcpb"' in workflow
+    assert 'RELEASE_TAG="v$VERSION"' in workflow
+    assert "gh release download" in workflow
+    assert 'registryType: "mcpb"' in workflow
+    assert "fileSha256: $sha256" in workflow
+    assert '.registryType == "oci" and .identifier == $image' in workflow
+    assert '.registryType == "mcpb" and' in workflow
+    assert ".fileSha256 == $mcpb_sha256" in workflow
+
+
 def test_registry_and_bundle_metadata_share_the_release_identity() -> None:
     registry = json.loads((ROOT / "server.json").read_text())
     bundle = json.loads((ROOT / "packaging" / "mcpb" / "manifest.json").read_text())
@@ -115,7 +129,7 @@ def test_registry_and_bundle_metadata_share_the_release_identity() -> None:
     assert registry["description"] == REGISTRY_DESCRIPTION
     assert len(registry["description"]) <= 100
     assert bundle["description"] == PUBLIC_DESCRIPTION
-    assert bundle["long_description"].startswith(PUBLIC_DESCRIPTION)
+    assert bundle["long_description"] == PUBLIC_DESCRIPTION
     assert PUBLIC_DESCRIPTION in readme.replace("\n", " ")
     assert f'org.opencontainers.image.description="{PUBLIC_DESCRIPTION}"' in dockerfile
     assert registry["packages"] == [

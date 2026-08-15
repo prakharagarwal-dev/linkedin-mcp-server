@@ -230,7 +230,7 @@ See the [Zed MCP documentation](https://zed.dev/docs/ai/mcp).
 <details>
 <summary>Goose</summary>
 
-[![Install in Goose](https://block.github.io/goose/img/extension-install-dark.svg)](https://block.github.io/goose/extension?cmd=uvx&arg=--from&arg=linkedin-mcp-local&arg=linkedin-mcp&arg=serve&arg=--transport&arg=stdio&id=linkedin-mcp&name=LinkedIn%20MCP&description=Search%20LinkedIn%20jobs%2C%20people%2C%20companies%2C%20posts%2C%20connections%2C%20and%20messages)
+[![Install in Goose](https://block.github.io/goose/img/extension-install-dark.svg)](https://block.github.io/goose/extension?cmd=uvx&arg=--from&arg=linkedin-mcp-local&arg=linkedin-mcp&arg=serve&arg=--transport&arg=stdio&id=linkedin-mcp&name=LinkedIn%20MCP&description=A%20LinkedIn%20MCP%20server%20to%20find%20jobs%2C%20search%20people%2C%20research%20companies%2C%20manage%20your%20network%2C%20publish%20and%20engage%20with%20posts%2C%20and%20read%20or%20send%20messages.)
 
 Or add a custom stdio extension with command `uvx` and arguments
 `--from linkedin-mcp-local linkedin-mcp serve --transport stdio`, or start one
@@ -452,6 +452,7 @@ See [SECURITY.md](SECURITY.md) and [the security design](docs/SECURITY.md).
 - [Architecture](docs/ARCHITECTURE.md)
 - [Testing](docs/TESTING.md)
 - [Collection verification](docs/COLLECTION_VERIFICATION_PROCESS.md)
+- [Distribution and registry coverage](docs/DISTRIBUTION.md)
 - [Publishing](docs/PUBLISHING.md)
 - [Changelog](CHANGELOG.md)
 
