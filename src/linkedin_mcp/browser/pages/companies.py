@@ -777,25 +777,52 @@ async def _about_region(main: Locator) -> Locator:
         "heading",
         name=re.compile(r"^(?:About|Overview)$", re.IGNORECASE),
     )
-    regions: list[Locator] = []
-    for index in range(await candidates.count()):
-        heading = candidates.nth(index)
-        if not await heading.is_visible():
-            continue
-        ancestor = heading.locator("xpath=ancestor::section[1]")
-        region = ancestor.first if await ancestor.count() else heading.locator("..")
-        if await region.is_visible() and (await region.inner_text()).strip():
-            regions.append(region)
-    if len(regions) != 1:
-        raise ParserDriftError("LinkedIn company About page has no unique visible About section.")
-    return regions[0]
+    for attempt in range(_INITIAL_RESULTS_POLL_ATTEMPTS):
+        regions: dict[
+            tuple[str, tuple[float, float, float, float] | None],
+            tuple[Locator, bool],
+        ] = {}
+        for index in range(await candidates.count()):
+            heading = candidates.nth(index)
+            if not await heading.is_visible():
+                continue
+            ancestor = heading.locator("xpath=ancestor::section[1]")
+            region = ancestor.first if await ancestor.count() else heading.locator("..")
+            if not await region.is_visible():
+                continue
+            text = (await region.inner_text()).strip()
+            if not text:
+                continue
+            lines = _unique_lines(text)
+            labels = {line.casefold().rstrip(":") for line in lines}
+            contains_about_field = any(label.casefold() in labels for label in _ABOUT_FIELD_LABELS)
+            box = await region.bounding_box()
+            bounds = (
+                (
+                    box["x"],
+                    box["y"],
+                    box["width"],
+                    box["height"],
+                )
+                if box is not None
+                else None
+            )
+            regions.setdefault(("\n".join(lines), bounds), (region, contains_about_field))
+        if len(regions) == 1:
+            return next(iter(regions.values()))[0]
+        qualified = [region for region, has_field in regions.values() if has_field]
+        if len(qualified) == 1:
+            return qualified[0]
+        if attempt + 1 < _INITIAL_RESULTS_POLL_ATTEMPTS:
+            await main.page.wait_for_timeout(_INITIAL_RESULTS_POLL_DELAY_MS)
+    raise ParserDriftError("LinkedIn company About page has no unique visible About section.")
 
 
 def _about_description(visible_text: str) -> str | None:
-    value = visible_text.strip()
-    heading = re.match(r"^(?:About|Overview)\s*", value, re.IGNORECASE)
-    if heading:
-        value = value[heading.end() :]
+    lines = visible_text.strip().splitlines()
+    while lines and lines[0].strip().casefold() in {"about", "overview"}:
+        lines.pop(0)
+    value = "\n".join(lines).strip()
     boundaries = tuple(
         match.start()
         for label in _ABOUT_FIELD_LABELS

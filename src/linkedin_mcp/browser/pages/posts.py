@@ -111,7 +111,9 @@ _POST_REGION_SELECTOR = (
     "[data-urn*='urn:li:share'], [data-urn*='urn:li:ugcPost'], "
     "[role='listitem']:has(button[aria-label^='Open control menu for post by '])"
 )
-_COMMENT_REGION_SELECTOR = "[data-comment-urn], [id^='replaceableComment_urn:li:comment:']"
+_COMMENT_REGION_SELECTOR = (
+    "[data-comment-urn], [data-id^='urn:li:comment:'], [id^='replaceableComment_urn:li:comment:']"
+)
 _POST_SEARCH_END_PATTERN = re.compile(
     r"^(?:no (?:matching )?(?:posts|results)(?: found| to show)?|"
     r"we couldn(?:'|\N{RIGHT SINGLE QUOTATION MARK})t find any results)"
@@ -2417,7 +2419,8 @@ async def _comment_reference(region: Locator) -> str | None:
 async def _belongs_to_comment(candidate: Locator, comment_ref: str) -> bool:
     owner = candidate.locator(
         "xpath=ancestor-or-self::*["
-        "@data-comment-urn or starts-with(@id, 'replaceableComment_urn:li:comment:')"
+        "@data-comment-urn or starts-with(@data-id, 'urn:li:comment:') or "
+        "starts-with(@id, 'replaceableComment_urn:li:comment:')"
         "][1]"
     )
     return bool(await owner.count() and await _comment_reference(owner.first) == comment_ref)
@@ -2430,7 +2433,8 @@ async def _comment_parent_reference(region: Locator) -> str | None:
             return reference
     parent = region.locator(
         "xpath=ancestor::*["
-        "@data-comment-urn or starts-with(@id, 'replaceableComment_urn:li:comment:')"
+        "@data-comment-urn or starts-with(@data-id, 'urn:li:comment:') or "
+        "starts-with(@id, 'replaceableComment_urn:li:comment:')"
         "][1]"
     )
     if await parent.count():
