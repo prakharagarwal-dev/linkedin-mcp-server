@@ -57,6 +57,7 @@ _REACTION_STATE_SELECTOR = "[aria-label^='Reaction button state:' i]"
 _REACTION_CONTROL_SELECTOR = (
     "[data-reaction-control], "
     "button[aria-label^='Reaction button state:' i], "
+    "button[aria-label^='React ' i][aria-pressed], "
     "[role='button'][tabindex='0']:has("
     "[aria-label^='Reaction button state:' i])"
 )
@@ -376,55 +377,62 @@ class PostEngagementPage:
 
     @staticmethod
     async def _active_actor(page: Page) -> tuple[str, str]:
-        explicit_candidates = page.locator(
-            "a[data-active-member][href*='/in/'], "
-            "[data-active-member] a[href*='/in/'], "
-            "nav a[aria-label*='profile' i][href*='/in/']"
-        )
-        values: list[tuple[str, str]] = []
-        for index in range(min(await explicit_candidates.count(), 20)):
-            candidate = explicit_candidates.nth(index)
-            if not await candidate.is_visible():
-                continue
-            href = await candidate.get_attribute("href")
-            slug = profile_slug_from_url(urljoin("https://www.linkedin.com", href or ""))
-            name = (await candidate.inner_text()).strip().splitlines()
-            if slug and name and name[0].strip():
-                values.append((slug, name[0].strip()))
-        unique = list(dict.fromkeys(values))
-        if len(unique) == 1:
-            return unique[0]
-        if unique:
-            raise ParserDriftError("LinkedIn has no unique visible active member identity.")
-
-        # The current post-detail layout exposes the signed-in member's profile
-        # card in a visible complementary rail while the top-navigation "Me"
-        # control is a button without a profile URL. Bind only when every
-        # visible profile link in that rail resolves to one stable member slug.
-        rail_candidates = page.locator("aside a[href*='/in/']")
         rail_slugs: set[str] = set()
         named_candidates: list[tuple[int, str, str]] = []
-        for index in range(min(await rail_candidates.count(), 50)):
-            candidate = rail_candidates.nth(index)
-            if not await candidate.is_visible():
-                continue
-            href = await candidate.get_attribute("href")
-            slug = profile_slug_from_url(urljoin("https://www.linkedin.com", href or ""))
-            if slug is None:
-                continue
-            rail_slugs.add(slug)
-            text = (await candidate.inner_text()).strip()
-            lines = [line.strip() for line in text.splitlines() if line.strip()]
-            if lines:
-                named_candidates.append((len(text), slug, lines[0]))
-        if len(rail_slugs) != 1:
-            raise ParserDriftError("LinkedIn has no unique visible active member identity.")
-        actor_slug = next(iter(rail_slugs))
-        names = [candidate for candidate in named_candidates if candidate[1] == actor_slug]
-        if not names:
+        for attempt in range(21):
+            explicit_candidates = page.locator(
+                "a[data-active-member][href*='/in/'], "
+                "[data-active-member] a[href*='/in/'], "
+                "nav a[aria-label*='profile' i][href*='/in/']"
+            )
+            values: list[tuple[str, str]] = []
+            for index in range(min(await explicit_candidates.count(), 20)):
+                candidate = explicit_candidates.nth(index)
+                if not await candidate.is_visible():
+                    continue
+                href = await candidate.get_attribute("href")
+                slug = profile_slug_from_url(urljoin("https://www.linkedin.com", href or ""))
+                name = (await candidate.inner_text()).strip().splitlines()
+                if slug and name and name[0].strip():
+                    values.append((slug, name[0].strip()))
+            unique = list(dict.fromkeys(values))
+            if len(unique) == 1:
+                return unique[0]
+            if unique:
+                raise ParserDriftError("LinkedIn has no unique visible active member identity.")
+
+            # The current post-detail layout exposes the signed-in member's
+            # profile card in a complementary rail after the post itself. Bind
+            # only when every visible profile link in that rail resolves to one
+            # stable member slug and a visible display name.
+            rail_candidates = page.locator("aside a[href*='/in/']")
+            rail_slugs = set()
+            named_candidates = []
+            for index in range(min(await rail_candidates.count(), 50)):
+                candidate = rail_candidates.nth(index)
+                if not await candidate.is_visible():
+                    continue
+                href = await candidate.get_attribute("href")
+                slug = profile_slug_from_url(urljoin("https://www.linkedin.com", href or ""))
+                if slug is None:
+                    continue
+                rail_slugs.add(slug)
+                text = (await candidate.inner_text()).strip()
+                lines = [line.strip() for line in text.splitlines() if line.strip()]
+                if lines:
+                    named_candidates.append((len(text), slug, lines[0]))
+            if len(rail_slugs) == 1:
+                actor_slug = next(iter(rail_slugs))
+                names = [candidate for candidate in named_candidates if candidate[1] == actor_slug]
+                if names:
+                    _, _, actor_name = max(names, key=lambda candidate: candidate[0])
+                    return actor_slug, actor_name
+            if attempt < 20:
+                await page.wait_for_timeout(250)
+
+        if len(rail_slugs) == 1 and not named_candidates:
             raise ParserDriftError("LinkedIn has no visible active member display name.")
-        _, _, actor_name = max(names, key=lambda candidate: candidate[0])
-        return actor_slug, actor_name
+        raise ParserDriftError("LinkedIn has no unique visible active member identity.")
 
     @staticmethod
     def _action_target(
@@ -471,7 +479,8 @@ class PostEngagementPage:
         region: Locator,
     ) -> Locator:
         scoped_label = re.compile(
-            r"add a comment|leave your thoughts|text editor for creating (?:a )?comment",
+            r"add a comment|leave your thoughts|"
+            r"text editor for creating (?:(?:a )?comment|content)",
             re.I,
         )
         composer = region.get_by_role("textbox", name=scoped_label)
@@ -785,12 +794,55 @@ class PostEngagementPage:
                 f"LinkedIn has no unique visible {desired.value} reaction option."
             )
         # The current UI portals the six reaction buttons outside the post
-        # region after hover. Their exact accessible names remain the
-        # binding, and only one visible option is accepted.
-        return await _unique_visible(
-            page.get_by_role("button", name=option_name),
-            f"{desired.value} reaction option",
+        # region after hover and prefixes their accessible names with "React".
+        # The trigger shares that name but retains aria-pressed, while menu
+        # options do not. Wait only for one exact visible unpressed option.
+        portaled_name = re.compile(
+            rf"^(?:React\s+)?{re.escape(_REACTION_LABELS[desired])}$",
+            re.I,
         )
+        portaled = page.get_by_role("button", name=portaled_name).and_(
+            page.locator("button:not([aria-pressed])")
+        )
+        visible: list[Locator] = []
+        for attempt in range(20):
+            visible = [
+                portaled.nth(index)
+                for index in range(await portaled.count())
+                if await portaled.nth(index).is_visible()
+            ]
+            if len(visible) == 1:
+                return visible[0]
+            if attempt < 19:
+                await page.wait_for_timeout(250)
+        raise ParserDriftError(f"LinkedIn has no unique visible {desired.value} reaction option.")
+
+    @staticmethod
+    async def _reaction_control_state(control: Locator) -> ReactionState | None:
+        state = control.locator(_REACTION_STATE_SELECTOR)
+        state_control = state if await state.count() == 1 else control
+        label = (await state_control.get_attribute("aria-label") or "").strip().casefold()
+        if label.startswith("reaction button state:"):
+            normalized = label.partition(":")[2].strip()
+            if normalized == "no reaction":
+                return ReactionState.NONE
+            if normalized in {
+                value.value for value in ReactionState if value is not ReactionState.NONE
+            }:
+                return ReactionState(normalized)
+        match = re.fullmatch(
+            r"react\s+(like|celebrate|support|love|insightful|funny)",
+            label,
+        )
+        if match is not None:
+            pressed = await control.get_attribute(
+                "aria-pressed"
+            ) or await state_control.get_attribute("aria-pressed")
+            if pressed == "false":
+                return ReactionState.NONE
+            if pressed == "true":
+                return ReactionState(match.group(1))
+        return None
 
     @staticmethod
     async def _reaction_state(region: Locator) -> ReactionState:
@@ -804,21 +856,8 @@ class PostEngagementPage:
                 return ReactionState(value)
         current_controls = await PostEngagementPage._visible_reaction_controls(region)
         for item in current_controls:
-            state = item.locator(_REACTION_STATE_SELECTOR)
-            label = (
-                await state.get_attribute("aria-label")
-                if await state.count() == 1
-                else await item.get_attribute("aria-label")
-            )
-            label = (label or "").strip().casefold()
-            _, _, value = label.partition(":")
-            normalized = value.strip()
-            if normalized == "no reaction":
-                return ReactionState.NONE
-            if normalized in {
-                state.value for state in ReactionState if state is not ReactionState.NONE
-            }:
-                return ReactionState(normalized)
+            if (value := await PostEngagementPage._reaction_control_state(item)) is not None:
+                return value
         pressed = region.locator(
             "button[aria-pressed='true'][data-reaction-control], "
             "button[aria-pressed='true'][data-current-reaction]"
@@ -862,12 +901,7 @@ class PostEngagementPage:
         current_containers = await PostEngagementPage._visible_reaction_controls(region)
         current_matches: list[Locator] = []
         for candidate in current_containers:
-            state = candidate.locator(_REACTION_STATE_SELECTOR)
-            if await state.count() == 1:
-                label = (await state.get_attribute("aria-label") or "").strip().casefold()
-            else:
-                label = (await candidate.get_attribute("aria-label") or "").strip().casefold()
-            if label.partition(":")[2].strip() == current.value:
+            if await PostEngagementPage._reaction_control_state(candidate) is current:
                 current_matches.append(candidate)
         if len(current_matches) != 1:
             raise ParserDriftError("LinkedIn has no unique visible current reaction control.")

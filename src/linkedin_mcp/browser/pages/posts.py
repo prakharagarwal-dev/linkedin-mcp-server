@@ -151,6 +151,7 @@ _POST_DETAIL_MAX_ANCHORS = 300
 _POST_DETAIL_MAX_MEDIA = 100
 _POST_DETAIL_MAX_ACCESSIBLE_LABELS = 1_000
 _POST_DETAIL_MAX_BODY_BOXES = 10
+_LINKEDIN_POST_SHORT_PATH = re.compile(r"^/p/[A-Za-z0-9_-]+/?$")
 _INSTALL_CLIPBOARD_CAPTURE = """
 () => {
   window.__linkedinMcpCopiedPostLink = null;
@@ -815,13 +816,17 @@ async def _post_reference_for_region(region: Locator) -> str | None:
                 "LinkedIn post menu has no unique visible Copy link to post control."
             )
         await visible_copy_controls[0].click()
-        await page.wait_for_timeout(100)
+        copied_value: str | None = None
+        for _ in range(20):
+            await page.wait_for_timeout(100)
+            copied_value = cast(
+                str | None,
+                await page.evaluate("window.__linkedinMcpCopiedPostLink"),
+            )
+            if copied_value:
+                break
         if page.url != source_url:
             raise ParserDriftError("LinkedIn Copy link to post unexpectedly navigated away.")
-        copied_value = cast(
-            str | None,
-            await page.evaluate("window.__linkedinMcpCopiedPostLink"),
-        )
     except PlaywrightError as error:
         raise ParserDriftError(
             "LinkedIn post link could not be captured from its visible menu."
@@ -833,6 +838,20 @@ async def _post_reference_for_region(region: Locator) -> str | None:
             await page.keyboard.press("Escape")
     if not copied_value:
         raise ParserDriftError("LinkedIn Copy link to post returned no stable visible link.")
+    parsed_copy = urlsplit(copied_value)
+    if (
+        parsed_copy.scheme == "https"
+        and parsed_copy.hostname == "lnkd.in"
+        and parsed_copy.netloc.casefold() == "lnkd.in"
+        and not parsed_copy.query
+        and not parsed_copy.fragment
+        and _LINKEDIN_POST_SHORT_PATH.fullmatch(parsed_copy.path)
+    ):
+        # The visible action now sometimes returns an opaque LinkedIn short
+        # link. It contains no stable post URN, and resolving it would broaden
+        # this collection beyond the configured LinkedIn hosts. Classify the
+        # selected card as unsupported instead of inventing an identity.
+        return None
     try:
         copied_url = validate_linkedin_url(copied_value, ("www.linkedin.com",))
     except InvalidTargetError as error:
@@ -1182,7 +1201,9 @@ async def _detail_post_regions(page: Page) -> list[tuple[Locator, str]]:
     )
     values: list[tuple[Locator, str]] = []
     for menu in menus:
-        region = menu.locator("xpath=ancestor::*[@role='listitem' or self::article][1]")
+        region = menu.locator(
+            "xpath=ancestor::*[@role='listitem' or @role='article' or self::article][1]"
+        )
         if not await region.count():
             continue
         reference = await _post_reference_for_region(region.first)
@@ -1267,10 +1288,17 @@ async def _expand_exact_post_body(
 
 
 async def _post_body_boxes(region: Locator) -> list[Locator]:
-    return await _bounded_visible_locators(
+    current = await _bounded_visible_locators(
         region.locator('[data-testid="expandable-text-box"]'),
         limit=_POST_DETAIL_MAX_BODY_BOXES,
         description="post-body",
+    )
+    if current:
+        return current
+    return await _bounded_visible_locators(
+        region.locator(".feed-shared-update-v2__description"),
+        limit=_POST_DETAIL_MAX_BODY_BOXES,
+        description="legacy post-body",
     )
 
 
