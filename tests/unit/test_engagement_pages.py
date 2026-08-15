@@ -251,6 +251,66 @@ async def test_comment_verifies_native_ugc_discussion_alias_for_activity_url(
     assert result.final_state.startswith("comment_published:comment:ugc-post:7999999999999999998:")
 
 
+@pytest.mark.timeout(30)
+async def test_comment_accepts_single_rendered_post_alias_for_requested_activity(
+    tmp_path: Path,
+) -> None:
+    html = ENGAGEMENT_HTML.replace(
+        'data-post-urn="urn:li:activity:7312345678901234567"',
+        'data-post-urn="urn:li:share:7999999999999999997"',
+    )
+    request = PostCommentInput(
+        context_id="engagement-context",
+        request_id="action-comment-with-rendered-post-alias",
+        post_ref=POST_REF,
+        text="thanks",
+    )
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        page = await browser.new_page()
+        adapter = PostEngagementPage(
+            cast(BrowserManager, EngagementFixtureBrowser(page, html=html)),
+            LocalAssetStore(tmp_path),
+        )
+        try:
+            result = await adapter.perform_comment(await _comment_command(adapter, request))
+        finally:
+            await browser.close()
+
+    assert result.outcome is ActionOutcome.VERIFIED
+    assert result.performed is True
+
+
+@pytest.mark.timeout(30)
+async def test_reaction_accepts_single_rendered_post_alias_for_requested_activity(
+    tmp_path: Path,
+) -> None:
+    html = ENGAGEMENT_HTML.replace(
+        'data-post-urn="urn:li:activity:7312345678901234567"',
+        'data-post-urn="urn:li:share:7999999999999999997"',
+    )
+    request = PostReactionInput(
+        context_id="engagement-context",
+        request_id="action-reaction-with-rendered-post-alias",
+        post_ref=POST_REF,
+        desired_reaction=ReactionState.LIKE,
+    )
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        page = await browser.new_page()
+        adapter = PostEngagementPage(
+            cast(BrowserManager, EngagementFixtureBrowser(page, html=html)),
+            LocalAssetStore(tmp_path),
+        )
+        try:
+            result = await adapter.perform_reaction(await _reaction_command(adapter, request))
+        finally:
+            await browser.close()
+
+    assert result.outcome is ActionOutcome.VERIFIED
+    assert result.performed is True
+
+
 @pytest.mark.timeout(40)
 @pytest.mark.parametrize("attachment_kind", ["photo", "gif"])
 async def test_comment_photo_and_gif_are_exact_and_verifiable(

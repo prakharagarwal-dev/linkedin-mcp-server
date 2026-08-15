@@ -211,6 +211,16 @@ class _PostHeaderFields:
 
 
 @dataclass(frozen=True, slots=True)
+class _VisiblePostBatch:
+    posts: tuple[PostSummary, ...]
+    unsupported_result_count: int
+
+
+class _UnsupportedPostAuthorIdentityError(ParserDriftError):
+    """A selected post has a LinkedIn identity outside the public slug contract."""
+
+
+@dataclass(frozen=True, slots=True)
 class _PostContentFields:
     content_type: PostContentType
     attachments: tuple[PostAttachment, ...]
@@ -974,17 +984,28 @@ async def _visible_posts(
     *,
     result_limit: int,
     excluded_refs: frozenset[str],
-) -> tuple[PostSummary, ...]:
+) -> _VisiblePostBatch:
     main = page.locator("main")
     candidates = main.locator(_POST_REGION_SELECTOR)
     inventory: list[tuple[int, str]] = []
     observed_refs: set[str] = set(excluded_refs)
+    unsupported_result_count = 0
     for index in range(min(await candidates.count(), 500)):
         candidate = candidates.nth(index)
         if not await candidate.is_visible():
             continue
         reference = await _post_reference_for_region(candidate)
-        if reference is None or reference in observed_refs:
+        if reference is None:
+            menus = candidate.get_by_role("button", name=_POST_MENU_PATTERN)
+            has_visible_post_menu = False
+            for menu_index in range(min(await menus.count(), 3)):
+                if await menus.nth(menu_index).is_visible():
+                    has_visible_post_menu = True
+                    break
+            if has_visible_post_menu:
+                unsupported_result_count += 1
+            continue
+        if reference in observed_refs:
             continue
         observed_refs.add(reference)
         inventory.append((index, reference))
@@ -1007,27 +1028,30 @@ async def _visible_posts(
             raise ParserDriftError(
                 "LinkedIn post search changed an exact result identity during extraction."
             )
-        summary = await _post_summary_from_region(
-            candidate,
-            known_reference=reference,
-        )
+        try:
+            summary = await _post_summary_from_region(
+                candidate,
+                known_reference=reference,
+            )
+        except _UnsupportedPostAuthorIdentityError:
+            unsupported_result_count += 1
+            continue
         if summary is not None:
             values[reference] = summary
-    return tuple(values[reference] for _, reference in inventory if reference in values)
+    return _VisiblePostBatch(
+        posts=tuple(values[reference] for _, reference in inventory if reference in values),
+        unsupported_result_count=unsupported_result_count,
+    )
 
 
-async def _region_for_post(page: Page, post_ref: str) -> Locator:
+async def _regions_for_post(page: Page, post_ref: str) -> list[Locator]:
     candidates = page.locator("main").locator(_POST_REGION_SELECTOR)
     matches: list[Locator] = []
     for index in range(min(await candidates.count(), 500)):
         candidate = candidates.nth(index)
         if await candidate.is_visible() and await _post_reference_for_region(candidate) == post_ref:
             matches.append(candidate)
-    if len(matches) != 1:
-        raise ParserDriftError(
-            "LinkedIn post detail did not expose one exact visible requested post."
-        )
-    return matches[0]
+    return matches
 
 
 class PostSearchPage:
@@ -1054,6 +1078,7 @@ class PostSearchPage:
         captures: list[tuple[str, str]] = []
         resolved = _ResolvedPostFacets()
         pages_visited = 0
+        unsupported_result_count = 0
         stop_reason = StopReason.SAFETY_BOUND
         async with self._browser.page() as page:
             if _requires_post_facet_resolution(request.filters):
@@ -1072,11 +1097,13 @@ class PostSearchPage:
                 await self._browser.navigate(page, target)
                 rendered_state = await _wait_for_post_search_state(page)
                 await _prepare_visible_content(page)
-                visible_posts = await _visible_posts(
+                visible_batch = await _visible_posts(
                     page,
                     result_limit=limit - len(posts),
                     excluded_refs=frozenset(posts),
                 )
+                visible_posts = visible_batch.posts
+                unsupported_result_count += visible_batch.unsupported_result_count
                 captured_text = (await page.locator("main").inner_text()).strip()
                 if not captured_text:
                     raise ParserDriftError("LinkedIn post search returned no visible text.")
@@ -1100,6 +1127,9 @@ class PostSearchPage:
                         break
                 if len(posts) >= limit:
                     break
+                if visible_batch.unsupported_result_count:
+                    stop_reason = StopReason.VISIBLE_PAGE_COMPLETE
+                    break
                 if len(posts) == before:
                     if rendered_state is CollectionSettleOutcome.EXPLICIT_END:
                         stop_reason = StopReason.NO_NEW_RESULTS
@@ -1111,6 +1141,7 @@ class PostSearchPage:
             filters=request.filters,
             pages_visited=pages_visited,
             result_count=len(values),
+            unsupported_result_count=unsupported_result_count,
             max_results=limit,
             stop_reason=stop_reason,
             captured_at=captured_at,
@@ -1164,6 +1195,13 @@ async def _detail_region_for_post(
     page: Page,
     requested_post_ref: str,
 ) -> tuple[Locator, str]:
+    exact_regions = await _regions_for_post(page, requested_post_ref)
+    if len(exact_regions) == 1:
+        return exact_regions[0], requested_post_ref
+    if len(exact_regions) > 1:
+        raise ParserDriftError(
+            "LinkedIn post detail exposed multiple visible copies of the requested post."
+        )
     regions = await _detail_post_regions(page)
     exact = [
         (region, reference) for region, reference in regions if reference == requested_post_ref
@@ -1274,6 +1312,7 @@ async def _author_from_identity_region(
         tuple[PostAuthorType, str],
         tuple[int, str, HttpUrl],
     ] = {}
+    unsupported_linkedin_identity = False
     normalized_expected = expected_name.casefold() if expected_name else None
     for anchor in anchors:
         href = await anchor.get_attribute("href")
@@ -1292,6 +1331,12 @@ async def _author_from_identity_region(
             identity = company_slug
             canonical_url = HttpUrl(canonical_company_url(company_slug))
         else:
+            parsed = urlsplit(absolute)
+            if (
+                parsed.hostname == "www.linkedin.com"
+                and re.match(r"^/(?:in|company)/[^/]+(?:/|$)", parsed.path) is not None
+            ):
+                unsupported_linkedin_identity = True
             continue
         lines = _unique_lines((await anchor.inner_text()).strip())
         alt_values: list[str] = []
@@ -1319,6 +1364,10 @@ async def _author_from_identity_region(
         if existing is None or score > existing[0]:
             candidates[key] = (score, display_name, canonical_url)
     if not candidates:
+        if unsupported_linkedin_identity:
+            raise _UnsupportedPostAuthorIdentityError(
+                "LinkedIn post author identity is outside the supported typed slug contract."
+            )
         raise ParserDriftError("LinkedIn post detail exposed no typed visible author identity.")
     selected = list(candidates.items())
     if normalized_expected is not None:
@@ -2624,9 +2673,16 @@ async def post_author_from_region(region: Locator) -> PostAuthor:
 
 
 async def region_for_post(page: Page, post_ref: str) -> Locator:
-    """Resolve one exact visible post region by its stable reference."""
+    """Resolve the sole visible detail region for a requested post reference.
 
-    return await _region_for_post(page, post_ref)
+    LinkedIn can keep an activity URL in the address bar while rendering that
+    activity's single underlying share or UGC-post reference. Detail reads
+    already retain both identities safely; engagement actions must use the
+    same bounded alias rule or they reject the exact post they just read.
+    """
+
+    region, _ = await _detail_region_for_post(page, post_ref)
+    return region
 
 
 def comment_regions(page: Page) -> Locator:
@@ -2705,7 +2761,10 @@ class PostCommentsPage:
         async with self._browser.page() as page:
             await self._browser.navigate(page, target)
             await _expand_visible_content(page)
-            post_region = await _region_for_post(page, request.post_ref)
+            post_region, displayed_post_ref = await _detail_region_for_post(
+                page,
+                request.post_ref,
+            )
             visible_regions = await _visible_comment_regions(page)
             if not visible_regions:
                 controls = post_region.get_by_role(
@@ -2801,7 +2860,7 @@ class PostCommentsPage:
                     delay_ms=_COLLECTION_POLL_DELAY_MS,
                 )
             regions = comment_regions(page)
-            native_post_ref = await discussion_post_reference(page, request.post_ref)
+            native_post_ref = await discussion_post_reference(page, displayed_post_ref)
             comments_with_layout: list[tuple[CommentObservation, float | None]] = []
             comment_refs: set[str] = set()
             for index in range(min(await regions.count(), 1_000)):

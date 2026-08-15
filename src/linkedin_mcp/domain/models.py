@@ -2480,6 +2480,13 @@ class PostSearchCoverage(StrictModel):
     filters: PostSearchFilters = Field(default_factory=PostSearchFilters)
     pages_visited: Annotated[int, Field(ge=1)]
     result_count: Annotated[int, Field(ge=0)]
+    unsupported_result_count: Annotated[int, Field(ge=0)] = Field(
+        default=0,
+        description=(
+            "Selected visible post cards omitted because their stable post or author "
+            "identity is outside the typed public contract."
+        ),
+    )
     max_results: Annotated[int, Field(ge=1)]
     stop_reason: StopReason
     captured_at: datetime

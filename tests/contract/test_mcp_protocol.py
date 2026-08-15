@@ -331,6 +331,7 @@ class ProtocolPostSearch:
                 filters=request.filters,
                 pages_visited=1,
                 result_count=1,
+                unsupported_result_count=1,
                 max_results=request.page_size,
                 stop_reason=StopReason.VISIBLE_PAGE_COMPLETE,
                 captured_at=captured_at,
@@ -857,6 +858,8 @@ async def test_every_read_and_operational_tool_round_trips_through_mcp(
             assert result.isError is False, tool_name
             assert result.structuredContent is not None
             assert expected_field in result.structuredContent
+            if tool_name == "linkedin.posts.search":
+                assert result.structuredContent["coverage"]["unsupported_result_count"] == 1
 
         replayed = await session.call_tool(
             "linkedin.jobs.search",

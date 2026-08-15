@@ -191,6 +191,7 @@ def test_post_fixture_manifest_locks_current_visible_filter_surface() -> None:
     assert "keyboard activation" in cast(str, search_contract["body"])
     assert "Reaction button state" in cast(str, search_contract["engagement"])
     assert "exclude author avatars" in cast(str, search_contract["content_type"])
+    assert search_contract["unsupported_identity_fixture"] == ("search-unsupported-author.html")
     detail_contract = cast(dict[str, object], manifest["detail_contract"])
     assert detail_contract["stable_reference_action"] == "Copy link to post"
     assert detail_contract["body"] == '[data-testid="expandable-text-box"]'
@@ -384,6 +385,7 @@ async def test_post_search_resolves_all_named_facets_and_extracts_stable_results
     assert posts[0].comment_count_text == "3"
     assert posts[0].repost_count_text == "1"
     assert coverage.pages_visited == 1
+    assert coverage.unsupported_result_count == 1
     assert coverage.stop_reason is StopReason.RESULT_LIMIT
     assert posts[0].visible_text in captured_text
     assert source_url == fixture_browser.navigations[-1]
@@ -430,6 +432,7 @@ async def test_post_search_inventories_virtualized_prefix_before_expanding_cards
         "activity:7312345678901234999",
     ]
     assert [post.author.name for post in posts] == ["Jane Doe", "Acme Cloud"]
+    assert coverage.unsupported_result_count == 1
     assert coverage.stop_reason is StopReason.RESULT_LIMIT
     assert all(post.visible_text in captured_text for post in posts)
 
@@ -511,6 +514,35 @@ async def test_post_search_only_completes_empty_on_visible_end_state() -> None:
 
     assert posts == ()
     assert coverage.stop_reason is StopReason.NO_NEW_RESULTS
+
+
+@pytest.mark.timeout(20)
+async def test_post_search_classifies_selected_card_with_unsupported_author_identity() -> None:
+    html = (FIXTURES / "posts/latest/search-unsupported-author.html").read_text()
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        page = await browser.new_page()
+        collector = PostSearchPage(
+            cast(BrowserManager, StaticPostFixtureBrowser(page, html)),
+            max_pages=1,
+        )
+        try:
+            posts, coverage, captured_text, _ = await collector.collect(
+                PostSearchInput(
+                    context_id="context-1",
+                    request_id="unsupported-post-author",
+                    query="reliability",
+                    page_size=2,
+                )
+            )
+        finally:
+            await browser.close()
+
+    assert [post.post_ref for post in posts] == ["activity:7312345678901234889"]
+    assert posts[0].visible_text in captured_text
+    assert coverage.result_count == 1
+    assert coverage.unsupported_result_count == 1
+    assert coverage.stop_reason is StopReason.VISIBLE_PAGE_COMPLETE
 
 
 @pytest.mark.timeout(30)
@@ -1169,6 +1201,50 @@ async def test_comments_preserve_native_ugc_discussion_alias_for_activity_url() 
         ).source_type.value
         == "linkedin_post_comments"
     )
+
+
+@pytest.mark.timeout(20)
+async def test_comments_accept_single_rendered_post_alias_for_requested_activity() -> None:
+    displayed_post_ref = "share:7999999999999999997"
+    html = (
+        (FIXTURES / "posts/latest/comments.html")
+        .read_text()
+        .replace(
+            'data-post-urn="urn:li:activity:7312345678901234567"',
+            'data-post-urn="urn:li:share:7999999999999999997"',
+        )
+        .replace(
+            '<button id="open-comments"',
+            (
+                '<button aria-label="Open control menu for post by Jane Doe"></button>'
+                '\n        <button id="open-comments"'
+            ),
+        )
+    )
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        page = await browser.new_page()
+        reader = PostCommentsPage(
+            cast(BrowserManager, StaticPostFixtureBrowser(page, html)),
+            max_expansion_rounds=1,
+        )
+        try:
+            threads, coverage, _, _ = await reader.collect(
+                PostCommentsListInput(
+                    context_id="context-1",
+                    request_id="rendered-post-alias-comments",
+                    post_ref=POST_REF,
+                    page_size=10,
+                    max_replies_per_comment=10,
+                )
+            )
+        finally:
+            await browser.close()
+
+    assert displayed_post_ref != coverage.post_ref
+    assert coverage.post_ref == POST_REF
+    assert coverage.discussion_post_ref == POST_REF
+    assert threads[0].comment.post_ref == POST_REF
 
 
 @pytest.mark.timeout(20)

@@ -34,6 +34,11 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Accept the single underlying share or UGC-post identity that LinkedIn renders
+  for an unchanged requested activity URL when listing comments, commenting, or
+  reacting. Post search now classifies selected cards whose stable post or
+  author identity falls outside the typed contract instead of aborting valid
+  neighboring results.
 - Parse current Post-search cards through the same exact header, content, and
   engagement contracts as Post detail. Preserve relationship degree, headline,
   edited age, full expanded text, numeric engagement, and article/job/media
