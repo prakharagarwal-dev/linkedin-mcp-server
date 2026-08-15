@@ -86,6 +86,10 @@ _PARENT_COMMENT_REGION_XPATH = (
 )
 _COMMENT_VERIFICATION_ATTEMPTS = 24
 _COMMENT_VERIFICATION_DELAY_MS = 250
+_COMMENT_EXPANSION_SUFFIX = re.compile(
+    r"(?:\r?\n)[ \t]*(?:\N{HORIZONTAL ELLIPSIS}|\.\.\.)[ \t]*more[ \t]*$",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,6 +138,12 @@ async def _unique_visible(locator: Locator, description: str) -> Locator:
     if len(values) != 1:
         raise ParserDriftError(f"LinkedIn has no unique visible {description}.")
     return values[0]
+
+
+def _visible_comment_text_matches(actual: str, expected: str) -> bool:
+    """Ignore only LinkedIn's trailing visible expansion affordance."""
+
+    return actual == expected or _COMMENT_EXPANSION_SUFFIX.sub("", actual) == expected
 
 
 class PostEngagementPage:
@@ -825,7 +835,9 @@ class PostEngagementPage:
                 for index in range(min(await text_candidates.count(), 100))
                 if await text_candidates.nth(index).is_visible()
             }
-            if payload.text not in visible_text:
+            if not any(
+                _visible_comment_text_matches(candidate, payload.text) for candidate in visible_text
+            ):
                 return False
 
         attachments = region.locator(_COMMENT_ATTACHMENT_SELECTOR)
@@ -925,7 +937,9 @@ class PostEngagementPage:
         comment: CommentObservation,
         payload: CommentCreatePayload,
     ) -> bool:
-        if payload.text is not None and comment.text != payload.text:
+        if payload.text is not None and (
+            comment.text is None or not _visible_comment_text_matches(comment.text, payload.text)
+        ):
             return False
         if payload.attachment is None:
             return not comment.attachments

@@ -42,10 +42,22 @@ def _role_article_target(html: str) -> str:
     ).replace("</article>", "</div>", 1)
 
 
+def test_visible_comment_text_match_only_ignores_expansion_affordance() -> None:
+    matches = engagement_page._visible_comment_text_matches  # pyright: ignore[reportPrivateUsage]
+    text = "An exact long comment."
+
+    assert matches(text, text)
+    assert matches(f"{text}\n… more", text)
+    assert matches(f"{text}\n... MORE", text)
+    assert not matches(f"{text} … more", text)
+    assert not matches(f"{text}\n… more context", text)
+
+
 def _optimistic_comment_html(
     *,
     clear_composer: bool,
     existing_own_comment_text: str | None = None,
+    expansion_suffix: bool = False,
 ) -> str:
     html = ENGAGEMENT_HTML.replace(
         """          comment.dataset.commentUrn =
@@ -58,6 +70,17 @@ def _optimistic_comment_html(
             '          document.querySelector("#discussion").append(comment);',
             """          document.querySelector("#discussion").append(comment);
           composer.querySelector("textarea").value = "";""",
+            1,
+        )
+    if expansion_suffix:
+        html = html.replace(
+            "            body.textContent = text;",
+            """            body.textContent = text;
+            const expansion = document.createElement("button");
+            expansion.type = "button";
+            expansion.textContent = "… more";
+            expansion.style.display = "block";
+            body.append(expansion);""",
             1,
         )
     if existing_own_comment_text is not None:
@@ -225,6 +248,51 @@ async def test_comment_verifies_exact_visible_delta_while_reference_is_delayed(
     assert result.final_state == "comment_published"
     assert "composer cleared" in result.detail
     assert fixture_browser.navigations == 2
+
+
+@pytest.mark.timeout(30)
+@pytest.mark.parametrize("stable_reference", [True, False])
+async def test_comment_verifies_text_with_visible_expansion_affordance(
+    tmp_path: Path,
+    stable_reference: bool,
+) -> None:
+    text = "A long exact comment that LinkedIn truncates in the visible discussion."
+    request = PostCommentInput(
+        context_id="engagement-context",
+        request_id=f"action-truncated-comment-{stable_reference}",
+        post_ref=POST_REF,
+        text=text,
+    )
+    html = _optimistic_comment_html(
+        clear_composer=not stable_reference,
+        expansion_suffix=True,
+    )
+    if stable_reference:
+        html = html.replace(
+            '          comment.className = "comments-comment-entity";',
+            """          comment.dataset.commentUrn =
+            `urn:li:comment:(ugcPost:7312345678901234566,${commentId})`;""",
+            1,
+        )
+
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        page = await browser.new_page()
+        adapter = PostEngagementPage(
+            cast(BrowserManager, EngagementFixtureBrowser(page, html=html)),
+            LocalAssetStore(tmp_path),
+        )
+        try:
+            result = await adapter.perform_comment(await _comment_command(adapter, request))
+        finally:
+            await browser.close()
+
+    assert result.outcome is ActionOutcome.VERIFIED
+    assert result.performed is True
+    if stable_reference:
+        assert result.final_state.startswith("comment_published:comment:")
+    else:
+        assert result.final_state == "comment_published"
 
 
 @pytest.mark.timeout(30)
