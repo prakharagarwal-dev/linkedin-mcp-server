@@ -1,6 +1,6 @@
 {
-  "color": "lightgrey",
+  "color": "red",
   "label": "",
-  "message": "not checked",
+  "message": "check failed",
   "schemaVersion": 1
 }
