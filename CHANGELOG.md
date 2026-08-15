@@ -34,6 +34,10 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Reconcile current invitation inventories when LinkedIn omits zero-count
+  Received category controls or the empty Sent People control. Preserve those
+  views as explicit `unadvertised_empty_views`, require stable structural empty
+  evidence, and continue to fail closed for changed controls or unadvertised cards.
 - Accept the single underlying share or UGC-post identity that LinkedIn renders
   for an unchanged requested activity URL when listing comments, commenting, or
   reacting. Post search now classifies selected cards whose stable post or

@@ -2728,7 +2728,9 @@ class InvitationListCoverage(StrictModel):
                 ge=0,
                 description=(
                     "LinkedIn's exact count for one selected visible view. Null for the "
-                    "server-defined Received all union because the current UI has no All count."
+                    "server-defined Received all union or when LinkedIn omits an empty "
+                    "view's count control and the collector independently proves that view "
+                    "empty."
                 ),
             ),
         ]
@@ -2742,12 +2744,22 @@ class InvitationListCoverage(StrictModel):
         ),
     ]
     view_counts: dict[InvitationFilter, Annotated[int, Field(ge=0)]]
+    unadvertised_empty_views: tuple[InvitationFilter, ...] = Field(
+        default=(),
+        description=(
+            "Selected views whose count control LinkedIn omitted and whose zero inventory "
+            "was independently established from the current visible surface."
+        ),
+    )
     view_source_urls: dict[InvitationFilter, HttpUrl]
     view_membership_count: Annotated[
         int,
         Field(
             ge=0,
-            description="Sum of LinkedIn's advertised counts across every collected view.",
+            description=(
+                "Sum of every reconciled selected-view count, including independently "
+                "proved zero inventories whose count controls LinkedIn omitted."
+            ),
         ),
     ]
     overlap_count: Annotated[
@@ -2780,11 +2792,23 @@ class InvitationListCoverage(StrictModel):
             raise ValueError("Invitation coverage must identify every captured visible view")
         if set(self.view_source_urls) != expected_views:
             raise ValueError("Invitation coverage must identify every visible view source URL")
+        omitted_empty_views = set(self.unadvertised_empty_views)
+        if len(omitted_empty_views) != len(self.unadvertised_empty_views):
+            raise ValueError("Unadvertised empty invitation views cannot contain duplicates")
+        if not omitted_empty_views.issubset(expected_views):
+            raise ValueError("Unadvertised empty invitation views must belong to this traversal")
+        if any(self.view_counts.get(view) != 0 for view in omitted_empty_views):
+            raise ValueError("An unadvertised invitation view must reconcile to zero")
         if sum(self.view_counts.values()) != self.view_membership_count:
             raise ValueError("Invitation view counts must equal the view-membership total")
         if self.invitation_filter is InvitationFilter.ALL:
             if self.advertised_count is not None:
                 raise ValueError("Received All has no current LinkedIn advertised count")
+        elif self.invitation_filter in omitted_empty_views:
+            if self.advertised_count is not None or self.view_membership_count != 0:
+                raise ValueError(
+                    "An omitted empty invitation view cannot claim an advertised count"
+                )
         elif (
             self.advertised_count != self.view_membership_count
             or self.view_counts.get(self.invitation_filter) != self.advertised_count
@@ -2809,12 +2833,14 @@ class InvitationListCoverage(StrictModel):
         if self.stop_reason is StopReason.VISIBLE_PAGE_COMPLETE:
             if self.unique_count + self.overlap_count != self.view_membership_count:
                 raise ValueError("Completed invitation traversal must reconcile view memberships")
-            if self.invitation_filter is not InvitationFilter.ALL and (
-                self.unique_count != self.advertised_count or self.overlap_count != 0
-            ):
-                raise ValueError(
-                    "A completed single invitation view must reconcile its exact count"
-                )
+            if self.invitation_filter is not InvitationFilter.ALL:
+                if self.invitation_filter in omitted_empty_views:
+                    if self.unique_count != 0 or self.overlap_count != 0:
+                        raise ValueError("A completed omitted invitation view must remain empty")
+                elif self.unique_count != self.advertised_count or self.overlap_count != 0:
+                    raise ValueError(
+                        "A completed single invitation view must reconcile its exact count"
+                    )
         return self
 
 

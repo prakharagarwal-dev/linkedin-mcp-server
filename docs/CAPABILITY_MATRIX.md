@@ -62,7 +62,11 @@ publish as a company Page, create nested comment replies, or react to comments.
 
 Received invitation filters are `all`, `focused`, `other`, `verified`,
 `same_company`, `same_school`, and `mutual_connections`. Sent invitations use
-the visible `people` view.
+the visible `people` view. LinkedIn conditionally omits controls for empty
+invitation views. In that state, coverage leaves `advertised_count` null, names
+the affected filters in `unadvertised_empty_views`, and reports completion only
+after the current visible surface independently proves the selected inventory
+empty.
 
 ## Messaging
 

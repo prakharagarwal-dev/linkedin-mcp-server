@@ -860,6 +860,8 @@ async def test_every_read_and_operational_tool_round_trips_through_mcp(
             assert expected_field in result.structuredContent
             if tool_name == "linkedin.posts.search":
                 assert result.structuredContent["coverage"]["unsupported_result_count"] == 1
+            if tool_name == "linkedin.invitations.list":
+                assert result.structuredContent["coverage"]["unadvertised_empty_views"] == []
 
         replayed = await session.call_tool(
             "linkedin.jobs.search",

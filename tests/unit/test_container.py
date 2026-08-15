@@ -32,7 +32,7 @@ async def test_production_container_composes_and_closes_without_connecting() -> 
     assert container.registry.get(CapabilityName.POSTS_SEARCH).version == "3.0.0"
     assert container.registry.get(CapabilityName.POSTS_GET).version == "2.0.0"
     assert container.registry.get(CapabilityName.POST_COMMENTS_LIST).version == "2.0.0"
-    assert container.registry.get(CapabilityName.INVITATIONS_LIST).version == "5.0.0"
+    assert container.registry.get(CapabilityName.INVITATIONS_LIST).version == "5.1.0"
     assert container.registry.get(CapabilityName.CONNECTIONS_LIST).version == "3.0.0"
     assert container.registry.get(CapabilityName.CONNECTIONS_SEARCH).version == "3.0.0"
     assert container.registry.get(CapabilityName.POSTS_CREATE).version == "4.0.0"
