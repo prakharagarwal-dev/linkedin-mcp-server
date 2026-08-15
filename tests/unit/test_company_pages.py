@@ -398,6 +398,43 @@ async def test_company_profile_reads_exact_overview_and_about_with_evidence() ->
 
 
 @pytest.mark.timeout(30)
+async def test_company_profile_deduplicates_headings_for_one_visible_about_section() -> None:
+    about_html = (
+        (FIXTURES / "companies/latest/about.html")
+        .read_text()
+        .replace("<h2>About</h2>", "<h2>About</h2><h3>Overview</h3>", 1)
+    )
+
+    class DuplicateAboutHeadingBrowser(CompanyFixtureBrowser):
+        async def navigate(self, page: Page, url: str) -> None:
+            if urlsplit(url).path.endswith("/about/"):
+                self.navigations.append(url)
+                await page.set_content(about_html)
+                return
+            await super().navigate(page, url)
+
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        page = await browser.new_page()
+        reader = CompanyProfilePage(cast(BrowserManager, DuplicateAboutHeadingBrowser(page)))
+        try:
+            company, captures = await reader.read(
+                CompanyGetInput(
+                    context_id="context-1",
+                    request_id="duplicate-about-heading",
+                    company_slug="acme-cloud",
+                )
+            )
+        finally:
+            await browser.close()
+
+    assert company.name == "Acme Cloud"
+    assert company.description == "Acme Cloud builds reliable infrastructure for software teams."
+    assert company.industry == "Software Development"
+    assert len(captures) == 2
+
+
+@pytest.mark.timeout(30)
 async def test_company_profile_fails_closed_when_about_identity_changes() -> None:
     about_html = (
         (FIXTURES / "companies/latest/about.html")

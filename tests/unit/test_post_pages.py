@@ -1002,6 +1002,68 @@ async def test_comments_open_and_parse_modern_stable_ids_and_nested_replies() ->
 
 
 @pytest.mark.timeout(20)
+async def test_comments_parse_current_article_data_id_container() -> None:
+    html = """
+    <!doctype html>
+    <html lang="en"><body><main>
+      <div role="article" data-urn="urn:li:activity:7312345678901234567">
+        <a href="/in/jane-doe/">Jane Doe</a>
+        <p data-post-text>Current discussion fixture.</p>
+        <button
+          type="button"
+          aria-label="Open control menu for post by Jane Doe"
+        ></button>
+        <button type="button" aria-label="Comment">1 comment</button>
+        <article data-id="urn:li:comment:(activity:7312345678901234567,401)">
+          <a href="/in/current-commenter/">
+            Current Commenter
+            <span>Platform Engineer</span>
+          </a>
+          <time>5m</time>
+          <button
+            type="button"
+            aria-label="Open options for Current Commenter's comment"
+          ></button>
+          <p>Current visible comment body.</p>
+          <button type="button" aria-label="React Like to Current Commenter's comment">
+            Like
+          </button>
+          <button type="button" aria-label="Reply to Current Commenter's comment">
+            Reply
+          </button>
+        </article>
+      </div>
+    </main></body></html>
+    """
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        page = await browser.new_page()
+        reader = PostCommentsPage(
+            cast(BrowserManager, StaticPostFixtureBrowser(page, html)),
+            max_expansion_rounds=1,
+        )
+        try:
+            threads, coverage, _, _ = await reader.collect(
+                PostCommentsListInput(
+                    context_id="context-1",
+                    request_id="current-data-id-comment",
+                    post_ref=POST_REF,
+                    page_size=10,
+                    max_replies_per_comment=10,
+                )
+            )
+        finally:
+            await browser.close()
+
+    assert len(threads) == 1
+    assert threads[0].comment.comment_ref == ("comment:activity:7312345678901234567:401")
+    assert threads[0].comment.author.profile_slug == "current-commenter"
+    assert threads[0].comment.text == "Current visible comment body."
+    assert coverage.top_level_visible == 1
+    assert coverage.top_level_returned == 1
+
+
+@pytest.mark.timeout(20)
 async def test_comments_bind_current_flattened_replies_to_nearest_root() -> None:
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
