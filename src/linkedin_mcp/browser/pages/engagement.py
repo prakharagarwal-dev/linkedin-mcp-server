@@ -42,6 +42,7 @@ from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
 from linkedin_mcp.policy import (
     canonical_post_url,
     canonical_profile_url,
+    comment_reference_from_value,
     profile_slug_from_url,
 )
 
@@ -67,6 +68,24 @@ _COMMENT_ATTACHMENT_SELECTOR = (
     '[class*="comments-comment-item__gif"], '
     '[class*="comments-comment-item__media"]'
 )
+_VISIBLE_COMMENT_REGION_SELECTOR = (
+    "[data-comment-urn], [data-id^='urn:li:comment:'], "
+    "[id^='replaceableComment_urn:li:comment:'], "
+    ".comments-comment-entity, [data-comment-entity]"
+)
+_VISIBLE_COMMENT_TEXT_SELECTOR = (
+    "[data-comment-text], .comments-comment-item__main-content, .comments-comment-item-content-body"
+)
+_PARENT_COMMENT_REGION_XPATH = (
+    "xpath=ancestor::*["
+    "@data-comment-urn or starts-with(@data-id, 'urn:li:comment:') or "
+    "starts-with(@id, 'replaceableComment_urn:li:comment:') or "
+    "contains(concat(' ', normalize-space(@class), ' '), "
+    "' comments-comment-entity ') or @data-comment-entity"
+    "][1]"
+)
+_COMMENT_VERIFICATION_ATTEMPTS = 24
+_COMMENT_VERIFICATION_DELAY_MS = 250
 
 
 @dataclass(frozen=True, slots=True)
@@ -188,6 +207,13 @@ class PostEngagementPage:
                 payload,
                 target.actor_slug,
             )
+            before_visible_count = await self._matching_visible_comment_count(
+                page,
+                payload,
+                actor_slug=target.actor_slug,
+                actor_name=target.actor_name,
+                stable_refs=before,
+            )
             submission_scope = composer.locator(
                 "xpath=ancestor::*[.//button[normalize-space(.)='Comment']][1]"
             )
@@ -211,7 +237,7 @@ class PostEngagementPage:
                     "comment_outcome_unknown",
                     "The final comment control was invoked, but its outcome is unknown.",
                 )
-            for _ in range(24):
+            for _ in range(_COMMENT_VERIFICATION_ATTEMPTS):
                 after = await self._matching_comment_refs(
                     page,
                     payload,
@@ -226,13 +252,37 @@ class PostEngagementPage:
                         f"comment_published:{created[0]}",
                         "One new exact visible comment matched the requested payload.",
                     )
-                await page.wait_for_timeout(250)
+                composer_value = await self._available_comment_composer_value(composer)
+                if not created and composer_value == "":
+                    after_visible_count = await self._matching_visible_comment_count(
+                        page,
+                        payload,
+                        actor_slug=target.actor_slug,
+                        actor_name=target.actor_name,
+                        stable_refs=after,
+                    )
+                    if after_visible_count == before_visible_count + 1:
+                        return await self._result(
+                            page,
+                            ActionOutcome.VERIFIED,
+                            True,
+                            "comment_published",
+                            (
+                                "One new exact comment from the active member became visible "
+                                "and the comment composer cleared; LinkedIn had not yet exposed "
+                                "a stable comment reference."
+                            ),
+                        )
+                await page.wait_for_timeout(_COMMENT_VERIFICATION_DELAY_MS)
             return await self._result(
                 page,
                 ActionOutcome.UNCERTAIN,
                 None,
                 "comment_outcome_unknown",
-                "No single new exact visible comment matched within the verification bound.",
+                (
+                    "No single new stable comment reference or exact visible own-comment "
+                    "delta with a cleared composer matched within the verification bound."
+                ),
             )
 
     async def inspect_reaction(
@@ -685,6 +735,155 @@ class PostEngagementPage:
             ):
                 matches.append(comment.comment_ref)
         return tuple(matches)
+
+    @staticmethod
+    async def _matching_visible_comment_count(
+        page: Page,
+        payload: CommentCreatePayload,
+        *,
+        actor_slug: str,
+        actor_name: str,
+        stable_refs: tuple[str, ...],
+    ) -> int:
+        count = len(stable_refs)
+        regions = page.locator("main").locator(_VISIBLE_COMMENT_REGION_SELECTOR)
+        for index in range(min(await regions.count(), 1_000)):
+            region = regions.nth(index)
+            if not await region.is_visible():
+                continue
+            if await PostEngagementPage._visible_comment_reference(region) is not None:
+                continue
+            if not await PostEngagementPage._is_top_level_visible_comment(region):
+                continue
+            if not await PostEngagementPage._visible_comment_actor_matches(
+                region,
+                actor_slug=actor_slug,
+                actor_name=actor_name,
+            ):
+                continue
+            if await PostEngagementPage._visible_comment_matches_payload(region, payload):
+                count += 1
+        return count
+
+    @staticmethod
+    async def _visible_comment_reference(region: Locator) -> str | None:
+        for attribute in ("data-comment-urn", "data-urn", "data-id", "id"):
+            value = await region.get_attribute(attribute)
+            if value and (reference := comment_reference_from_value(value)):
+                return reference
+        return None
+
+    @staticmethod
+    async def _is_top_level_visible_comment(region: Locator) -> bool:
+        for attribute in ("data-parent-comment-urn", "data-parent-comment"):
+            if (await region.get_attribute(attribute) or "").strip():
+                return False
+        return await region.locator(_PARENT_COMMENT_REGION_XPATH).count() == 0
+
+    @staticmethod
+    async def _visible_comment_actor_matches(
+        region: Locator,
+        *,
+        actor_slug: str,
+        actor_name: str,
+    ) -> bool:
+        profile_links = region.locator('a[href*="/in/"]')
+        for index in range(min(await profile_links.count(), 20)):
+            link = profile_links.nth(index)
+            if not await link.is_visible():
+                continue
+            href = await link.get_attribute("href")
+            return (
+                profile_slug_from_url(urljoin("https://www.linkedin.com", href or "")) == actor_slug
+            )
+
+        actor = region.get_by_text(
+            re.compile(rf"^{re.escape(actor_name)}$", re.I),
+            exact=True,
+        )
+        viewer_badge = region.get_by_text(re.compile(r"^you$", re.I), exact=True)
+        actor_visible = any(
+            [await actor.nth(index).is_visible() for index in range(min(await actor.count(), 20))]
+        )
+        viewer_badge_visible = any(
+            [
+                await viewer_badge.nth(index).is_visible()
+                for index in range(min(await viewer_badge.count(), 20))
+            ]
+        )
+        return actor_visible and viewer_badge_visible
+
+    @staticmethod
+    async def _visible_comment_matches_payload(
+        region: Locator,
+        payload: CommentCreatePayload,
+    ) -> bool:
+        if payload.text is not None:
+            text_candidates = region.locator(_VISIBLE_COMMENT_TEXT_SELECTOR)
+            visible_text = {
+                (await text_candidates.nth(index).inner_text()).strip()
+                for index in range(min(await text_candidates.count(), 100))
+                if await text_candidates.nth(index).is_visible()
+            }
+            if payload.text not in visible_text:
+                return False
+
+        attachments = region.locator(_COMMENT_ATTACHMENT_SELECTOR)
+        visible_attachments = [
+            attachments.nth(index)
+            for index in range(min(await attachments.count(), 20))
+            if await attachments.nth(index).is_visible()
+        ]
+        if payload.attachment is None:
+            return not visible_attachments
+        if isinstance(payload.attachment, CommentPhotoAttachment):
+            for attachment in visible_attachments:
+                evidence = " ".join(
+                    value
+                    for value in (
+                        await attachment.get_attribute("data-kind"),
+                        await attachment.get_attribute("aria-label"),
+                        await attachment.get_attribute("class"),
+                    )
+                    if value
+                ).casefold()
+                if "gif" not in evidence and (
+                    "photo" in evidence
+                    or "image" in evidence
+                    or await attachment.locator("img").count() > 0
+                ):
+                    return True
+            return False
+
+        expected = payload.attachment.visible_result_label.casefold()
+        for attachment in visible_attachments:
+            media = attachment.locator("img, video, a").first
+            values = {
+                value.casefold()
+                for value in (
+                    await attachment.get_attribute("aria-label"),
+                    await attachment.get_attribute("title"),
+                    (await media.get_attribute("aria-label") if await media.count() else None),
+                    (await media.get_attribute("alt") if await media.count() else None),
+                    (await attachment.inner_text()).strip(),
+                )
+                if value
+            }
+            if expected in values:
+                return True
+        return False
+
+    @staticmethod
+    async def _available_comment_composer_value(composer: Locator) -> str | None:
+        try:
+            if await composer.count() != 1 or not await composer.is_visible():
+                return None
+            try:
+                return (await composer.input_value()).strip()
+            except PlaywrightError:
+                return (await composer.inner_text()).strip()
+        except PlaywrightError:
+            return None
 
     @staticmethod
     async def _wait_for_existing_comment_baseline(

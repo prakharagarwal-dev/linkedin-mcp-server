@@ -12,6 +12,7 @@ from pydantic import ValidationError
 from linkedin_mcp.assets import LocalAssetStore
 from linkedin_mcp.browser import BrowserManager
 from linkedin_mcp.browser.pages import PostEngagementPage
+from linkedin_mcp.browser.pages import engagement as engagement_page
 from linkedin_mcp.domain.models import (
     ActionCommand,
     ActionOutcome,
@@ -39,6 +40,33 @@ def _role_article_target(html: str) -> str:
         '<div\n        role="article"\n        id="target-post"',
         1,
     ).replace("</article>", "</div>", 1)
+
+
+def _optimistic_comment_html(
+    *,
+    clear_composer: bool,
+    existing_own_comment_text: str | None = None,
+) -> str:
+    html = ENGAGEMENT_HTML.replace(
+        """          comment.dataset.commentUrn =
+            `urn:li:comment:(ugcPost:7312345678901234566,${commentId})`;""",
+        '          comment.className = "comments-comment-entity";',
+        1,
+    )
+    if clear_composer:
+        html = html.replace(
+            '          document.querySelector("#discussion").append(comment);',
+            """          document.querySelector("#discussion").append(comment);
+          composer.querySelector("textarea").value = "";""",
+            1,
+        )
+    if existing_own_comment_text is not None:
+        html = (
+            html.replace("/in/alex-ray/", "/in/current-member/", 1)
+            .replace("Alex Ray", "Current Member", 1)
+            .replace("Helpful breakdown.", existing_own_comment_text, 1)
+        )
+    return html
 
 
 class EngagementFixtureBrowser:
@@ -159,6 +187,80 @@ async def test_top_level_comment_preserves_text_link_emoji_mention_and_target(
     assert result.performed is True
     assert result.final_state.startswith("comment_published:comment:ugc-post:7312345678901234566:")
     assert text in result.captured_text
+
+
+@pytest.mark.timeout(30)
+async def test_comment_verifies_exact_visible_delta_while_reference_is_delayed(
+    tmp_path: Path,
+) -> None:
+    text = "A duplicate-safe optimistic comment."
+    request = PostCommentInput(
+        context_id="engagement-context",
+        request_id="action-optimistic-comment",
+        post_ref=POST_REF,
+        text=text,
+    )
+    fixture_browser: EngagementFixtureBrowser
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        page = await browser.new_page()
+        fixture_browser = EngagementFixtureBrowser(
+            page,
+            html=_optimistic_comment_html(
+                clear_composer=True,
+                existing_own_comment_text=text,
+            ),
+        )
+        adapter = PostEngagementPage(
+            cast(BrowserManager, fixture_browser),
+            LocalAssetStore(tmp_path),
+        )
+        try:
+            result = await adapter.perform_comment(await _comment_command(adapter, request))
+        finally:
+            await browser.close()
+
+    assert result.outcome is ActionOutcome.VERIFIED
+    assert result.performed is True
+    assert result.final_state == "comment_published"
+    assert "composer cleared" in result.detail
+    assert fixture_browser.navigations == 2
+
+
+@pytest.mark.timeout(30)
+async def test_comment_does_not_accept_visible_delta_while_composer_retains_payload(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(engagement_page, "_COMMENT_VERIFICATION_ATTEMPTS", 2)
+    monkeypatch.setattr(engagement_page, "_COMMENT_VERIFICATION_DELAY_MS", 1)
+    request = PostCommentInput(
+        context_id="engagement-context",
+        request_id="action-optimistic-comment-with-stale-composer",
+        post_ref=POST_REF,
+        text="A locally rendered but uncommitted comment.",
+    )
+    fixture_browser: EngagementFixtureBrowser
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        page = await browser.new_page()
+        fixture_browser = EngagementFixtureBrowser(
+            page,
+            html=_optimistic_comment_html(clear_composer=False),
+        )
+        adapter = PostEngagementPage(
+            cast(BrowserManager, fixture_browser),
+            LocalAssetStore(tmp_path),
+        )
+        try:
+            result = await adapter.perform_comment(await _comment_command(adapter, request))
+        finally:
+            await browser.close()
+
+    assert result.outcome is ActionOutcome.UNCERTAIN
+    assert result.performed is None
+    assert result.final_state == "comment_outcome_unknown"
+    assert fixture_browser.navigations == 2
 
 
 @pytest.mark.timeout(30)
