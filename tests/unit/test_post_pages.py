@@ -545,6 +545,62 @@ async def test_post_search_classifies_selected_card_with_unsupported_author_iden
     assert coverage.stop_reason is StopReason.VISIBLE_PAGE_COMPLETE
 
 
+@pytest.mark.timeout(20)
+async def test_post_search_classifies_delayed_linkedin_short_link_as_unsupported() -> None:
+    html = """
+    <!doctype html>
+    <html lang="en">
+      <body>
+        <main>
+          <div role="listitem">
+            <a href="/in/jane-doe/">Jane Doe</a>
+            <div>1h</div>
+            <button data-menu aria-label="Open control menu for post by Jane Doe"></button>
+            <div class="feed-shared-update-v2__description">Opaque short-link post.</div>
+            <button aria-label="React Like" aria-pressed="false">Like</button>
+          </div>
+        </main>
+        <script>
+          document.querySelector('[data-menu]').addEventListener('click', () => {
+            const item = document.createElement('p');
+            item.textContent = 'Copy link to post';
+            item.addEventListener('click', () => {
+              setTimeout(
+                () => navigator.clipboard.writeText('https://lnkd.in/p/fixture-token'),
+                350,
+              );
+            });
+            document.body.append(item);
+          });
+        </script>
+      </body>
+    </html>
+    """
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        page = await browser.new_page()
+        collector = PostSearchPage(
+            cast(BrowserManager, StaticPostFixtureBrowser(page, html)),
+            max_pages=1,
+        )
+        try:
+            posts, coverage, _, _ = await collector.collect(
+                PostSearchInput(
+                    context_id="context-1",
+                    request_id="delayed-short-link",
+                    query="opaque",
+                    page_size=2,
+                )
+            )
+        finally:
+            await browser.close()
+
+    assert posts == ()
+    assert coverage.result_count == 0
+    assert coverage.unsupported_result_count == 1
+    assert coverage.stop_reason is StopReason.VISIBLE_PAGE_COMPLETE
+
+
 @pytest.mark.timeout(30)
 async def test_post_detail_image_preserves_current_visible_contract_and_evidence() -> None:
     async with async_playwright() as playwright:
@@ -866,6 +922,44 @@ async def test_post_detail_preserves_a_single_page_activity_alias_without_invent
     assert post.content_type is PostContentType.IMAGE
     assert post.reshared_post is None
     assert post.coverage.pages_visited == 1
+
+
+@pytest.mark.timeout(20)
+async def test_post_detail_accepts_role_article_with_legacy_visible_body() -> None:
+    alias_ref = "share:7312345678901234599"
+    html = (
+        (FIXTURES / "posts/latest/detail-image.html")
+        .read_text()
+        .replace(
+            '<div role="listitem">',
+            f'<div role="article" data-urn="urn:li:{alias_ref}">',
+            1,
+        )
+        .replace(
+            'data-testid="expandable-text-box"',
+            'class="feed-shared-update-v2__description"',
+            1,
+        )
+    )
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        page = await browser.new_page()
+        reader = PostDetailPage(cast(BrowserManager, StaticPostFixtureBrowser(page, html)))
+        try:
+            post = await reader.read(
+                PostGetInput(
+                    context_id="context-1",
+                    request_id="role-article-legacy-body",
+                    post_ref=POST_REF,
+                )
+            )
+        finally:
+            await browser.close()
+
+    assert post.post_ref == POST_REF
+    assert post.displayed_post_ref == alias_ref
+    assert post.text is not None and "recovery checks" in post.text
+    assert post.content_type is PostContentType.IMAGE
 
 
 @pytest.mark.timeout(20)

@@ -33,6 +33,14 @@ POST_REF = "activity:7312345678901234567"
 COMMENT_REF = "comment:ugc-post:7312345678901234566:111"
 
 
+def _role_article_target(html: str) -> str:
+    return html.replace(
+        '<article\n        id="target-post"',
+        '<div\n        role="article"\n        id="target-post"',
+        1,
+    ).replace("</article>", "</div>", 1)
+
+
 class EngagementFixtureBrowser:
     def __init__(
         self,
@@ -221,6 +229,43 @@ async def test_comment_waits_for_async_composer_after_count_control(tmp_path: Pa
 
 
 @pytest.mark.timeout(30)
+async def test_comment_waits_for_async_active_member_rail(tmp_path: Path) -> None:
+    html = ENGAGEMENT_HTML.replace(
+        '<aside aria-label="Signed-in member profile">',
+        '<aside hidden aria-label="Signed-in member profile">',
+        1,
+    ).replace(
+        "</body>",
+        (
+            "<script>setTimeout(() => "
+            "document.querySelector('aside').removeAttribute('hidden'), 600);</script>"
+            "</body>"
+        ),
+        1,
+    )
+    request = PostCommentInput(
+        context_id="engagement-context",
+        request_id="action-comment-with-async-actor",
+        post_ref=POST_REF,
+        text="thanks",
+    )
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        page = await browser.new_page()
+        adapter = PostEngagementPage(
+            cast(BrowserManager, EngagementFixtureBrowser(page, html=html)),
+            LocalAssetStore(tmp_path),
+        )
+        try:
+            result = await adapter.perform_comment(await _comment_command(adapter, request))
+        finally:
+            await browser.close()
+
+    assert result.outcome is ActionOutcome.VERIFIED
+    assert result.performed is True
+
+
+@pytest.mark.timeout(30)
 async def test_comment_verifies_native_ugc_discussion_alias_for_activity_url(
     tmp_path: Path,
 ) -> None:
@@ -255,9 +300,17 @@ async def test_comment_verifies_native_ugc_discussion_alias_for_activity_url(
 async def test_comment_accepts_single_rendered_post_alias_for_requested_activity(
     tmp_path: Path,
 ) -> None:
-    html = ENGAGEMENT_HTML.replace(
-        'data-post-urn="urn:li:activity:7312345678901234567"',
-        'data-post-urn="urn:li:share:7999999999999999997"',
+    html = (
+        _role_article_target(ENGAGEMENT_HTML)
+        .replace(
+            'data-post-urn="urn:li:activity:7312345678901234567"',
+            'data-post-urn="urn:li:share:7999999999999999997"',
+        )
+        .replace(
+            'aria-label="Text editor for creating comment"',
+            'aria-label="Text editor for creating content"',
+            1,
+        )
     )
     request = PostCommentInput(
         context_id="engagement-context",
@@ -285,7 +338,7 @@ async def test_comment_accepts_single_rendered_post_alias_for_requested_activity
 async def test_reaction_accepts_single_rendered_post_alias_for_requested_activity(
     tmp_path: Path,
 ) -> None:
-    html = ENGAGEMENT_HTML.replace(
+    html = _role_article_target(ENGAGEMENT_HTML).replace(
         'data-post-urn="urn:li:activity:7312345678901234567"',
         'data-post-urn="urn:li:share:7999999999999999997"',
     )
@@ -412,6 +465,57 @@ async def test_current_portaled_reaction_control_is_inspected_and_verified(
                 BrowserManager,
                 EngagementFixtureBrowser(page, html=CURRENT_REACTION_HTML),
             ),
+            LocalAssetStore(tmp_path),
+        )
+        try:
+            command = await _reaction_command(adapter, request)
+            result = await adapter.perform_reaction(command)
+        finally:
+            await browser.close()
+
+    assert isinstance(command.payload, ReactionSetPayload)
+    assert command.payload.existing_reaction is ReactionState.NONE
+    assert result.outcome is ActionOutcome.VERIFIED
+    assert result.performed is True
+    assert result.final_state == "reaction_set:funny"
+
+
+@pytest.mark.timeout(30)
+async def test_react_label_and_pressed_state_are_inspected_and_verified(
+    tmp_path: Path,
+) -> None:
+    html = (
+        CURRENT_REACTION_HTML.replace(
+            'aria-label="Reaction button state: no reaction"',
+            'aria-label="React Like" aria-pressed="false"',
+            1,
+        )
+        .replace(
+            """          control.setAttribute(
+            "aria-label",
+            `Reaction button state: ${reaction}`
+          );""",
+            """          control.setAttribute("aria-label", `React ${reaction}`);
+          control.setAttribute("aria-pressed", "true");""",
+            1,
+        )
+        .replace(
+            "picker.hidden = false;",
+            "setTimeout(() => { picker.hidden = false; }, 600);",
+            1,
+        )
+    )
+    request = PostReactionInput(
+        context_id="engagement-context",
+        request_id="action-react-label-and-pressed-state",
+        post_ref=POST_REF,
+        desired_reaction=ReactionState.FUNNY,
+    )
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        page = await browser.new_page()
+        adapter = PostEngagementPage(
+            cast(BrowserManager, EngagementFixtureBrowser(page, html=html)),
             LocalAssetStore(tmp_path),
         )
         try:
