@@ -8,6 +8,12 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Standardize package, bundle, installer, catalog, and marketplace copy on the
+  README's outcome-focused product description, retaining only the Official MCP
+  Registry's schema-required 100-character variant.
+- Publish checksum-pinned MCPB release assets alongside the immutable OCI image
+  in future Official MCP Registry versions, and add a maintained distribution
+  ledger for package, registry, catalog, and review status.
 - Replace the fourteen public prepare/execute tools with seven direct atomic
   action tools: `linkedin.posts.create`, `linkedin.posts.comment`,
   `linkedin.posts.react`, `linkedin.invitations.send`,
