@@ -1,0 +1,47 @@
+<!doctype html>
+<!-- Sanitized synthetic fixture for a live-observed unsupported vanity path. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>LinkedIn Posts search with one unsupported author identity</title>
+  </head>
+  <body>
+    <main aria-label="Post search results">
+      <h1>Posts</h1>
+      <article aria-label="Neighboring recommendation">
+        <h2>People also viewed</h2>
+        <p>This neighboring collection is not a selected post card.</p>
+      </article>
+      <article data-post-urn="urn:li:activity:7312345678901234888">
+        <header>
+          <a href="/in/%E2%98%83/">Unsupported Member</a>
+          <p>Systems Engineer</p>
+          <p>1h</p>
+          <button
+            type="button"
+            aria-label="Open control menu for post by Unsupported Member"
+          ></button>
+        </header>
+        <p data-testid="expandable-text-box">An addressable post with an untyped author.</p>
+        <button type="button" aria-label="Reaction button state: no reaction"></button>
+        <button type="button" aria-label="Comment"></button>
+        <button type="button" aria-label="Repost"></button>
+      </article>
+      <article data-post-urn="urn:li:activity:7312345678901234889">
+        <header>
+          <a href="/in/supported-member/">Supported Member</a>
+          <p>Reliability Engineer</p>
+          <p>2h</p>
+          <button
+            type="button"
+            aria-label="Open control menu for post by Supported Member"
+          ></button>
+        </header>
+        <p data-testid="expandable-text-box">A fully typed neighboring post.</p>
+        <button type="button" aria-label="Reaction button state: no reaction"></button>
+        <button type="button" aria-label="Comment"></button>
+        <button type="button" aria-label="Repost"></button>
+      </article>
+    </main>
+  </body>
+</html>

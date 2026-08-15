@@ -38,7 +38,7 @@ Profile section selectors are `all`, `overview`, `about`, `experience`,
 
 | Tool | Input | Result |
 | --- | --- | --- |
-| `linkedin.posts.search` | Query, sort, date, content type, source member/company, relationship, mentioned member/company, author industry/company, and author keywords | Typed post summaries, coverage, pagination, and evidence |
+| `linkedin.posts.search` | Query, sort, date, content type, source member/company, relationship, mentioned member/company, author industry/company, and author keywords | Typed post summaries, explicit unsupported-card counts, coverage, pagination, and evidence |
 | `linkedin.posts.get` | Activity, share, or UGC post reference | Expanded post, author, text, media, links, mentions, hashtags, poll/repost data, engagement, coverage, and evidence |
 | `linkedin.posts.comments.list` | Post reference, sort, page size, and bounded replies per root | Typed root comments and visible nested replies with pagination and coverage |
 | `linkedin.posts.create` | Typed content, audience, comment control, optional group/collaborators/brand partnership/schedule | One terminal action result plus evidence |

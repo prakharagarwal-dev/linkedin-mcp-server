@@ -127,7 +127,8 @@
     "header": "one compact region containing the exact post-menu control, author identity, relationship or follower count, headline, and age",
     "body": "[data-testid=\"expandable-text-box\"] with bounded expansion through its visible button; keyboard activation is used when the text layer intercepts pointer input",
     "engagement": "numeric text inside the exact Reaction button state, Comment, and Repost controls",
-    "content_type": "derive from bounded post content and link-card regions; exclude author avatars"
+    "content_type": "derive from bounded post content and link-card regions; exclude author avatars",
+    "unsupported_identity_fixture": "search-unsupported-author.html"
   },
   "detail_contract": {
     "exact_post_control": "button[aria-label^=\"Open control menu for post by \"]",

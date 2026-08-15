@@ -493,6 +493,7 @@ class FakePostSearch:
                 filters=request.filters,
                 pages_visited=1,
                 result_count=1,
+                unsupported_result_count=1,
                 max_results=request.page_size,
                 stop_reason=StopReason.VISIBLE_PAGE_COMPLETE,
                 captured_at=now,
@@ -1785,6 +1786,7 @@ async def test_post_discussion_reads_persist_exact_evidence_and_replay() -> None
     assert (await executor.get_post(detail_request)).replayed is True
     assert (await executor.list_post_comments(comments_request)).replayed is True
     assert post_search_output.posts[0].post_ref == post_ref
+    assert post_search_output.coverage.unsupported_result_count == 1
     assert post_detail_output.post.evidence[1].quote in post_detail_output.post.visible_text
     assert comments_output.threads[0].replies[0].parent_comment_ref == (
         comments_output.threads[0].comment.comment_ref
