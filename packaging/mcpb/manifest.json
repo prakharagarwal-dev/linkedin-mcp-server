@@ -4,7 +4,7 @@
   "display_name": "LinkedIn MCP Server",
   "version": "0.16.0",
   "description": "A LinkedIn MCP server to find jobs, search people, research companies, manage your network, publish and engage with posts, and read or send messages.",
-  "long_description": "A LinkedIn MCP server to find jobs, search people, research companies, manage your network, publish and engage with posts, and read or send messages. It runs locally and works with any MCP client. This is an unofficial project and is not affiliated with or endorsed by LinkedIn.",
+  "long_description": "A LinkedIn MCP server to find jobs, search people, research companies, manage your network, publish and engage with posts, and read or send messages.",
   "author": {
     "name": "Prakhar Agarwal",
     "email": "prakharagarwal3031@gmail.com",
