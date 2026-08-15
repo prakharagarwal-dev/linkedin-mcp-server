@@ -7,6 +7,11 @@
 [![PyPI](https://img.shields.io/pypi/v/linkedin-mcp-local.svg)](https://pypi.org/project/linkedin-mcp-local/)
 [![Python 3.12–3.13](https://img.shields.io/badge/Python-3.12%E2%80%933.13-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
+[![MCP Registry](https://img.shields.io/badge/MCP_Registry-listed-5A67D8.svg)](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.prakharagarwal-dev%2Flinkedin-mcp-server)
+[![Glama](https://glama.ai/mcp/servers/prakharagarwal-dev/linkedin-mcp-server/badges/score.svg)](https://glama.ai/mcp/servers/prakharagarwal-dev/linkedin-mcp-server)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/prakharagarwal-dev/linkedin-mcp-server/badge)](https://scorecard.dev/viewer/?uri=github.com/prakharagarwal-dev/linkedin-mcp-server)
+[![PyPI provenance](https://img.shields.io/badge/PyPI-provenance_attested-3775A9.svg?logo=pypi&logoColor=white)](https://pypi.org/project/linkedin-mcp-local/#files)
+[![Container provenance and SBOM](https://img.shields.io/badge/Container-provenance_%2B_SBOM-2496ED.svg?logo=docker&logoColor=white)](https://github.com/prakharagarwal-dev/linkedin-mcp-server/attestations)
 
 > **Disclaimer:** LinkedIn is a registered trademark of LinkedIn Corporation
 > and its affiliates. LinkedIn MCP Server is an independent, unofficial project
