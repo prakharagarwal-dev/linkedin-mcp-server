@@ -40,12 +40,11 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
-- Verify a newly submitted top-level comment when LinkedIn first renders one
-  exact visible own-comment delta and clears the composer but delays the stable
-  comment reference. Treat LinkedIn's separate trailing `… more` expansion
-  affordance as UI chrome when matching the exact requested text. Continue to
-  prefer a single new stable reference and never retry or reload after invoking
-  the final Comment control.
+- Verify a newly submitted top-level comment only when exactly one new stable
+  comment reference matches the requested payload. Treat LinkedIn's separate
+  trailing `… more` expansion affordance as UI chrome when matching the exact
+  requested text, and never retry or reload after invoking the final Comment
+  control.
 - Reconcile current invitation inventories when LinkedIn omits zero-count
   Received category controls or the empty Sent People control. Preserve those
   views as explicit `unadvertised_empty_views`, require stable structural empty
