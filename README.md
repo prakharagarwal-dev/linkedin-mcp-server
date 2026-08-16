@@ -44,7 +44,7 @@ LinkedIn and complete any required verification.
 Find remote software engineering jobs in India posted this week.
 ```
 
-## Tools
+## 🛠️ Tools
 
 > [!TIP]
 > **What “verified” means:** The tool passed the latest end-to-end compatibility
