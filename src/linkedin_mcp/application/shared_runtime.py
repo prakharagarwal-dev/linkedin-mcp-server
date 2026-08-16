@@ -10,7 +10,7 @@ import sys
 import time
 from contextlib import suppress
 from pathlib import Path
-from typing import cast
+from typing import BinaryIO, Protocol, TextIO, cast
 from urllib.parse import urlsplit
 
 import uvicorn
@@ -32,6 +32,44 @@ from linkedin_mcp.server import create_mcp_server
 
 _RUNTIME_COMMAND = "_runtime"
 _RUNTIME_TRANSPORT = "shared-loopback"
+_WINDOWS_BROKER_COMMAND_ENV = "LINKEDIN_MCP_INTERNAL_BROKER_COMMAND"
+_WINDOWS_BROKER_CWD_ENV = "LINKEDIN_MCP_INTERNAL_BROKER_CWD"
+_WINDOWS_BROKERED_RUNTIME_ENV = "LINKEDIN_MCP_INTERNAL_BROKERED_RUNTIME"
+_WINDOWS_RUNTIME_CREATION_FLAGS = 0x00000008 | 0x00000200
+_WINDOWS_BROKER_SCRIPT = "; ".join(
+    (
+        f"$command = $env:{_WINDOWS_BROKER_COMMAND_ENV}",
+        f"$workingDirectory = $env:{_WINDOWS_BROKER_CWD_ENV}",
+        "$environment = [System.Environment]::GetEnvironmentVariables('Process')",
+        f"[void]$environment.Remove('{_WINDOWS_BROKER_COMMAND_ENV}')",
+        f"[void]$environment.Remove('{_WINDOWS_BROKER_CWD_ENV}')",
+        "$environmentVariables = [string[]]@($environment.GetEnumerator() | "
+        "ForEach-Object { [string]::Concat($_.Key, '=', $_.Value) })",
+        "$startup = New-CimInstance -ClassName Win32_ProcessStartup -ClientOnly -Property @{ "
+        f"CreateFlags = [uint32]{_WINDOWS_RUNTIME_CREATION_FLAGS}; "
+        "EnvironmentVariables = $environmentVariables; ShowWindow = [uint16]0 }",
+        "$result = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ "
+        "CommandLine = $command; CurrentDirectory = $workingDirectory; "
+        "ProcessStartupInformation = $startup }",
+        "if ([uint32]$result.ReturnValue -ne 0) { "
+        "throw ('Win32_Process.Create failed with code ' + $result.ReturnValue) }",
+    )
+)
+
+
+class _RuntimeStarter(Protocol):
+    def poll(self) -> int | None: ...
+
+
+class _BrokeredRuntimeStarter:
+    """Report only broker failures while the elected runtime publishes its own PID."""
+
+    def __init__(self, broker: subprocess.Popen[bytes]) -> None:
+        self._broker = broker
+
+    def poll(self) -> int | None:
+        return_code = self._broker.poll()
+        return return_code if return_code not in {None, 0} else None
 
 
 class _LoopbackMCPApp:
@@ -75,7 +113,7 @@ async def ensure_shared_runtime(settings: Settings) -> str:
 async def wait_for_shared_runtime(
     settings: Settings,
     *,
-    starter: subprocess.Popen[bytes] | None = None,
+    starter: _RuntimeStarter | None = None,
 ) -> str:
     deadline = time.monotonic() + settings.runtime_start_timeout_seconds
     last_owner_command: str | None = None
@@ -213,7 +251,7 @@ async def _healthy_endpoint(status: AccountRuntimeStatus) -> str | None:
     return endpoint if await runtime_is_healthy(endpoint) else None
 
 
-def _spawn_shared_runtime(settings: Settings) -> subprocess.Popen[bytes]:
+def _spawn_shared_runtime(settings: Settings) -> _RuntimeStarter:
     log_path = _runtime_log_path(settings)
     log_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     with suppress(OSError):
@@ -223,16 +261,7 @@ def _spawn_shared_runtime(settings: Settings) -> subprocess.Popen[bytes]:
         if os.name != "nt":
             os.fchmod(log.fileno(), 0o600)
         if os.name == "nt":
-            creation_flags = int(getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200))
-            creation_flags |= int(getattr(subprocess, "DETACHED_PROCESS", 0x00000008))
-            process = subprocess.Popen(
-                [sys.executable, "-m", "linkedin_mcp", _RUNTIME_COMMAND],
-                stdin=subprocess.DEVNULL,
-                stdout=log,
-                stderr=log,
-                close_fds=True,
-                creationflags=creation_flags,
-            )
+            process: _RuntimeStarter = _spawn_windows_shared_runtime(log)
         else:
             process = subprocess.Popen(
                 [sys.executable, "-m", "linkedin_mcp", _RUNTIME_COMMAND],
@@ -245,6 +274,62 @@ def _spawn_shared_runtime(settings: Settings) -> subprocess.Popen[bytes]:
     finally:
         log.close()
     return process
+
+
+def _spawn_windows_shared_runtime(log: BinaryIO) -> _BrokeredRuntimeStarter:
+    """Ask local Windows CIM to create the runtime outside the caller's Job Object."""
+
+    environment = os.environ.copy()
+    environment[_WINDOWS_BROKER_COMMAND_ENV] = subprocess.list2cmdline(
+        [sys.executable, "-m", "linkedin_mcp", _RUNTIME_COMMAND]
+    )
+    environment[_WINDOWS_BROKER_CWD_ENV] = str(Path.cwd())
+    environment[_WINDOWS_BROKERED_RUNTIME_ENV] = "1"
+    powershell = (
+        Path(environment.get("SystemRoot", r"C:\Windows"))
+        / "System32"
+        / "WindowsPowerShell"
+        / "v1.0"
+        / "powershell.exe"
+    )
+    creation_flags = int(getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000))
+    try:
+        broker = subprocess.Popen(
+            [
+                str(powershell),
+                "-NoLogo",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                _WINDOWS_BROKER_SCRIPT,
+            ],
+            stdin=subprocess.DEVNULL,
+            stdout=log,
+            stderr=log,
+            close_fds=True,
+            creationflags=creation_flags,
+            env=environment,
+        )
+    except OSError as error:
+        raise ConfigurationError(
+            "The shared LinkedIn MCP runtime could not start through local Windows CIM."
+        ) from error
+    return _BrokeredRuntimeStarter(broker)
+
+
+def brokered_runtime_output_required() -> bool:
+    return os.environ.get(_WINDOWS_BROKERED_RUNTIME_ENV) == "1"
+
+
+def redirect_brokered_runtime_output(settings: Settings) -> TextIO:
+    """Give the detached Windows runtime safe Python output streams for diagnostics."""
+
+    log_path = _runtime_log_path(settings)
+    log_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    log = log_path.open("a", encoding="utf-8", buffering=1)
+    sys.stdout = log
+    sys.stderr = log
+    return log
 
 
 def _runtime_log_path(settings: Settings) -> Path:

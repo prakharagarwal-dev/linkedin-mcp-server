@@ -29,6 +29,13 @@ application-data directory. POSIX permissions are tightened to the owner;
 Windows uses the current user's application-data directory and inherited user
 profile ACL.
 
+Windows background startup uses the operating system's local PowerShell CIM
+provider to create the elected runtime outside an MCP client's process Job
+Object. The launcher executes a fixed script against `Win32_Process.Create`,
+passes the current process environment in memory, removes its two internal
+command-routing variables before runtime creation, and makes no network call.
+Only the elected Python runtime remains after the launcher exits.
+
 Normal `serve` startup creates this dedicated profile automatically when it is
 missing. The first client elects one runtime; subsequent clients attach instead
 of opening the profile again. Explicit `profile create`, `login`, `logout`, and

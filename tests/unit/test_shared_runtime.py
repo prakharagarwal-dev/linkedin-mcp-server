@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import subprocess
 from pathlib import Path
 from typing import Any, cast
 
@@ -466,11 +467,14 @@ def test_runtime_spawn_listener_and_owner_validation_helpers(
     assert spawned is not None
     assert len(popen_calls) == 1
     args, kwargs = popen_calls[0]
-    assert args == [shared_runtime.sys.executable, "-m", "linkedin_mcp", "_runtime"]
     if os.name == "nt":
+        assert Path(args[0]).name == "powershell.exe"
+        assert args[-2] == "-Command"
+        assert args[-1] == shared_runtime._WINDOWS_BROKER_SCRIPT  # pyright: ignore[reportPrivateUsage]
         assert kwargs["creationflags"]
         assert "start_new_session" not in kwargs
     else:
+        assert args == [shared_runtime.sys.executable, "-m", "linkedin_mcp", "_runtime"]
         assert kwargs["start_new_session"] is True
         assert "creationflags" not in kwargs
     assert (tmp_path / "runtime.log").is_file()
@@ -500,3 +504,106 @@ def test_runtime_spawn_listener_and_owner_validation_helpers(
             AccountRuntimeStatus(running=True, owner=wrong_account),
             settings,
         )
+
+
+def test_windows_runtime_uses_a_local_cim_broker_outside_client_jobs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    popen_calls: list[tuple[list[str], dict[str, object]]] = []
+
+    class FakeBroker:
+        return_code: int | None = None
+
+        def poll(self) -> int | None:
+            return self.return_code
+
+    broker = FakeBroker()
+
+    def fake_popen(args: list[str], **kwargs: object) -> Any:
+        popen_calls.append((args, kwargs))
+        return broker
+
+    monkeypatch.setattr(shared_runtime.subprocess, "Popen", fake_popen)
+    monkeypatch.setenv("SystemRoot", str(tmp_path / "Windows"))
+    log_path = tmp_path / "runtime.log"
+    with log_path.open("wb") as log:
+        starter = shared_runtime._spawn_windows_shared_runtime(  # pyright: ignore[reportPrivateUsage]
+            log
+        )
+
+    assert len(popen_calls) == 1
+    args, kwargs = popen_calls[0]
+    assert Path(args[0]).name == "powershell.exe"
+    assert args[1:5] == ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command"]
+    script = args[5]
+    assert "Win32_ProcessStartup" in script
+    assert "Win32_Process" in script
+    assert "EnvironmentVariables" in script
+    assert "CreateFlags = [uint32]520" in script
+
+    environment = cast(dict[str, str], kwargs["env"])
+    assert environment["LINKEDIN_MCP_INTERNAL_BROKER_COMMAND"] == subprocess.list2cmdline(
+        [shared_runtime.sys.executable, "-m", "linkedin_mcp", "_runtime"]
+    )
+    assert environment["LINKEDIN_MCP_INTERNAL_BROKER_CWD"] == str(Path.cwd())
+    assert environment["LINKEDIN_MCP_INTERNAL_BROKERED_RUNTIME"] == "1"
+    assert kwargs["stdin"] is subprocess.DEVNULL
+    assert cast(Any, kwargs["stdout"]).closed is True
+    assert cast(Any, kwargs["stderr"]).closed is True
+    assert kwargs["close_fds"] is True
+    assert kwargs["creationflags"]
+
+    assert starter.poll() is None
+    broker.return_code = 0
+    assert starter.poll() is None
+    broker.return_code = 7
+    assert starter.poll() == 7
+
+
+def test_windows_cim_broker_start_failure_is_safe(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_popen(*_: object, **__: object) -> Any:
+        raise OSError("sensitive local launch detail")
+
+    monkeypatch.setattr(shared_runtime.subprocess, "Popen", fail_popen)
+    with (
+        (tmp_path / "runtime.log").open("wb") as log,
+        pytest.raises(ConfigurationError, match="local Windows CIM") as raised,
+    ):
+        shared_runtime._spawn_windows_shared_runtime(  # pyright: ignore[reportPrivateUsage]
+            log
+        )
+    assert "sensitive local launch detail" not in str(raised.value)
+
+
+def test_brokered_runtime_redirects_python_output_to_the_safe_log(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeSys:
+        stdout: Any = None
+        stderr: Any = None
+
+    fake_sys = FakeSys()
+    monkeypatch.setattr(shared_runtime, "sys", fake_sys)
+    monkeypatch.delenv("LINKEDIN_MCP_INTERNAL_BROKERED_RUNTIME", raising=False)
+    assert shared_runtime.brokered_runtime_output_required() is False
+    monkeypatch.setenv("LINKEDIN_MCP_INTERNAL_BROKERED_RUNTIME", "1")
+    assert shared_runtime.brokered_runtime_output_required() is True
+
+    log = shared_runtime.redirect_brokered_runtime_output(
+        Settings(runtime_lock_path=tmp_path / "runtime.lock")
+    )
+    try:
+        assert fake_sys.stdout is log
+        assert fake_sys.stderr is log
+        log.write("brokered runtime diagnostic\n")
+        log.flush()
+    finally:
+        log.close()
+    assert (tmp_path / "runtime.log").read_text(encoding="utf-8") == (
+        "brokered runtime diagnostic\n"
+    )

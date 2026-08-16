@@ -88,6 +88,12 @@ settings. A configuration-fingerprint error identifies this mismatch without
 exposing the values. A background startup failure is recorded in `runtime.log`
 beside the configured runtime lock.
 
+On Windows, background election also requires the built-in Windows PowerShell
+and local CIM/WMI provider. The server uses them only to create the runtime
+outside a client-owned Job Object. If an organization disables either local
+component, `runtime.log` records the bounded broker failure and startup stops
+without opening Chromium.
+
 Do not delete the runtime lock while a server or browser process is still
 running.
 

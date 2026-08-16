@@ -21,8 +21,10 @@ from linkedin_mcp.application import (
 )
 from linkedin_mcp.application.proxy import run_stdio_proxy
 from linkedin_mcp.application.shared_runtime import (
+    brokered_runtime_output_required,
     ensure_shared_runtime,
     read_shared_runtime_status,
+    redirect_brokered_runtime_output,
     run_shared_runtime,
     wait_for_shared_runtime,
 )
@@ -421,6 +423,8 @@ def main() -> None:
     arguments = parser().parse_args()
     try:
         settings = _settings(cast(str | None, getattr(arguments, "transport", None)))
+        if arguments.command == "_runtime" and brokered_runtime_output_required():
+            redirect_brokered_runtime_output(settings)
         configure_logging(settings.log_level)
         if arguments.command == "setup":
             asyncio.run(_setup(settings))

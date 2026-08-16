@@ -29,6 +29,13 @@ prevents profile corruption by a second owner. It uses native advisory file
 locking on POSIX and Windows; graceful stop requests are instance-bound local
 files, so runtime lifecycle does not depend on POSIX process signals.
 
+On Windows, the first stdio bridge uses a short-lived local PowerShell CIM
+launcher to ask `Win32_Process.Create` for the background runtime. Windows does
+not associate that broker-created process with the bridge's Job Object, so the
+single Python runtime survives individual MCP-client teardown. The launcher
+passes the current process environment in memory, exits after the request, and
+does not add another long-lived service or runtime.
+
 The loopback endpoint uses stateful Streamable HTTP with JSON responses. It
 does not expose the optional standalone GET event stream because the server has
 no unsolicited server-to-client messages; clients receive `405 Method Not
