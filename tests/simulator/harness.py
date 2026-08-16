@@ -24,7 +24,6 @@ from linkedin_mcp.application import (
     PostSearchProvider,
 )
 from linkedin_mcp.browser import BrowserManager
-from linkedin_mcp.capabilities import create_default_registry
 from linkedin_mcp.config import Settings
 from linkedin_mcp.container import AppContainer
 from tests.contract.test_mcp_protocol import (
@@ -49,7 +48,6 @@ def create_simulator_container(
         minimum_navigation_interval_seconds=0,
         runtime_lock_path=root / f"runtime-{suffix}.lock",
     )
-    registry = create_default_registry()
     browser = BrowserManager(settings)
     network = StatefulProtocolNetwork(state)
     executor = CapabilityExecutor(
@@ -74,7 +72,6 @@ def create_simulator_container(
     worker = CapabilityWorker(executor, queue_capacity=settings.queue_capacity)
     return AppContainer(
         settings=settings,
-        registry=registry,
         browser=browser,
         executor=executor,
         worker=worker,

@@ -128,11 +128,6 @@ LinkedInFacetLabels = Annotated[
 ]
 
 
-class CapabilityEffect(StrEnum):
-    READ = "read"
-    WRITE = "write"
-
-
 class CapabilityName(StrEnum):
     JOBS_SEARCH = "linkedin.jobs.search"
     JOBS_GET = "linkedin.jobs.get"
@@ -155,23 +150,6 @@ class CapabilityName(StrEnum):
     MESSAGING_SEARCH = "linkedin.messaging.search"
     MESSAGING_CONVERSATION_GET = "linkedin.messaging.conversation.get"
     MESSAGING_SEND = "linkedin.messaging.send"
-
-
-class LinkedInSurface(StrEnum):
-    JOB_SEARCH = "job-search"
-    JOB_DETAIL = "job-detail"
-    PEOPLE_SEARCH = "people-search"
-    MEMBER_PROFILE = "member-profile"
-    COMPANY_SEARCH = "company-search"
-    COMPANY_PROFILE = "company-profile"
-    COMPANY_ABOUT = "company-about"
-    CONTENT_SEARCH = "content-search"
-    POST_DETAIL = "post-detail"
-    POST_DISCUSSION = "post-discussion"
-    POST_COMPOSER = "post-composer"
-    MESSAGING = "messaging"
-    CONNECTIONS = "connections"
-    JOB_APPLICATION = "job-application"
 
 
 class SourceType(StrEnum):
@@ -3181,18 +3159,6 @@ class ActionOutput(StrictModel):
     request_id: Identifier
     result: ActionResult
     sources: tuple[SourceReference, ...]
-
-
-class CapabilityInfo(StrictModel):
-    name: CapabilityName
-    version: str
-    effect: CapabilityEffect
-    required_surfaces: tuple[LinkedInSurface, ...]
-    enabled: Literal[True] = True
-
-
-class CapabilityListOutput(StrictModel):
-    capabilities: tuple[CapabilityInfo, ...]
 
 
 class ServerStatusOutput(StrictModel):

@@ -141,7 +141,6 @@ the CLI.
 | --- | --- |
 | `server.py` | FastMCP tools, annotations, and client binding |
 | `domain/` | Strict Pydantic inputs, outputs, identifiers, and evidence |
-| `capabilities/` | Registry of supported typed operations |
 | `application/` | Worker, executor, scheduler, cursors, and runtime election |
 | `browser/` | Chromium lifecycle, authentication, pacing, host guard, and page objects |
 | `policy/` | Canonical LinkedIn URL and stable-reference parsing |
@@ -154,13 +153,12 @@ extraction remain separate so a UI change does not leak into the MCP protocol.
 A new capability needs:
 
 1. strict input and output models;
-2. a registry descriptor;
-3. a narrow provider/page-object contract;
-4. executor and worker wiring;
-5. one MCP tool with accurate annotations;
-6. synthetic current-UI fixtures and failure variants;
-7. evidence and bounded-completeness behavior; and
-8. contract, page, runtime, and workflow tests as applicable.
+2. a narrow provider/page-object contract;
+3. executor and worker wiring;
+4. one MCP tool with accurate annotations;
+5. synthetic current-UI fixtures and failure variants;
+6. evidence and bounded-completeness behavior; and
+7. contract, page, runtime, and workflow tests as applicable.
 
 Collection tools must also follow
 [COLLECTION_VERIFICATION_PROCESS.md](COLLECTION_VERIFICATION_PROCESS.md).

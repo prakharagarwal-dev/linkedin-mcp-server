@@ -113,10 +113,10 @@ sensitive and is not deleted automatically.
 
 ## A tool is installed but disabled
 
-Call `linkedin.capabilities.list` to confirm the installed server version
-contains the capability. If it does, enable the exact tool in the MCP client's
-tool configuration and restart that client. The server has no separate scope
-or effect allowlist.
+Refresh the MCP client's standard tool list to confirm the installed server
+exposes the tool. If it does, enable the exact tool in the client's tool
+configuration and restart that client. The server has no separate scope or
+effect allowlist.
 
 ## A scheduled action stops for confirmation
 

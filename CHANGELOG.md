@@ -8,6 +8,10 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Remove the duplicate capability registry and custom
+  `linkedin.capabilities.list` tool. FastMCP's standard MCP `tools/list`
+  response is now the single source of truth for tool discovery, schemas, and
+  annotations.
 - Remove the process-local call/evidence repository, completed-read replay,
   duplicate-call coalescing, replay flags, and captured-source MCP resource.
   Every tool invocation now executes freshly and returns its result with source
