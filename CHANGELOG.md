@@ -55,6 +55,9 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Let concurrent clients wait through the bounded interval between a shared
+  runtime acquiring its account lock and publishing owner metadata, preventing
+  a second client from abandoning a valid Windows startup election.
 - Wait for a real active-member display name when LinkedIn's profile rail is
   still rendering instead of accepting a briefly visible numeric metrics link
   as the acting identity.
