@@ -309,6 +309,48 @@ See the [Warp MCP documentation](https://docs.warp.dev/agent-platform/capabiliti
 
 </details>
 
+## Examples
+
+### Find jobs
+
+```text
+Find remote software engineering jobs in India posted this week with Easy Apply.
+```
+
+### Research people
+
+```text
+Find engineering managers at Stripe in India and show me their relevant experience.
+```
+
+### Research companies
+
+```text
+Find fintech companies in Bengaluru with 51–200 employees and summarize each company.
+```
+
+### Explore posts
+
+```text
+Find recent LinkedIn posts about AI agents and summarize the most useful discussions.
+```
+
+### Manage your network
+
+```text
+Show my latest received connection requests.
+```
+
+```text
+Send a connection request to <profile URL> with the note <note>.
+```
+
+### Send messages
+
+```text
+Send <message> to <profile URL>.
+```
+
 ## Architecture
 
 ```mermaid
