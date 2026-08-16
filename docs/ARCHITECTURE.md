@@ -29,6 +29,12 @@ prevents profile corruption by a second owner. It uses native advisory file
 locking on POSIX and Windows; graceful stop requests are instance-bound local
 files, so runtime lifecycle does not depend on POSIX process signals.
 
+The loopback endpoint uses stateful Streamable HTTP with JSON responses. It
+does not expose the optional standalone GET event stream because the server has
+no unsolicited server-to-client messages; clients receive `405 Method Not
+Allowed` for that optional channel and continue using POST and DELETE. This
+also keeps repeated Windows client teardown bounded in the official SDK.
+
 ## Request lifecycle
 
 Every tool call is one bounded operation:

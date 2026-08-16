@@ -16,6 +16,8 @@ from urllib.parse import urlsplit
 import uvicorn
 from mcp import ClientSession, types
 from mcp.client.streamable_http import streamable_http_client
+from starlette.responses import Response
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from linkedin_mcp import __version__
 from linkedin_mcp.application.process_lock import (
@@ -30,6 +32,23 @@ from linkedin_mcp.server import create_mcp_server
 
 _RUNTIME_COMMAND = "_runtime"
 _RUNTIME_TRANSPORT = "shared-loopback"
+
+
+class _LoopbackMCPApp:
+    """Expose request/response MCP without the optional standalone SSE stream."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self._app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http" and scope["method"] == "GET":
+            await Response(status_code=405, headers={"Allow": "POST, DELETE"})(
+                scope,
+                receive,
+                send,
+            )
+            return
+        await self._app(scope, receive, send)
 
 
 def shared_runtime_endpoint(settings: Settings) -> str:
@@ -148,7 +167,7 @@ async def run_shared_runtime(settings: Settings) -> None:
     try:
         listener = _bind_listener(host, settings.http_port)
         mcp = create_mcp_server(container, manage_container_lifecycle=False)
-        app = mcp.streamable_http_app()
+        app = _LoopbackMCPApp(mcp.streamable_http_app())
         config = uvicorn.Config(
             app,
             host=host,
