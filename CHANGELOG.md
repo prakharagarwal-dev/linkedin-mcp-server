@@ -8,6 +8,8 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Extend the supported Python runtime range through 3.14 across PyPI, MCPB,
+  CI, and contributor metadata.
 - Standardize package, bundle, installer, catalog, and marketplace copy on the
   README's outcome-focused product description, retaining only the Official MCP
   Registry's schema-required 100-character variant.

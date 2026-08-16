@@ -96,7 +96,7 @@ uv build
 ```
 
 CI runs formatting, linting, type checking, packaging, and the full offline
-suite on Python 3.12 and 3.13 for every pull request.
+suite on Python 3.12, 3.13, and 3.14 for every pull request.
 
 ## Adding or changing a tool
 

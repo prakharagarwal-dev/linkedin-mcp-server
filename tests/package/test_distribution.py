@@ -90,6 +90,22 @@ def test_public_repository_metadata_is_complete() -> None:
     assert "Report a vulnerability privately" in (ROOT / "SECURITY.md").read_text()
 
 
+def test_supported_python_versions_are_consistent() -> None:
+    configuration = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    project = configuration["project"]
+    bundle = json.loads((ROOT / "packaging" / "mcpb" / "manifest.json").read_text())
+    workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text()
+
+    assert project["requires-python"] == ">=3.12,<3.15"
+    assert bundle["compatibility"]["runtimes"]["python"] == ">=3.12 <3.15"
+    assert {
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
+        "Programming Language :: Python :: 3.14",
+    } <= set(project["classifiers"])
+    assert 'python-version: ["3.12", "3.13", "3.14"]' in workflow
+
+
 def test_release_workflow_has_a_non_mutating_pypi_retry_target() -> None:
     workflow = (ROOT / ".github" / "workflows" / "publish.yml").read_text()
     all_surfaces_gate = "if: ${{ github.event_name == 'release' || inputs.target == 'all' }}"
