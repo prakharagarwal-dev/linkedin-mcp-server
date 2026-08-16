@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from linkedin_mcp.domain.models import MessageDirection, ReactionState
+from linkedin_mcp.linkedin.models import MessageDirection, ReactionState
 
 
 def _empty_comments() -> list[SimulatorComment]:

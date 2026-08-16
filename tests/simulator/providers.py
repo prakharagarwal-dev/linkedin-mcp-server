@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 
 from pydantic import HttpUrl
 
-from linkedin_mcp.domain.models import (
+from linkedin_mcp.linkedin.models import (
     ActionCommand,
     ActionPageResult,
     CommentCreatePayload,

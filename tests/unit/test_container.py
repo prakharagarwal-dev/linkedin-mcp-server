@@ -12,17 +12,17 @@ from types import ModuleType
 
 import pytest
 
-import linkedin_mcp.application.process_lock as process_lock_module
-from linkedin_mcp.application import (
+import linkedin_mcp.runtime.ownership as process_lock_module
+from linkedin_mcp.app.container import create_production_container
+from linkedin_mcp.config import Settings
+from linkedin_mcp.errors import ConfigurationError
+from linkedin_mcp.runtime import (
     AccountProcessLock,
     AccountRuntimeOwner,
     AccountRuntimeStatus,
     inspect_account_runtime,
     stop_account_runtime,
 )
-from linkedin_mcp.config import Settings
-from linkedin_mcp.container import create_production_container
-from linkedin_mcp.errors import ConfigurationError
 
 
 @pytest.mark.asyncio
@@ -232,7 +232,7 @@ import asyncio
 import os
 import sys
 from pathlib import Path
-from linkedin_mcp.application import AccountProcessLock
+from linkedin_mcp.runtime import AccountProcessLock
 
 lock = AccountProcessLock(Path(sys.argv[1]), account_id="personal", transport="stdio")
 lock.acquire()

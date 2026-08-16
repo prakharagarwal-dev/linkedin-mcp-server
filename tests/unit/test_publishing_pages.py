@@ -11,10 +11,10 @@ from playwright.async_api import Locator, Page, Route, async_playwright
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl, ValidationError
 
-from linkedin_mcp.assets import LocalAssetStore
-from linkedin_mcp.browser import BrowserManager
-from linkedin_mcp.browser.pages import PostPublishingPage
-from linkedin_mcp.domain.models import (
+from linkedin_mcp.app.assets import LocalAssetStore
+from linkedin_mcp.errors import InvalidTargetError
+from linkedin_mcp.linkedin.browser import BrowserManager
+from linkedin_mcp.linkedin.models import (
     ActionCommand,
     ActionOutcome,
     ActionPageResult,
@@ -48,7 +48,7 @@ from linkedin_mcp.domain.models import (
     VideoCaptionMode,
     VideoPostContent,
 )
-from linkedin_mcp.errors import InvalidTargetError
+from linkedin_mcp.linkedin.posts.publishing import PostPublishingPage
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 COMPOSER_HTML = (FIXTURES / "posts/latest/composer.html").read_text(encoding="utf-8")

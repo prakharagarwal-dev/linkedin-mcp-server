@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from linkedin_mcp.application.scheduler import FairClientScheduler, SchedulerClosedError
+from linkedin_mcp.app.scheduler import FairClientScheduler, SchedulerClosedError
 
 
 @pytest.mark.asyncio

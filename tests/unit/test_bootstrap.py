@@ -12,8 +12,8 @@ import pytest
 import linkedin_mcp.browser.bootstrap as bootstrap_module
 from linkedin_mcp.browser.bootstrap import BrowserRuntimeBootstrap
 from linkedin_mcp.config import Settings
-from linkedin_mcp.domain.models import BrowserSetupState
 from linkedin_mcp.errors import BrowserUnavailableError
+from linkedin_mcp.linkedin.models import BrowserSetupState
 
 _TARGETS = (
     ("chromium-", "1234"),

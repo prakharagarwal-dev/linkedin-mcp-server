@@ -7,13 +7,8 @@ from typing import Any, cast
 
 import pytest
 
-import linkedin_mcp.browser.manager as manager_module
-from linkedin_mcp.browser import (
-    BrowserManager,
-    BrowserRuntimeBootstrap,
-    login_interactively,
-    logout_interactively,
-)
+import linkedin_mcp.linkedin.browser as manager_module
+from linkedin_mcp.browser import BrowserRuntimeBootstrap
 from linkedin_mcp.browser.profile import BrowserProfileManager, BrowserProfileStatus
 from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import (
@@ -24,6 +19,11 @@ from linkedin_mcp.errors import (
     InvalidTargetError,
     ParserDriftError,
     RestrictionDetectedError,
+)
+from linkedin_mcp.linkedin.browser import (
+    BrowserManager,
+    login_interactively,
+    logout_interactively,
 )
 
 

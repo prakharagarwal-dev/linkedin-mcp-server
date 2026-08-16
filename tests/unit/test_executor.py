@@ -7,10 +7,14 @@ from typing import Any
 import pytest
 from pydantic import HttpUrl
 
-from linkedin_mcp.application import CapabilityExecutor
-from linkedin_mcp.application.executor import safe_capability_error
 from linkedin_mcp.config import Settings
-from linkedin_mcp.domain.models import (
+from linkedin_mcp.errors import (
+    InternalServerError,
+    InvalidCursorError,
+    InvalidTargetError,
+    ParserDriftError,
+)
+from linkedin_mcp.linkedin.models import (
     CURRENT_RECEIVED_INVITATION_VIEWS,
     ActionCommand,
     ActionInspection,
@@ -92,12 +96,7 @@ from linkedin_mcp.domain.models import (
     StopReason,
     TextPostContent,
 )
-from linkedin_mcp.errors import (
-    InternalServerError,
-    InvalidCursorError,
-    InvalidTargetError,
-    ParserDriftError,
-)
+from linkedin_mcp.linkedin.operations import CapabilityExecutor, safe_capability_error
 
 
 class FakeJobSearch:

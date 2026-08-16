@@ -41,7 +41,7 @@ Changelog = "https://github.com/prakharagarwal-dev/linkedin-mcp-server/blob/main
 "Privacy Policy" = "https://github.com/prakharagarwal-dev/linkedin-mcp-server/blob/main/PRIVACY.md"
 
 [project.scripts]
-linkedin-mcp = "linkedin_mcp.__main__:main"
+linkedin-mcp = "linkedin_mcp.cli.main:main"
 
 [dependency-groups]
 dev = [

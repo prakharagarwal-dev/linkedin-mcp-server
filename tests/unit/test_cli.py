@@ -10,15 +10,15 @@ from typing import Any, cast
 import pytest
 from pydantic import ValidationError
 
-import linkedin_mcp.__main__ as cli
-from linkedin_mcp.application import (
+import linkedin_mcp.cli.main as cli
+from linkedin_mcp.browser import BrowserProfileResetResult, BrowserProfileStatus
+from linkedin_mcp.config import Settings
+from linkedin_mcp.errors import ConfigurationError
+from linkedin_mcp.runtime import (
     AccountProcessLock,
     AccountRuntimeOwner,
     AccountRuntimeStatus,
 )
-from linkedin_mcp.browser import BrowserProfileResetResult, BrowserProfileStatus
-from linkedin_mcp.config import Settings
-from linkedin_mcp.errors import ConfigurationError
 
 _TARGETS = (
     ("chromium-", "1234"),
