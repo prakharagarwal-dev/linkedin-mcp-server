@@ -47,11 +47,7 @@ Find remote software engineering jobs in India posted this week.
 ## 🛠️ Tools
 
 > [!TIP]
-> **What “verified” means:** The tool passed the latest end-to-end compatibility
-> check through its public MCP interface against LinkedIn's visible web UI using
-> isolated test accounts. Reads returned the expected typed data; writes
-> produced and visibly verified the requested result. The accompanying date
-> shows when the check ran.
+> **Verified** means the tool passed an end-to-end live compatibility test against LinkedIn's visible web UI on the date shown.
 
 | Area | Function | MCP tool | LinkedIn UI compatibility | What it does |
 | --- | --- | --- | --- | --- |
