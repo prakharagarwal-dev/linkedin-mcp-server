@@ -41,7 +41,7 @@ LinkedIn and complete any required verification.
 ### 3. Try your first request
 
 ```text
-Find remote software engineering jobs in India posted this week.
+Find remote software engineering jobs in India posted on LinkedIn this week.
 ```
 
 ## 🛠️ Tools
@@ -317,19 +317,19 @@ See the [Warp MCP documentation](https://docs.warp.dev/agent-platform/capabiliti
 ### Find jobs
 
 ```text
-Find remote software engineering jobs in India posted this week with Easy Apply.
+Find remote software engineering jobs in India posted on LinkedIn this week with Easy Apply.
 ```
 
 ### Research people
 
 ```text
-Find engineering managers at Stripe in India and show me their relevant experience.
+Find LinkedIn profiles for engineering managers at Stripe in India and show me their relevant experience.
 ```
 
 ### Research companies
 
 ```text
-Find fintech companies in Bengaluru with 51–200 employees and summarize each company.
+Find fintech companies in Bengaluru on LinkedIn with 51–200 employees and summarize each company.
 ```
 
 ### Explore posts
@@ -341,17 +341,17 @@ Find recent LinkedIn posts about AI agents and summarize the most useful discuss
 ### Manage your network
 
 ```text
-Show my latest received connection requests.
+Show my latest received connection requests on LinkedIn.
 ```
 
 ```text
-Send a connection request to <profile URL> with the note <note>.
+Send a LinkedIn connection request to <profile URL> with the note <note>.
 ```
 
 ### Send messages
 
 ```text
-Send <message> to <profile URL>.
+Send <message> on LinkedIn to <profile URL>.
 ```
 
 ## 🏗️ Architecture
