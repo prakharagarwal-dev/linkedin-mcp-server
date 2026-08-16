@@ -105,6 +105,7 @@ def test_supported_python_versions_are_consistent() -> None:
         "Programming Language :: Python :: 3.14",
     } <= set(project["classifiers"])
     assert 'python-version: ["3.12", "3.13", "3.14"]' in workflow
+    assert "UV_PYTHON: ${{ matrix.python-version }}" in workflow
 
 
 def test_release_workflow_has_a_non_mutating_pypi_retry_target() -> None:

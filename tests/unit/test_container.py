@@ -126,8 +126,8 @@ from linkedin_mcp.application import AccountProcessLock
 
 lock = AccountProcessLock(Path(sys.argv[1]), account_id="personal", transport="stdio")
 lock.acquire()
-print("ready", flush=True)
 signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+print("ready", flush=True)
 while True:
     time.sleep(1)
 """
