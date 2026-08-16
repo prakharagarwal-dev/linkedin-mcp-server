@@ -102,6 +102,100 @@ async def test_existing_healthy_runtime_is_reused_without_spawning(
 
 
 @pytest.mark.asyncio
+async def test_ensure_waits_for_new_lock_owner_metadata(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = Settings(runtime_lock_path=tmp_path / "runtime.lock")
+    endpoint = "http://127.0.0.1:8000/mcp"
+
+    def starting(_: Path) -> AccountRuntimeStatus:
+        return AccountRuntimeStatus(running=True)
+
+    monkeypatch.setattr(shared_runtime, "inspect_account_runtime", starting)
+
+    async def wait(_: Settings, *, starter: Any = None) -> str:
+        assert starter is None
+        return endpoint
+
+    monkeypatch.setattr(shared_runtime, "wait_for_shared_runtime", wait)
+
+    def unexpected_spawn(_: Settings) -> Any:
+        raise AssertionError("A held runtime lock must not spawn another owner.")
+
+    monkeypatch.setattr(shared_runtime, "_spawn_shared_runtime", unexpected_spawn)
+    assert await shared_runtime.ensure_shared_runtime(settings) == endpoint
+
+
+@pytest.mark.asyncio
+async def test_runtime_wait_tolerates_owner_metadata_publication_window(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = Settings(runtime_lock_path=tmp_path / "runtime.lock")
+    endpoint = "http://127.0.0.1:8000/mcp"
+    owner = AccountRuntimeOwner(
+        pid=4321,
+        command="_runtime",
+        endpoint=endpoint,
+        version=shared_runtime.__version__,
+        account_id=settings.account_id,
+        configuration_fingerprint=shared_runtime.runtime_configuration_fingerprint(settings),
+    )
+    statuses = iter(
+        (
+            AccountRuntimeStatus(running=True),
+            AccountRuntimeStatus(running=True, owner=owner),
+        )
+    )
+
+    def inspect(_: Path) -> AccountRuntimeStatus:
+        return next(statuses)
+
+    async def healthy(status: AccountRuntimeStatus) -> str | None:
+        return endpoint if status.owner is owner else None
+
+    async def no_sleep(_: float) -> None:
+        return None
+
+    monkeypatch.setattr(shared_runtime, "inspect_account_runtime", inspect)
+    monkeypatch.setattr(shared_runtime, "_healthy_endpoint", healthy)
+    monkeypatch.setattr(shared_runtime.asyncio, "sleep", no_sleep)
+    assert await shared_runtime.wait_for_shared_runtime(settings) == endpoint
+
+
+@pytest.mark.asyncio
+async def test_runtime_wait_rejects_persistently_missing_owner_metadata(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = Settings(
+        runtime_lock_path=tmp_path / "runtime.lock",
+        runtime_start_timeout_seconds=10,
+    )
+
+    def missing(_: Path) -> AccountRuntimeStatus:
+        return AccountRuntimeStatus(running=True)
+
+    async def no_sleep(_: float) -> None:
+        return None
+
+    class FakeTime:
+        values = iter((0.0, 0.1, 6.0))
+
+        @classmethod
+        def monotonic(cls) -> float:
+            return next(cls.values)
+
+    monkeypatch.setattr(shared_runtime, "inspect_account_runtime", missing)
+    monkeypatch.setattr(shared_runtime.asyncio, "sleep", no_sleep)
+    monkeypatch.setattr(shared_runtime, "time", FakeTime)
+
+    with pytest.raises(ConfigurationError, match="without valid runtime metadata"):
+        await shared_runtime.wait_for_shared_runtime(settings)
+
+
+@pytest.mark.asyncio
 async def test_runtime_wait_rejects_exclusive_profile_maintenance(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

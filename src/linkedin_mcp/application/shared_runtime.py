@@ -32,6 +32,8 @@ from linkedin_mcp.server import create_mcp_server
 
 _RUNTIME_COMMAND = "_runtime"
 _RUNTIME_TRANSPORT = "shared-loopback"
+# The OS lock becomes visible before its holder can fsync owner metadata.
+_LOCK_OWNER_PUBLICATION_GRACE_SECONDS = 5.0
 _WINDOWS_BROKER_COMMAND_ENV = "LINKEDIN_MCP_INTERNAL_BROKER_COMMAND"
 _WINDOWS_BROKER_CWD_ENV = "LINKEDIN_MCP_INTERNAL_BROKER_CWD"
 _WINDOWS_BROKERED_RUNTIME_ENV = "LINKEDIN_MCP_INTERNAL_BROKERED_RUNTIME"
@@ -99,6 +101,8 @@ async def ensure_shared_runtime(settings: Settings) -> str:
     """Return a healthy endpoint, starting one elected background owner if needed."""
 
     status = inspect_account_runtime(settings.runtime_lock_path)
+    if status.running and status.owner is None:
+        return await wait_for_shared_runtime(settings)
     _validate_running_owner(status, settings)
     endpoint = await _healthy_endpoint(status)
     if endpoint is not None:
@@ -117,10 +121,19 @@ async def wait_for_shared_runtime(
 ) -> str:
     deadline = time.monotonic() + settings.runtime_start_timeout_seconds
     last_owner_command: str | None = None
-    while time.monotonic() < deadline:
+    unpublished_owner_since: float | None = None
+    while (now := time.monotonic()) < deadline:
         status = inspect_account_runtime(settings.runtime_lock_path)
         owner = status.owner
         last_owner_command = owner.command if owner is not None else None
+        if status.running and owner is None:
+            if unpublished_owner_since is None:
+                unpublished_owner_since = now
+            if now - unpublished_owner_since < _LOCK_OWNER_PUBLICATION_GRACE_SECONDS:
+                await asyncio.sleep(0.1)
+                continue
+        else:
+            unpublished_owner_since = None
         _validate_running_owner(status, settings)
         endpoint = await _healthy_endpoint(status)
         if endpoint is not None:
