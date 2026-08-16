@@ -28,7 +28,7 @@ class _ClientObservation(TypedDict):
 
 
 @pytest.mark.asyncio
-@pytest.mark.timeout(60)
+@pytest.mark.timeout(90)
 async def test_two_stdio_clients_elect_and_share_one_surviving_runtime(
     tmp_path: Path,
     unused_tcp_port: int,
@@ -133,7 +133,8 @@ async def test_two_stdio_clients_elect_and_share_one_surviving_runtime(
         assert after_disconnect.running is True
         assert after_disconnect.owner is not None
         assert after_disconnect.owner.pid == owner_pid
-        assert await runtime_is_healthy(endpoint)
+        for _ in range(12):
+            assert await runtime_is_healthy(endpoint, timeout_seconds=3)
     finally:
         release.set()
         for client in clients:

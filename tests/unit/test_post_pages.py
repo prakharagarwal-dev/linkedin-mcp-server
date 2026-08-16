@@ -98,7 +98,7 @@ class PostFixtureBrowser:
         await route.fulfill(
             status=200,
             content_type="text/html; charset=utf-8",
-            body=(FIXTURES / fixture).read_text(),
+            body=(FIXTURES / fixture).read_text(encoding="utf-8"),
         )
 
     async def click_visible_control(self, page: Page, control: object) -> None:
@@ -155,7 +155,7 @@ def _decoded_values(query: dict[str, list[str]], key: str) -> list[str]:
 def test_post_fixture_manifest_locks_current_visible_filter_surface() -> None:
     manifest = cast(
         dict[str, object],
-        json.loads((FIXTURES / "posts/latest/manifest.json").read_text()),
+        json.loads((FIXTURES / "posts/latest/manifest.json").read_text(encoding="utf-8")),
     )
 
     assert manifest["provenance"] == "mock_verified"
@@ -518,7 +518,7 @@ async def test_post_search_only_completes_empty_on_visible_end_state() -> None:
 
 @pytest.mark.timeout(20)
 async def test_post_search_classifies_selected_card_with_unsupported_author_identity() -> None:
-    html = (FIXTURES / "posts/latest/search-unsupported-author.html").read_text()
+    html = (FIXTURES / "posts/latest/search-unsupported-author.html").read_text(encoding="utf-8")
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -837,7 +837,7 @@ async def test_post_detail_reads_repost_wrapper_and_full_original_as_two_bounded
 
 @pytest.mark.timeout(30)
 async def test_post_detail_classifies_every_current_visible_link_card_family() -> None:
-    base = (FIXTURES / "posts/latest/detail-article.html").read_text()
+    base = (FIXTURES / "posts/latest/detail-article.html").read_text(encoding="utf-8")
     variants = (
         (
             PostContentType.ARTICLE,
@@ -896,7 +896,7 @@ async def test_post_detail_preserves_a_single_page_activity_alias_without_invent
     alias_ref = "share:7312345678901234599"
     html = (
         (FIXTURES / "posts/latest/detail-image.html")
-        .read_text()
+        .read_text(encoding="utf-8")
         .replace(
             ("https://www.linkedin.com/feed/update/urn:li:activity:7312345678901234567/"),
             f"https://www.linkedin.com/feed/update/urn:li:share:{alias_ref.split(':')[1]}/",
@@ -929,7 +929,7 @@ async def test_post_detail_accepts_role_article_with_legacy_visible_body() -> No
     alias_ref = "share:7312345678901234599"
     html = (
         (FIXTURES / "posts/latest/detail-image.html")
-        .read_text()
+        .read_text(encoding="utf-8")
         .replace(
             '<div role="listitem">',
             f'<div role="article" data-urn="urn:li:{alias_ref}">',
@@ -969,7 +969,7 @@ async def test_comments_open_and_parse_modern_stable_ids_and_nested_replies() ->
         page = await browser.new_page()
         fixture_browser = StaticPostFixtureBrowser(
             page,
-            (FIXTURES / "posts/latest/comments.html").read_text(),
+            (FIXTURES / "posts/latest/comments.html").read_text(encoding="utf-8"),
         )
         reader = PostCommentsPage(
             cast(BrowserManager, fixture_browser),
@@ -1070,7 +1070,7 @@ async def test_comments_bind_current_flattened_replies_to_nearest_root() -> None
         page = await browser.new_page()
         fixture_browser = StaticPostFixtureBrowser(
             page,
-            (FIXTURES / "posts/latest/comments-flat-threads.html").read_text(),
+            (FIXTURES / "posts/latest/comments-flat-threads.html").read_text(encoding="utf-8"),
         )
         reader = PostCommentsPage(
             cast(BrowserManager, fixture_browser),
@@ -1107,7 +1107,7 @@ async def test_comments_bind_current_flattened_replies_to_nearest_root() -> None
 async def test_comments_wait_for_discussion_after_async_sort_rerender() -> None:
     html = (
         (FIXTURES / "posts/latest/comments.html")
-        .read_text()
+        .read_text(encoding="utf-8")
         .replace(
             '<section id="discussion" aria-label="Comments" hidden>',
             """
@@ -1175,7 +1175,7 @@ async def test_comments_wait_for_discussion_after_async_sort_rerender() -> None:
 async def test_comments_wait_for_async_load_more_render() -> None:
     html = (
         (FIXTURES / "posts/latest/comments.html")
-        .read_text()
+        .read_text(encoding="utf-8")
         .replace(
             """
           </section>
@@ -1259,7 +1259,7 @@ async def test_comments_wait_for_async_load_more_render() -> None:
 async def test_comments_expand_current_see_previous_replies_control() -> None:
     html = (
         (FIXTURES / "posts/latest/comments.html")
-        .read_text()
+        .read_text(encoding="utf-8")
         .replace(
             '<section aria-label="Replies">',
             (
@@ -1315,7 +1315,7 @@ async def test_comments_preserve_native_ugc_discussion_alias_for_activity_url() 
     native_post_ref = "ugc-post:7999999999999999998"
     html = (
         (FIXTURES / "posts/latest/comments.html")
-        .read_text()
+        .read_text(encoding="utf-8")
         .replace(
             "urn:li:comment:(urn:li:activity:7312345678901234567,",
             "urn:li:comment:(urn:li:ugcPost:7999999999999999998,",
@@ -1364,7 +1364,7 @@ async def test_comments_accept_single_rendered_post_alias_for_requested_activity
     displayed_post_ref = "share:7999999999999999997"
     html = (
         (FIXTURES / "posts/latest/comments.html")
-        .read_text()
+        .read_text(encoding="utf-8")
         .replace(
             'data-post-urn="urn:li:activity:7312345678901234567"',
             'data-post-urn="urn:li:share:7999999999999999997"',
@@ -1407,7 +1407,7 @@ async def test_comments_accept_single_rendered_post_alias_for_requested_activity
 async def test_post_detail_fails_closed_without_exact_requested_reference() -> None:
     html = (
         (FIXTURES / "posts/latest/detail-image.html")
-        .read_text()
+        .read_text(encoding="utf-8")
         .replace(
             'aria-label="Open control menu for post by Jane Doe"',
             'aria-label="Post options for Jane Doe"',
@@ -1433,9 +1433,9 @@ async def test_post_detail_fails_closed_without_exact_requested_reference() -> N
 
 @pytest.mark.timeout(30)
 async def test_post_detail_fails_closed_on_current_ui_drift_and_safety_bounds() -> None:
-    image = (FIXTURES / "posts/latest/detail-image.html").read_text()
-    poll = (FIXTURES / "posts/latest/detail-poll-closed.html").read_text()
-    repost = (FIXTURES / "posts/latest/detail-repost.html").read_text()
+    image = (FIXTURES / "posts/latest/detail-image.html").read_text(encoding="utf-8")
+    poll = (FIXTURES / "posts/latest/detail-poll-closed.html").read_text(encoding="utf-8")
+    repost = (FIXTURES / "posts/latest/detail-repost.html").read_text(encoding="utf-8")
     cases = (
         (
             image.replace(

@@ -116,7 +116,7 @@ class DelayedDetailBrowser(FixtureBrowser):
 
 
 def test_latest_job_fixture_manifest_locks_live_verified_ui_contract() -> None:
-    manifest = json.loads((JOB_FIXTURES / "manifest.json").read_text())
+    manifest = json.loads((JOB_FIXTURES / "manifest.json").read_text(encoding="utf-8"))
 
     assert manifest["provenance"] == "mock_verified"
     assert manifest["verified_at"] == "2026-08-05"
@@ -197,7 +197,9 @@ async def test_current_job_search_cards_extract_exact_typed_fields_and_evidence(
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         try:
-            await page.set_content((FIXTURES / "jobs/latest/search.html").read_text())
+            await page.set_content(
+                (FIXTURES / "jobs/latest/search.html").read_text(encoding="utf-8")
+            )
             jobs = await JobSearchPage.extract_visible_jobs(page)
         finally:
             await browser.close()
@@ -342,7 +344,7 @@ async def test_job_search_collects_scoped_source_and_visible_terminal_coverage()
         page = await browser.new_page()
         fixture_browser = FixtureBrowser(
             page,
-            (FIXTURES / "jobs/latest/search.html").read_text(),
+            (FIXTURES / "jobs/latest/search.html").read_text(encoding="utf-8"),
         )
         collector = JobSearchPage(cast(BrowserManager, fixture_browser), max_pages=3)
         try:
@@ -378,7 +380,7 @@ async def test_job_search_hydrates_every_virtualized_shell_before_completion() -
                 BrowserManager,
                 FixtureBrowser(
                     page,
-                    (FIXTURES / "jobs/latest/search-virtualized.html").read_text(),
+                    (FIXTURES / "jobs/latest/search-virtualized.html").read_text(encoding="utf-8"),
                 ),
             ),
             max_pages=1,
@@ -412,7 +414,7 @@ async def test_zero_result_recommendations_are_never_returned_as_query_matches()
                 BrowserManager,
                 FixtureBrowser(
                     page,
-                    (FIXTURES / "jobs/latest/search-empty.html").read_text(),
+                    (FIXTURES / "jobs/latest/search-empty.html").read_text(encoding="utf-8"),
                 ),
             ),
             max_pages=1,
@@ -700,7 +702,7 @@ async def test_job_search_resolves_current_visible_facet_names_to_exact_ids() ->
         page = await browser.new_page()
         fixture_browser = FixtureBrowser(
             page,
-            (FIXTURES / "jobs/latest/search-filters.html").read_text(),
+            (FIXTURES / "jobs/latest/search-filters.html").read_text(encoding="utf-8"),
         )
         collector = JobSearchPage(cast(BrowserManager, fixture_browser), max_pages=1)
         request = JobSearchInput(
@@ -742,7 +744,7 @@ async def test_job_search_name_resolution_fails_closed_when_choice_is_not_visibl
         page = await browser.new_page()
         fixture_browser = FixtureBrowser(
             page,
-            (FIXTURES / "jobs/latest/search-filters.html").read_text(),
+            (FIXTURES / "jobs/latest/search-filters.html").read_text(encoding="utf-8"),
         )
         collector = JobSearchPage(cast(BrowserManager, fixture_browser), max_pages=1)
         try:
@@ -766,7 +768,7 @@ async def test_current_easy_apply_job_expands_jd_and_retains_hiring_team() -> No
         page = await browser.new_page()
         fixture_browser = FixtureBrowser(
             page,
-            (FIXTURES / "jobs/latest/detail-easy-apply.html").read_text(),
+            (FIXTURES / "jobs/latest/detail-easy-apply.html").read_text(encoding="utf-8"),
         )
         reader = JobDetailPage(cast(BrowserManager, fixture_browser))
         try:
@@ -811,7 +813,7 @@ async def test_current_external_apply_job_reports_company_site_method() -> None:
         page = await browser.new_page()
         fixture_browser = FixtureBrowser(
             page,
-            (FIXTURES / "jobs/latest/detail-external-apply.html").read_text(),
+            (FIXTURES / "jobs/latest/detail-external-apply.html").read_text(encoding="utf-8"),
         )
         reader = JobDetailPage(cast(BrowserManager, fixture_browser))
         try:
@@ -841,7 +843,7 @@ async def test_current_anonymous_job_preserves_missing_company_identity() -> Non
         page = await browser.new_page()
         fixture_browser = FixtureBrowser(
             page,
-            (FIXTURES / "jobs/latest/detail-anonymous.html").read_text(),
+            (FIXTURES / "jobs/latest/detail-anonymous.html").read_text(encoding="utf-8"),
         )
         reader = JobDetailPage(cast(BrowserManager, fixture_browser))
         try:
@@ -977,7 +979,7 @@ async def test_current_closed_job_reports_unavailable_application_method() -> No
         page = await browser.new_page()
         fixture_browser = FixtureBrowser(
             page,
-            (FIXTURES / "jobs/latest/detail-unavailable.html").read_text(),
+            (FIXTURES / "jobs/latest/detail-unavailable.html").read_text(encoding="utf-8"),
         )
         reader = JobDetailPage(cast(BrowserManager, fixture_browser))
         try:

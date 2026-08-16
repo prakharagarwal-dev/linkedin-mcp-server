@@ -51,7 +51,7 @@ from linkedin_mcp.domain.models import (
 from linkedin_mcp.errors import InvalidTargetError
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
-COMPOSER_HTML = (FIXTURES / "posts/latest/composer.html").read_text()
+COMPOSER_HTML = (FIXTURES / "posts/latest/composer.html").read_text(encoding="utf-8")
 
 
 class PublishingFixtureBrowser:
@@ -338,7 +338,10 @@ async def test_video_document_and_poll_modes_cover_all_structured_composer_optio
 ) -> None:
     (tmp_path / "demo.mp4").write_bytes(b"v" * (75 * 1024))
     (tmp_path / "thumb.png").write_bytes(b"thumbnail")
-    (tmp_path / "captions.srt").write_text("1\n00:00:00,000 --> 00:00:01,000\nFixture\n")
+    (tmp_path / "captions.srt").write_text(
+        "1\n00:00:00,000 --> 00:00:01,000\nFixture\n",
+        encoding="utf-8",
+    )
     (tmp_path / "guide.pdf").write_bytes(b"%PDF-fixture")
     requests = (
         PostCreateInput(
@@ -584,7 +587,7 @@ async def test_asset_store_uses_current_file_and_rejects_wrong_type(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "safe.png").write_bytes(b"first")
-    (tmp_path / "notes.txt").write_text("wrong type")
+    (tmp_path / "notes.txt").write_text("wrong type", encoding="utf-8")
     store = LocalAssetStore(tmp_path)
     content = ImagePostContent(
         text="Safe asset",

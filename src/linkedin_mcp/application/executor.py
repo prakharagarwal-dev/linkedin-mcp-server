@@ -1406,7 +1406,12 @@ class CapabilityExecutor:
                 started_at=started_at,
                 completed_at=datetime.now(UTC),
             )
-            source = source_from_action_execution(command, result, page_result)
+            source = source_from_action_execution(
+                command,
+                result,
+                page_result,
+                execution_id=call.call_id,
+            )
             output = ActionOutput(
                 context_id=request.context_id,
                 request_id=request.request_id,

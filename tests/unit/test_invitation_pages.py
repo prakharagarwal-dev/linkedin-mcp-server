@@ -90,7 +90,7 @@ class InvitationFixtureBrowser:
 
 
 def _fixture(name: str) -> str:
-    return (FIXTURES / name).read_text()
+    return (FIXTURES / name).read_text(encoding="utf-8")
 
 
 def _request(
@@ -125,7 +125,7 @@ async def _collect(
 
 
 def test_fixture_manifest_records_sanitized_current_selector_provenance() -> None:
-    manifest = json.loads((FIXTURES / "manifest.json").read_text())
+    manifest = json.loads((FIXTURES / "manifest.json").read_text(encoding="utf-8"))
 
     assert manifest == {
         "provenance": "mock_verified",

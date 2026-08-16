@@ -77,16 +77,22 @@ uvx --from linkedin-mcp-local linkedin-mcp stop
 ```
 
 `stop` addresses only the elected process currently holding the configured
-lock, asks it to shut down gracefully, and waits for release. It does not use
-`SIGKILL`. If the timeout expires, an active bounded LinkedIn write may still
-be reaching its terminal verification; run `status` again rather than deleting
-the lock.
+lock, publishes an instance-bound local shutdown request, and waits for release.
+It does not send a force-kill signal. If the timeout expires, an active bounded
+LinkedIn write may still be reaching its terminal verification; run `status`
+again rather than deleting the lock.
 
 If a normal client still reports a competing owner, check that every client is
 using the same current package version and effective `LINKEDIN_MCP_` runtime
 settings. A configuration-fingerprint error identifies this mismatch without
 exposing the values. A background startup failure is recorded in `runtime.log`
 beside the configured runtime lock.
+
+On Windows, background election also requires the built-in Windows PowerShell
+and local CIM/WMI provider. The server uses them only to create the runtime
+outside a client-owned Job Object. If an organization disables either local
+component, `runtime.log` records the bounded broker failure and startup stops
+without opening Chromium.
 
 Do not delete the runtime lock while a server or browser process is still
 running.

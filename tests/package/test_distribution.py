@@ -54,7 +54,7 @@ PUBLIC_REPOSITORY_FILES = {
 
 
 def test_build_configuration_packages_only_the_standalone_server() -> None:
-    configuration = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    configuration = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     project = configuration["project"]
     wheel = configuration["tool"]["hatch"]["build"]["targets"]["wheel"]
     dependencies = {
@@ -76,7 +76,8 @@ def test_build_configuration_packages_only_the_standalone_server() -> None:
     assert project["scripts"] == {"linkedin-mcp": "linkedin_mcp.__main__:main"}
 
     production_sources = "\n".join(
-        path.read_text() for path in sorted((ROOT / "src" / "linkedin_mcp").rglob("*.py"))
+        path.read_text(encoding="utf-8")
+        for path in sorted((ROOT / "src" / "linkedin_mcp").rglob("*.py"))
     )
     assert "tests.simulator" not in production_sources
     assert "startup_scanner" not in production_sources
@@ -87,15 +88,15 @@ def test_public_repository_metadata_is_complete() -> None:
     missing = sorted(path for path in PUBLIC_REPOSITORY_FILES if not (ROOT / path).is_file())
 
     assert missing == []
-    assert "Apache License" in (ROOT / "LICENSE").read_text()
-    assert "Report a vulnerability privately" in (ROOT / "SECURITY.md").read_text()
+    assert "Apache License" in (ROOT / "LICENSE").read_text(encoding="utf-8")
+    assert "Report a vulnerability privately" in (ROOT / "SECURITY.md").read_text(encoding="utf-8")
 
 
-def test_supported_python_versions_are_consistent() -> None:
-    configuration = tomllib.loads((ROOT / "pyproject.toml").read_text())
+def test_supported_runtime_versions_and_platforms_are_consistent() -> None:
+    configuration = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     project = configuration["project"]
-    bundle = json.loads((ROOT / "packaging" / "mcpb" / "manifest.json").read_text())
-    workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text()
+    bundle = json.loads((ROOT / "packaging" / "mcpb" / "manifest.json").read_text(encoding="utf-8"))
+    workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 
     assert project["requires-python"] == ">=3.12,<3.15"
     assert bundle["compatibility"]["runtimes"]["python"] == ">=3.12 <3.15"
@@ -104,12 +105,21 @@ def test_supported_python_versions_are_consistent() -> None:
         "Programming Language :: Python :: 3.13",
         "Programming Language :: Python :: 3.14",
     } <= set(project["classifiers"])
+    assert {
+        "Operating System :: MacOS",
+        "Operating System :: Microsoft :: Windows",
+        "Operating System :: POSIX :: Linux",
+    } <= set(project["classifiers"])
     assert 'python-version: ["3.12", "3.13", "3.14"]' in workflow
+    assert "macos-latest" in workflow
+    assert "windows-latest" in workflow
+    assert "ubuntu-24.04-arm" in workflow
     assert "UV_PYTHON: ${{ matrix.python-version }}" in workflow
+    assert 'UV_PYTHON: "3.13"' in workflow
 
 
 def test_release_workflow_has_a_non_mutating_pypi_retry_target() -> None:
-    workflow = (ROOT / ".github" / "workflows" / "publish.yml").read_text()
+    workflow = (ROOT / ".github" / "workflows" / "publish.yml").read_text(encoding="utf-8")
     all_surfaces_gate = "if: ${{ github.event_name == 'release' || inputs.target == 'all' }}"
     pypi_job = workflow.split("\n  pypi:\n", 1)[1].split("\n  container:\n", 1)[0]
 
@@ -121,7 +131,9 @@ def test_release_workflow_has_a_non_mutating_pypi_retry_target() -> None:
 
 
 def test_registry_workflow_publishes_immutable_oci_and_mcpb_packages() -> None:
-    workflow = (ROOT / ".github" / "workflows" / "publish-registries.yml").read_text()
+    workflow = (ROOT / ".github" / "workflows" / "publish-registries.yml").read_text(
+        encoding="utf-8"
+    )
 
     assert 'MCPB_FILENAME="linkedin-mcp-server-$VERSION.mcpb"' in workflow
     assert 'RELEASE_TAG="v$VERSION"' in workflow
@@ -134,12 +146,12 @@ def test_registry_workflow_publishes_immutable_oci_and_mcpb_packages() -> None:
 
 
 def test_registry_and_bundle_metadata_share_the_release_identity() -> None:
-    registry = json.loads((ROOT / "server.json").read_text())
-    bundle = json.loads((ROOT / "packaging" / "mcpb" / "manifest.json").read_text())
-    configuration = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    registry = json.loads((ROOT / "server.json").read_text(encoding="utf-8"))
+    bundle = json.loads((ROOT / "packaging" / "mcpb" / "manifest.json").read_text(encoding="utf-8"))
+    configuration = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     project = configuration["project"]
-    readme = (ROOT / "README.md").read_text()
-    dockerfile = (ROOT / "Dockerfile").read_text()
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
 
     assert registry["name"] == "io.github.prakharagarwal-dev/linkedin-mcp-server"
     assert registry["version"] == project["version"] == bundle["version"]
@@ -172,7 +184,7 @@ def test_registry_and_bundle_metadata_share_the_release_identity() -> None:
         "https://github.com/prakharagarwal-dev/linkedin-mcp-server/blob/main/PRIVACY.md",
         "https://www.linkedin.com/legal/privacy-policy",
     ]
-    privacy = (ROOT / "PRIVACY.md").read_text()
+    privacy = (ROOT / "PRIVACY.md").read_text(encoding="utf-8")
     assert re.search(r"^## (?:\S+\s+)?Privacy Policy\s*$", readme, re.MULTILINE)
     assert all(
         heading in privacy
@@ -216,7 +228,7 @@ def test_synthetic_fixtures_contain_no_session_or_trace_artifacts() -> None:
             continue
         assert path.name.casefold() not in forbidden_names
         assert path.suffix.casefold() not in forbidden_suffixes
-        content = path.read_text(errors="ignore").casefold()
+        content = path.read_text(encoding="utf-8", errors="ignore").casefold()
         assert all(token not in content for token in forbidden_text), path
 
 

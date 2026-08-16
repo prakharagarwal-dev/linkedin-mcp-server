@@ -9,9 +9,9 @@ import signal
 import sys
 from collections.abc import Awaitable, Callable, Generator
 from contextlib import contextmanager
+from types import FrameType
 from typing import cast
 
-import anyio
 from pydantic import ValidationError
 
 from linkedin_mcp.application import (
@@ -21,8 +21,10 @@ from linkedin_mcp.application import (
 )
 from linkedin_mcp.application.proxy import run_stdio_proxy
 from linkedin_mcp.application.shared_runtime import (
+    brokered_runtime_output_required,
     ensure_shared_runtime,
     read_shared_runtime_status,
+    redirect_brokered_runtime_output,
     run_shared_runtime,
     wait_for_shared_runtime,
 )
@@ -128,7 +130,11 @@ async def _logout(settings: Settings) -> None:
 
 
 @contextmanager
-def _claim_account_runtime(settings: Settings, *, command: str) -> Generator[None, None, None]:
+def _claim_account_runtime(
+    settings: Settings,
+    *,
+    command: str,
+) -> Generator[AccountProcessLock, None, None]:
     lock = AccountProcessLock(
         settings.runtime_lock_path,
         account_id=settings.account_id,
@@ -136,7 +142,7 @@ def _claim_account_runtime(settings: Settings, *, command: str) -> Generator[Non
     )
     lock.acquire()
     try:
-        yield
+        yield lock
     finally:
         lock.release()
 
@@ -147,29 +153,29 @@ async def _run_owned_operation[ResultT](
     command: str,
     operation: Callable[[], Awaitable[ResultT]],
 ) -> ResultT:
-    with _claim_account_runtime(settings, command=command):
+    with _claim_account_runtime(settings, command=command) as process_lock:
         operation_task = asyncio.ensure_future(operation())
-        signal_task = asyncio.create_task(_wait_for_stop_signal())
+        stop_task = asyncio.create_task(_wait_for_owned_operation_stop(process_lock))
         try:
             done, _ = await asyncio.wait(
-                (operation_task, signal_task),
+                (operation_task, stop_task),
                 return_when=asyncio.FIRST_COMPLETED,
             )
             if operation_task in done:
                 return await operation_task
 
-            received = await signal_task
+            reason = await stop_task
             if operation_task.done():
                 return await operation_task
             operation_task.cancel()
             await asyncio.gather(operation_task, return_exceptions=True)
-            raise RuntimeError(f"The {command} operation was interrupted by {received.name}.")
+            raise RuntimeError(f"The {command} operation was interrupted by {reason}.")
         finally:
             if not operation_task.done():
                 operation_task.cancel()
-            if not signal_task.done():
-                signal_task.cancel()
-            await asyncio.gather(operation_task, signal_task, return_exceptions=True)
+            if not stop_task.done():
+                stop_task.cancel()
+            await asyncio.gather(operation_task, stop_task, return_exceptions=True)
 
 
 async def _profile_create(settings: Settings) -> None:
@@ -339,10 +345,43 @@ def _stop(settings: Settings, *, timeout_seconds: float) -> None:
 
 
 async def _wait_for_stop_signal() -> signal.Signals:
-    with anyio.open_signal_receiver(signal.SIGINT, signal.SIGTERM) as signals:
-        async for received in signals:
-            return received
-    raise RuntimeError("The signal receiver closed unexpectedly.")
+    """Wait for a console stop signal using APIs available on every supported OS."""
+
+    loop = asyncio.get_running_loop()
+    received: asyncio.Future[signal.Signals] = loop.create_future()
+
+    def receive(signum: int, _: FrameType | None) -> None:
+        if not received.done():
+            received.set_result(signal.Signals(signum))
+
+    watched = (signal.SIGINT, signal.SIGTERM)
+    previous = {watched_signal: signal.getsignal(watched_signal) for watched_signal in watched}
+    try:
+        for watched_signal in watched:
+            signal.signal(watched_signal, receive)
+        return await received
+    finally:
+        for watched_signal, handler in previous.items():
+            signal.signal(watched_signal, handler)
+
+
+async def _wait_for_owned_operation_stop(process_lock: AccountProcessLock) -> str:
+    request_task = asyncio.create_task(process_lock.wait_for_stop_request())
+    signal_task = asyncio.create_task(_wait_for_stop_signal())
+    try:
+        done, _ = await asyncio.wait(
+            (request_task, signal_task),
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        if signal_task in done:
+            return (await signal_task).name
+        await request_task
+        return "a graceful stop request"
+    finally:
+        for task in (request_task, signal_task):
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(request_task, signal_task, return_exceptions=True)
 
 
 async def _serve(settings: Settings) -> None:
@@ -384,6 +423,8 @@ def main() -> None:
     arguments = parser().parse_args()
     try:
         settings = _settings(cast(str | None, getattr(arguments, "transport", None)))
+        if arguments.command == "_runtime" and brokered_runtime_output_required():
+            redirect_brokered_runtime_output(settings)
         configure_logging(settings.log_level)
         if arguments.command == "setup":
             asyncio.run(_setup(settings))

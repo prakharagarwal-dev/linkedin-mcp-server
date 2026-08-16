@@ -51,10 +51,13 @@ def stable_source_id(
     source_url: str,
     captured_at: datetime,
     captured_text: str,
+    *,
+    identity: str | None = None,
 ) -> str:
-    payload = "\x1f".join(
-        (source_type.value, source_url, captured_at.isoformat(), captured_text)
-    ).encode()
+    fields = [source_type.value, source_url, captured_at.isoformat(), captured_text]
+    if identity is not None:
+        fields.append(identity)
+    payload = "\x1f".join(fields).encode()
     digest = hashlib.sha256(payload).hexdigest()[:24]
     return f"{source_type.value}:{digest}"
 
@@ -358,13 +361,17 @@ def source_from_action_execution(
     command: ActionCommand,
     result: ActionResult,
     page_result: ActionPageResult,
+    *,
+    execution_id: str,
 ) -> CapturedSource:
     return _source_from_collection(
         source_type=SourceType.ACTION_EXECUTION,
         source_url=str(page_result.source_url),
         captured_at=page_result.captured_at,
         captured_text=page_result.captured_text,
+        identity=execution_id,
         content={
+            "execution_id": execution_id,
             "action": command.model_dump(mode="json"),
             "result": result.model_dump(mode="json"),
         },
@@ -468,8 +475,15 @@ def _source_from_collection(
     captured_at: datetime,
     captured_text: str,
     content: dict[str, object],
+    identity: str | None = None,
 ) -> CapturedSource:
-    source_id = stable_source_id(source_type, source_url, captured_at, captured_text)
+    source_id = stable_source_id(
+        source_type,
+        source_url,
+        captured_at,
+        captured_text,
+        identity=identity,
+    )
     return CapturedSource(
         source_id=source_id,
         source_type=source_type,

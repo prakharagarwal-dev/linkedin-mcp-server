@@ -38,6 +38,13 @@ LinkedIn and complete any required verification.
 > [!NOTE]
 > Your session is saved locally and reused automatically.
 
+### Supported platforms
+
+The server runs natively on Windows, macOS, and Linux. CI executes the complete
+offline suite on Windows, macOS, Linux x86-64, and Linux ARM64. Browser and OS
+version requirements follow the official
+[Playwright Python system requirements](https://playwright.dev/python/docs/intro#system-requirements).
+
 ### 3. Try your first request
 
 ```text

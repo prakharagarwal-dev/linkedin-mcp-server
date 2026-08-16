@@ -25,8 +25,16 @@ in process memory.
 
 Authentication uses an official Playwright persistent Chromium context. The
 profile defaults to the operating system's per-user `linkedin-mcp`
-application-data directory and is created owner-only on supported POSIX
-systems.
+application-data directory. POSIX permissions are tightened to the owner;
+Windows uses the current user's application-data directory and inherited user
+profile ACL.
+
+Windows background startup uses the operating system's local PowerShell CIM
+provider to create the elected runtime outside an MCP client's process Job
+Object. The launcher executes a fixed script against `Win32_Process.Create`,
+passes the current process environment in memory, removes its two internal
+command-routing variables before runtime creation, and makes no network call.
+Only the elected Python runtime remains after the launcher exits.
 
 Normal `serve` startup creates this dedicated profile automatically when it is
 missing. The first client elects one runtime; subsequent clients attach instead
@@ -126,9 +134,10 @@ per-client exclusion gate. It also stores a SHA-256 fingerprint of the
 effective non-secret runtime configuration so clients with conflicting policy
 cannot silently attach. `status` reads it without opening the browser and also
 queries safe queue health. `stop` verifies the same owner before sending a
-graceful termination signal and never force-kills it. Clean shutdown rejects
-queued work, lets an active write reach a terminal result, closes local
-resources, and then releases the lock.
+local stop request bound to that owner's random instance ID, and never
+force-kills it. The request marker is non-secret and lives beside the lock.
+Clean shutdown rejects queued work, lets an active write reach a terminal
+result, closes local resources, and then releases the lock.
 
 The project does not implement:
 
@@ -205,6 +214,10 @@ Each captured source includes:
 - retained visible text;
 - normalized structured content;
 - field-level quotes where the contract requires them.
+
+Action-execution source IDs also bind to the unique process-local execution
+identity. Separate account-changing invocations therefore retain distinct
+evidence even when their visible capture text and wall-clock timestamp match.
 
 Evidence objects are immutable after insertion, but available only through the
 same live runtime at `linkedin://sources/{source_id}`. Clients that need durable

@@ -46,7 +46,9 @@ class PeopleFixtureBrowser:
             if self._search_html is not None:
                 await page.set_content(self._search_html)
                 return
-            await page.set_content((FIXTURES / "people" / "latest" / "search.html").read_text())
+            await page.set_content(
+                (FIXTURES / "people" / "latest" / "search.html").read_text(encoding="utf-8")
+            )
             await page.evaluate(
                 "(target) => window.initializePeopleSearchFixture(target)",
                 url,
@@ -60,7 +62,9 @@ class PeopleFixtureBrowser:
             fixture = "skills.html"
         else:
             fixture = "overview-complete.html"
-        await page.set_content((FIXTURES / "people" / "latest" / fixture).read_text())
+        await page.set_content(
+            (FIXTURES / "people" / "latest" / fixture).read_text(encoding="utf-8")
+        )
 
 
 class StaticProfileBrowser:
@@ -97,7 +101,9 @@ class CurrentPeopleSearchFixtureBrowser:
 
     async def navigate(self, page: Page, url: str) -> None:
         self.navigations.append(url)
-        await page.set_content((FIXTURES / "people" / "latest" / "search.html").read_text())
+        await page.set_content(
+            (FIXTURES / "people" / "latest" / "search.html").read_text(encoding="utf-8")
+        )
         await page.evaluate(
             "(target) => window.initializePeopleSearchFixture(target)",
             url,
@@ -132,7 +138,9 @@ class CurrentProfileFixtureBrowser:
             fixture = "education.html"
         else:
             fixture = "overview.html"
-        await page.set_content((FIXTURES / "people" / "latest" / fixture).read_text())
+        await page.set_content(
+            (FIXTURES / "people" / "latest" / fixture).read_text(encoding="utf-8")
+        )
 
 
 class SelfProfileFixtureBrowser:
@@ -146,7 +154,9 @@ class SelfProfileFixtureBrowser:
 
     async def navigate(self, page: Page, url: str) -> None:
         self.navigations.append(url)
-        await page.set_content((FIXTURES / "people/latest/self-overview.html").read_text())
+        await page.set_content(
+            (FIXTURES / "people/latest/self-overview.html").read_text(encoding="utf-8")
+        )
 
 
 class CurrentRolelessDetailFixtureBrowser:
@@ -165,7 +175,9 @@ class CurrentRolelessDetailFixtureBrowser:
             if urlsplit(url).path.endswith("/details/honors/")
             else "roleless-overview.html"
         )
-        await page.set_content((FIXTURES / "people" / "latest" / fixture).read_text())
+        await page.set_content(
+            (FIXTURES / "people" / "latest" / fixture).read_text(encoding="utf-8")
+        )
 
 
 class CurrentPeoplePaginationFixtureBrowser:
@@ -181,7 +193,9 @@ class CurrentPeoplePaginationFixtureBrowser:
         self.navigations.append(url)
         page_number = parse_qs(urlsplit(url).query).get("page", ["1"])[0]
         fixture = "search-unidentifiable.html" if page_number == "2" else "search.html"
-        await page.set_content((FIXTURES / "people" / "latest" / fixture).read_text())
+        await page.set_content(
+            (FIXTURES / "people" / "latest" / fixture).read_text(encoding="utf-8")
+        )
         if fixture == "search.html":
             await page.evaluate(
                 "(target) => window.initializePeopleSearchFixture(target)",
@@ -196,7 +210,7 @@ def _decoded_values(query: dict[str, list[str]], key: str) -> list[str]:
 def test_people_fixture_manifest_locks_every_current_visible_filter() -> None:
     manifest = cast(
         dict[str, object],
-        json.loads((FIXTURES / "people/latest/manifest.json").read_text()),
+        json.loads((FIXTURES / "people/latest/manifest.json").read_text(encoding="utf-8")),
     )
 
     assert manifest["provenance"] == "mock_verified"

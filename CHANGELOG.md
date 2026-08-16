@@ -8,6 +8,14 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Support native Windows runtime ownership, CIM-brokered startup that survives
+  client-owned Job Objects, console handling, and graceful instance-bound
+  shutdown alongside POSIX platforms. Run the full
+  offline suite in CI on macOS, Windows, and Linux ARM64 in addition to the
+  Linux x86-64 Python-version matrix, with explicit UTF-8 fixture decoding and
+  distinct evidence identities for every account-changing invocation. Reject
+  the unused optional GET event stream so repeated Windows client sessions
+  clean up without blocking the shared runtime.
 - Run the offline Pytest suite across four work-stealing workers and shorten
   polling delays only for deterministic semantic-site fixtures, without
   changing production browser timing or collection verification rounds; keep
