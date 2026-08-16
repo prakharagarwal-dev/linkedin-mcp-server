@@ -21,7 +21,33 @@
 A LinkedIn MCP server to find jobs, search people, research companies, manage
 your network, publish and engage with posts, and read or send messages.
 
-## Tools
+## ⚡ Quickstart
+
+### 1. Connect Claude Code
+
+```bash
+claude mcp add --scope user --transport stdio linkedin-mcp -- \
+  uvx --from linkedin-mcp-local linkedin-mcp serve --transport stdio
+```
+
+### 2. Sign in to LinkedIn
+
+Restart Claude Code. A dedicated browser window opens automatically—sign in to
+LinkedIn and complete any required verification.
+
+> [!NOTE]
+> Your session is saved locally and reused automatically.
+
+### 3. Try your first request
+
+```text
+Find remote software engineering jobs in India posted on LinkedIn this week.
+```
+
+## 🛠️ Tools
+
+> [!TIP]
+> **Verified** means the tool passed an end-to-end live compatibility test against LinkedIn's visible web UI on the date shown.
 
 | Area | Function | MCP tool | LinkedIn UI compatibility | What it does |
 | --- | --- | --- | --- | --- |
@@ -76,61 +102,12 @@ your network, publish and engage with posts, and read or send messages.
 [status-checked-on]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Ftool-status%2Fbadges%2Fchecked-on.json&label=
 [status-not-checked]: https://img.shields.io/badge/status-not_checked-lightgrey?label=
 
-Each account-changing tool performs one complete action. MCP clients can use
-the tool's destructive annotation to ask for confirmation or apply their own
-durable per-tool approval policy. Every capability is task-specific; the server
-does not expose unrestricted browser, click, navigation, JavaScript, or network
-access.
-
 See the [capability matrix](docs/CAPABILITY_MATRIX.md) for exact filters,
 supported formats, inputs, outputs, limits, and unsupported features.
 
-## Installation
+## 📦 Installation
 
 <details open>
-<summary>VS Code and GitHub Copilot</summary>
-
-[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect?url=vscode%3Amcp%2Finstall%3F%257B%2522name%2522%253A%2522linkedin-mcp%2522%252C%2522command%2522%253A%2522uvx%2522%252C%2522args%2522%253A%255B%2522--from%2522%252C%2522linkedin-mcp-local%2522%252C%2522linkedin-mcp%2522%252C%2522serve%2522%252C%2522--transport%2522%252C%2522stdio%2522%255D%257D)
-[![Install in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install_Server-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect?url=vscode-insiders%3Amcp%2Finstall%3F%257B%2522name%2522%253A%2522linkedin-mcp%2522%252C%2522command%2522%253A%2522uvx%2522%252C%2522args%2522%253A%255B%2522--from%2522%252C%2522linkedin-mcp-local%2522%252C%2522linkedin-mcp%2522%252C%2522serve%2522%252C%2522--transport%2522%252C%2522stdio%2522%255D%257D)
-
-Or add this to `.vscode/mcp.json`:
-
-```json
-{
-  "servers": {
-    "linkedin-mcp": {
-      "command": "uvx",
-      "args": ["--from", "linkedin-mcp-local", "linkedin-mcp", "serve", "--transport", "stdio"]
-    }
-  }
-}
-```
-
-See the [VS Code MCP documentation](https://code.visualstudio.com/docs/agent-customization/mcp-servers).
-
-</details>
-
-<details>
-<summary>Codex and ChatGPT Desktop</summary>
-
-Add this to `~/.codex/config.toml`:
-
-```toml
-[mcp_servers."linkedin-mcp"]
-command = "uvx"
-args = ["--from", "linkedin-mcp-local", "linkedin-mcp", "serve", "--transport", "stdio"]
-startup_timeout_sec = 60
-tool_timeout_sec = 900
-default_tools_approval_mode = "auto"
-```
-
-Codex CLI, the Codex IDE extension, and ChatGPT Desktop share this local
-configuration. Restart the client after saving it. See the
-[Codex MCP documentation](https://learn.chatgpt.com/docs/extend/mcp).
-
-</details>
-
-<details>
 <summary>Claude Code</summary>
 
 ```bash
@@ -151,6 +128,43 @@ Check it with `claude mcp list`. See the
 Download the `.mcpb` file, then open **Settings → Extensions → Advanced
 settings → Install Extension**.
 See [Claude Desktop's extension documentation](https://support.claude.com/en/articles/10949351-getting-started-with-local-mcp-servers-on-claude-desktop).
+
+</details>
+
+<details>
+<summary>Codex and ChatGPT Desktop</summary>
+
+```bash
+codex mcp add linkedin-mcp -- \
+  uvx --from linkedin-mcp-local linkedin-mcp serve --transport stdio
+```
+
+Check it with `codex mcp list`. Codex CLI, the Codex IDE extension, and ChatGPT
+Desktop share this local configuration. Restart the client after adding it. See
+the [Codex MCP documentation](https://learn.chatgpt.com/docs/extend/mcp).
+
+</details>
+
+<details>
+<summary>VS Code and GitHub Copilot</summary>
+
+[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect?url=vscode%3Amcp%2Finstall%3F%257B%2522name%2522%253A%2522linkedin-mcp%2522%252C%2522command%2522%253A%2522uvx%2522%252C%2522args%2522%253A%255B%2522--from%2522%252C%2522linkedin-mcp-local%2522%252C%2522linkedin-mcp%2522%252C%2522serve%2522%252C%2522--transport%2522%252C%2522stdio%2522%255D%257D)
+[![Install in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install_Server-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect?url=vscode-insiders%3Amcp%2Finstall%3F%257B%2522name%2522%253A%2522linkedin-mcp%2522%252C%2522command%2522%253A%2522uvx%2522%252C%2522args%2522%253A%255B%2522--from%2522%252C%2522linkedin-mcp-local%2522%252C%2522linkedin-mcp%2522%252C%2522serve%2522%252C%2522--transport%2522%252C%2522stdio%2522%255D%257D)
+
+Or add this to `.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "linkedin-mcp": {
+      "command": "uvx",
+      "args": ["--from", "linkedin-mcp-local", "linkedin-mcp", "serve", "--transport", "stdio"]
+    }
+  }
+}
+```
+
+See the [VS Code MCP documentation](https://code.visualstudio.com/docs/agent-customization/mcp-servers).
 
 </details>
 
@@ -298,105 +312,73 @@ See the [Warp MCP documentation](https://docs.warp.dev/agent-platform/capabiliti
 
 </details>
 
-## Usage
+## 💡 Examples
 
-### First-time LinkedIn login
+### Find jobs
 
-After installation, restart your MCP client. The server opens LinkedIn in a
-browser window where you can sign in and complete MFA or any checkpoint. On
-this first use it creates its own persistent Chromium profile automatically.
-Your session is saved in that profile and reused across restarts.
-
-If you have not started the server yet and want to log in manually, create the
-dedicated profile first:
-
-```bash
-uvx --from linkedin-mcp-local linkedin-mcp profile create
-uvx --from linkedin-mcp-local linkedin-mcp login
+```text
+Find remote software engineering jobs in India posted on LinkedIn this week with Easy Apply.
 ```
 
-The server never asks for or stores your LinkedIn password.
+### Research people
 
-### Local session controls
-
-Use these commands without locating PIDs or deleting lock files manually:
-
-```bash
-# Show or gracefully stop the process that owns this account
-uvx --from linkedin-mcp-local linkedin-mcp status
-uvx --from linkedin-mcp-local linkedin-mcp stop
-
-# Inspect the dedicated Chromium profile or sign out visibly
-uvx --from linkedin-mcp-local linkedin-mcp profile status
-uvx --from linkedin-mcp-local linkedin-mcp logout
+```text
+Find LinkedIn profiles for engineering managers at Stripe in India and show me their relevant experience.
 ```
 
-For a clean profile, run `linkedin-mcp profile reset`. The command asks for
-confirmation, archives the old profile, and creates a replacement. See
-[Configuration](docs/CONFIGURATION.md#browser-profile-and-linkedin-session)
-for the complete lifecycle.
+### Research companies
 
-### Try it
-
-Ask your MCP client naturally:
-
-**Find jobs**
-
-> Find remote software engineering jobs in India posted this week with Easy Apply.
-
-**Research people**
-
-> Find engineering managers at Stripe in India and show me their relevant experience.
-
-**Research companies**
-
-> Find fintech companies in Bengaluru with 51–200 employees and summarize each company.
-
-**Explore posts**
-
-> Find recent LinkedIn posts about AI agents and summarize the most useful discussions.
-
-**Manage your network**
-
-> Show my latest received connection requests.
-
-> Send a connection request to `<profile URL>` with the note `<note>`.
-
-**Send messages**
-
-> Send `<message>` to `<profile URL>`.
-
-### Action approval
-
-Account-changing tools are marked destructive. Approval is controlled entirely
-by the MCP client: it may prompt, reject, or durably approve an exact tool. The
-server does not maintain a second scope or permission system. To let a Codex
-scheduled task publish posts unattended while every other LinkedIn action keeps
-its normal client behavior, approve only the direct post tool:
-
-```toml
-[mcp_servers."linkedin-mcp".tools."linkedin.posts.create"]
-approval_mode = "approve"
+```text
+Find fintech companies in Bengaluru on LinkedIn with 51–200 employees and summarize each company.
 ```
 
-Restart Codex after changing its configuration. The tool still resolves the
-exact visible target, validates any local attachment path, type, and size,
-performs one narrow UI action, and verifies the visible postcondition. Avoid
-approving the entire server when only one action is needed. See
-[Configuration](docs/CONFIGURATION.md#client-tool-policy) for the full model.
+### Explore posts
 
-## Architecture
+```text
+Find recent LinkedIn posts about AI agents and summarize the most useful discussions.
+```
 
-```mermaid
-%%{init: {"flowchart": {"nodeSpacing": 55, "rankSpacing": 65}, "themeVariables": {"fontSize": "20px"}}}%%
-flowchart LR
-    A["MCP Clients<br/>Codex · Claude · Cursor"] --> B["stdio bridges or<br/>loopback HTTP"]
-    B --> C["Shared Local Runtime<br/>Typed LinkedIn Tools"]
-    C --> D["Fair Per-Client Queue"]
-    D --> E["One Atomic Browser Operation<br/>Fresh Page · Global Pacing"]
-    E -->|"Visible UI only"| F["LinkedIn"]
-    E <--> G["One Chromium Context<br/>Persistent Profile"]
-    C -. "Tool annotations and results" .-> A
+### Manage your network
+
+```text
+Show my latest received connection requests on LinkedIn.
+```
+
+```text
+Send a LinkedIn connection request to <profile URL> with the note <note>.
+```
+
+### Send messages
+
+```text
+Send <message> on LinkedIn to <profile URL>.
+```
+
+## 🏗️ Architecture
+
+```text
+[Claude | Codex | Cursor | ...]
+               |
+       stdio / loopback HTTP
+               v
+      [Typed MCP boundary]
+               |
+               v
+       [Fair queue + pacing]
+               |
+      one operation at a time
+               v
+[Capability executor] ---> [Process-local calls, cursors, evidence]
+               |
+               v
+      [Capability page objects]
+               |
+               v
+[Browser manager: fresh page per call] <--> [Persistent auth profile]
+               |
+        visible web UI only
+               v
+           [LinkedIn]
 ```
 
 Everything runs locally. There is no hosted backend, telemetry, database,
@@ -406,20 +388,7 @@ runtime; later clients attach to it, and fair scheduling gives each client a
 turn between complete tool calls. Operation state lasts only for that runtime.
 Read the full [architecture](docs/ARCHITECTURE.md) and [privacy policy](PRIVACY.md).
 
-## Configuration
-
-Common settings control:
-
-- the persistent browser profile and headed/headless operation;
-- the local attachment directory;
-- internal pacing, queue capacity, and bounded collection traversal; and
-- stdio or loopback-only Streamable HTTP transport.
-
-Tool availability and approval are configured in the MCP client. See
-[Configuration](docs/CONFIGURATION.md) for every server environment variable,
-client policy guidance, local HTTP sharing, and the container image.
-
-## Privacy Policy
+## 🔒 Privacy Policy
 
 The server has no maintainer-operated backend, analytics, advertising, or
 telemetry. LinkedIn receives normal visible-UI requests, and the invoking MCP
@@ -427,7 +396,7 @@ client receives tool results under its own data policy; the project sends
 nothing to the maintainer. Read the complete [privacy policy](PRIVACY.md) for
 processing, storage, sharing, retention, and deletion details.
 
-## Safety
+## 🛡️ Safety
 
 Use of this software is at your own risk. You are solely responsible for
 complying with [LinkedIn's User Agreement](https://www.linkedin.com/legal/user-agreement),
@@ -445,7 +414,7 @@ violations, or circumvention of access controls.
 
 See [SECURITY.md](SECURITY.md) and [the security design](docs/SECURITY.md).
 
-## More documentation
+## 📚 More documentation
 
 - [Configuration](docs/CONFIGURATION.md)
 - [Capability matrix](docs/CAPABILITY_MATRIX.md)
@@ -456,14 +425,14 @@ See [SECURITY.md](SECURITY.md) and [the security design](docs/SECURITY.md).
 - [Publishing](docs/PUBLISHING.md)
 - [Changelog](CHANGELOG.md)
 
-## Support the project
+## ❤️ Support the project
 
 If LinkedIn MCP Server is useful to you:
 
 - [Star the repository](https://github.com/prakharagarwal-dev/linkedin-mcp-server)
 - [Sponsor continued development](https://github.com/sponsors/prakharagarwal-dev)
 
-## Let's connect
+## 🌐 Let's connect
 
 Have feedback or an idea for LinkedIn MCP Server?
 
@@ -471,6 +440,6 @@ Have feedback or an idea for LinkedIn MCP Server?
 - [Follow me on GitHub](https://github.com/prakharagarwal-dev)
 - [Report a bug or request a feature](https://github.com/prakharagarwal-dev/linkedin-mcp-server/issues)
 
-## License
+## ⚖️ License
 
 Licensed under the [Apache License 2.0](LICENSE).
