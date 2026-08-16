@@ -357,31 +357,28 @@ Send <message> to <profile URL>.
 ## 🏗️ Architecture
 
 ```text
-+-----------------------------+
-| MCP clients                 |
-| Claude, Codex, Cursor, ...  |
-+--------------+--------------+
+[Claude | Codex | Cursor | ...]
                |
-               | stdio or loopback HTTP
+       stdio / loopback HTTP
                v
-+---------------------------------------------+
-| LinkedIn MCP Server (runs locally)          |
-|                                             |
-| Typed tools -> Fair queue -> Browser worker |
-+----------------------+----------------------+
-                       |
-                       | Playwright
-                       v
-+---------------------------------------------+
-| Dedicated Chromium browser                 |
-| Persistent local profile and session       |
-+----------------------+----------------------+
-                       |
-                       | Visible web UI only
-                       v
-+---------------------------------------------+
-| LinkedIn                                    |
-+---------------------------------------------+
+      [Typed MCP boundary]
+               |
+               v
+       [Fair queue + pacing]
+               |
+      one operation at a time
+               v
+[Capability executor] ---> [Process-local calls, cursors, evidence]
+               |
+               v
+      [Capability page objects]
+               |
+               v
+[Browser manager: fresh page per call] <--> [Persistent auth profile]
+               |
+        visible web UI only
+               v
+           [LinkedIn]
 ```
 
 Everything runs locally. There is no hosted backend, telemetry, database,
