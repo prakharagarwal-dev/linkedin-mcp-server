@@ -1,4 +1,4 @@
-# 🔗 LinkedIn MCP Server
+# LinkedIn MCP Server
 
 <!-- mcp-name: io.github.prakharagarwal-dev/linkedin-mcp-server -->
 
