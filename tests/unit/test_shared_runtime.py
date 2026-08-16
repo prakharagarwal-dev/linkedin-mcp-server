@@ -75,7 +75,7 @@ async def test_existing_healthy_runtime_is_reused_without_spawning(
         running=True,
         owner=AccountRuntimeOwner(
             pid=4321,
-            command="_runtime",
+            command="shared-runtime",
             endpoint=endpoint,
             version=shared_runtime.__version__,
             account_id=settings.account_id,
@@ -136,7 +136,7 @@ async def test_runtime_wait_tolerates_owner_metadata_publication_window(
     endpoint = "http://127.0.0.1:8000/mcp"
     owner = AccountRuntimeOwner(
         pid=4321,
-        command="_runtime",
+        command="shared-runtime",
         endpoint=endpoint,
         version=shared_runtime.__version__,
         account_id=settings.account_id,
@@ -230,7 +230,7 @@ async def test_runtime_wait_rejects_an_incompatible_owner_version(
         running=True,
         owner=AccountRuntimeOwner(
             pid=4321,
-            command="_runtime",
+            command="shared-runtime",
             version="0.1.0",
             endpoint="http://127.0.0.1:8000/mcp",
             account_id=settings.account_id,
@@ -256,7 +256,7 @@ async def test_runtime_wait_rejects_different_effective_configuration(
         running=True,
         owner=AccountRuntimeOwner(
             pid=4321,
-            command="_runtime",
+            command="shared-runtime",
             version=shared_runtime.__version__,
             endpoint="http://127.0.0.1:8000/mcp",
             account_id=settings.account_id,
@@ -344,7 +344,7 @@ async def test_healthy_endpoint_requires_a_live_published_owner(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     endpoint = "http://127.0.0.1:8000/mcp"
-    owner = AccountRuntimeOwner(pid=4321, command="_runtime", endpoint=endpoint)
+    owner = AccountRuntimeOwner(pid=4321, command="shared-runtime", endpoint=endpoint)
 
     async def healthy(_: str, *, timeout_seconds: float = 2.0) -> bool:
         del timeout_seconds
@@ -397,7 +397,7 @@ async def test_ensure_and_wait_cover_starting_running_and_timeout_states(
 
     owner = AccountRuntimeOwner(
         pid=4321,
-        command="_runtime",
+        command="shared-runtime",
         endpoint=endpoint,
         version=shared_runtime.__version__,
         account_id=settings.account_id,
@@ -428,7 +428,7 @@ async def test_wait_timeout_reports_the_last_owner(
     )
     owner = AccountRuntimeOwner(
         pid=4321,
-        command="_runtime",
+        command="shared-runtime",
         endpoint="http://127.0.0.1:8000/mcp",
         version=shared_runtime.__version__,
         account_id=settings.account_id,
@@ -457,7 +457,7 @@ async def test_wait_timeout_reports_the_last_owner(
     monkeypatch.setattr(shared_runtime.asyncio, "sleep", no_sleep)
     monkeypatch.setattr(shared_runtime, "time", FakeTime)
 
-    with pytest.raises(ConfigurationError, match="current owner command is '_runtime'"):
+    with pytest.raises(ConfigurationError, match="current owner command is 'shared-runtime'"):
         await shared_runtime.wait_for_shared_runtime(settings)
 
 
@@ -568,7 +568,7 @@ def test_runtime_spawn_listener_and_owner_validation_helpers(
         assert kwargs["creationflags"]
         assert "start_new_session" not in kwargs
     else:
-        assert args == [shared_runtime.sys.executable, "-m", "linkedin_mcp", "_runtime"]
+        assert args == [shared_runtime.sys.executable, "-m", "linkedin_mcp.runtime"]
         assert kwargs["start_new_session"] is True
         assert "creationflags" not in kwargs
     assert (tmp_path / "runtime.log").is_file()
@@ -587,7 +587,7 @@ def test_runtime_spawn_listener_and_owner_validation_helpers(
         )
     wrong_account = AccountRuntimeOwner(
         pid=4321,
-        command="_runtime",
+        command="shared-runtime",
         endpoint="http://127.0.0.1:8000/mcp",
         version=shared_runtime.__version__,
         account_id="other",
@@ -638,7 +638,7 @@ def test_windows_runtime_uses_a_local_cim_broker_outside_client_jobs(
 
     environment = cast(dict[str, str], kwargs["env"])
     assert environment["LINKEDIN_MCP_INTERNAL_BROKER_COMMAND"] == subprocess.list2cmdline(
-        [shared_runtime.sys.executable, "-m", "linkedin_mcp", "_runtime"]
+        [shared_runtime.sys.executable, "-m", "linkedin_mcp.runtime"]
     )
     assert environment["LINKEDIN_MCP_INTERNAL_BROKER_CWD"] == str(Path.cwd())
     assert environment["LINKEDIN_MCP_INTERNAL_BROKERED_RUNTIME"] == "1"
