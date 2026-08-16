@@ -74,7 +74,7 @@ from linkedin_mcp.domain.models import (
     StopReason,
     TextPostContent,
 )
-from linkedin_mcp.errors import BrowserUnavailableError, IdempotencyConflictError
+from linkedin_mcp.errors import BrowserUnavailableError
 
 
 def _pagination(request: PaginatedInput) -> PaginationMetadata:
@@ -458,7 +458,7 @@ async def _search_as(
 
 
 @pytest.mark.asyncio
-async def test_worker_serializes_fifo_and_coalesces_identical_inflight_calls() -> None:
+async def test_worker_serializes_fifo_and_executes_every_inflight_call() -> None:
     runner = BlockingRunner()
     worker = CapabilityWorker(cast(CapabilityRunner, runner), queue_capacity=10)
     await worker.start()
@@ -477,24 +477,27 @@ async def test_worker_serializes_fifo_and_coalesces_identical_inflight_calls() -
     await runner.started.wait()
     duplicate = asyncio.create_task(worker.search_jobs(first_request))
     second = asyncio.create_task(worker.search_jobs(second_request))
-    await _wait_for_queue_depth(worker, 1)
+    changed = asyncio.create_task(
+        worker.search_jobs(first_request.model_copy(update={"query": "go"}))
+    )
+    await _wait_for_queue_depth(worker, 3)
 
     assert runner.search_queries == ["python"]
-    assert worker.queue_depth == 1
-    with pytest.raises(IdempotencyConflictError, match="different arguments"):
-        await worker.search_jobs(first_request.model_copy(update={"query": "go"}))
+    assert worker.queue_depth == 3
 
     runner.release.set()
-    first_output, duplicate_output, second_output = await asyncio.gather(
+    first_output, duplicate_output, second_output, changed_output = await asyncio.gather(
         first,
         duplicate,
         second,
+        changed,
     )
     await worker.close()
 
-    assert first_output == duplicate_output
+    assert first_output.request_id == duplicate_output.request_id == "request-1"
     assert second_output.request_id == "request-2"
-    assert runner.search_queries == ["python", "rust"]
+    assert changed_output.request_id == "request-1"
+    assert runner.search_queries == ["python", "python", "rust", "go"]
     assert worker.running is False
 
 
@@ -680,7 +683,7 @@ async def test_worker_dispatches_all_atomic_action_capabilities() -> None:
 
 
 @pytest.mark.asyncio
-async def test_worker_does_not_coalesce_repeated_action_requests() -> None:
+async def test_worker_executes_every_repeated_action_request() -> None:
     runner = BlockingRunner()
     worker = CapabilityWorker(cast(CapabilityRunner, runner), queue_capacity=10)
     await worker.start()
@@ -888,7 +891,7 @@ async def test_cancelled_caller_does_not_duplicate_already_queued_work() -> None
 
 
 @pytest.mark.asyncio
-async def test_last_cancelled_waiter_removes_queued_read_before_execution() -> None:
+async def test_cancelled_submission_removes_queued_read_before_execution() -> None:
     runner = BlockingRunner()
     worker = CapabilityWorker(cast(CapabilityRunner, runner), queue_capacity=2)
     await worker.start()

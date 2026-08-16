@@ -369,7 +369,8 @@ async def test_inbox_and_conversation_fixtures_extract_both_message_directions()
     assert observation.messages[1].reply_to_sender_name == "Jane Doe"
     assert observation.messages[0].reaction_summaries == ("1 like reaction",)
     assert observation.messages[2].attachments[0].name == "brief.pdf"
-    assert source.captured_text == observation.visible_text
+    assert source.captured_at == observation.captured_at
+    assert str(source.source_url).endswith("/in/jane-doe/")
 
 
 @pytest.mark.timeout(20)

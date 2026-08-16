@@ -32,12 +32,14 @@ Data is used only to perform the requested MCP capability, return typed results
 and evidence to your MCP client, pace visible-UI navigation, enforce the typed
 browser boundary, and verify account-changing actions.
 
-The server has no analytics, advertising, telemetry, database, or external
-application-state service. Read-call replay, evidence, continuation state, and
-internal action call records remain in process memory. The Chromium profile and
-user-managed asset directory are the only locations where the server
-intentionally keeps user data across restarts. Your MCP client may retain tool
-inputs or results under that client's own settings and privacy policy.
+The server has no analytics, advertising, telemetry, database, call-result
+cache, evidence store, or external application-state service. Tool inputs,
+observations, and results are not retained after the invocation completes.
+Queue coordination, pacing, and continuation cursors remain temporarily in
+process memory. The Chromium profile and user-managed asset directory are the
+only locations where the server intentionally keeps user data across restarts.
+Your MCP client may retain tool inputs or results under that client's own
+settings and privacy policy.
 
 ## Third-party sharing
 
@@ -56,8 +58,8 @@ your MCP client's processing is governed by that client's policy.
 
 ## Retention and deletion
 
-- Process-memory data is discarded when the server process exits and may be
-  removed earlier by expiry or bounded-capacity eviction.
+- Queue coordination is discarded when calls complete. Continuation cursors and
+  pacing state are discarded when the server exits and may expire earlier.
 - The Chromium profile persists until you sign out and/or delete the configured
   profile directory. `profile reset` archives the old directory as a sibling
   `*.backup-*` path; backups and failed-creation archives persist until you
@@ -79,8 +81,8 @@ application-data directory and can be overridden with
 
 You can revoke the saved LinkedIn session with `linkedin-mcp logout`, delete the
 local browser profile and its archives, remove local assets at any time,
-disable tools in your MCP client, and stop the process to clear its in-memory
-state.
+disable tools in your MCP client, and stop the process to clear cursors, pacing,
+and queue state.
 
 ## Contact
 

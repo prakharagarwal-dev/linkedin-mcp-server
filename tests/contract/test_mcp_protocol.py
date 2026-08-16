@@ -12,8 +12,7 @@ import anyio
 import pytest
 from mcp import ClientSession
 from mcp.shared.message import SessionMessage
-from mcp.types import TextResourceContents
-from pydantic import AnyUrl, HttpUrl
+from pydantic import HttpUrl
 
 from linkedin_mcp import __version__
 from linkedin_mcp.application import (
@@ -109,7 +108,6 @@ from linkedin_mcp.domain.models import (
     ReactionState,
     StopReason,
 )
-from linkedin_mcp.persistence import MemoryRepository
 from linkedin_mcp.server import create_mcp_server
 
 ROOT = Path(__file__).parents[2]
@@ -657,7 +655,6 @@ def protocol_container(root: Path) -> AppContainer:
         minimum_navigation_interval_seconds=0,
         runtime_lock_path=root / "runtime.lock",
     )
-    repository = MemoryRepository()
     registry = create_default_registry()
     browser = BrowserManager(settings)
     network = ProtocolNetwork()
@@ -668,8 +665,6 @@ def protocol_container(root: Path) -> AppContainer:
     )
     executor = CapabilityExecutor(
         settings=settings,
-        registry=registry,
-        repository=repository,
         job_search=ProtocolJobSearch(),
         job_detail=ProtocolJobDetail(),
         people_search=ProtocolPeopleSearch(),
@@ -693,12 +688,10 @@ def protocol_container(root: Path) -> AppContainer:
         queue_capacity=settings.queue_capacity,
         pagination=pagination,
         account_id=settings.account_id,
-        call_lookup=repository.find_call,
     )
     return AppContainer(
         settings=settings,
         registry=registry,
-        repository=repository,
         browser=browser,
         executor=executor,
         worker=worker,
@@ -774,12 +767,11 @@ async def test_mcp_exposes_current_tools_and_runs_core_read(tmp_path: Path) -> N
         assert result.structuredContent is not None
         assert result.structuredContent["jobs"][0]["job_id"] == "4100000001"
         assert result.structuredContent["sources"]
-        source_uri = result.structuredContent["sources"][0]["resource_uri"]
-        resource = await session.read_resource(AnyUrl(source_uri))
-        assert len(resource.contents) == 1
-        content = resource.contents[0]
-        assert isinstance(content, TextResourceContents)
-        assert "Senior Python Engineer" in content.text
+        source = result.structuredContent["sources"][0]
+        assert source["source_type"] == "linkedin_job_search"
+        assert source["source_url"].startswith("https://www.linkedin.com/")
+        assert (await session.list_resources()).resources == []
+        assert (await session.list_resource_templates()).resourceTemplates == []
 
 
 @pytest.mark.asyncio
@@ -863,7 +855,7 @@ async def test_every_read_and_operational_tool_round_trips_through_mcp(
             if tool_name == "linkedin.invitations.list":
                 assert result.structuredContent["coverage"]["unadvertised_empty_views"] == []
 
-        replayed = await session.call_tool(
+        repeated = await session.call_tool(
             "linkedin.jobs.search",
             {
                 "context_id": "read-matrix",
@@ -872,9 +864,10 @@ async def test_every_read_and_operational_tool_round_trips_through_mcp(
                 "page_size": 10,
             },
         )
-        assert replayed.isError is False
-        assert replayed.structuredContent is not None
-        assert replayed.structuredContent["replayed"] is True
+        assert repeated.isError is False
+        assert repeated.structuredContent is not None
+        assert repeated.structuredContent["jobs"][0]["job_id"] == "4100000001"
+        assert "replayed" not in repeated.structuredContent
 
 
 @pytest.mark.asyncio

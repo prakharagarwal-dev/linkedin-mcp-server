@@ -34,14 +34,12 @@ from linkedin_mcp.browser.pages import (
 )
 from linkedin_mcp.capabilities import CapabilityRegistry, create_default_registry
 from linkedin_mcp.config import Settings, runtime_configuration_fingerprint
-from linkedin_mcp.persistence import MemoryRepository, Repository
 
 
 @dataclass(slots=True)
 class AppContainer:
     settings: Settings
     registry: CapabilityRegistry
-    repository: Repository
     browser: BrowserManager
     executor: CapabilityExecutor
     worker: CapabilityWorker
@@ -76,10 +74,7 @@ class AppContainer:
                     try:
                         await self.browser.close()
                     finally:
-                        try:
-                            await self.repository.close()
-                        finally:
-                            self.process_lock.release()
+                        self.process_lock.release()
 
     async def quiesce(self) -> None:
         """Stop accepting queued calls and let the active call reach a terminal result."""
@@ -89,7 +84,6 @@ class AppContainer:
 
 
 def create_production_container(settings: Settings) -> AppContainer:
-    repository = MemoryRepository()
     registry = create_default_registry()
     browser = BrowserManager(settings)
     connections_list = ConnectionsListPage(
@@ -112,8 +106,6 @@ def create_production_container(settings: Settings) -> AppContainer:
     )
     executor = CapabilityExecutor(
         settings=settings,
-        registry=registry,
-        repository=repository,
         job_search=JobSearchPage(
             browser,
             max_pages=settings.job_search_max_pages_per_call,
@@ -166,12 +158,10 @@ def create_production_container(settings: Settings) -> AppContainer:
         queue_capacity=settings.queue_capacity,
         pagination=pagination,
         account_id=settings.account_id,
-        call_lookup=repository.find_call,
     )
     return AppContainer(
         settings=settings,
         registry=registry,
-        repository=repository,
         browser=browser,
         executor=executor,
         worker=worker,

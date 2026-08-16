@@ -803,7 +803,8 @@ async def test_current_easy_apply_job_expands_jd_and_retains_hiring_team() -> No
     assert job.hiring_team[0].role_text == "Job poster"
     assert "Noise that must not enter retained job evidence." not in job.visible_text
     source = source_from_job_detail(job)
-    assert all(evidence.quote in source.captured_text for evidence in job.evidence)
+    assert source.source_url == job.job_url
+    assert all(evidence.quote in job.visible_text for evidence in job.evidence)
 
 
 @pytest.mark.timeout(20)
