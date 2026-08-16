@@ -21,6 +21,29 @@
 A LinkedIn MCP server to find jobs, search people, research companies, manage
 your network, publish and engage with posts, and read or send messages.
 
+## ⚡ Quickstart
+
+### 1. Connect Claude Code
+
+```bash
+claude mcp add --scope user --transport stdio linkedin-mcp -- \
+  uvx --from linkedin-mcp-local linkedin-mcp serve --transport stdio
+```
+
+### 2. Sign in to LinkedIn
+
+Restart Claude Code. A dedicated browser window opens automatically—sign in to
+LinkedIn and complete any required verification.
+
+> [!NOTE]
+> Your session is saved locally and reused automatically.
+
+### 3. Try your first request
+
+```text
+Find remote software engineering jobs in India posted this week.
+```
+
 ## Tools
 
 | Area | Function | MCP tool | LinkedIn UI compatibility | What it does |
@@ -76,61 +99,12 @@ your network, publish and engage with posts, and read or send messages.
 [status-checked-on]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Ftool-status%2Fbadges%2Fchecked-on.json&label=
 [status-not-checked]: https://img.shields.io/badge/status-not_checked-lightgrey?label=
 
-Each account-changing tool performs one complete action. MCP clients can use
-the tool's destructive annotation to ask for confirmation or apply their own
-durable per-tool approval policy. Every capability is task-specific; the server
-does not expose unrestricted browser, click, navigation, JavaScript, or network
-access.
-
 See the [capability matrix](docs/CAPABILITY_MATRIX.md) for exact filters,
 supported formats, inputs, outputs, limits, and unsupported features.
 
 ## Installation
 
 <details open>
-<summary>VS Code and GitHub Copilot</summary>
-
-[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect?url=vscode%3Amcp%2Finstall%3F%257B%2522name%2522%253A%2522linkedin-mcp%2522%252C%2522command%2522%253A%2522uvx%2522%252C%2522args%2522%253A%255B%2522--from%2522%252C%2522linkedin-mcp-local%2522%252C%2522linkedin-mcp%2522%252C%2522serve%2522%252C%2522--transport%2522%252C%2522stdio%2522%255D%257D)
-[![Install in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install_Server-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect?url=vscode-insiders%3Amcp%2Finstall%3F%257B%2522name%2522%253A%2522linkedin-mcp%2522%252C%2522command%2522%253A%2522uvx%2522%252C%2522args%2522%253A%255B%2522--from%2522%252C%2522linkedin-mcp-local%2522%252C%2522linkedin-mcp%2522%252C%2522serve%2522%252C%2522--transport%2522%252C%2522stdio%2522%255D%257D)
-
-Or add this to `.vscode/mcp.json`:
-
-```json
-{
-  "servers": {
-    "linkedin-mcp": {
-      "command": "uvx",
-      "args": ["--from", "linkedin-mcp-local", "linkedin-mcp", "serve", "--transport", "stdio"]
-    }
-  }
-}
-```
-
-See the [VS Code MCP documentation](https://code.visualstudio.com/docs/agent-customization/mcp-servers).
-
-</details>
-
-<details>
-<summary>Codex and ChatGPT Desktop</summary>
-
-Add this to `~/.codex/config.toml`:
-
-```toml
-[mcp_servers."linkedin-mcp"]
-command = "uvx"
-args = ["--from", "linkedin-mcp-local", "linkedin-mcp", "serve", "--transport", "stdio"]
-startup_timeout_sec = 60
-tool_timeout_sec = 900
-default_tools_approval_mode = "auto"
-```
-
-Codex CLI, the Codex IDE extension, and ChatGPT Desktop share this local
-configuration. Restart the client after saving it. See the
-[Codex MCP documentation](https://learn.chatgpt.com/docs/extend/mcp).
-
-</details>
-
-<details>
 <summary>Claude Code</summary>
 
 ```bash
@@ -151,6 +125,43 @@ Check it with `claude mcp list`. See the
 Download the `.mcpb` file, then open **Settings → Extensions → Advanced
 settings → Install Extension**.
 See [Claude Desktop's extension documentation](https://support.claude.com/en/articles/10949351-getting-started-with-local-mcp-servers-on-claude-desktop).
+
+</details>
+
+<details>
+<summary>Codex and ChatGPT Desktop</summary>
+
+```bash
+codex mcp add linkedin-mcp -- \
+  uvx --from linkedin-mcp-local linkedin-mcp serve --transport stdio
+```
+
+Check it with `codex mcp list`. Codex CLI, the Codex IDE extension, and ChatGPT
+Desktop share this local configuration. Restart the client after adding it. See
+the [Codex MCP documentation](https://learn.chatgpt.com/docs/extend/mcp).
+
+</details>
+
+<details>
+<summary>VS Code and GitHub Copilot</summary>
+
+[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect?url=vscode%3Amcp%2Finstall%3F%257B%2522name%2522%253A%2522linkedin-mcp%2522%252C%2522command%2522%253A%2522uvx%2522%252C%2522args%2522%253A%255B%2522--from%2522%252C%2522linkedin-mcp-local%2522%252C%2522linkedin-mcp%2522%252C%2522serve%2522%252C%2522--transport%2522%252C%2522stdio%2522%255D%257D)
+[![Install in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install_Server-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect?url=vscode-insiders%3Amcp%2Finstall%3F%257B%2522name%2522%253A%2522linkedin-mcp%2522%252C%2522command%2522%253A%2522uvx%2522%252C%2522args%2522%253A%255B%2522--from%2522%252C%2522linkedin-mcp-local%2522%252C%2522linkedin-mcp%2522%252C%2522serve%2522%252C%2522--transport%2522%252C%2522stdio%2522%255D%257D)
+
+Or add this to `.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "linkedin-mcp": {
+      "command": "uvx",
+      "args": ["--from", "linkedin-mcp-local", "linkedin-mcp", "serve", "--transport", "stdio"]
+    }
+  }
+}
+```
+
+See the [VS Code MCP documentation](https://code.visualstudio.com/docs/agent-customization/mcp-servers).
 
 </details>
 
@@ -405,19 +416,6 @@ only in the local Playwright profile. The first client starts one shared local
 runtime; later clients attach to it, and fair scheduling gives each client a
 turn between complete tool calls. Operation state lasts only for that runtime.
 Read the full [architecture](docs/ARCHITECTURE.md) and [privacy policy](PRIVACY.md).
-
-## Configuration
-
-Common settings control:
-
-- the persistent browser profile and headed/headless operation;
-- the local attachment directory;
-- internal pacing, queue capacity, and bounded collection traversal; and
-- stdio or loopback-only Streamable HTTP transport.
-
-Tool availability and approval are configured in the MCP client. See
-[Configuration](docs/CONFIGURATION.md) for every server environment variable,
-client policy guidance, local HTTP sharing, and the container image.
 
 ## Privacy Policy
 
