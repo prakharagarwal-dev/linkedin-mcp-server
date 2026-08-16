@@ -10,7 +10,6 @@ import pytest
 from playwright.async_api import Locator, Page, Route, async_playwright
 from pydantic import HttpUrl
 
-import linkedin_mcp.browser.pages.connections as connection_pages
 from linkedin_mcp.browser import BrowserManager
 from linkedin_mcp.browser.pages import ConnectionsListPage, InvitationActionPage
 from linkedin_mcp.domain.models import (
@@ -38,13 +37,6 @@ from linkedin_mcp.errors import (
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 ACTION_FIXTURES = FIXTURES / "invitations" / "actions" / "latest"
 INVITATION_REF = "invitation:ca598f6086a20bb05af6bfe8"
-
-
-@pytest.fixture(autouse=True)
-def _use_fast_synthetic_collection_clock(  # pyright: ignore[reportUnusedFunction]
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(connection_pages, "_SCROLL_PROGRESS_POLL_DELAY_MS", 25)
 
 
 class ConnectionFixtureBrowser:
@@ -192,7 +184,7 @@ def _ignore_command(
 
 @pytest.mark.timeout(20)
 async def test_connections_read_delayed_tail_and_trailing_hyphen_slugs() -> None:
-    html = (FIXTURES / "connections/latest/list-infinite-scroll.html").read_text()
+    html = (FIXTURES / "connections/latest/list-infinite-scroll.html").read_text(encoding="utf-8")
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -232,7 +224,7 @@ async def test_connections_read_delayed_tail_and_trailing_hyphen_slugs() -> None
 
 @pytest.mark.timeout(20)
 async def test_connections_finish_at_live_stable_nested_bottom_without_end_copy() -> None:
-    html = (FIXTURES / "connections/latest/list-terminal.html").read_text()
+    html = (FIXTURES / "connections/latest/list-terminal.html").read_text(encoding="utf-8")
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -269,7 +261,7 @@ async def test_connections_finish_at_live_stable_nested_bottom_without_end_copy(
 
 @pytest.mark.timeout(20)
 async def test_connections_detect_virtualized_same_count_replacement() -> None:
-    html = (FIXTURES / "connections/latest/list-virtualized.html").read_text()
+    html = (FIXTURES / "connections/latest/list-virtualized.html").read_text(encoding="utf-8")
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -304,8 +296,10 @@ async def test_connections_detect_virtualized_same_count_replacement() -> None:
 
 
 def test_latest_connection_and_invitation_fixtures_record_provenance() -> None:
-    list_manifest = json.loads((FIXTURES / "connections" / "latest" / "manifest.json").read_text())
-    action_manifest = json.loads((ACTION_FIXTURES / "manifest.json").read_text())
+    list_manifest = json.loads(
+        (FIXTURES / "connections" / "latest" / "manifest.json").read_text(encoding="utf-8")
+    )
+    action_manifest = json.loads((ACTION_FIXTURES / "manifest.json").read_text(encoding="utf-8"))
 
     assert list_manifest["provenance"] == "mock_verified"
     assert list_manifest["verified_at"] == "2026-07-29"
@@ -342,7 +336,7 @@ def test_latest_connection_and_invitation_fixtures_record_provenance() -> None:
 
 @pytest.mark.timeout(20)
 async def test_connections_list_uses_latest_visible_sort_and_card_contract() -> None:
-    html = (FIXTURES / "connections" / "latest" / "list.html").read_text()
+    html = (FIXTURES / "connections" / "latest" / "list.html").read_text(encoding="utf-8")
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -384,7 +378,7 @@ async def test_connections_list_uses_latest_visible_sort_and_card_contract() -> 
 async def test_invite_inspection_reads_current_dialog_without_sending(
     note: str | None,
 ) -> None:
-    html = (ACTION_FIXTURES / "send-profile.html").read_text()
+    html = (ACTION_FIXTURES / "send-profile.html").read_text(encoding="utf-8")
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -429,7 +423,7 @@ async def test_invite_inspection_selects_current_identity_bound_button_among_rec
 ):
     html = (
         (ACTION_FIXTURES / "send-profile.html")
-        .read_text()
+        .read_text(encoding="utf-8")
         .replace(
             "</main>",
             (
@@ -467,7 +461,7 @@ async def test_invite_inspection_selects_current_identity_bound_button_among_rec
 async def test_invite_inspection_waits_for_current_profile_action_hydration() -> None:
     html = (
         (ACTION_FIXTURES / "send-profile.html")
-        .read_text()
+        .read_text(encoding="utf-8")
         .replace('id="connect"', 'id="connect" hidden', 1)
         .replace(
             'const connect = document.querySelector("#connect");',
@@ -507,7 +501,7 @@ async def test_invite_inspection_waits_for_current_profile_action_hydration() ->
 async def test_invite_action_uses_current_dialog_and_exact_pending_postcondition(
     note: str | None,
 ) -> None:
-    html = (ACTION_FIXTURES / "send-profile.html").read_text()
+    html = (ACTION_FIXTURES / "send-profile.html").read_text(encoding="utf-8")
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -527,7 +521,7 @@ async def test_invite_action_uses_current_dialog_and_exact_pending_postcondition
 
 @pytest.mark.timeout(20)
 async def test_invite_fails_closed_for_current_dialog_drift_and_changed_target() -> None:
-    base = (ACTION_FIXTURES / "send-profile.html").read_text()
+    base = (ACTION_FIXTURES / "send-profile.html").read_text(encoding="utf-8")
     wrong_link = base.replace(
         "Invite Jane Doe to connect",
         "Invite Jane Roe to connect",
@@ -697,7 +691,9 @@ async def test_invite_inspection_covers_current_dialog_safety_failures(
     note: str | None,
     message: str,
 ) -> None:
-    html = (ACTION_FIXTURES / "send-profile.html").read_text().replace(*fixture_change)
+    html = (
+        (ACTION_FIXTURES / "send-profile.html").read_text(encoding="utf-8").replace(*fixture_change)
+    )
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -723,7 +719,7 @@ async def test_invite_inspection_covers_current_dialog_safety_failures(
 
 @pytest.mark.timeout(20)
 async def test_invite_click_interruption_is_uncertain_and_fresh_connect_is_failed() -> None:
-    base = (ACTION_FIXTURES / "send-profile.html").read_text()
+    base = (ACTION_FIXTURES / "send-profile.html").read_text(encoding="utf-8")
     not_sent = base.replace('data-send-outcome="pending"', 'data-send-outcome="connect"')
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
@@ -760,7 +756,7 @@ async def test_invite_click_interruption_is_uncertain_and_fresh_connect_is_faile
 
 @pytest.mark.timeout(20)
 async def test_invite_action_reports_missing_dialog_and_typed_click_uncertainty() -> None:
-    base = (ACTION_FIXTURES / "send-profile.html").read_text()
+    base = (ACTION_FIXTURES / "send-profile.html").read_text(encoding="utf-8")
     missing_dialog = base.replace("inviteDialog.showModal();", "")
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
@@ -796,7 +792,7 @@ async def test_invite_action_reports_missing_dialog_and_typed_click_uncertainty(
 
 @pytest.mark.timeout(20)
 async def test_invite_final_click_authentication_failure_is_not_swallowed() -> None:
-    html = (ACTION_FIXTURES / "send-profile.html").read_text()
+    html = (ACTION_FIXTURES / "send-profile.html").read_text(encoding="utf-8")
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -819,7 +815,7 @@ async def test_invite_final_click_authentication_failure_is_not_swallowed() -> N
 
 @pytest.mark.timeout(20)
 async def test_invite_action_rejects_disabled_send_and_uncommitted_note_before_click() -> None:
-    base = (ACTION_FIXTURES / "send-profile.html").read_text()
+    base = (ACTION_FIXTURES / "send-profile.html").read_text(encoding="utf-8")
     disabled = base.replace(
         'id="send-invitation" type="button"',
         'id="send-invitation" type="button" disabled',
@@ -870,21 +866,21 @@ async def test_invite_action_rejects_disabled_send_and_uncommitted_note_before_c
         ),
         (
             (ACTION_FIXTURES / "send-profile.html")
-            .read_text()
+            .read_text(encoding="utf-8")
             .replace("Add a note to your invitation?", "How do you know Jane Doe?"),
             None,
             "relationship_confirmation_required",
         ),
         (
             (ACTION_FIXTURES / "send-profile.html")
-            .read_text()
+            .read_text(encoding="utf-8")
             .replace('aria-label="Add a note"', 'aria-label="Personalize invitation"'),
             "Hello Jane",
             "personalized_invitation_unavailable",
         ),
         (
             (ACTION_FIXTURES / "send-profile.html")
-            .read_text()
+            .read_text(encoding="utf-8")
             .replace(
                 '<span id="note-counter">0/200</span>',
                 '<span id="note-counter">0/5</span>',
@@ -894,14 +890,14 @@ async def test_invite_action_rejects_disabled_send_and_uncommitted_note_before_c
         ),
         (
             (ACTION_FIXTURES / "send-profile.html")
-            .read_text()
+            .read_text(encoding="utf-8")
             .replace('aria-label="Send invitation"', 'aria-label="Submit invitation"'),
             "Hello Jane",
             "invitation_send_unavailable",
         ),
         (
             (ACTION_FIXTURES / "send-profile.html")
-            .read_text()
+            .read_text(encoding="utf-8")
             .replace(
                 'id="send-without-note"\n        type="button"',
                 (
@@ -1003,7 +999,7 @@ async def test_invite_post_click_reload_failure_is_uncertain_with_retained_evide
     reload_error: Exception,
     detail: str,
 ) -> None:
-    html = (ACTION_FIXTURES / "send-profile.html").read_text()
+    html = (ACTION_FIXTURES / "send-profile.html").read_text(encoding="utf-8")
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -1049,7 +1045,7 @@ async def test_invite_fresh_profile_ambiguous_state_is_uncertain(
     fresh_profile_body: str,
     detail: str,
 ) -> None:
-    initial = (ACTION_FIXTURES / "send-profile.html").read_text()
+    initial = (ACTION_FIXTURES / "send-profile.html").read_text(encoding="utf-8")
     fresh = f"<html><body><main>{fresh_profile_body}</main></body></html>"
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
@@ -1071,7 +1067,7 @@ async def test_invite_fresh_profile_ambiguous_state_is_uncertain(
 
 @pytest.mark.timeout(20)
 async def test_invite_post_click_authentication_failure_is_not_swallowed() -> None:
-    html = (ACTION_FIXTURES / "send-profile.html").read_text()
+    html = (ACTION_FIXTURES / "send-profile.html").read_text(encoding="utf-8")
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -1093,7 +1089,7 @@ async def test_invite_post_click_authentication_failure_is_not_swallowed() -> No
 
 @pytest.mark.timeout(20)
 async def test_accept_and_ignore_inspect_exact_current_profile_controls() -> None:
-    html = (ACTION_FIXTURES / "incoming-profile.html").read_text()
+    html = (ACTION_FIXTURES / "incoming-profile.html").read_text(encoding="utf-8")
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -1131,7 +1127,7 @@ async def test_accept_and_ignore_inspect_exact_current_profile_controls() -> Non
 
 @pytest.mark.timeout(20)
 async def test_accept_action_verifies_exact_profile_terminal_state_after_reload() -> None:
-    html = (ACTION_FIXTURES / "incoming-profile.html").read_text()
+    html = (ACTION_FIXTURES / "incoming-profile.html").read_text(encoding="utf-8")
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -1154,7 +1150,7 @@ async def test_accept_action_verifies_exact_profile_terminal_state_after_reload(
 
 @pytest.mark.timeout(20)
 async def test_ignore_action_verifies_request_removed_without_connection_after_reload() -> None:
-    html = (ACTION_FIXTURES / "incoming-profile.html").read_text()
+    html = (ACTION_FIXTURES / "incoming-profile.html").read_text(encoding="utf-8")
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -1180,7 +1176,7 @@ async def test_ignore_action_verifies_request_removed_without_connection_after_r
 async def test_incoming_actions_fail_closed_for_missing_pair_identity_and_click_interruptions() -> (
     None
 ):
-    base = (ACTION_FIXTURES / "incoming-profile.html").read_text()
+    base = (ACTION_FIXTURES / "incoming-profile.html").read_text(encoding="utf-8")
     missing_pair = base.replace(
         'aria-label="Ignore Jane Doe\N{RIGHT SINGLE QUOTATION MARK}s request to connect"',
         'aria-label="Dismiss request"',
@@ -1243,7 +1239,7 @@ async def test_incoming_actions_fail_closed_for_missing_pair_identity_and_click_
 
 @pytest.mark.timeout(20)
 async def test_incoming_actions_require_their_distinct_fresh_profile_postconditions() -> None:
-    base = (ACTION_FIXTURES / "incoming-profile.html").read_text()
+    base = (ACTION_FIXTURES / "incoming-profile.html").read_text(encoding="utf-8")
     accept_removes_without_connecting = base.replace(
         'sessionStorage.setItem("mock-connection-request-state", "connected");',
         'sessionStorage.setItem("mock-connection-request-state", "ignored");',

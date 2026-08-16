@@ -28,8 +28,8 @@ from linkedin_mcp.domain.models import (
 )
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
-ENGAGEMENT_HTML = (FIXTURES / "posts/latest/engagement.html").read_text()
-CURRENT_REACTION_HTML = (FIXTURES / "posts/latest/reaction.html").read_text()
+ENGAGEMENT_HTML = (FIXTURES / "posts/latest/engagement.html").read_text(encoding="utf-8")
+CURRENT_REACTION_HTML = (FIXTURES / "posts/latest/reaction.html").read_text(encoding="utf-8")
 POST_REF = "activity:7312345678901234567"
 COMMENT_REF = "comment:ugc-post:7312345678901234566:111"
 

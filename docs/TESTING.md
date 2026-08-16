@@ -85,7 +85,9 @@ The semantic browser aborts any document route not registered by its scenario.
 ## Run the suite
 
 During development, run the smallest affected test module or test selection.
-Before merging, run the complete gate once:
+The default Pytest configuration uses four work-stealing workers; pass `-n 0`
+when serial execution is useful for debugging. Before merging, run the complete
+gate once:
 
 ```bash
 uv run ruff format --check .

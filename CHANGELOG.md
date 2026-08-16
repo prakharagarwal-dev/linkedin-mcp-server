@@ -11,7 +11,13 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Support native Windows runtime ownership, detached startup, console handling,
   and graceful instance-bound shutdown alongside POSIX platforms. Run the full
   offline suite in CI on macOS, Windows, and Linux ARM64 in addition to the
-  Linux x86-64 Python-version matrix.
+  Linux x86-64 Python-version matrix, with explicit UTF-8 fixture decoding and
+  distinct evidence identities for every account-changing invocation.
+- Run the offline Pytest suite across four work-stealing workers and shorten
+  polling delays only for deterministic semantic-site fixtures, without
+  changing production browser timing or collection verification rounds; keep
+  timing-sensitive fixtures deterministic under load and run every CI matrix
+  job with its declared Python interpreter.
 - Extend the supported Python runtime range through 3.14 across PyPI, MCPB,
   CI, and contributor metadata.
 - Standardize package, bundle, installer, catalog, and marketplace copy on the

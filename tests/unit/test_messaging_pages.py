@@ -328,7 +328,9 @@ async def test_inbox_and_conversation_fixtures_extract_both_message_directions()
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         try:
-            await page.set_content((MESSAGING_FIXTURES / "current.html").read_text())
+            await page.set_content(
+                (MESSAGING_FIXTURES / "current.html").read_text(encoding="utf-8")
+            )
             summaries = await ConversationSearchPage.extract_visible_conversations(page)
             await page.locator("#thread").evaluate("element => element.classList.remove('hidden')")
             conversation_root = page.get_by_role(
@@ -422,7 +424,7 @@ async def test_current_thread_sender_names_resolve_outgoing_grouped_messages() -
 
 @pytest.mark.timeout(20)
 async def test_conversation_history_collects_virtualized_older_messages() -> None:
-    html = (MESSAGING_FIXTURES / "history-virtualized.html").read_text()
+    html = (MESSAGING_FIXTURES / "history-virtualized.html").read_text(encoding="utf-8")
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -458,7 +460,7 @@ async def test_conversation_history_collects_virtualized_older_messages() -> Non
 
 @pytest.mark.timeout(20)
 async def test_inbox_collection_retains_search_contract_and_visible_source() -> None:
-    html = (MESSAGING_FIXTURES / "current.html").read_text()
+    html = (MESSAGING_FIXTURES / "current.html").read_text(encoding="utf-8")
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -488,7 +490,7 @@ async def test_inbox_collection_retains_search_contract_and_visible_source() -> 
 
 @pytest.mark.timeout(20)
 async def test_inbox_collection_applies_visible_unread_filter_and_server_check() -> None:
-    html = (MESSAGING_FIXTURES / "current.html").read_text()
+    html = (MESSAGING_FIXTURES / "current.html").read_text(encoding="utf-8")
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -520,7 +522,7 @@ async def test_inbox_collection_applies_visible_unread_filter_and_server_check()
 
 @pytest.mark.timeout(20)
 async def test_inbox_collection_retries_idle_wheel_delivery_before_terminal() -> None:
-    html = (MESSAGING_FIXTURES / "search-virtualized.html").read_text()
+    html = (MESSAGING_FIXTURES / "search-virtualized.html").read_text(encoding="utf-8")
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -551,7 +553,7 @@ async def test_inbox_collection_retries_idle_wheel_delivery_before_terminal() ->
 
 @pytest.mark.timeout(30)
 async def test_inbox_collection_applies_all_desktop_categories_and_filters() -> None:
-    html = (MESSAGING_FIXTURES / "current.html").read_text()
+    html = (MESSAGING_FIXTURES / "current.html").read_text(encoding="utf-8")
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         try:
@@ -601,7 +603,7 @@ async def test_inbox_collection_applies_all_desktop_categories_and_filters() -> 
 
 @pytest.mark.timeout(20)
 async def test_current_linkless_inbox_cards_are_readable_by_visible_reference() -> None:
-    html = (MESSAGING_FIXTURES / "current.html").read_text()
+    html = (MESSAGING_FIXTURES / "current.html").read_text(encoding="utf-8")
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -663,7 +665,7 @@ async def test_current_linkless_inbox_cards_are_readable_by_visible_reference() 
 
 @pytest.mark.timeout(20)
 async def test_missing_visible_conversation_reference_fails_closed() -> None:
-    html = (MESSAGING_FIXTURES / "current.html").read_text()
+    html = (MESSAGING_FIXTURES / "current.html").read_text(encoding="utf-8")
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -728,7 +730,7 @@ async def test_malformed_conversation_cards_are_ignored_without_identity_guessin
 
 @pytest.mark.timeout(20)
 async def test_conversation_read_is_direct_by_visible_conversation_id() -> None:
-    html = (FIXTURES / "messaging/latest/action.html").read_text()
+    html = (FIXTURES / "messaging/latest/action.html").read_text(encoding="utf-8")
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -751,7 +753,7 @@ async def test_conversation_read_is_direct_by_visible_conversation_id() -> None:
 
 @pytest.mark.timeout(20)
 async def test_message_action_verifies_a_new_exact_outgoing_bubble() -> None:
-    html = (FIXTURES / "messaging/latest/action.html").read_text()
+    html = (FIXTURES / "messaging/latest/action.html").read_text(encoding="utf-8")
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -789,7 +791,7 @@ async def test_message_action_verifies_a_new_exact_outgoing_bubble() -> None:
 
 @pytest.mark.timeout(30)
 async def test_message_reply_is_bound_to_the_exact_history_message_and_postcondition() -> None:
-    html = (MESSAGING_FIXTURES / "current.html").read_text()
+    html = (MESSAGING_FIXTURES / "current.html").read_text(encoding="utf-8")
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -841,7 +843,7 @@ async def test_message_reply_is_bound_to_the_exact_history_message_and_postcondi
 async def test_message_reply_never_claims_success_for_a_plain_outgoing_bubble() -> None:
     html = (
         (MESSAGING_FIXTURES / "current.html")
-        .read_text()
+        .read_text(encoding="utf-8")
         .replace(
             'appendReplyQuote(item.querySelector(".msg-s-event-listitem__message-bubble"));',
             "",
@@ -893,7 +895,7 @@ async def test_message_reply_never_claims_success_for_a_plain_outgoing_bubble() 
 async def test_message_reply_fails_closed_for_a_visible_nonreplyable_message() -> None:
     html = (
         (MESSAGING_FIXTURES / "current.html")
-        .read_text()
+        .read_text(encoding="utf-8")
         .replace(
             (
                 '<button class="msg-s-event-listitem__hover-action-button" '
@@ -935,7 +937,7 @@ async def test_message_reply_fails_closed_for_a_visible_nonreplyable_message() -
 async def test_message_action_accepts_exact_thread_when_profile_link_is_absent() -> None:
     html = (
         (FIXTURES / "messaging/latest/action.html")
-        .read_text()
+        .read_text(encoding="utf-8")
         .replace(
             '<a href="/in/jane-doe/">Jane Doe</a>',
             "",
@@ -960,7 +962,7 @@ async def test_message_action_accepts_exact_thread_when_profile_link_is_absent()
 async def test_message_action_revalidates_exact_profile_after_stale_compose_overlay() -> None:
     thread_html = (
         (FIXTURES / "messaging/latest/action.html")
-        .read_text()
+        .read_text(encoding="utf-8")
         .replace(
             '<a href="/in/jane-doe/">Jane Doe</a>',
             "",
@@ -1041,7 +1043,7 @@ async def test_profile_message_does_not_fallback_when_exact_overlay_disappears()
 async def test_message_read_and_direct_file_send_cover_visible_attachments(
     tmp_path: Path,
 ) -> None:
-    html = (MESSAGING_FIXTURES / "current.html").read_text()
+    html = (MESSAGING_FIXTURES / "current.html").read_text(encoding="utf-8")
     asset = tmp_path / "candidate-brief.pdf"
     asset.write_bytes(b"%PDF-1.4 fixture")
     request = MessageSendInput(
@@ -1100,7 +1102,7 @@ async def test_message_read_and_direct_file_send_cover_visible_attachments(
 async def test_image_send_verifies_with_duplicate_dom_wrappers_and_generic_preview(
     tmp_path: Path,
 ) -> None:
-    html = (MESSAGING_FIXTURES / "sent-image-duplicate-dom.html").read_text()
+    html = (MESSAGING_FIXTURES / "sent-image-duplicate-dom.html").read_text(encoding="utf-8")
     asset = tmp_path / "candidate-photo.png"
     asset.write_bytes(b"PNG fixture")
     request = MessageSendInput(
@@ -1141,7 +1143,7 @@ async def test_image_send_verifies_with_duplicate_dom_wrappers_and_generic_previ
 
 @pytest.mark.timeout(30)
 async def test_message_gif_is_verified_as_one_immediate_send() -> None:
-    html = (MESSAGING_FIXTURES / "current.html").read_text()
+    html = (MESSAGING_FIXTURES / "current.html").read_text(encoding="utf-8")
     request = MessageSendInput(
         context_id="messaging-context",
         request_id="gif-action",
@@ -1258,7 +1260,7 @@ async def test_message_attachments_reject_combined_size_over_20_mb(tmp_path: Pat
 
 @pytest.mark.timeout(20)
 async def test_message_inspection_rejects_groups_missing_identity_and_inmail() -> None:
-    base = (FIXTURES / "messaging/latest/action.html").read_text()
+    base = (FIXTURES / "messaging/latest/action.html").read_text(encoding="utf-8")
     group_html = base.replace(
         '<a href="/in/jane-doe/">Jane Doe</a>',
         '<a href="/in/jane-doe/">Jane Doe</a><a href="/in/alex-lee/">Alex Lee</a>',
@@ -1442,7 +1444,7 @@ async def test_profile_target_leaves_named_blank_page_unchanged() -> None:
         'target="_blank"',
         'target="messaging-window"',
     )
-    thread_html = (FIXTURES / "messaging/latest/action.html").read_text()
+    thread_html = (FIXTURES / "messaging/latest/action.html").read_text(encoding="utf-8")
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -1683,7 +1685,7 @@ async def test_profile_message_rejects_missing_or_conflicting_identity_evidence(
 
 @pytest.mark.timeout(20)
 async def test_message_action_fails_closed_for_changed_target_limits_and_controls() -> None:
-    base = (FIXTURES / "messaging/latest/action.html").read_text()
+    base = (FIXTURES / "messaging/latest/action.html").read_text(encoding="utf-8")
     cases = (
         (
             base,

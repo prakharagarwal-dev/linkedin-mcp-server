@@ -208,6 +208,10 @@ Each captured source includes:
 - normalized structured content;
 - field-level quotes where the contract requires them.
 
+Action-execution source IDs also bind to the unique process-local execution
+identity. Separate account-changing invocations therefore retain distinct
+evidence even when their visible capture text and wall-clock timestamp match.
+
 Evidence objects are immutable after insertion, but available only through the
 same live runtime at `linkedin://sources/{source_id}`. Clients that need durable
 audit records must copy the required structured data into their own authorized

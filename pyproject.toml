@@ -50,6 +50,7 @@ dev = [
   "pytest-asyncio>=1,<2",
   "pytest-cov>=6,<8",
   "pytest-timeout>=2.4,<3",
+  "pytest-xdist>=3.8,<4",
   "ruff>=0.12,<1",
 ]
 
@@ -61,7 +62,7 @@ build-backend = "hatchling.build"
 packages = ["src/linkedin_mcp"]
 
 [tool.pytest.ini_options]
-addopts = "-ra --strict-config --strict-markers"
+addopts = "-ra --strict-config --strict-markers -n 4 --dist=worksteal"
 asyncio_mode = "auto"
 testpaths = ["tests"]
 

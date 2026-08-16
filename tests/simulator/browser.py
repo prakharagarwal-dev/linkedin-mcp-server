@@ -143,7 +143,7 @@ class SimulatorBrowser:
         await route.fulfill(
             status=200,
             content_type="text/html; charset=utf-8",
-            body=fixture.read_text(),
+            body=fixture.read_text(encoding="utf-8"),
         )
 
     def _raise_planned_fault(self, operation: str) -> None:

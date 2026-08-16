@@ -250,13 +250,14 @@ def test_runtime_stop_requests_only_the_exact_lock_owner(tmp_path: Path) -> None
     path = tmp_path / "runtime.lock"
     program = """
 import asyncio
+import os
 import sys
 from pathlib import Path
 from linkedin_mcp.application import AccountProcessLock
 
 lock = AccountProcessLock(Path(sys.argv[1]), account_id="personal", transport="stdio")
 lock.acquire()
-print("ready", flush=True)
+print(f"ready:{os.getpid()}", flush=True)
 asyncio.run(lock.wait_for_stop_request())
 lock.release()
 """
@@ -268,7 +269,8 @@ lock.release()
     )
     try:
         assert child.stdout is not None
-        assert child.stdout.readline().strip() == "ready"
+        ready, owner_pid = child.stdout.readline().strip().split(":", 1)
+        assert ready == "ready"
         before = inspect_account_runtime(path)
 
         result = stop_account_runtime(path, timeout_seconds=5)
@@ -276,7 +278,7 @@ lock.release()
 
         assert before.running is True
         assert before.owner is not None
-        assert before.owner.pid == child.pid
+        assert before.owner.pid == int(owner_pid)
         assert result.running is False
         assert result.owner == before.owner
         assert child.returncode == 0

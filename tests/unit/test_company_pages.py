@@ -51,7 +51,7 @@ class CompanyFixtureBrowser:
             fixture = "companies/latest/about.html"
         else:
             fixture = "companies/latest/overview.html"
-        await page.set_content((FIXTURES / fixture).read_text())
+        await page.set_content((FIXTURES / fixture).read_text(encoding="utf-8"))
 
     async def click_visible_control(self, page: Page, control: Locator) -> None:
         del page
@@ -72,7 +72,7 @@ def _decoded_values(query: dict[str, list[str]], key: str) -> list[str]:
 def test_company_fixture_manifest_locks_current_visible_surface() -> None:
     manifest = cast(
         dict[str, object],
-        json.loads((COMPANY_FIXTURES / "manifest.json").read_text()),
+        json.loads((COMPANY_FIXTURES / "manifest.json").read_text(encoding="utf-8")),
     )
 
     assert manifest["provenance"] == "mock_verified"
@@ -401,7 +401,7 @@ async def test_company_profile_reads_exact_overview_and_about_with_evidence() ->
 async def test_company_profile_deduplicates_headings_for_one_visible_about_section() -> None:
     about_html = (
         (FIXTURES / "companies/latest/about.html")
-        .read_text()
+        .read_text(encoding="utf-8")
         .replace("<h2>About</h2>", "<h2>About</h2><h3>Overview</h3>", 1)
     )
 
@@ -438,7 +438,7 @@ async def test_company_profile_deduplicates_headings_for_one_visible_about_secti
 async def test_company_profile_fails_closed_when_about_identity_changes() -> None:
     about_html = (
         (FIXTURES / "companies/latest/about.html")
-        .read_text()
+        .read_text(encoding="utf-8")
         .replace(
             "<h1>Acme Cloud</h1>",
             "<h1>Other Company</h1>",
@@ -475,7 +475,7 @@ async def test_company_profile_fails_closed_when_about_identity_changes() -> Non
 async def test_company_profile_decodes_visible_linkedin_website_redirect() -> None:
     about_html = (
         (FIXTURES / "companies/latest/about.html")
-        .read_text()
+        .read_text(encoding="utf-8")
         .replace(
             'href="https://acme.example/"',
             'href="https://www.linkedin.com/redir/redirect?url=https%3A%2F%2Facme.example%2F"',
