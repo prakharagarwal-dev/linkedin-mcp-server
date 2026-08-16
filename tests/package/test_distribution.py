@@ -109,6 +109,7 @@ def test_source_layout_keeps_infrastructure_and_linkedin_features_separate() -> 
     assert "linkedin_mcp.linkedin" not in browser_sources
 
     cli = package / "cli"
+    commands = cli / "commands"
     for command in (
         "serve",
         "setup",
@@ -117,15 +118,21 @@ def test_source_layout_keeps_infrastructure_and_linkedin_features_separate() -> 
         "doctor",
         "status",
         "stop",
-        "internal_runtime",
     ):
-        assert (cli / f"{command}.py").is_file()
+        assert (commands / f"{command}.py").is_file()
     for profile_command in ("create", "status", "reset"):
-        assert (cli / "profile" / f"{profile_command}.py").is_file()
+        assert (commands / "profile" / f"{profile_command}.py").is_file()
+    for retired_cli_module in ("common.py", "types.py", "internal_runtime.py"):
+        assert not (cli / retired_cli_module).exists()
+
+    runtime = package / "runtime"
+    for runtime_module in ("__main__.py", "owned_operation.py", "runner.py"):
+        assert (runtime / runtime_module).is_file()
 
     main_source = (cli / "main.py").read_text(encoding="utf-8")
     assert "BrowserProfileManager" not in main_source
     assert "run_shared_runtime" not in main_source
+    assert "_runtime" not in main_source
 
 
 def test_public_repository_metadata_is_complete() -> None:
@@ -311,7 +318,7 @@ def test_wheel_excludes_tests_profiles_secrets_and_other_repositories(tmp_path: 
             name.endswith((".env", "cookies.json", "storage-state.json")) for name in lowered
         )
         assert not any(
-            ("/profile/" in name and not name.startswith("linkedin_mcp/cli/profile/"))
+            ("/profile/" in name and not name.startswith("linkedin_mcp/cli/commands/profile/"))
             or "browser_profile" in name
             for name in lowered
         )

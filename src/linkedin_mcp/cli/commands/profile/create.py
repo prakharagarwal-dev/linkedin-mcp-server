@@ -5,13 +5,11 @@ import asyncio
 import json
 
 from linkedin_mcp.browser import BrowserProfileManager
-from linkedin_mcp.cli.common import run_owned_operation
-from linkedin_mcp.cli.types import Subparsers
 from linkedin_mcp.config import Settings
+from linkedin_mcp.runtime.owned_operation import run_owned_operation
 
 
-def register(commands: Subparsers) -> None:
-    command = commands.add_parser("create", help="Create a clean Chromium profile")
+def configure(command: argparse.ArgumentParser) -> None:
     command.set_defaults(handler=handle)
 
 

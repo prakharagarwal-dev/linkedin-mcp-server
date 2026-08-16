@@ -107,7 +107,7 @@ async def test_two_stdio_clients_elect_and_share_one_surviving_runtime(
         ownership = inspect_account_runtime(lock_path)
         assert ownership.running is True
         assert ownership.owner is not None
-        assert ownership.owner.command == "_runtime"
+        assert ownership.owner.command == "shared-runtime"
         assert ownership.owner.transport == "shared-loopback"
         assert ownership.owner.version == __version__
         assert ownership.owner.configuration_fingerprint is not None

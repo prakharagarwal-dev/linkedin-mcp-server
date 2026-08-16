@@ -1,4 +1,4 @@
-"""Shared lifecycle helpers for CLI commands."""
+"""Run exclusive local operations under process ownership."""
 
 from __future__ import annotations
 
@@ -9,16 +9,7 @@ from contextlib import contextmanager
 from types import FrameType
 
 from linkedin_mcp.config import Settings
-from linkedin_mcp.runtime import AccountProcessLock
-
-
-def settings_for_transport(transport: str | None = None) -> Settings:
-    settings = Settings()
-    if transport is None:
-        return settings
-    values = settings.model_dump()
-    values["transport"] = transport
-    return Settings.model_validate(values)
+from linkedin_mcp.runtime.ownership import AccountProcessLock
 
 
 @contextmanager
@@ -47,7 +38,7 @@ async def run_owned_operation[ResultT](
 ) -> ResultT:
     with claim_account_runtime(settings, command=command) as process_lock:
         operation_task = asyncio.ensure_future(operation())
-        stop_task = asyncio.create_task(wait_for_owned_operation_stop(process_lock))
+        stop_task = asyncio.create_task(_wait_for_owned_operation_stop(process_lock))
         try:
             done, _ = await asyncio.wait(
                 (operation_task, stop_task),
@@ -70,7 +61,7 @@ async def run_owned_operation[ResultT](
             await asyncio.gather(operation_task, stop_task, return_exceptions=True)
 
 
-async def wait_for_stop_signal() -> signal.Signals:
+async def _wait_for_stop_signal() -> signal.Signals:
     """Wait for a console stop signal using APIs available on every supported OS."""
 
     loop = asyncio.get_running_loop()
@@ -91,9 +82,9 @@ async def wait_for_stop_signal() -> signal.Signals:
             signal.signal(watched_signal, handler)
 
 
-async def wait_for_owned_operation_stop(process_lock: AccountProcessLock) -> str:
+async def _wait_for_owned_operation_stop(process_lock: AccountProcessLock) -> str:
     request_task = asyncio.create_task(process_lock.wait_for_stop_request())
-    signal_task = asyncio.create_task(wait_for_stop_signal())
+    signal_task = asyncio.create_task(_wait_for_stop_signal())
     try:
         done, _ = await asyncio.wait(
             (request_task, signal_task),

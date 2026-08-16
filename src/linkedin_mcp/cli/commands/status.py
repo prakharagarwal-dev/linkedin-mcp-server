@@ -4,14 +4,12 @@ import argparse
 import asyncio
 import json
 
-from linkedin_mcp.cli.types import Subparsers
 from linkedin_mcp.config import Settings
 from linkedin_mcp.runtime import inspect_account_runtime
 from linkedin_mcp.runtime.shared import read_shared_runtime_status
 
 
-def register(commands: Subparsers) -> None:
-    command = commands.add_parser("status", help="Show local LinkedIn MCP runtime ownership")
+def configure(command: argparse.ArgumentParser) -> None:
     command.set_defaults(handler=handle)
 
 

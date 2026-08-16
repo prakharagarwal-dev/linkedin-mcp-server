@@ -145,8 +145,9 @@ linkedin_mcp/
 ├── mcp/                 FastMCP server, client context, and stdio transport bridge
 ├── app/                 process-local queue, scheduling, pagination, assets, composition
 ├── browser/             generic Playwright installation, profile, pacing, convergence
-├── runtime/             shared-process ownership and lifecycle
-├── cli/                 one module per command; nested profile/ subcommands
+├── runtime/             shared-process ownership, lifecycle, and private entry point
+├── cli/                 public CLI assembly and commands/ hierarchy
+│   └── commands/        flat public commands; nested profile/ subcommands
 └── linkedin/            all LinkedIn-specific behavior
     ├── jobs/            models, evidence, operations, and page implementation
     ├── people/          models, evidence, operations, and page implementation

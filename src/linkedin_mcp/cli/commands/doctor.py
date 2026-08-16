@@ -9,13 +9,11 @@ from linkedin_mcp.browser import (
     BrowserRuntimeBootstrap,
     BrowserSetupState,
 )
-from linkedin_mcp.cli.types import Subparsers
 from linkedin_mcp.config import Settings
 from linkedin_mcp.runtime import inspect_account_runtime
 
 
-def register(commands: Subparsers) -> None:
-    command = commands.add_parser("doctor", help="Check non-secret local runtime readiness")
+def configure(command: argparse.ArgumentParser) -> None:
     command.set_defaults(handler=handle)
 
 

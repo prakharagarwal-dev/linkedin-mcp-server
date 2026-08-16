@@ -5,15 +5,10 @@ import asyncio
 import json
 
 from linkedin_mcp.browser import BrowserRuntimeBootstrap
-from linkedin_mcp.cli.types import Subparsers
 from linkedin_mcp.config import Settings
 
 
-def register(commands: Subparsers) -> None:
-    command = commands.add_parser(
-        "setup",
-        help="Install the managed Playwright Chromium runtime",
-    )
+def configure(command: argparse.ArgumentParser) -> None:
     command.set_defaults(handler=handle)
 
 

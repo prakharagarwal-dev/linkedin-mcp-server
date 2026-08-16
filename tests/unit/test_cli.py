@@ -8,21 +8,19 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
-from pydantic import ValidationError
 
-import linkedin_mcp.cli.common as cli_common
-import linkedin_mcp.cli.doctor as doctor_command
-import linkedin_mcp.cli.internal_runtime as internal_runtime_command
-import linkedin_mcp.cli.login as login_command
-import linkedin_mcp.cli.logout as logout_command
+import linkedin_mcp.cli.commands.doctor as doctor_command
+import linkedin_mcp.cli.commands.login as login_command
+import linkedin_mcp.cli.commands.logout as logout_command
+import linkedin_mcp.cli.commands.profile.create as profile_create_command
+import linkedin_mcp.cli.commands.profile.reset as profile_reset_command
+import linkedin_mcp.cli.commands.profile.status as profile_status_command
+import linkedin_mcp.cli.commands.serve as serve_command
+import linkedin_mcp.cli.commands.setup as setup_command
+import linkedin_mcp.cli.commands.status as status_command
+import linkedin_mcp.cli.commands.stop as stop_command
 import linkedin_mcp.cli.main as cli
-import linkedin_mcp.cli.profile.create as profile_create_command
-import linkedin_mcp.cli.profile.reset as profile_reset_command
-import linkedin_mcp.cli.profile.status as profile_status_command
-import linkedin_mcp.cli.serve as serve_command
-import linkedin_mcp.cli.setup as setup_command
-import linkedin_mcp.cli.status as status_command
-import linkedin_mcp.cli.stop as stop_command
+import linkedin_mcp.runtime.owned_operation as owned_operation
 from linkedin_mcp.browser import BrowserProfileResetResult, BrowserProfileStatus
 from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import ConfigurationError
@@ -48,11 +46,9 @@ def _mark_browser_ready(path: Path) -> None:
 
 def test_parser_and_transport_override() -> None:
     arguments = cli.parser().parse_args(["serve", "--transport", "streamable-http"])
-    settings = cli_common.settings_for_transport(arguments.transport)
 
     assert arguments.command == "serve"
-    assert settings.transport == "streamable-http"
-    assert cli_common.settings_for_transport().transport == "stdio"
+    assert arguments.transport == "streamable-http"
     assert cli.parser().parse_args(["setup"]).command == "setup"
     assert cli.parser().parse_args(["login"]).command == "login"
     assert cli.parser().parse_args(["logout"]).command == "logout"
@@ -64,6 +60,8 @@ def test_parser_and_transport_override() -> None:
     reset = cli.parser().parse_args(["profile", "reset", "--yes"])
     assert reset.profile_command == "reset"
     assert reset.yes is True
+    with pytest.raises(SystemExit):
+        cli.parser().parse_args(["_runtime"])
 
 
 @pytest.mark.asyncio
@@ -204,9 +202,6 @@ def test_main_dispatches_every_remaining_current_command(
     async def fake_status(_: Settings) -> None:
         await record_async("status")
 
-    async def fake_runtime(_: Settings) -> None:
-        await record_async("runtime")
-
     async def fake_profile_reset(_: Settings, *, confirmed: bool) -> None:
         assert confirmed is True
         calls.append("profile-reset")
@@ -229,7 +224,6 @@ def test_main_dispatches_every_remaining_current_command(
     monkeypatch.setattr(doctor_command, "execute", successful_doctor)
     monkeypatch.setattr(status_command, "execute", fake_status)
     monkeypatch.setattr(stop_command, "execute", fake_stop)
-    monkeypatch.setattr(internal_runtime_command, "execute", fake_runtime)
     monkeypatch.setenv("LINKEDIN_MCP_RUNTIME_LOCK_PATH", str(tmp_path / "runtime.lock"))
 
     invocations = (
@@ -240,7 +234,6 @@ def test_main_dispatches_every_remaining_current_command(
         (["linkedin-mcp", "doctor"], 0),
         (["linkedin-mcp", "status"], None),
         (["linkedin-mcp", "stop", "--timeout", "4"], None),
-        (["linkedin-mcp", "_runtime"], None),
     )
     for argv, expected_exit in invocations:
         monkeypatch.setattr(sys, "argv", argv)
@@ -259,7 +252,6 @@ def test_main_dispatches_every_remaining_current_command(
         "doctor",
         "status",
         "stop",
-        "runtime",
     ]
 
 
@@ -278,7 +270,10 @@ async def test_logout_and_owned_operation_complete_without_a_signal(
     async def logged_out(_: Settings) -> bool:
         return True
 
-    monkeypatch.setattr(cli_common, "wait_for_stop_signal", no_signal)
+    monkeypatch.setattr(
+        "linkedin_mcp.runtime.owned_operation._wait_for_stop_signal",
+        no_signal,
+    )
     monkeypatch.setattr(logout_command, "logout_interactively", logged_out)
 
     await logout_command.execute(settings)
@@ -395,7 +390,7 @@ async def test_runtime_status_and_stop_report_exact_owner(
         pid=4321,
         instance_id="instance-1",
         account_id="personal",
-        command="_runtime",
+        command="shared-runtime",
         transport="shared-loopback",
         started_at="2026-08-03T10:00:00+00:00",
         endpoint="http://127.0.0.1:8000/mcp",
@@ -440,7 +435,7 @@ async def test_runtime_status_and_stop_report_exact_owner(
         "accepting_calls": True,
         "active_browser_operation": True,
         "active_capability": "linkedin.jobs.search",
-        "command": "_runtime",
+        "command": "shared-runtime",
         "connected_clients": 2,
         "endpoint": "http://127.0.0.1:8000/mcp",
         "healthy": True,
@@ -455,7 +450,7 @@ async def test_runtime_status_and_stop_report_exact_owner(
     }
     assert stopped == {
         "account_id": "personal",
-        "command": "_runtime",
+        "command": "shared-runtime",
         "pid": 4321,
         "status": "stopped",
         "stopped": True,
@@ -473,7 +468,7 @@ def test_login_refuses_to_open_profile_owned_by_running_server(
     try:
         with (
             pytest.raises(ConfigurationError, match="linkedin-mcp stop"),
-            cli_common.claim_account_runtime(
+            owned_operation.claim_account_runtime(
                 settings,
                 command="login",
             ),
@@ -543,10 +538,13 @@ async def test_owned_cli_operation_cleans_up_before_releasing_lock_on_stop_signa
         await started.wait()
         return signal.SIGTERM
 
-    monkeypatch.setattr(cli_common, "wait_for_stop_signal", signal_after_start)
+    monkeypatch.setattr(
+        "linkedin_mcp.runtime.owned_operation._wait_for_stop_signal",
+        signal_after_start,
+    )
 
     with pytest.raises(RuntimeError, match="SIGTERM"):
-        await cli_common.run_owned_operation(
+        await owned_operation.run_owned_operation(
             settings,
             command="login",
             operation=blocking_operation,
@@ -646,46 +644,3 @@ async def test_streamable_http_reuses_an_owner_and_recovers_an_election_race(
     monkeypatch.setattr(serve_command, "run_shared_runtime", lose_election)
     await serve_command.execute(settings)
     assert endpoint in capsys.readouterr().err
-
-
-@pytest.mark.asyncio
-async def test_internal_runtime_rewrites_transport_and_recovers_an_election_race(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    observed: list[str] = []
-
-    async def run(settings: Settings) -> None:
-        observed.append(settings.transport)
-
-    monkeypatch.setattr(internal_runtime_command, "run_shared_runtime", run)
-    settings = Settings(
-        transport="stdio",
-        runtime_lock_path=tmp_path / "runtime.lock",
-    )
-    await internal_runtime_command.execute(settings)
-
-    async def lose_election(_: Settings) -> None:
-        raise ConfigurationError("another owner won")
-
-    def running(_: Path) -> AccountRuntimeStatus:
-        return AccountRuntimeStatus(running=True)
-
-    async def wait(_: Settings) -> str:
-        observed.append("waited")
-        return "http://127.0.0.1:8000/mcp"
-
-    monkeypatch.setattr(internal_runtime_command, "run_shared_runtime", lose_election)
-    monkeypatch.setattr(internal_runtime_command, "inspect_account_runtime", running)
-    monkeypatch.setattr(internal_runtime_command, "wait_for_shared_runtime", wait)
-    await internal_runtime_command.execute(settings)
-
-    assert observed == ["streamable-http", "waited"]
-
-
-@pytest.mark.asyncio
-async def test_hidden_runtime_revalidates_loopback_transport() -> None:
-    settings = Settings(transport="stdio", http_host="0.0.0.0")
-
-    with pytest.raises(ValidationError, match="restricted to loopback"):
-        await internal_runtime_command.execute(settings)

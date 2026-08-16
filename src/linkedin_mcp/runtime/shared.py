@@ -30,7 +30,8 @@ from linkedin_mcp.runtime.ownership import (
     inspect_account_runtime,
 )
 
-_RUNTIME_COMMAND = "_runtime"
+_RUNTIME_OWNER_COMMAND = "shared-runtime"
+_RUNTIME_MODULE = "linkedin_mcp.runtime"
 _RUNTIME_TRANSPORT = "shared-loopback"
 # The OS lock becomes visible before its holder can fsync owner metadata.
 _LOCK_OWNER_PUBLICATION_GRACE_SECONDS = 5.0
@@ -208,7 +209,7 @@ async def run_shared_runtime(settings: Settings) -> None:
     container.process_lock = AccountProcessLock(
         settings.runtime_lock_path,
         account_id=settings.account_id,
-        command=_RUNTIME_COMMAND,
+        command=_RUNTIME_OWNER_COMMAND,
         transport=_RUNTIME_TRANSPORT,
         version=__version__,
         configuration_fingerprint=runtime_configuration_fingerprint(settings),
@@ -277,7 +278,7 @@ def _spawn_shared_runtime(settings: Settings) -> _RuntimeStarter:
             process: _RuntimeStarter = _spawn_windows_shared_runtime(log)
         else:
             process = subprocess.Popen(
-                [sys.executable, "-m", "linkedin_mcp", _RUNTIME_COMMAND],
+                [sys.executable, "-m", _RUNTIME_MODULE],
                 stdin=subprocess.DEVNULL,
                 stdout=log,
                 stderr=log,
@@ -294,7 +295,7 @@ def _spawn_windows_shared_runtime(log: BinaryIO) -> _BrokeredRuntimeStarter:
 
     environment = os.environ.copy()
     environment[_WINDOWS_BROKER_COMMAND_ENV] = subprocess.list2cmdline(
-        [sys.executable, "-m", "linkedin_mcp", _RUNTIME_COMMAND]
+        [sys.executable, "-m", _RUNTIME_MODULE]
     )
     environment[_WINDOWS_BROKER_CWD_ENV] = str(Path.cwd())
     environment[_WINDOWS_BROKERED_RUNTIME_ENV] = "1"
@@ -389,7 +390,7 @@ def _validate_running_owner(status: AccountRuntimeStatus, settings: Settings) ->
             "A local process owns the LinkedIn profile without valid runtime metadata. "
             "Run `linkedin-mcp status`, then `linkedin-mcp stop`."
         )
-    if owner.command != _RUNTIME_COMMAND:
+    if owner.command != _RUNTIME_OWNER_COMMAND:
         raise ConfigurationError(
             f"LinkedIn profile maintenance ({owner.command or 'unknown'}) "
             "currently owns the browser profile. Retry after it completes, or run "

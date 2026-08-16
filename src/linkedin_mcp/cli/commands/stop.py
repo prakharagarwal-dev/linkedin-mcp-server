@@ -3,13 +3,11 @@
 import argparse
 import json
 
-from linkedin_mcp.cli.types import Subparsers
 from linkedin_mcp.config import Settings
 from linkedin_mcp.runtime import inspect_account_runtime, stop_account_runtime
 
 
-def register(commands: Subparsers) -> None:
-    command = commands.add_parser("stop", help="Gracefully stop the owning local MCP runtime")
+def configure(command: argparse.ArgumentParser) -> None:
     command.add_argument(
         "--timeout",
         type=float,

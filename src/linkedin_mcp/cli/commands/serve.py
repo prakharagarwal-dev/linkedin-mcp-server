@@ -4,7 +4,6 @@ import argparse
 import asyncio
 import sys
 
-from linkedin_mcp.cli.types import Subparsers
 from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import LinkedInMCPError
 from linkedin_mcp.mcp.transports.stdio import run_stdio_proxy
@@ -16,8 +15,7 @@ from linkedin_mcp.runtime.shared import (
 )
 
 
-def register(commands: Subparsers) -> None:
-    command = commands.add_parser("serve", help="Run the MCP server")
+def configure(command: argparse.ArgumentParser) -> None:
     command.add_argument(
         "--transport",
         choices=("stdio", "streamable-http"),
