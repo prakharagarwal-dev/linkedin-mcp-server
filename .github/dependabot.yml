@@ -8,9 +8,16 @@ updates:
     versioning-strategy: lockfile-only
     open-pull-requests-limit: 5
     groups:
-      python-dependencies:
+      python-minor-and-patch:
+        applies-to: version-updates
         patterns:
           - "*"
+        exclude-patterns:
+          - playwright
+          - pydantic-settings
+        update-types:
+          - minor
+          - patch
     labels:
       - dependencies
 
@@ -21,8 +28,12 @@ updates:
       day: monday
     open-pull-requests-limit: 5
     groups:
-      github-actions:
+      github-actions-minor-and-patch:
+        applies-to: version-updates
         patterns:
           - "*"
+        update-types:
+          - minor
+          - patch
     labels:
       - dependencies
