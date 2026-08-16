@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from linkedin_mcp.errors import InvalidTargetError
-from linkedin_mcp.policy import (
+from linkedin_mcp.linkedin.urls import (
     canonical_company_url,
     canonical_conversation_url,
     canonical_job_url,

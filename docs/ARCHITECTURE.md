@@ -137,24 +137,39 @@ the CLI.
 
 ## Code layout
 
-| Layer | Responsibility |
-| --- | --- |
-| `server.py` | FastMCP tools, annotations, and client binding |
-| `domain/` | Strict Pydantic inputs, outputs, identifiers, and evidence |
-| `application/` | Worker, executor, scheduler, cursors, and runtime election |
-| `browser/` | Chromium lifecycle, authentication, pacing, host guard, and page objects |
-| `policy/` | Canonical LinkedIn URL and stable-reference parsing |
+The package is split first by infrastructure versus LinkedIn behavior, then by
+LinkedIn feature:
 
-Transport wiring, domain contracts, orchestration, browser mechanics, and page
-extraction remain separate so a UI change does not leak into the MCP protocol.
+```text
+linkedin_mcp/
+├── mcp/                 FastMCP server, client context, and stdio transport bridge
+├── app/                 process-local queue, scheduling, pagination, assets, composition
+├── browser/             generic Playwright installation, profile, pacing, convergence
+├── runtime/             shared-process ownership and lifecycle
+├── cli/                 command-line entrypoint
+└── linkedin/            all LinkedIn-specific behavior
+    ├── jobs/            models, evidence, operations, and page implementation
+    ├── people/          models, evidence, operations, and page implementation
+    ├── companies/       models, evidence, operations, and page implementation
+    ├── posts/           models, evidence, operations, pages, publishing, engagement
+    ├── network/         models, evidence, operations, connections, invitations
+    └── messaging/       models, evidence, operations, and page implementation
+```
+
+The feature packages are vertical slices: a job UI change stays under
+`linkedin/jobs/`, while generic Chromium lifecycle code stays under `browser/`.
+`linkedin/operations.py` and `linkedin/models.py` are composition/compatibility
+facades, not registries or parallel implementations. URL validation,
+authentication, shared action execution, and source construction remain common
+LinkedIn support because every feature uses the same rules.
 
 ## Adding a capability
 
-A new capability needs:
+A new capability belongs in its LinkedIn feature package and needs:
 
 1. strict input and output models;
 2. a narrow provider/page-object contract;
-3. executor and worker wiring;
+3. a feature-owned operation and worker wiring;
 4. one MCP tool with accurate annotations;
 5. synthetic current-UI fixtures and failure variants;
 6. evidence and bounded-completeness behavior; and

@@ -12,18 +12,9 @@ import pytest
 from playwright.async_api import Locator, Page, Route, async_playwright
 from pydantic import HttpUrl, ValidationError
 
-from linkedin_mcp.browser import BrowserManager
-from linkedin_mcp.browser.pages import (
-    PostCommentsPage,
-    PostDetailPage,
-    PostSearchPage,
-)
-from linkedin_mcp.domain.evidence import (
-    source_from_post,
-    source_from_post_comments,
-    source_from_post_search,
-)
-from linkedin_mcp.domain.models import (
+from linkedin_mcp.errors import ParserDriftError
+from linkedin_mcp.linkedin.browser import BrowserManager
+from linkedin_mcp.linkedin.models import (
     CommentSort,
     PostAuthorType,
     PostCommentsListInput,
@@ -41,8 +32,17 @@ from linkedin_mcp.domain.models import (
     ReactionState,
     StopReason,
 )
-from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.policy import post_reference_from_value
+from linkedin_mcp.linkedin.posts.evidence import (
+    source_from_post,
+    source_from_post_comments,
+    source_from_post_search,
+)
+from linkedin_mcp.linkedin.posts.pages import (
+    PostCommentsPage,
+    PostDetailPage,
+    PostSearchPage,
+)
+from linkedin_mcp.linkedin.urls import post_reference_from_value
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 POST_REF = "activity:7312345678901234567"

@@ -16,15 +16,15 @@ from playwright.async_api import (
     async_playwright,
 )
 
-from linkedin_mcp.browser.guard import assert_safe_linkedin_page
-from linkedin_mcp.domain.models import BrowserSetupState, SessionAuthenticationState
 from linkedin_mcp.errors import (
     AuthenticationRequiredError,
     BrowserUnavailableError,
     ParserDriftError,
     RestrictionDetectedError,
 )
-from linkedin_mcp.policy import validate_linkedin_url
+from linkedin_mcp.linkedin.guard import assert_safe_linkedin_page
+from linkedin_mcp.linkedin.models import BrowserSetupState, SessionAuthenticationState
+from linkedin_mcp.linkedin.urls import validate_linkedin_url
 from tests.simulator.scenario import SimulatorScenario
 from tests.simulator.state import SimulatorFault
 

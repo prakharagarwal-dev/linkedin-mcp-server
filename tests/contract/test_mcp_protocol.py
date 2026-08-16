@@ -15,23 +15,11 @@ from mcp.shared.message import SessionMessage
 from pydantic import HttpUrl
 
 from linkedin_mcp import __version__
-from linkedin_mcp.application import (
-    AccountProcessLock,
-    CapabilityExecutor,
-    CapabilityWorker,
-    ConnectionsListProvider,
-    ConversationProvider,
-    ConversationSearchProvider,
-    InvitationActionProvider,
-    InvitationListProvider,
-    PaginationManager,
-    PostEngagementProvider,
-    PostPublishingProvider,
-)
-from linkedin_mcp.browser import BrowserManager
+from linkedin_mcp.app import CapabilityWorker, PaginationManager
+from linkedin_mcp.app.container import AppContainer
 from linkedin_mcp.config import Settings
-from linkedin_mcp.container import AppContainer
-from linkedin_mcp.domain.models import (
+from linkedin_mcp.linkedin.browser import BrowserManager
+from linkedin_mcp.linkedin.models import (
     ActionCommand,
     ActionInspection,
     ActionOutcome,
@@ -107,7 +95,18 @@ from linkedin_mcp.domain.models import (
     ReactionState,
     StopReason,
 )
-from linkedin_mcp.server import create_mcp_server
+from linkedin_mcp.linkedin.operations import (
+    CapabilityExecutor,
+    ConnectionsListProvider,
+    ConversationProvider,
+    ConversationSearchProvider,
+    InvitationActionProvider,
+    InvitationListProvider,
+    PostEngagementProvider,
+    PostPublishingProvider,
+)
+from linkedin_mcp.mcp.server import create_mcp_server
+from linkedin_mcp.runtime import AccountProcessLock
 
 ROOT = Path(__file__).parents[2]
 

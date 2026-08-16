@@ -3,9 +3,10 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from linkedin_mcp.app.container import create_production_container
 from linkedin_mcp.config import Settings
-from linkedin_mcp.container import create_production_container
-from linkedin_mcp.domain.models import (
+from linkedin_mcp.errors import ErrorCode
+from linkedin_mcp.linkedin.models import (
     CapabilityName,
     CompanySearchFilters,
     ConnectionsSearchFilters,
@@ -17,8 +18,7 @@ from linkedin_mcp.domain.models import (
     ReactionState,
     StrictModel,
 )
-from linkedin_mcp.errors import ErrorCode
-from linkedin_mcp.server import create_mcp_server
+from linkedin_mcp.mcp.server import create_mcp_server
 from tests.simulator import standard_scenario
 from tests.verification_manifest import MOCK_VERIFICATION, missing_test_files
 

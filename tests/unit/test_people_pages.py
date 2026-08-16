@@ -11,9 +11,9 @@ import pytest
 from playwright.async_api import Locator, Page, async_playwright
 from pydantic import ValidationError
 
-from linkedin_mcp.browser import BrowserManager
-from linkedin_mcp.browser.pages import PeopleSearchPage, PersonProfilePage
-from linkedin_mcp.domain.models import (
+from linkedin_mcp.errors import ParserDriftError
+from linkedin_mcp.linkedin.browser import BrowserManager
+from linkedin_mcp.linkedin.models import (
     ConnectionsSearchFilters,
     ConnectionsSearchInput,
     PeopleGetInput,
@@ -24,7 +24,7 @@ from linkedin_mcp.domain.models import (
     PersonProfileSectionSelector,
     StopReason,
 )
-from linkedin_mcp.errors import ParserDriftError
+from linkedin_mcp.linkedin.people.pages import PeopleSearchPage, PersonProfilePage
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 

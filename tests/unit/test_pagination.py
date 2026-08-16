@@ -4,15 +4,15 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from linkedin_mcp.application.pagination import PaginationManager, select_page
-from linkedin_mcp.domain.models import (
+from linkedin_mcp.app.pagination import PaginationManager, select_page
+from linkedin_mcp.errors import InvalidCursorError
+from linkedin_mcp.linkedin.models import (
     CapabilityName,
     ConnectionsListInput,
     InvitationFilter,
     InvitationListInput,
     JobSearchInput,
 )
-from linkedin_mcp.errors import InvalidCursorError
 
 
 class MutableClock:

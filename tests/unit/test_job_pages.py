@@ -11,11 +11,12 @@ import pytest
 from playwright.async_api import Locator, Page, async_playwright
 from pydantic import ValidationError
 
-import linkedin_mcp.browser.pages.jobs as jobs_page_module
-from linkedin_mcp.browser import BrowserManager
-from linkedin_mcp.browser.pages import JobDetailPage, JobSearchPage
-from linkedin_mcp.domain.evidence import source_from_job_detail
-from linkedin_mcp.domain.models import (
+import linkedin_mcp.linkedin.jobs.pages as jobs_page_module
+from linkedin_mcp.errors import ParserDriftError
+from linkedin_mcp.linkedin.browser import BrowserManager
+from linkedin_mcp.linkedin.jobs.evidence import source_from_job_detail
+from linkedin_mcp.linkedin.jobs.pages import JobDetailPage, JobSearchPage
+from linkedin_mcp.linkedin.models import (
     JobApplyMethod,
     JobBenefit,
     JobCommitment,
@@ -28,7 +29,6 @@ from linkedin_mcp.domain.models import (
     JobWorkplaceType,
     StopReason,
 )
-from linkedin_mcp.errors import ParserDriftError
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 JOB_FIXTURES = FIXTURES / "jobs" / "latest"

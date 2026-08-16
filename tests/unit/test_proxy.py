@@ -15,8 +15,8 @@ from mcp.server.lowlevel import Server
 from mcp.shared.message import SessionMessage
 from pydantic import AnyUrl
 
-import linkedin_mcp.application.proxy as proxy_module
-from linkedin_mcp.application.proxy import (
+import linkedin_mcp.mcp.transports.stdio as proxy_module
+from linkedin_mcp.mcp.transports.stdio import (
     _read_resource_content,  # pyright: ignore[reportPrivateUsage]
     _register_proxy_handlers,  # pyright: ignore[reportPrivateUsage]
 )

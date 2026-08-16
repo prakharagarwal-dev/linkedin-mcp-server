@@ -73,7 +73,7 @@ def test_build_configuration_packages_only_the_standalone_server() -> None:
     )
     assert wheel["packages"] == ["src/linkedin_mcp"]
     assert dependencies.isdisjoint(FORBIDDEN_RUNTIME_DEPENDENCIES)
-    assert project["scripts"] == {"linkedin-mcp": "linkedin_mcp.__main__:main"}
+    assert project["scripts"] == {"linkedin-mcp": "linkedin_mcp.cli.main:main"}
 
     production_sources = "\n".join(
         path.read_text(encoding="utf-8")
@@ -82,6 +82,31 @@ def test_build_configuration_packages_only_the_standalone_server() -> None:
     assert "tests.simulator" not in production_sources
     assert "startup_scanner" not in production_sources
     assert "startup-scanner" not in production_sources
+
+
+def test_source_layout_keeps_infrastructure_and_linkedin_features_separate() -> None:
+    package = ROOT / "src" / "linkedin_mcp"
+    retired_layers = ("application", "auth", "domain", "policy")
+    for layer in retired_layers:
+        assert not tuple((package / layer).glob("*.py"))
+
+    linkedin = package / "linkedin"
+    for feature in ("jobs", "people", "companies", "posts", "network", "messaging"):
+        feature_root = linkedin / feature
+        assert (feature_root / "models.py").is_file()
+        assert (feature_root / "evidence.py").is_file()
+        assert (feature_root / "operations.py").is_file()
+
+        feature_sources = "\n".join(
+            path.read_text(encoding="utf-8") for path in feature_root.glob("*.py")
+        )
+        assert "linkedin_mcp.linkedin.models" not in feature_sources
+        assert "linkedin_mcp.linkedin.operations" not in feature_sources
+
+    browser_sources = "\n".join(
+        path.read_text(encoding="utf-8") for path in (package / "browser").glob("*.py")
+    )
+    assert "linkedin_mcp.linkedin" not in browser_sources
 
 
 def test_public_repository_metadata_is_complete() -> None:
@@ -257,7 +282,8 @@ def test_wheel_excludes_tests_profiles_secrets_and_other_repositories(tmp_path: 
     with zipfile.ZipFile(wheels[0]) as archive:
         names = tuple(archive.namelist())
         lowered = tuple(name.casefold() for name in names)
-        assert "linkedin_mcp/server.py" in names
+        assert "linkedin_mcp/mcp/server.py" in names
+        assert "linkedin_mcp/linkedin/jobs/operations.py" in names
         assert any(name.endswith(".dist-info/entry_points.txt") for name in names)
         assert not any(name.startswith("tests/") for name in names)
         assert not any("simulator" in name for name in lowered)
@@ -287,7 +313,7 @@ def test_wheel_excludes_tests_profiles_secrets_and_other_repositories(tmp_path: 
             name for name in names if name.endswith(".dist-info/entry_points.txt")
         )
         entry_points = archive.read(entry_points_name).decode()
-        assert "linkedin-mcp = linkedin_mcp.__main__:main" in entry_points
+        assert "linkedin-mcp = linkedin_mcp.cli.main:main" in entry_points
 
     imported = subprocess.run(
         [

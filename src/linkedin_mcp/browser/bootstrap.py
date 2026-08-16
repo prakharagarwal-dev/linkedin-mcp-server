@@ -13,8 +13,8 @@ from typing import cast
 
 import playwright
 
+from linkedin_mcp.browser.models import BrowserSetupState
 from linkedin_mcp.config import Settings
-from linkedin_mcp.domain.models import BrowserSetupState
 from linkedin_mcp.errors import BrowserUnavailableError
 
 _BROWSER_PREFIXES = {

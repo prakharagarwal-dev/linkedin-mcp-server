@@ -11,10 +11,10 @@ import pytest
 from playwright.async_api import Locator, Page, Route, async_playwright
 from pydantic import ValidationError
 
-import linkedin_mcp.browser.pages.invitations as invitation_pages
-from linkedin_mcp.browser import BrowserManager
-from linkedin_mcp.browser.pages import InvitationListPage
-from linkedin_mcp.domain.models import (
+import linkedin_mcp.linkedin.network.invitations as invitation_pages
+from linkedin_mcp.errors import BrowserUnavailableError, ParserDriftError
+from linkedin_mcp.linkedin.browser import BrowserManager
+from linkedin_mcp.linkedin.models import (
     InvitationAvailableAction,
     InvitationDirection,
     InvitationEntityType,
@@ -25,7 +25,7 @@ from linkedin_mcp.domain.models import (
     InvitationType,
     StopReason,
 )
-from linkedin_mcp.errors import BrowserUnavailableError, ParserDriftError
+from linkedin_mcp.linkedin.network.invitations import InvitationListPage
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin" / "invitations" / "latest"
 _COUNT_LABELS = {

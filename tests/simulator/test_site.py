@@ -4,30 +4,19 @@ from typing import cast
 
 import pytest
 
-import linkedin_mcp.browser.pages.companies as company_pages
-import linkedin_mcp.browser.pages.connections as connection_pages
-import linkedin_mcp.browser.pages.invitations as invitation_pages
-import linkedin_mcp.browser.pages.jobs as job_pages
-import linkedin_mcp.browser.pages.messaging as messaging_pages
-import linkedin_mcp.browser.pages.people as people_pages
-import linkedin_mcp.browser.pages.posts as post_pages
-from linkedin_mcp.browser import BrowserManager
-from linkedin_mcp.browser.pages import (
-    CompanyProfilePage,
-    CompanySearchPage,
-    ConnectionsListPage,
-    ConversationPage,
-    ConversationSearchPage,
-    InvitationListPage,
-    JobDetailPage,
-    JobSearchPage,
-    PeopleSearchPage,
-    PersonProfilePage,
-    PostCommentsPage,
-    PostDetailPage,
-    PostSearchPage,
-)
-from linkedin_mcp.domain.models import (
+import linkedin_mcp.linkedin.companies.pages as company_pages
+import linkedin_mcp.linkedin.jobs.pages as job_pages
+import linkedin_mcp.linkedin.messaging.pages as messaging_pages
+import linkedin_mcp.linkedin.network.connections as connection_pages
+import linkedin_mcp.linkedin.network.invitations as invitation_pages
+import linkedin_mcp.linkedin.people.pages as people_pages
+import linkedin_mcp.linkedin.posts.pages as post_pages
+from linkedin_mcp.errors import AuthenticationRequiredError, BrowserUnavailableError
+from linkedin_mcp.linkedin.browser import BrowserManager
+from linkedin_mcp.linkedin.companies.pages import CompanyProfilePage, CompanySearchPage
+from linkedin_mcp.linkedin.jobs.pages import JobDetailPage, JobSearchPage
+from linkedin_mcp.linkedin.messaging.pages import ConversationPage, ConversationSearchPage
+from linkedin_mcp.linkedin.models import (
     CompanyGetInput,
     CompanySearchInput,
     ConnectionsListInput,
@@ -46,7 +35,10 @@ from linkedin_mcp.domain.models import (
     PostSearchInput,
     StopReason,
 )
-from linkedin_mcp.errors import AuthenticationRequiredError, BrowserUnavailableError
+from linkedin_mcp.linkedin.network.connections import ConnectionsListPage
+from linkedin_mcp.linkedin.network.invitations import InvitationListPage
+from linkedin_mcp.linkedin.people.pages import PeopleSearchPage, PersonProfilePage
+from linkedin_mcp.linkedin.posts.pages import PostCommentsPage, PostDetailPage, PostSearchPage
 from tests.simulator import SimulatorBrowser, standard_scenario
 from tests.simulator.state import SimulatorFault
 

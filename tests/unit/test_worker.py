@@ -9,13 +9,9 @@ from typing import cast
 import pytest
 from pydantic import HttpUrl
 
-from linkedin_mcp.application import (
-    CapabilityRunner,
-    CapabilityWorker,
-    PaginationManager,
-    bind_client_execution,
-)
-from linkedin_mcp.domain.models import (
+from linkedin_mcp.app import CapabilityRunner, CapabilityWorker, PaginationManager
+from linkedin_mcp.errors import BrowserUnavailableError
+from linkedin_mcp.linkedin.models import (
     ActionOutcome,
     ActionOutput,
     ActionResult,
@@ -74,7 +70,7 @@ from linkedin_mcp.domain.models import (
     StopReason,
     TextPostContent,
 )
-from linkedin_mcp.errors import BrowserUnavailableError
+from linkedin_mcp.mcp.context import bind_client_execution
 
 
 def _pagination(request: PaginatedInput) -> PaginationMetadata:

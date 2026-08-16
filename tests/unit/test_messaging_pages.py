@@ -10,15 +10,16 @@ import pytest
 from playwright.async_api import Locator, Page, Route, async_playwright
 from pydantic import HttpUrl, ValidationError
 
-import linkedin_mcp.browser.pages.messaging as messaging_pages
-from linkedin_mcp.assets import LocalAssetStore
-from linkedin_mcp.browser import BrowserManager
-from linkedin_mcp.browser.pages import (
+import linkedin_mcp.linkedin.messaging.pages as messaging_pages
+from linkedin_mcp.app.assets import LocalAssetStore
+from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
+from linkedin_mcp.linkedin.browser import BrowserManager
+from linkedin_mcp.linkedin.messaging.evidence import source_from_conversation
+from linkedin_mcp.linkedin.messaging.pages import (
     ConversationPage,
     ConversationSearchPage,
 )
-from linkedin_mcp.domain.evidence import source_from_conversation
-from linkedin_mcp.domain.models import (
+from linkedin_mcp.linkedin.models import (
     ActionCommand,
     ActionOutcome,
     ActionTarget,
@@ -35,7 +36,6 @@ from linkedin_mcp.domain.models import (
     MessageSendInput,
     MessageSendPayload,
 )
-from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 MESSAGING_FIXTURES = FIXTURES / "messaging" / "latest"

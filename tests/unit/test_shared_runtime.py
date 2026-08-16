@@ -10,11 +10,11 @@ import anyio
 import pytest
 import uvicorn
 
-import linkedin_mcp.application.shared_runtime as shared_runtime
-from linkedin_mcp.application import AccountRuntimeOwner, AccountRuntimeStatus
+import linkedin_mcp.runtime.shared as shared_runtime
 from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import ConfigurationError
-from linkedin_mcp.server import create_mcp_server
+from linkedin_mcp.mcp.server import create_mcp_server
+from linkedin_mcp.runtime import AccountRuntimeOwner, AccountRuntimeStatus
 from tests.contract.test_mcp_protocol import protocol_container
 
 

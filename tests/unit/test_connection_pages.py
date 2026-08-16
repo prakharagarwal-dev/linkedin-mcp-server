@@ -10,9 +10,14 @@ import pytest
 from playwright.async_api import Locator, Page, Route, async_playwright
 from pydantic import HttpUrl
 
-from linkedin_mcp.browser import BrowserManager
-from linkedin_mcp.browser.pages import ConnectionsListPage, InvitationActionPage
-from linkedin_mcp.domain.models import (
+from linkedin_mcp.errors import (
+    AuthenticationRequiredError,
+    BrowserUnavailableError,
+    InvalidTargetError,
+    ParserDriftError,
+)
+from linkedin_mcp.linkedin.browser import BrowserManager
+from linkedin_mcp.linkedin.models import (
     ActionCommand,
     ActionOutcome,
     ActionTarget,
@@ -27,12 +32,7 @@ from linkedin_mcp.domain.models import (
     InvitationSendPayload,
     StopReason,
 )
-from linkedin_mcp.errors import (
-    AuthenticationRequiredError,
-    BrowserUnavailableError,
-    InvalidTargetError,
-    ParserDriftError,
-)
+from linkedin_mcp.linkedin.network.connections import ConnectionsListPage, InvitationActionPage
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 ACTION_FIXTURES = FIXTURES / "invitations" / "actions" / "latest"
