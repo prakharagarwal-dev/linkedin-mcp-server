@@ -1,4 +1,4 @@
-# LinkedIn MCP Server
+# 🔗 LinkedIn MCP Server
 
 <!-- mcp-name: io.github.prakharagarwal-dev/linkedin-mcp-server -->
 
@@ -23,14 +23,14 @@ your network, publish and engage with posts, and read or send messages.
 
 ## ⚡ Quickstart
 
-### 1. Connect Claude Code
+### 1. 🔌 Connect Claude Code
 
 ```bash
 claude mcp add --scope user --transport stdio linkedin-mcp -- \
   uvx --from linkedin-mcp-local linkedin-mcp serve --transport stdio
 ```
 
-### 2. Sign in to LinkedIn
+### 2. 🔐 Sign in to LinkedIn
 
 Restart Claude Code. A dedicated browser window opens automatically—sign in to
 LinkedIn and complete any required verification.
@@ -38,7 +38,7 @@ LinkedIn and complete any required verification.
 > [!NOTE]
 > Your session is saved locally and reused automatically.
 
-### 3. Try your first request
+### 3. 🚀 Try your first request
 
 ```text
 Find remote software engineering jobs in India posted this week.
@@ -105,7 +105,7 @@ Find remote software engineering jobs in India posted this week.
 See the [capability matrix](docs/CAPABILITY_MATRIX.md) for exact filters,
 supported formats, inputs, outputs, limits, and unsupported features.
 
-## Installation
+## 📦 Installation
 
 <details open>
 <summary>Claude Code</summary>
@@ -312,33 +312,33 @@ See the [Warp MCP documentation](https://docs.warp.dev/agent-platform/capabiliti
 
 </details>
 
-## Examples
+## 💡 Examples
 
-### Find jobs
+### 💼 Find jobs
 
 ```text
 Find remote software engineering jobs in India posted this week with Easy Apply.
 ```
 
-### Research people
+### 👥 Research people
 
 ```text
 Find engineering managers at Stripe in India and show me their relevant experience.
 ```
 
-### Research companies
+### 🏢 Research companies
 
 ```text
 Find fintech companies in Bengaluru with 51–200 employees and summarize each company.
 ```
 
-### Explore posts
+### 📝 Explore posts
 
 ```text
 Find recent LinkedIn posts about AI agents and summarize the most useful discussions.
 ```
 
-### Manage your network
+### 🤝 Manage your network
 
 ```text
 Show my latest received connection requests.
@@ -348,13 +348,13 @@ Show my latest received connection requests.
 Send a connection request to <profile URL> with the note <note>.
 ```
 
-### Send messages
+### 💬 Send messages
 
 ```text
 Send <message> to <profile URL>.
 ```
 
-## Architecture
+## 🏗️ Architecture
 
 ```mermaid
 %%{init: {"flowchart": {"nodeSpacing": 55, "rankSpacing": 65}, "themeVariables": {"fontSize": "20px"}}}%%
@@ -375,7 +375,7 @@ runtime; later clients attach to it, and fair scheduling gives each client a
 turn between complete tool calls. Operation state lasts only for that runtime.
 Read the full [architecture](docs/ARCHITECTURE.md) and [privacy policy](PRIVACY.md).
 
-## Privacy Policy
+## 🔒 Privacy Policy
 
 The server has no maintainer-operated backend, analytics, advertising, or
 telemetry. LinkedIn receives normal visible-UI requests, and the invoking MCP
@@ -383,7 +383,7 @@ client receives tool results under its own data policy; the project sends
 nothing to the maintainer. Read the complete [privacy policy](PRIVACY.md) for
 processing, storage, sharing, retention, and deletion details.
 
-## Safety
+## 🛡️ Safety
 
 Use of this software is at your own risk. You are solely responsible for
 complying with [LinkedIn's User Agreement](https://www.linkedin.com/legal/user-agreement),
@@ -401,7 +401,7 @@ violations, or circumvention of access controls.
 
 See [SECURITY.md](SECURITY.md) and [the security design](docs/SECURITY.md).
 
-## More documentation
+## 📚 More documentation
 
 - [Configuration](docs/CONFIGURATION.md)
 - [Capability matrix](docs/CAPABILITY_MATRIX.md)
@@ -412,14 +412,14 @@ See [SECURITY.md](SECURITY.md) and [the security design](docs/SECURITY.md).
 - [Publishing](docs/PUBLISHING.md)
 - [Changelog](CHANGELOG.md)
 
-## Support the project
+## ❤️ Support the project
 
 If LinkedIn MCP Server is useful to you:
 
 - [Star the repository](https://github.com/prakharagarwal-dev/linkedin-mcp-server)
 - [Sponsor continued development](https://github.com/sponsors/prakharagarwal-dev)
 
-## Let's connect
+## 🌐 Let's connect
 
 Have feedback or an idea for LinkedIn MCP Server?
 
@@ -427,6 +427,6 @@ Have feedback or an idea for LinkedIn MCP Server?
 - [Follow me on GitHub](https://github.com/prakharagarwal-dev)
 - [Report a bug or request a feature](https://github.com/prakharagarwal-dev/linkedin-mcp-server/issues)
 
-## License
+## ⚖️ License
 
 Licensed under the [Apache License 2.0](LICENSE).
