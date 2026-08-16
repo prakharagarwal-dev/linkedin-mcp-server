@@ -8,6 +8,9 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Run the offline Pytest suite across four work-stealing workers and shorten
+  polling delays only for deterministic semantic-site fixtures, without
+  changing production browser timing or collection verification rounds.
 - Extend the supported Python runtime range through 3.14 across PyPI, MCPB,
   CI, and contributor metadata.
 - Standardize package, bundle, installer, catalog, and marketplace copy on the

@@ -4,7 +4,13 @@ from typing import cast
 
 import pytest
 
+import linkedin_mcp.browser.pages.companies as company_pages
 import linkedin_mcp.browser.pages.connections as connection_pages
+import linkedin_mcp.browser.pages.invitations as invitation_pages
+import linkedin_mcp.browser.pages.jobs as job_pages
+import linkedin_mcp.browser.pages.messaging as messaging_pages
+import linkedin_mcp.browser.pages.people as people_pages
+import linkedin_mcp.browser.pages.posts as post_pages
 from linkedin_mcp.browser import BrowserManager
 from linkedin_mcp.browser.pages import (
     CompanyProfilePage,
@@ -49,7 +55,16 @@ from tests.simulator.state import SimulatorFault
 def _use_fast_synthetic_collection_clock(  # pyright: ignore[reportUnusedFunction]
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # These routes are deterministic local HTML. Keep every production polling
+    # round while avoiding real-site delays that cannot reveal new fixture state.
+    monkeypatch.setattr(company_pages, "_INITIAL_RESULTS_POLL_DELAY_MS", 25)
     monkeypatch.setattr(connection_pages, "_SCROLL_PROGRESS_POLL_DELAY_MS", 25)
+    monkeypatch.setattr(invitation_pages, "_INVENTORY_DELAY_MS", 25)
+    monkeypatch.setattr(invitation_pages, "_SETTLE_DELAY_MS", 25)
+    monkeypatch.setattr(job_pages, "_SEARCH_SETTLE_DELAY_MS", 25)
+    monkeypatch.setattr(messaging_pages, "_SCROLL_PROGRESS_POLL_DELAY_MS", 25)
+    monkeypatch.setattr(people_pages, "_INITIAL_RESULTS_POLL_DELAY_MS", 25)
+    monkeypatch.setattr(post_pages, "_COLLECTION_POLL_DELAY_MS", 25)
 
 
 @pytest.mark.timeout(60)
