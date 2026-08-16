@@ -10,7 +10,6 @@ import pytest
 from playwright.async_api import Locator, Page, Route, async_playwright
 from pydantic import HttpUrl
 
-import linkedin_mcp.browser.pages.connections as connection_pages
 from linkedin_mcp.browser import BrowserManager
 from linkedin_mcp.browser.pages import ConnectionsListPage, InvitationActionPage
 from linkedin_mcp.domain.models import (
@@ -38,13 +37,6 @@ from linkedin_mcp.errors import (
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 ACTION_FIXTURES = FIXTURES / "invitations" / "actions" / "latest"
 INVITATION_REF = "invitation:ca598f6086a20bb05af6bfe8"
-
-
-@pytest.fixture(autouse=True)
-def _use_fast_synthetic_collection_clock(  # pyright: ignore[reportUnusedFunction]
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(connection_pages, "_SCROLL_PROGRESS_POLL_DELAY_MS", 25)
 
 
 class ConnectionFixtureBrowser:
@@ -191,13 +183,7 @@ def _ignore_command(
 
 
 @pytest.mark.timeout(20)
-async def test_connections_read_delayed_tail_and_trailing_hyphen_slugs(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    # This fixture deliberately defers its final batch after several wheel events.
-    # Retain the production settling interval so concurrent Chromium workers do not
-    # turn the delayed render into a scheduler-dependent test result.
-    monkeypatch.setattr(connection_pages, "_SCROLL_PROGRESS_POLL_DELAY_MS", 250)
+async def test_connections_read_delayed_tail_and_trailing_hyphen_slugs() -> None:
     html = (FIXTURES / "connections/latest/list-infinite-scroll.html").read_text()
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
