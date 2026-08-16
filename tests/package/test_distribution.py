@@ -108,6 +108,25 @@ def test_source_layout_keeps_infrastructure_and_linkedin_features_separate() -> 
     )
     assert "linkedin_mcp.linkedin" not in browser_sources
 
+    cli = package / "cli"
+    for command in (
+        "serve",
+        "setup",
+        "login",
+        "logout",
+        "doctor",
+        "status",
+        "stop",
+        "internal_runtime",
+    ):
+        assert (cli / f"{command}.py").is_file()
+    for profile_command in ("create", "status", "reset"):
+        assert (cli / "profile" / f"{profile_command}.py").is_file()
+
+    main_source = (cli / "main.py").read_text(encoding="utf-8")
+    assert "BrowserProfileManager" not in main_source
+    assert "run_shared_runtime" not in main_source
+
 
 def test_public_repository_metadata_is_complete() -> None:
     missing = sorted(path for path in PUBLIC_REPOSITORY_FILES if not (ROOT / path).is_file())
@@ -291,7 +310,11 @@ def test_wheel_excludes_tests_profiles_secrets_and_other_repositories(tmp_path: 
         assert not any(
             name.endswith((".env", "cookies.json", "storage-state.json")) for name in lowered
         )
-        assert not any("/profile/" in name or "browser_profile" in name for name in lowered)
+        assert not any(
+            ("/profile/" in name and not name.startswith("linkedin_mcp/cli/profile/"))
+            or "browser_profile" in name
+            for name in lowered
+        )
 
         metadata_name = next(name for name in names if name.endswith(".dist-info/METADATA"))
         metadata = email.message_from_bytes(archive.read(metadata_name))

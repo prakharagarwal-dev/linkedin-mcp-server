@@ -146,7 +146,7 @@ linkedin_mcp/
 ├── app/                 process-local queue, scheduling, pagination, assets, composition
 ├── browser/             generic Playwright installation, profile, pacing, convergence
 ├── runtime/             shared-process ownership and lifecycle
-├── cli/                 command-line entrypoint
+├── cli/                 one module per command; nested profile/ subcommands
 └── linkedin/            all LinkedIn-specific behavior
     ├── jobs/            models, evidence, operations, and page implementation
     ├── people/          models, evidence, operations, and page implementation
