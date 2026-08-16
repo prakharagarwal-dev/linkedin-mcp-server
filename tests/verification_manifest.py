@@ -32,13 +32,6 @@ MOCK_VERIFICATION: dict[str, ToolVerification] = {
     "linkedin.server.status": _entry(
         "operational", "read", _OPERATIONAL, "tests/contract/test_mcp_protocol.py"
     ),
-    "linkedin.capabilities.list": _entry(
-        "operational",
-        "read",
-        _OPERATIONAL,
-        "tests/contract/test_mcp_protocol.py",
-        "tests/unit/test_registry.py",
-    ),
     "linkedin.session.status": _entry(
         "operational",
         "read",

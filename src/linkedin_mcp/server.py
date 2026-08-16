@@ -19,7 +19,6 @@ from linkedin_mcp.container import AppContainer
 from linkedin_mcp.domain.identifiers import PROFILE_SLUG_PATTERN
 from linkedin_mcp.domain.models import (
     ActionOutput,
-    CapabilityListOutput,
     CommentAttachment,
     CommentSort,
     CompanyGetInput,
@@ -188,17 +187,6 @@ def create_mcp_server(
             active_browser_operation=container.worker.active,
             active_capability=container.worker.active_capability,
             accepting_calls=container.worker.accepting,
-        )
-
-    @mcp.tool(
-        name="linkedin.capabilities.list",
-        title="List LinkedIn Capabilities",
-        description="List installed capabilities and whether runtime policy enables each one.",
-        annotations=local_read,
-    )
-    async def _list_capabilities() -> CapabilityListOutput:
-        return CapabilityListOutput(
-            capabilities=tuple(descriptor.info() for descriptor in container.registry.list())
         )
 
     @mcp.tool(
@@ -1144,7 +1132,6 @@ def create_mcp_server(
 
     registered_handlers = (
         _server_status,
-        _list_capabilities,
         _session_status,
         _search_jobs,
         _get_job,

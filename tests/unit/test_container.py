@@ -22,7 +22,6 @@ from linkedin_mcp.application import (
 )
 from linkedin_mcp.config import Settings
 from linkedin_mcp.container import create_production_container
-from linkedin_mcp.domain.models import CapabilityName
 from linkedin_mcp.errors import ConfigurationError
 
 
@@ -30,26 +29,6 @@ from linkedin_mcp.errors import ConfigurationError
 async def test_production_container_composes_and_closes_without_connecting() -> None:
     container = create_production_container(Settings())
 
-    assert container.registry.get(CapabilityName.JOBS_SEARCH).version == "3.0.0"
-    assert container.registry.get(CapabilityName.PEOPLE_SEARCH).version == "3.0.0"
-    assert container.registry.get(CapabilityName.PEOPLE_GET).version == "1.1.1"
-    assert container.registry.get(CapabilityName.COMPANIES_SEARCH).version == "3.0.0"
-    assert container.registry.get(CapabilityName.COMPANIES_GET).version == "2.0.0"
-    assert container.registry.get(CapabilityName.POSTS_SEARCH).version == "3.0.0"
-    assert container.registry.get(CapabilityName.POSTS_GET).version == "2.0.0"
-    assert container.registry.get(CapabilityName.POST_COMMENTS_LIST).version == "2.0.0"
-    assert container.registry.get(CapabilityName.INVITATIONS_LIST).version == "5.1.0"
-    assert container.registry.get(CapabilityName.CONNECTIONS_LIST).version == "3.0.0"
-    assert container.registry.get(CapabilityName.CONNECTIONS_SEARCH).version == "3.0.0"
-    assert container.registry.get(CapabilityName.POSTS_CREATE).version == "4.0.0"
-    assert container.registry.get(CapabilityName.POST_COMMENT).version == "4.0.0"
-    assert container.registry.get(CapabilityName.POST_REACT).version == "4.0.0"
-    assert container.registry.get(CapabilityName.INVITATION_SEND).version == "3.0.0"
-    assert container.registry.get(CapabilityName.INVITATION_ACCEPT).version == "2.0.0"
-    assert container.registry.get(CapabilityName.INVITATION_IGNORE).version == "2.0.0"
-    assert container.registry.get(CapabilityName.MESSAGING_CONVERSATION_GET).version == "2.0.0"
-    assert container.registry.get(CapabilityName.MESSAGING_SEARCH).version == "3.0.0"
-    assert container.registry.get(CapabilityName.MESSAGING_SEND).version == "3.0.0"
     assert container.browser.started is False
 
     await container.close()

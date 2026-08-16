@@ -85,8 +85,10 @@ message reactions are outside the current contract.
 | Tool | Purpose |
 | --- | --- |
 | `linkedin.server.status` | Read safe shared-runtime, queue, and active-operation state |
-| `linkedin.capabilities.list` | Discover registered domain tools, versions, effects, and required surfaces |
 | `linkedin.session.status` | Read safe browser setup and LinkedIn authentication state |
+
+MCP clients discover this complete tool surface, including input schemas and
+annotations, through the standard `tools/list` request.
 
 ## Result contract
 

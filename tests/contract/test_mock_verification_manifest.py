@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from linkedin_mcp.capabilities import create_default_registry
 from linkedin_mcp.config import Settings
 from linkedin_mcp.container import create_production_container
 from linkedin_mcp.domain.models import (
@@ -209,16 +208,6 @@ def test_manifest_matches_the_exact_public_tool_surface() -> None:
     registered_names = {tool.name for tool in tools}
 
     assert registered_names == set(MOCK_VERIFICATION)
-    assert {descriptor.name.value for descriptor in create_default_registry().list()} == {
-        name
-        for name in MOCK_VERIFICATION
-        if name
-        not in {
-            "linkedin.server.status",
-            "linkedin.capabilities.list",
-            "linkedin.session.status",
-        }
-    }
     assert {name.value for name in CapabilityName} <= registered_names
 
 

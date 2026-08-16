@@ -32,14 +32,12 @@ from linkedin_mcp.browser.pages import (
     PostPublishingPage,
     PostSearchPage,
 )
-from linkedin_mcp.capabilities import CapabilityRegistry, create_default_registry
 from linkedin_mcp.config import Settings, runtime_configuration_fingerprint
 
 
 @dataclass(slots=True)
 class AppContainer:
     settings: Settings
-    registry: CapabilityRegistry
     browser: BrowserManager
     executor: CapabilityExecutor
     worker: CapabilityWorker
@@ -84,7 +82,6 @@ class AppContainer:
 
 
 def create_production_container(settings: Settings) -> AppContainer:
-    registry = create_default_registry()
     browser = BrowserManager(settings)
     connections_list = ConnectionsListPage(
         browser,
@@ -161,7 +158,6 @@ def create_production_container(settings: Settings) -> AppContainer:
     )
     return AppContainer(
         settings=settings,
-        registry=registry,
         browser=browser,
         executor=executor,
         worker=worker,

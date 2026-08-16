@@ -81,7 +81,6 @@ Find remote software engineering jobs in India posted on LinkedIn this week.
 |  | Send messages | `linkedin.messaging.send` | ![LinkedIn UI compatibility][status-linkedin-messaging-send]<br>![Compatibility check date][status-checked-on] | Send or reply in one-to-one conversations with text, links, emoji, files, images, and GIFs. |
 | **Server** | Check runtime | `linkedin.server.status` | ![LinkedIn UI compatibility][status-linkedin-server-status]<br>![Compatibility check date][status-checked-on] | Inspect the shared runtime, queue, and active browser operation. |
 |  | Check LinkedIn session | `linkedin.session.status` | ![LinkedIn UI compatibility][status-linkedin-session-status]<br>![Compatibility check date][status-checked-on] | Inspect browser-profile, authentication, login, and pause state. |
-|  | List capabilities | `linkedin.capabilities.list` | ![LinkedIn UI compatibility][status-linkedin-capabilities-list]<br>![Compatibility check date][status-checked-on] | Inspect available capabilities, versions, read/write effects, and required LinkedIn surfaces. |
 
 `NOT CHECKED` tools remain covered by the offline simulator on every pull request.
 
@@ -105,7 +104,6 @@ Find remote software engineering jobs in India posted on LinkedIn this week.
 [status-linkedin-messaging-send]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Ftool-status%2Fbadges%2Flinkedin.messaging.send.json&label=
 [status-linkedin-server-status]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Ftool-status%2Fbadges%2Flinkedin.server.status.json&label=
 [status-linkedin-session-status]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Ftool-status%2Fbadges%2Flinkedin.session.status.json&label=
-[status-linkedin-capabilities-list]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Ftool-status%2Fbadges%2Flinkedin.capabilities.list.json&label=
 [status-checked-on]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fprakharagarwal-dev%2Flinkedin-mcp-server%2Ftool-status%2Fbadges%2Fchecked-on.json&label=
 [status-not-checked]: https://img.shields.io/badge/status-not_checked-lightgrey?label=
 

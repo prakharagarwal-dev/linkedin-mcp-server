@@ -29,7 +29,6 @@ from linkedin_mcp.application import (
     PostPublishingProvider,
 )
 from linkedin_mcp.browser import BrowserManager
-from linkedin_mcp.capabilities import create_default_registry
 from linkedin_mcp.config import Settings
 from linkedin_mcp.container import AppContainer
 from linkedin_mcp.domain.models import (
@@ -655,7 +654,6 @@ def protocol_container(root: Path) -> AppContainer:
         minimum_navigation_interval_seconds=0,
         runtime_lock_path=root / "runtime.lock",
     )
-    registry = create_default_registry()
     browser = BrowserManager(settings)
     network = ProtocolNetwork()
     pagination = PaginationManager(
@@ -691,7 +689,6 @@ def protocol_container(root: Path) -> AppContainer:
     )
     return AppContainer(
         settings=settings,
-        registry=registry,
         browser=browser,
         executor=executor,
         worker=worker,
@@ -781,7 +778,6 @@ async def test_every_read_and_operational_tool_round_trips_through_mcp(
     post_ref = "activity:7312345678901234567"
     cases: tuple[tuple[str, dict[str, object], str], ...] = (
         ("linkedin.server.status", {}, "name"),
-        ("linkedin.capabilities.list", {}, "capabilities"),
         ("linkedin.session.status", {}, "authentication_state"),
         (
             "linkedin.jobs.search",
@@ -839,7 +835,6 @@ async def test_every_read_and_operational_tool_round_trips_through_mcp(
             arguments = dict(tool_args)
             if tool_name not in {
                 "linkedin.server.status",
-                "linkedin.capabilities.list",
                 "linkedin.session.status",
             }:
                 arguments.update(

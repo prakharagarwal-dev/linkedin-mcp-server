@@ -13,10 +13,9 @@ entry. A source checkout can also use an uncommitted `.env` file based on
 ## Tool availability
 
 The server does not maintain capability scopes, effect allowlists, or per-tool
-authorization records. `linkedin.capabilities.list` reports the complete
-installed capability set and its read/write effect plus required visible UI
-surfaces. Those surfaces document implementation boundaries; they are not
-operator permissions.
+authorization records. MCP clients discover the complete installed tool set,
+input schemas, descriptions, and read/write annotations through the standard
+MCP `tools/list` request.
 
 Enable, disable, or restrict tools in the MCP client. If a client makes a tool
 available and invokes it, the server treats that invocation as authorized for
