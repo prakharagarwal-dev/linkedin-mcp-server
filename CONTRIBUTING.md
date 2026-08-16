@@ -14,7 +14,7 @@ LinkedIn account.
 
 ## Development setup
 
-Install Python 3.12 or 3.13 and [`uv`](https://docs.astral.sh/uv/), then run:
+Install Python 3.12, 3.13, or 3.14 and [`uv`](https://docs.astral.sh/uv/), then run:
 
 ```bash
 git clone https://github.com/prakharagarwal-dev/linkedin-mcp-server.git
