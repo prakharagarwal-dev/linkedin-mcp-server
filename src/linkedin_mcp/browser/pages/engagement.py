@@ -434,7 +434,7 @@ class PostEngagementPage:
                 rail_slugs.add(slug)
                 text = (await candidate.inner_text()).strip()
                 lines = [line.strip() for line in text.splitlines() if line.strip()]
-                if lines:
+                if lines and any(character.isalpha() for character in lines[0]):
                     named_candidates.append((len(text), slug, lines[0]))
             if len(rail_slugs) == 1:
                 actor_slug = next(iter(rail_slugs))

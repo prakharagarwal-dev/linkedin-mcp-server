@@ -55,6 +55,9 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Wait for a real active-member display name when LinkedIn's profile rail is
+  still rendering instead of accepting a briefly visible numeric metrics link
+  as the acting identity.
 - Verify a newly submitted top-level comment only when exactly one new stable
   comment reference matches the requested payload. Treat LinkedIn's separate
   trailing `… more` expansion affordance as UI chrome when matching the exact

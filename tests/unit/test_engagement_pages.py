@@ -352,16 +352,16 @@ async def test_comment_waits_for_async_composer_after_count_control(tmp_path: Pa
 
 
 @pytest.mark.timeout(30)
-async def test_comment_waits_for_async_active_member_rail(tmp_path: Path) -> None:
+async def test_comment_waits_for_async_named_active_member_link(tmp_path: Path) -> None:
     html = ENGAGEMENT_HTML.replace(
-        '<aside aria-label="Signed-in member profile">',
-        '<aside hidden aria-label="Signed-in member profile">',
+        '<a href="/in/current-member/">\n          Current Member',
+        '<a hidden href="/in/current-member/">\n          Current Member',
         1,
     ).replace(
         "</body>",
         (
             "<script>setTimeout(() => "
-            "document.querySelector('aside').removeAttribute('hidden'), 600);</script>"
+            "document.querySelector('aside a').removeAttribute('hidden'), 600);</script>"
             "</body>"
         ),
         1,
@@ -380,7 +380,9 @@ async def test_comment_waits_for_async_active_member_rail(tmp_path: Path) -> Non
             LocalAssetStore(tmp_path),
         )
         try:
-            result = await adapter.perform_comment(await _comment_command(adapter, request))
+            command = await _comment_command(adapter, request)
+            assert command.target.actor_display_name == "Current Member"
+            result = await adapter.perform_comment(command)
         finally:
             await browser.close()
 
