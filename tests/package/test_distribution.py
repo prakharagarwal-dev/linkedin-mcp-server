@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import email
 import json
+import re
 import subprocess
 import sys
 import tomllib
@@ -155,7 +156,7 @@ def test_registry_and_bundle_metadata_share_the_release_identity() -> None:
         "https://www.linkedin.com/legal/privacy-policy",
     ]
     privacy = (ROOT / "PRIVACY.md").read_text()
-    assert "## Privacy Policy" in readme
+    assert re.search(r"^## (?:\S+\s+)?Privacy Policy\s*$", readme, re.MULTILINE)
     assert all(
         heading in privacy
         for heading in (

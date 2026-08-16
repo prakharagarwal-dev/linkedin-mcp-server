@@ -225,10 +225,15 @@ def test_manifest_matches_the_exact_public_tool_surface() -> None:
 
 def test_readme_tools_table_matches_the_exact_public_tool_surface() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    tools_section = readme.partition("## Tools")[2].partition("## Installation")[0]
+    tools_section_match = re.search(
+        r"^## (?:\S+\s+)?Tools\s*$\n(?P<section>.*?)(?=^## (?:\S+\s+)?Installation\s*$)",
+        readme,
+        flags=re.MULTILINE | re.DOTALL,
+    )
+    assert tools_section_match is not None
+    tools_section = tools_section_match.group("section")
     documented_names = set(re.findall(r"`(linkedin\.[a-z0-9_.]+)`", tools_section))
 
-    assert tools_section
     assert documented_names == set(MOCK_VERIFICATION)
 
 
