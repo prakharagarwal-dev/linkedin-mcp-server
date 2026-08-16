@@ -91,7 +91,7 @@ def test_public_repository_metadata_is_complete() -> None:
     assert "Report a vulnerability privately" in (ROOT / "SECURITY.md").read_text()
 
 
-def test_supported_python_versions_are_consistent() -> None:
+def test_supported_runtime_versions_and_platforms_are_consistent() -> None:
     configuration = tomllib.loads((ROOT / "pyproject.toml").read_text())
     project = configuration["project"]
     bundle = json.loads((ROOT / "packaging" / "mcpb" / "manifest.json").read_text())
@@ -104,7 +104,15 @@ def test_supported_python_versions_are_consistent() -> None:
         "Programming Language :: Python :: 3.13",
         "Programming Language :: Python :: 3.14",
     } <= set(project["classifiers"])
+    assert {
+        "Operating System :: MacOS",
+        "Operating System :: Microsoft :: Windows",
+        "Operating System :: POSIX :: Linux",
+    } <= set(project["classifiers"])
     assert 'python-version: ["3.12", "3.13", "3.14"]' in workflow
+    assert "macos-latest" in workflow
+    assert "windows-latest" in workflow
+    assert "ubuntu-24.04-arm" in workflow
 
 
 def test_release_workflow_has_a_non_mutating_pypi_retry_target() -> None:

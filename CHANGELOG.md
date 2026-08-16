@@ -8,6 +8,10 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Support native Windows runtime ownership, detached startup, console handling,
+  and graceful instance-bound shutdown alongside POSIX platforms. Run the full
+  offline suite in CI on macOS, Windows, and Linux ARM64 in addition to the
+  Linux x86-64 Python-version matrix.
 - Extend the supported Python runtime range through 3.14 across PyPI, MCPB,
   CI, and contributor metadata.
 - Standardize package, bundle, installer, catalog, and marketplace copy on the

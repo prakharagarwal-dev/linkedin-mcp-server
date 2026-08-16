@@ -25,7 +25,9 @@ Playwright page object ── visible UI ── LinkedIn
 One background runtime owns the configured Chromium profile. Stdio clients
 start or attach to that runtime through a loopback MCP endpoint. Direct
 Streamable HTTP clients can use the same loopback endpoint. The account lock
-prevents profile corruption by a second owner.
+prevents profile corruption by a second owner. It uses native advisory file
+locking on POSIX and Windows; graceful stop requests are instance-bound local
+files, so runtime lifecycle does not depend on POSIX process signals.
 
 ## Request lifecycle
 

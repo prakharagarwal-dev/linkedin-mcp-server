@@ -159,7 +159,7 @@ async def run_shared_runtime(settings: Settings) -> None:
         )
         server = uvicorn.Server(config)
         container.process_lock.publish_endpoint(endpoint)
-        await server.serve(sockets=[listener])
+        await _serve_until_stopped(server, container.process_lock, listener)
     finally:
         if listener is not None:
             listener.close()
@@ -201,15 +201,28 @@ def _spawn_shared_runtime(settings: Settings) -> subprocess.Popen[bytes]:
         log_path.parent.chmod(0o700)
     log = log_path.open("ab", buffering=0)
     try:
-        os.fchmod(log.fileno(), 0o600)
-        process = subprocess.Popen(
-            [sys.executable, "-m", "linkedin_mcp", _RUNTIME_COMMAND],
-            stdin=subprocess.DEVNULL,
-            stdout=log,
-            stderr=log,
-            close_fds=True,
-            start_new_session=True,
-        )
+        if os.name != "nt":
+            os.fchmod(log.fileno(), 0o600)
+        if os.name == "nt":
+            creation_flags = int(getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200))
+            creation_flags |= int(getattr(subprocess, "DETACHED_PROCESS", 0x00000008))
+            process = subprocess.Popen(
+                [sys.executable, "-m", "linkedin_mcp", _RUNTIME_COMMAND],
+                stdin=subprocess.DEVNULL,
+                stdout=log,
+                stderr=log,
+                close_fds=True,
+                creationflags=creation_flags,
+            )
+        else:
+            process = subprocess.Popen(
+                [sys.executable, "-m", "linkedin_mcp", _RUNTIME_COMMAND],
+                stdin=subprocess.DEVNULL,
+                stdout=log,
+                stderr=log,
+                close_fds=True,
+                start_new_session=True,
+            )
     finally:
         log.close()
     return process
@@ -217,6 +230,31 @@ def _spawn_shared_runtime(settings: Settings) -> subprocess.Popen[bytes]:
 
 def _runtime_log_path(settings: Settings) -> Path:
     return settings.runtime_lock_path.with_name("runtime.log")
+
+
+async def _serve_until_stopped(
+    server: uvicorn.Server,
+    process_lock: AccountProcessLock,
+    listener: socket.socket,
+) -> None:
+    """Serve until Uvicorn exits or the exact elected owner receives a stop request."""
+
+    server_task = asyncio.create_task(server.serve(sockets=[listener]))
+    stop_task = asyncio.create_task(process_lock.wait_for_stop_request())
+    try:
+        done, _ = await asyncio.wait(
+            (server_task, stop_task),
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        if stop_task in done:
+            await stop_task
+            server.should_exit = True
+        await server_task
+    finally:
+        for task in (server_task, stop_task):
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(server_task, stop_task, return_exceptions=True)
 
 
 def _normalized_loopback_host(host: str) -> str:

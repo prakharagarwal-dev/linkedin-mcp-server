@@ -25,8 +25,9 @@ in process memory.
 
 Authentication uses an official Playwright persistent Chromium context. The
 profile defaults to the operating system's per-user `linkedin-mcp`
-application-data directory and is created owner-only on supported POSIX
-systems.
+application-data directory. POSIX permissions are tightened to the owner;
+Windows uses the current user's application-data directory and inherited user
+profile ACL.
 
 Normal `serve` startup creates this dedicated profile automatically when it is
 missing. The first client elects one runtime; subsequent clients attach instead
@@ -126,9 +127,10 @@ per-client exclusion gate. It also stores a SHA-256 fingerprint of the
 effective non-secret runtime configuration so clients with conflicting policy
 cannot silently attach. `status` reads it without opening the browser and also
 queries safe queue health. `stop` verifies the same owner before sending a
-graceful termination signal and never force-kills it. Clean shutdown rejects
-queued work, lets an active write reach a terminal result, closes local
-resources, and then releases the lock.
+local stop request bound to that owner's random instance ID, and never
+force-kills it. The request marker is non-secret and lives beside the lock.
+Clean shutdown rejects queued work, lets an active write reach a terminal
+result, closes local resources, and then releases the lock.
 
 The project does not implement:
 

@@ -77,10 +77,10 @@ uvx --from linkedin-mcp-local linkedin-mcp stop
 ```
 
 `stop` addresses only the elected process currently holding the configured
-lock, asks it to shut down gracefully, and waits for release. It does not use
-`SIGKILL`. If the timeout expires, an active bounded LinkedIn write may still
-be reaching its terminal verification; run `status` again rather than deleting
-the lock.
+lock, publishes an instance-bound local shutdown request, and waits for release.
+It does not send a force-kill signal. If the timeout expires, an active bounded
+LinkedIn write may still be reaching its terminal verification; run `status`
+again rather than deleting the lock.
 
 If a normal client still reports a competing owner, check that every client is
 using the same current package version and effective `LINKEDIN_MCP_` runtime

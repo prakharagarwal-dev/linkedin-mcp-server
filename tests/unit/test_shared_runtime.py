@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import os
 from pathlib import Path
 from typing import Any, cast
 
@@ -378,6 +380,9 @@ async def test_run_shared_runtime_owns_and_closes_its_listener(
         def publish_endpoint(self, endpoint: str) -> None:
             events.append(f"published:{endpoint}")
 
+        async def wait_for_stop_request(self) -> None:
+            await asyncio.Event().wait()
+
     class FakeContainer:
         process_lock: Any = None
 
@@ -448,10 +453,10 @@ def test_runtime_spawn_listener_and_owner_validation_helpers(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = Settings(runtime_lock_path=tmp_path / "runtime.lock")
-    popen_calls: list[list[str]] = []
+    popen_calls: list[tuple[list[str], dict[str, object]]] = []
 
-    def fake_popen(args: list[str], **_: object) -> Any:
-        popen_calls.append(args)
+    def fake_popen(args: list[str], **kwargs: object) -> Any:
+        popen_calls.append((args, kwargs))
         return object()
 
     monkeypatch.setattr(shared_runtime.subprocess, "Popen", fake_popen)
@@ -459,7 +464,15 @@ def test_runtime_spawn_listener_and_owner_validation_helpers(
         settings
     )
     assert spawned is not None
-    assert popen_calls == [[shared_runtime.sys.executable, "-m", "linkedin_mcp", "_runtime"]]
+    assert len(popen_calls) == 1
+    args, kwargs = popen_calls[0]
+    assert args == [shared_runtime.sys.executable, "-m", "linkedin_mcp", "_runtime"]
+    if os.name == "nt":
+        assert kwargs["creationflags"]
+        assert "start_new_session" not in kwargs
+    else:
+        assert kwargs["start_new_session"] is True
+        assert "creationflags" not in kwargs
     assert (tmp_path / "runtime.log").is_file()
 
     listener = shared_runtime._bind_listener(  # pyright: ignore[reportPrivateUsage]

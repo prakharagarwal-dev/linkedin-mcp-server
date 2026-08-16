@@ -96,7 +96,9 @@ uv build
 ```
 
 CI runs formatting, linting, type checking, packaging, and the full offline
-suite on Python 3.12, 3.13, and 3.14 for every pull request.
+suite on Python 3.12, 3.13, and 3.14 for every pull request. Native platform
+jobs also run the full suite on macOS, Windows, and Linux ARM64; the primary
+Linux x86-64 jobs remain the version matrix and coverage gate.
 
 ## Adding or changing a tool
 
