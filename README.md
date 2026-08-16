@@ -356,16 +356,32 @@ Send <message> to <profile URL>.
 
 ## 🏗️ Architecture
 
-```mermaid
-%%{init: {"flowchart": {"nodeSpacing": 55, "rankSpacing": 65}, "themeVariables": {"fontSize": "20px"}}}%%
-flowchart LR
-    A["MCP Clients<br/>Codex · Claude · Cursor"] --> B["stdio bridges or<br/>loopback HTTP"]
-    B --> C["Shared Local Runtime<br/>Typed LinkedIn Tools"]
-    C --> D["Fair Per-Client Queue"]
-    D --> E["One Atomic Browser Operation<br/>Fresh Page · Global Pacing"]
-    E -->|"Visible UI only"| F["LinkedIn"]
-    E <--> G["One Chromium Context<br/>Persistent Profile"]
-    C -. "Tool annotations and results" .-> A
+```text
++-----------------------------+
+| MCP clients                 |
+| Claude, Codex, Cursor, ...  |
++--------------+--------------+
+               |
+               | stdio or loopback HTTP
+               v
++---------------------------------------------+
+| LinkedIn MCP Server (runs locally)          |
+|                                             |
+| Typed tools -> Fair queue -> Browser worker |
++----------------------+----------------------+
+                       |
+                       | Playwright
+                       v
++---------------------------------------------+
+| Dedicated Chromium browser                 |
+| Persistent local profile and session       |
++----------------------+----------------------+
+                       |
+                       | Visible web UI only
+                       v
++---------------------------------------------+
+| LinkedIn                                    |
++---------------------------------------------+
 ```
 
 Everything runs locally. There is no hosted backend, telemetry, database,
