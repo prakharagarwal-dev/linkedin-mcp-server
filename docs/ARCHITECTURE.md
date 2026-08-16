@@ -53,7 +53,7 @@ Every tool call is one bounded operation:
 5. The executor opens a temporary Playwright page in the shared browser
    context.
 6. A capability-specific page object navigates and uses visible controls.
-7. The executor stores process-local evidence and returns a typed result.
+7. The executor validates evidence and returns the typed result directly.
 8. The temporary page closes; the browser context and login profile remain.
 
 Calls are atomic at the MCP boundary. A client does not own a browser tab
@@ -62,9 +62,8 @@ between calls, and a cursor does not preserve a live page.
 ### Reads
 
 Reads collect visible data, coverage metadata, source URLs, and capture times.
-The process-local repository can replay a completed read when the same MCP
-client repeats the same `request_id` and arguments. Reusing a request ID with
-different arguments fails closed.
+Every invocation executes the provider again. `request_id` is returned for
+caller correlation; it does not cache, deduplicate, or lock the request arguments.
 
 Collections return one page plus an opaque cursor. Cursors are:
 
@@ -90,8 +89,8 @@ Each write tool performs one complete action in one call:
 5. verify a visible postcondition; and
 6. return `verified`, `failed`, or `uncertain`.
 
-Write calls are never replayed or coalesced. Clients should not blindly retry
-an `uncertain` result. MCP annotations mark these tools as destructive so the
+Write calls also execute once per invocation and are never retried by the
+server. Clients should not blindly retry an `uncertain` result. MCP annotations mark these tools as destructive so the
 client can apply its own approval policy; the server has no second approval or
 permission database.
 
@@ -101,13 +100,13 @@ supported type and LinkedIn size limit, and passes the path to Playwright.
 
 ## Runtime state
 
-All application state is memory-only:
+The server has no call-result or evidence repository. Runtime coordination is
+memory-only:
 
-- active and completed read calls;
-- evidence resources;
+- queued and active calls;
 - pagination cursors;
 - queue ownership and progress; and
-- terminal action observations.
+- navigation pacing.
 
 Restarting the shared runtime clears that state. The Chromium profile is the
 only persistent server-owned state and contains LinkedIn authentication data.
@@ -140,13 +139,12 @@ the CLI.
 
 | Layer | Responsibility |
 | --- | --- |
-| `server.py` | FastMCP tools, resources, annotations, and client binding |
+| `server.py` | FastMCP tools, annotations, and client binding |
 | `domain/` | Strict Pydantic inputs, outputs, identifiers, and evidence |
 | `capabilities/` | Registry of supported typed operations |
-| `application/` | Worker, executor, scheduler, cursors, runtime election, and in-memory state |
+| `application/` | Worker, executor, scheduler, cursors, and runtime election |
 | `browser/` | Chromium lifecycle, authentication, pacing, host guard, and page objects |
 | `policy/` | Canonical LinkedIn URL and stable-reference parsing |
-| `persistence/` | Process-local repository contracts and implementation |
 
 Transport wiring, domain contracts, orchestration, browser mechanics, and page
 extraction remain separate so a UI change does not leak into the MCP protocol.

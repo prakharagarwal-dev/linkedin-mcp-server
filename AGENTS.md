@@ -30,18 +30,18 @@
 
 - Python 3.12+, strict Pyright, Ruff, Pydantic v2, and async I/O.
 - Use the official `mcp` Python SDK and official Playwright async API.
-- Use an in-process `asyncio.Queue` for local capability execution and
-  process-local memory for calls, observations, and evidence. The browser profile
-  is the only server-owned authentication persistence. Client approval choices are
-  not stored as server authorization records. Do not add a database or external
-  work queue.
-- Keep MCP transport wiring, policy, operation-state storage, browser mechanics, page
-  extraction, and domain contracts in separate modules.
-- Store immutable field-level evidence with source URL and capture time.
+- Use an in-process `asyncio.Queue` for local capability execution. Do not store
+  call results, observations, or evidence. The browser profile is the only
+  server-owned authentication persistence. Client approval choices are not stored
+  as server authorization records. Do not add a database or external work queue.
+- Keep MCP transport wiring, policy, browser mechanics, page extraction, and domain
+  contracts in separate modules.
+- Return immutable field-level evidence with source URL and capture time in the
+  tool response.
 - Prefer accessible, user-facing Playwright locators.
-- Every operation must be bounded and observable. Read operations may replay safely.
-  Every write-tool invocation is a new action and must never be retried automatically
-  after its final LinkedIn control may have been invoked.
+- Every operation must be bounded and observable. Every read invocation executes
+  freshly. Every write-tool invocation is a new action and must never be retried
+  automatically after its final LinkedIn control may have been invoked.
 
 ## Working style
 

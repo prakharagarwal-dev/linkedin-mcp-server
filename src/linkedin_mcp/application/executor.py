@@ -10,20 +10,15 @@ from typing import Protocol
 
 import structlog
 
-from linkedin_mcp.application.client_context import (
-    current_client_id,
-    current_execution_context,
-)
+from linkedin_mcp.application.client_context import current_execution_context
 from linkedin_mcp.application.pagination import (
     PaginationLease,
     PaginationManager,
     request_binding,
     select_page,
 )
-from linkedin_mcp.capabilities import CapabilityRegistry
 from linkedin_mcp.config import Settings
 from linkedin_mcp.domain.evidence import (
-    canonical_input_fingerprint,
     source_from_action_execution,
     source_from_company_search,
     source_from_connections,
@@ -117,17 +112,12 @@ from linkedin_mcp.domain.models import (
     PostSummary,
     ReactionSetPayload,
     StopReason,
-    StrictModel,
 )
 from linkedin_mcp.errors import (
-    BrowserUnavailableError,
-    ErrorCode,
-    IdempotencyConflictError,
     InternalServerError,
     LinkedInMCPError,
     ParserDriftError,
 )
-from linkedin_mcp.persistence.contracts import CallStart, CallStatus, Repository
 
 logger = structlog.get_logger(__name__)
 ProgressReporter = Callable[[int, int, str], Awaitable[None]]
@@ -302,38 +292,11 @@ class ConversationProvider(Protocol):
     async def perform_message(self, command: ActionCommand) -> ActionPageResult: ...
 
 
-CapabilityRequest = (
-    JobSearchInput
-    | JobDetailInput
-    | PeopleSearchInput
-    | PeopleGetInput
-    | CompanySearchInput
-    | CompanyGetInput
-    | PostSearchInput
-    | PostGetInput
-    | PostCommentsListInput
-    | PostCreateInput
-    | PostCommentInput
-    | PostReactionInput
-    | InvitationListInput
-    | ConnectionsListInput
-    | ConnectionsSearchInput
-    | ConversationSearchInput
-    | ConversationGetInput
-    | InvitationSendInput
-    | InvitationAcceptInput
-    | InvitationIgnoreInput
-    | MessageSendInput
-)
-
-
 class CapabilityExecutor:
     def __init__(
         self,
         *,
         settings: Settings,
-        registry: CapabilityRegistry,
-        repository: Repository,
         job_search: JobSearchProvider,
         job_detail: JobDetailProvider,
         people_search: PeopleSearchProvider,
@@ -353,8 +316,6 @@ class CapabilityExecutor:
         pagination: PaginationManager | None = None,
     ) -> None:
         self._settings = settings
-        self._registry = registry
-        self._repository = repository
         self._job_search = job_search
         self._job_detail = job_detail
         self._people_search = people_search
@@ -381,14 +342,9 @@ class CapabilityExecutor:
         await self._pagination.close()
 
     async def search_jobs(self, request: JobSearchInput) -> JobSearchOutput:
-        descriptor = self._registry.get(CapabilityName.JOBS_SEARCH)
-        call = await self._begin_call(descriptor.name, request)
-        replay = self._replayed_output(call, JobSearchOutput)
-        if replay is not None:
-            return replay
         lease: PaginationLease | None = None
         try:
-            lease = await self._pagination_lease(descriptor.name, request)
+            lease = await self._pagination_lease(CapabilityName.JOBS_SEARCH, request)
             jobs, coverage, captured_text, source_url = await self._job_search.collect(
                 request,
                 result_limit=self._pagination.traversal_limit(lease, request.page_size),
@@ -424,73 +380,32 @@ class CapabilityExecutor:
                 returned_keys=page.keys,
                 provider_has_more=provider_has_more,
             )
-            output = JobSearchOutput(
+            return JobSearchOutput(
                 context_id=request.context_id,
                 request_id=request.request_id,
                 jobs=page.items,
                 coverage=page_coverage,
                 pagination=pagination,
-                sources=(source.reference(),),
-            )
-            await self._repository.complete_call(
-                call_id=call.call_id,
-                output=output.model_dump(mode="json"),
                 sources=(source,),
             )
-            return output
-        except asyncio.CancelledError:
-            await self._record_failure(
-                call.call_id,
-                BrowserUnavailableError("The LinkedIn job search was interrupted."),
-            )
-            raise
-        except Exception as error:
-            await self._record_failure(call.call_id, error)
-            raise
         finally:
             if lease is not None:
                 await self._pagination.abort(lease)
 
     async def get_job(self, request: JobDetailInput) -> JobDetailOutput:
-        descriptor = self._registry.get(CapabilityName.JOBS_GET)
-        call = await self._begin_call(descriptor.name, request)
-        replay = self._replayed_output(call, JobDetailOutput)
-        if replay is not None:
-            return replay
-        try:
-            job = await self._job_detail.read(request)
-            source = source_from_job_detail(job)
-            output = JobDetailOutput(
-                context_id=request.context_id,
-                request_id=request.request_id,
-                job=job,
-                sources=(source.reference(),),
-            )
-            await self._repository.complete_call(
-                call_id=call.call_id,
-                output=output.model_dump(mode="json"),
-                sources=(source,),
-            )
-            return output
-        except asyncio.CancelledError:
-            await self._record_failure(
-                call.call_id,
-                BrowserUnavailableError("The LinkedIn job read was interrupted."),
-            )
-            raise
-        except Exception as error:
-            await self._record_failure(call.call_id, error)
-            raise
+        job = await self._job_detail.read(request)
+        source = source_from_job_detail(job)
+        return JobDetailOutput(
+            context_id=request.context_id,
+            request_id=request.request_id,
+            job=job,
+            sources=(source,),
+        )
 
     async def search_people(self, request: PeopleSearchInput) -> PeopleSearchOutput:
-        descriptor = self._registry.get(CapabilityName.PEOPLE_SEARCH)
-        call = await self._begin_call(descriptor.name, request)
-        replay = self._replayed_output(call, PeopleSearchOutput)
-        if replay is not None:
-            return replay
         lease: PaginationLease | None = None
         try:
-            lease = await self._pagination_lease(descriptor.name, request)
+            lease = await self._pagination_lease(CapabilityName.PEOPLE_SEARCH, request)
             people, coverage, captured_text, source_url = await self._people_search.collect(
                 request,
                 result_limit=self._pagination.traversal_limit(lease, request.page_size),
@@ -526,29 +441,14 @@ class CapabilityExecutor:
                 returned_keys=page.keys,
                 provider_has_more=provider_has_more,
             )
-            output = PeopleSearchOutput(
+            return PeopleSearchOutput(
                 context_id=request.context_id,
                 request_id=request.request_id,
                 people=page.items,
                 coverage=page_coverage,
                 pagination=pagination,
-                sources=(source.reference(),),
-            )
-            await self._repository.complete_call(
-                call_id=call.call_id,
-                output=output.model_dump(mode="json"),
                 sources=(source,),
             )
-            return output
-        except asyncio.CancelledError:
-            await self._record_failure(
-                call.call_id,
-                BrowserUnavailableError("The LinkedIn People search was interrupted."),
-            )
-            raise
-        except Exception as error:
-            await self._record_failure(call.call_id, error)
-            raise
         finally:
             if lease is not None:
                 await self._pagination.abort(lease)
@@ -557,14 +457,9 @@ class CapabilityExecutor:
         self,
         request: ConnectionsSearchInput,
     ) -> ConnectionsSearchOutput:
-        descriptor = self._registry.get(CapabilityName.CONNECTIONS_SEARCH)
-        call = await self._begin_call(descriptor.name, request)
-        replay = self._replayed_output(call, ConnectionsSearchOutput)
-        if replay is not None:
-            return replay
         lease: PaginationLease | None = None
         try:
-            lease = await self._pagination_lease(descriptor.name, request)
+            lease = await self._pagination_lease(CapabilityName.CONNECTIONS_SEARCH, request)
             people_request = request.as_people_search_input()
             people, coverage, captured_text, source_url = await self._people_search.collect(
                 people_request,
@@ -608,73 +503,32 @@ class CapabilityExecutor:
                 returned_keys=page.keys,
                 provider_has_more=provider_has_more,
             )
-            output = ConnectionsSearchOutput(
+            return ConnectionsSearchOutput(
                 context_id=request.context_id,
                 request_id=request.request_id,
                 people=page.items,
                 coverage=page_coverage,
                 pagination=pagination,
-                sources=(source.reference(),),
-            )
-            await self._repository.complete_call(
-                call_id=call.call_id,
-                output=output.model_dump(mode="json"),
                 sources=(source,),
             )
-            return output
-        except asyncio.CancelledError:
-            await self._record_failure(
-                call.call_id,
-                BrowserUnavailableError("The LinkedIn Connections search was interrupted."),
-            )
-            raise
-        except Exception as error:
-            await self._record_failure(call.call_id, error)
-            raise
         finally:
             if lease is not None:
                 await self._pagination.abort(lease)
 
     async def get_person(self, request: PeopleGetInput) -> PeopleGetOutput:
-        descriptor = self._registry.get(CapabilityName.PEOPLE_GET)
-        call = await self._begin_call(descriptor.name, request)
-        replay = self._replayed_output(call, PeopleGetOutput)
-        if replay is not None:
-            return replay
-        try:
-            person, captures = await self._person_profile.read(request)
-            sources = sources_from_person_profile(person, captures)
-            output = PeopleGetOutput(
-                context_id=request.context_id,
-                request_id=request.request_id,
-                person=person,
-                sources=tuple(source.reference() for source in sources),
-            )
-            await self._repository.complete_call(
-                call_id=call.call_id,
-                output=output.model_dump(mode="json"),
-                sources=sources,
-            )
-            return output
-        except asyncio.CancelledError:
-            await self._record_failure(
-                call.call_id,
-                BrowserUnavailableError("The LinkedIn member-profile read was interrupted."),
-            )
-            raise
-        except Exception as error:
-            await self._record_failure(call.call_id, error)
-            raise
+        person, captures = await self._person_profile.read(request)
+        sources = sources_from_person_profile(person, captures)
+        return PeopleGetOutput(
+            context_id=request.context_id,
+            request_id=request.request_id,
+            person=person,
+            sources=sources,
+        )
 
     async def search_companies(self, request: CompanySearchInput) -> CompanySearchOutput:
-        descriptor = self._registry.get(CapabilityName.COMPANIES_SEARCH)
-        call = await self._begin_call(descriptor.name, request)
-        replay = self._replayed_output(call, CompanySearchOutput)
-        if replay is not None:
-            return replay
         lease: PaginationLease | None = None
         try:
-            lease = await self._pagination_lease(descriptor.name, request)
+            lease = await self._pagination_lease(CapabilityName.COMPANIES_SEARCH, request)
             companies, coverage, captured_text, source_url = await self._company_search.collect(
                 request,
                 result_limit=self._pagination.traversal_limit(lease, request.page_size),
@@ -710,73 +564,32 @@ class CapabilityExecutor:
                 returned_keys=page.keys,
                 provider_has_more=provider_has_more,
             )
-            output = CompanySearchOutput(
+            return CompanySearchOutput(
                 context_id=request.context_id,
                 request_id=request.request_id,
                 companies=page.items,
                 coverage=page_coverage,
                 pagination=pagination,
-                sources=(source.reference(),),
-            )
-            await self._repository.complete_call(
-                call_id=call.call_id,
-                output=output.model_dump(mode="json"),
                 sources=(source,),
             )
-            return output
-        except asyncio.CancelledError:
-            await self._record_failure(
-                call.call_id,
-                BrowserUnavailableError("The LinkedIn Company search was interrupted."),
-            )
-            raise
-        except Exception as error:
-            await self._record_failure(call.call_id, error)
-            raise
         finally:
             if lease is not None:
                 await self._pagination.abort(lease)
 
     async def get_company(self, request: CompanyGetInput) -> CompanyGetOutput:
-        descriptor = self._registry.get(CapabilityName.COMPANIES_GET)
-        call = await self._begin_call(descriptor.name, request)
-        replay = self._replayed_output(call, CompanyGetOutput)
-        if replay is not None:
-            return replay
-        try:
-            company, captures = await self._company_profile.read(request)
-            sources = sources_from_company_profile(company, captures)
-            output = CompanyGetOutput(
-                context_id=request.context_id,
-                request_id=request.request_id,
-                company=company,
-                sources=tuple(source.reference() for source in sources),
-            )
-            await self._repository.complete_call(
-                call_id=call.call_id,
-                output=output.model_dump(mode="json"),
-                sources=sources,
-            )
-            return output
-        except asyncio.CancelledError:
-            await self._record_failure(
-                call.call_id,
-                BrowserUnavailableError("The LinkedIn company-profile read was interrupted."),
-            )
-            raise
-        except Exception as error:
-            await self._record_failure(call.call_id, error)
-            raise
+        company, captures = await self._company_profile.read(request)
+        sources = sources_from_company_profile(company, captures)
+        return CompanyGetOutput(
+            context_id=request.context_id,
+            request_id=request.request_id,
+            company=company,
+            sources=sources,
+        )
 
     async def search_posts(self, request: PostSearchInput) -> PostSearchOutput:
-        descriptor = self._registry.get(CapabilityName.POSTS_SEARCH)
-        call = await self._begin_call(descriptor.name, request)
-        replay = self._replayed_output(call, PostSearchOutput)
-        if replay is not None:
-            return replay
         lease: PaginationLease | None = None
         try:
-            lease = await self._pagination_lease(descriptor.name, request)
+            lease = await self._pagination_lease(CapabilityName.POSTS_SEARCH, request)
             posts, coverage, captured_text, source_url = await self._post_search.collect(
                 request,
                 result_limit=self._pagination.traversal_limit(lease, request.page_size),
@@ -812,76 +625,35 @@ class CapabilityExecutor:
                 returned_keys=page.keys,
                 provider_has_more=provider_has_more,
             )
-            output = PostSearchOutput(
+            return PostSearchOutput(
                 context_id=request.context_id,
                 request_id=request.request_id,
                 posts=page.items,
                 coverage=page_coverage,
                 pagination=pagination,
-                sources=(source.reference(),),
-            )
-            await self._repository.complete_call(
-                call_id=call.call_id,
-                output=output.model_dump(mode="json"),
                 sources=(source,),
             )
-            return output
-        except asyncio.CancelledError:
-            await self._record_failure(
-                call.call_id,
-                BrowserUnavailableError("The LinkedIn post search was interrupted."),
-            )
-            raise
-        except Exception as error:
-            await self._record_failure(call.call_id, error)
-            raise
         finally:
             if lease is not None:
                 await self._pagination.abort(lease)
 
     async def get_post(self, request: PostGetInput) -> PostGetOutput:
-        descriptor = self._registry.get(CapabilityName.POSTS_GET)
-        call = await self._begin_call(descriptor.name, request)
-        replay = self._replayed_output(call, PostGetOutput)
-        if replay is not None:
-            return replay
-        try:
-            post = await self._post_detail.read(request)
-            source = source_from_post(post)
-            output = PostGetOutput(
-                context_id=request.context_id,
-                request_id=request.request_id,
-                post=post,
-                sources=(source.reference(),),
-            )
-            await self._repository.complete_call(
-                call_id=call.call_id,
-                output=output.model_dump(mode="json"),
-                sources=(source,),
-            )
-            return output
-        except asyncio.CancelledError:
-            await self._record_failure(
-                call.call_id,
-                BrowserUnavailableError("The LinkedIn post read was interrupted."),
-            )
-            raise
-        except Exception as error:
-            await self._record_failure(call.call_id, error)
-            raise
+        post = await self._post_detail.read(request)
+        source = source_from_post(post)
+        return PostGetOutput(
+            context_id=request.context_id,
+            request_id=request.request_id,
+            post=post,
+            sources=(source,),
+        )
 
     async def list_post_comments(
         self,
         request: PostCommentsListInput,
     ) -> PostCommentsListOutput:
-        descriptor = self._registry.get(CapabilityName.POST_COMMENTS_LIST)
-        call = await self._begin_call(descriptor.name, request)
-        replay = self._replayed_output(call, PostCommentsListOutput)
-        if replay is not None:
-            return replay
         lease: PaginationLease | None = None
         try:
-            lease = await self._pagination_lease(descriptor.name, request)
+            lease = await self._pagination_lease(CapabilityName.POST_COMMENTS_LIST, request)
             threads, coverage, captured_text, source_url = await self._post_comments.collect(
                 request,
                 result_limit=self._pagination.traversal_limit(lease, request.page_size),
@@ -917,29 +689,14 @@ class CapabilityExecutor:
                 provider_has_more=provider_has_more,
                 force_truncated=coverage.truncated and not provider_has_more,
             )
-            output = PostCommentsListOutput(
+            return PostCommentsListOutput(
                 context_id=request.context_id,
                 request_id=request.request_id,
                 threads=page.items,
                 coverage=page_coverage,
                 pagination=pagination,
-                sources=(source.reference(),),
-            )
-            await self._repository.complete_call(
-                call_id=call.call_id,
-                output=output.model_dump(mode="json"),
                 sources=(source,),
             )
-            return output
-        except asyncio.CancelledError:
-            await self._record_failure(
-                call.call_id,
-                BrowserUnavailableError("The LinkedIn post discussion read was interrupted."),
-            )
-            raise
-        except Exception as error:
-            await self._record_failure(call.call_id, error)
-            raise
         finally:
             if lease is not None:
                 await self._pagination.abort(lease)
@@ -949,14 +706,9 @@ class CapabilityExecutor:
         request: InvitationListInput,
         progress: ProgressReporter | None = None,
     ) -> InvitationListOutput:
-        descriptor = self._registry.get(CapabilityName.INVITATIONS_LIST)
-        call = await self._begin_call(descriptor.name, request)
-        replay = self._replayed_output(call, InvitationListOutput)
-        if replay is not None:
-            return replay
         lease: PaginationLease | None = None
         try:
-            lease = await self._pagination_lease(descriptor.name, request)
+            lease = await self._pagination_lease(CapabilityName.INVITATIONS_LIST, request)
             invitations, coverage, captured_text, source_url = await self._invitation_list.collect(
                 request,
                 result_limit=self._pagination.traversal_limit(lease, request.page_size),
@@ -998,42 +750,22 @@ class CapabilityExecutor:
                 returned_keys=page.keys,
                 provider_has_more=provider_has_more,
             )
-            output = InvitationListOutput(
+            return InvitationListOutput(
                 context_id=request.context_id,
                 request_id=request.request_id,
                 invitations=page.items,
                 coverage=page_coverage,
                 pagination=pagination,
-                sources=(source.reference(),),
-            )
-            await self._repository.complete_call(
-                call_id=call.call_id,
-                output=output.model_dump(mode="json"),
                 sources=(source,),
             )
-            return output
-        except asyncio.CancelledError:
-            await self._record_failure(
-                call.call_id,
-                BrowserUnavailableError("The LinkedIn invitation read was interrupted."),
-            )
-            raise
-        except Exception as error:
-            await self._record_failure(call.call_id, error)
-            raise
         finally:
             if lease is not None:
                 await self._pagination.abort(lease)
 
     async def list_connections(self, request: ConnectionsListInput) -> ConnectionsListOutput:
-        descriptor = self._registry.get(CapabilityName.CONNECTIONS_LIST)
-        call = await self._begin_call(descriptor.name, request)
-        replay = self._replayed_output(call, ConnectionsListOutput)
-        if replay is not None:
-            return replay
         lease: PaginationLease | None = None
         try:
-            lease = await self._pagination_lease(descriptor.name, request)
+            lease = await self._pagination_lease(CapabilityName.CONNECTIONS_LIST, request)
             connections, coverage, captured_text, source_url = await self._connections_list.collect(
                 request,
                 result_limit=self._pagination.traversal_limit(lease, request.page_size),
@@ -1069,29 +801,14 @@ class CapabilityExecutor:
                 returned_keys=page.keys,
                 provider_has_more=provider_has_more,
             )
-            output = ConnectionsListOutput(
+            return ConnectionsListOutput(
                 context_id=request.context_id,
                 request_id=request.request_id,
                 connections=page.items,
                 coverage=page_coverage,
                 pagination=pagination,
-                sources=(source.reference(),),
-            )
-            await self._repository.complete_call(
-                call_id=call.call_id,
-                output=output.model_dump(mode="json"),
                 sources=(source,),
             )
-            return output
-        except asyncio.CancelledError:
-            await self._record_failure(
-                call.call_id,
-                BrowserUnavailableError("The LinkedIn connections read was interrupted."),
-            )
-            raise
-        except Exception as error:
-            await self._record_failure(call.call_id, error)
-            raise
         finally:
             if lease is not None:
                 await self._pagination.abort(lease)
@@ -1100,14 +817,9 @@ class CapabilityExecutor:
         self,
         request: ConversationSearchInput,
     ) -> ConversationSearchOutput:
-        descriptor = self._registry.get(CapabilityName.MESSAGING_SEARCH)
-        call = await self._begin_call(descriptor.name, request)
-        replay = self._replayed_output(call, ConversationSearchOutput)
-        if replay is not None:
-            return replay
         lease: PaginationLease | None = None
         try:
-            lease = await self._pagination_lease(descriptor.name, request)
+            lease = await self._pagination_lease(CapabilityName.MESSAGING_SEARCH, request)
             (
                 conversations,
                 coverage,
@@ -1150,29 +862,14 @@ class CapabilityExecutor:
                 returned_keys=page.keys,
                 provider_has_more=provider_has_more,
             )
-            output = ConversationSearchOutput(
+            return ConversationSearchOutput(
                 context_id=request.context_id,
                 request_id=request.request_id,
                 conversations=page.items,
                 coverage=page_coverage,
                 pagination=pagination,
-                sources=(source.reference(),),
-            )
-            await self._repository.complete_call(
-                call_id=call.call_id,
-                output=output.model_dump(mode="json"),
                 sources=(source,),
             )
-            return output
-        except asyncio.CancelledError:
-            await self._record_failure(
-                call.call_id,
-                BrowserUnavailableError("The LinkedIn inbox read was interrupted."),
-            )
-            raise
-        except Exception as error:
-            await self._record_failure(call.call_id, error)
-            raise
         finally:
             if lease is not None:
                 await self._pagination.abort(lease)
@@ -1181,35 +878,14 @@ class CapabilityExecutor:
         self,
         request: ConversationGetInput,
     ) -> ConversationGetOutput:
-        descriptor = self._registry.get(CapabilityName.MESSAGING_CONVERSATION_GET)
-        call = await self._begin_call(descriptor.name, request)
-        replay = self._replayed_output(call, ConversationGetOutput)
-        if replay is not None:
-            return replay
-        try:
-            observation = await self._conversation.read(request)
-            source = source_from_conversation(observation)
-            output = ConversationGetOutput(
-                context_id=request.context_id,
-                request_id=request.request_id,
-                conversation=observation,
-                sources=(source.reference(),),
-            )
-            await self._repository.complete_call(
-                call_id=call.call_id,
-                output=output.model_dump(mode="json"),
-                sources=(source,),
-            )
-            return output
-        except asyncio.CancelledError:
-            await self._record_failure(
-                call.call_id,
-                BrowserUnavailableError("The LinkedIn conversation read was interrupted."),
-            )
-            raise
-        except Exception as error:
-            await self._record_failure(call.call_id, error)
-            raise
+        observation = await self._conversation.read(request)
+        source = source_from_conversation(observation)
+        return ConversationGetOutput(
+            context_id=request.context_id,
+            request_id=request.request_id,
+            conversation=observation,
+            sources=(source,),
+        )
 
     async def send_invitation(self, request: InvitationSendInput) -> ActionOutput:
         return await self._run_action(
@@ -1335,124 +1011,68 @@ class CapabilityExecutor:
         payload: ActionPayload | None = None,
         payload_factory: Callable[[ActionInspection], ActionPayload] | None = None,
     ) -> ActionOutput:
-        descriptor = self._registry.get(capability_name)
-        value = request.model_dump(mode="json")
-        call = await self._repository.begin_call(
-            account_id=self._settings.account_id,
-            client_id=current_client_id(),
-            context_id=request.context_id,
-            request_id=f"{request.request_id}:{uuid.uuid4()}",
-            capability_name=descriptor.name,
-            input_fingerprint=canonical_input_fingerprint(value),
-            input_value=value,
-        )
+        execution_id = str(uuid.uuid4())
         started_at = datetime.now(UTC)
+        inspection = await inspect()
+        resolved_payload = payload_factory(inspection) if payload_factory is not None else payload
+        if resolved_payload is None:
+            raise RuntimeError("Action inspection produced no typed payload.")
+        command = ActionCommand(
+            action_type=action_type,
+            target=inspection.target,
+            payload=resolved_payload,
+        )
         try:
-            inspection = await inspect()
-            resolved_payload = (
-                payload_factory(inspection) if payload_factory is not None else payload
+            page_result = await perform(command)
+        except asyncio.CancelledError:
+            raise
+        except LinkedInMCPError:
+            raise
+        except Exception as error:
+            logger.error(
+                "action_execution_interrupted",
+                capability_name=capability_name.value,
+                error_type=type(error).__name__,
             )
-            if resolved_payload is None:
-                raise RuntimeError("Action inspection produced no typed payload.")
-            command = ActionCommand(
-                action_type=action_type,
-                target=inspection.target,
-                payload=resolved_payload,
-            )
-            try:
-                page_result = await perform(command)
-            except asyncio.CancelledError:
-                raise
-            except LinkedInMCPError:
-                raise
-            except Exception as error:
-                logger.error(
-                    "action_execution_interrupted",
-                    capability_name=capability_name.value,
-                    error_type=type(error).__name__,
-                )
-                completed_at = datetime.now(UTC)
-                result = ActionResult(
-                    action_type=action_type,
-                    outcome=ActionOutcome.UNCERTAIN,
-                    performed=None,
-                    final_state="unknown_after_interruption",
-                    detail=(
-                        "Execution stopped without a verified visible outcome; "
-                        "operator review is required."
-                    ),
-                    started_at=started_at,
-                    completed_at=completed_at,
-                )
-                output = ActionOutput(
-                    context_id=request.context_id,
-                    request_id=request.request_id,
-                    result=result,
-                    sources=(),
-                )
-                await self._repository.complete_call(
-                    call_id=call.call_id,
-                    output=output.model_dump(mode="json"),
-                    sources=(),
-                )
-                return output
-
             result = ActionResult(
                 action_type=action_type,
-                outcome=page_result.outcome,
-                performed=page_result.performed,
-                final_state=page_result.final_state,
-                detail=page_result.detail,
+                outcome=ActionOutcome.UNCERTAIN,
+                performed=None,
+                final_state="unknown_after_interruption",
+                detail=(
+                    "Execution stopped without a verified visible outcome; "
+                    "operator review is required."
+                ),
                 started_at=started_at,
                 completed_at=datetime.now(UTC),
             )
-            source = source_from_action_execution(
-                command,
-                result,
-                page_result,
-                execution_id=call.call_id,
-            )
-            output = ActionOutput(
+            return ActionOutput(
                 context_id=request.context_id,
                 request_id=request.request_id,
                 result=result,
-                sources=(source.reference(),),
+                sources=(),
             )
-            await self._repository.complete_call(
-                call_id=call.call_id,
-                output=output.model_dump(mode="json"),
-                sources=(source,),
-            )
-            return output
-        except asyncio.CancelledError:
-            await self._record_failure(
-                call.call_id,
-                BrowserUnavailableError("The LinkedIn action was interrupted."),
-            )
-            raise
-        except Exception as error:
-            await self._record_failure(call.call_id, error)
-            raise
+
+        result = ActionResult(
+            action_type=action_type,
+            outcome=page_result.outcome,
+            performed=page_result.performed,
+            final_state=page_result.final_state,
+            detail=page_result.detail,
+            started_at=started_at,
+            completed_at=datetime.now(UTC),
+        )
+        source = source_from_action_execution(page_result, execution_id=execution_id)
+        return ActionOutput(
+            context_id=request.context_id,
+            request_id=request.request_id,
+            result=result,
+            sources=(source,),
+        )
 
     @staticmethod
     def _missing_invitation_reference() -> str:
         raise RuntimeError("Invitation inspection did not return an invitation reference.")
-
-    async def _begin_call(
-        self,
-        capability_name: CapabilityName,
-        request: CapabilityRequest,
-    ) -> CallStart:
-        value = request.model_dump(mode="json")
-        return await self._repository.begin_call(
-            account_id=self._settings.account_id,
-            client_id=current_client_id(),
-            context_id=request.context_id,
-            request_id=request.request_id,
-            capability_name=capability_name,
-            input_fingerprint=canonical_input_fingerprint(value),
-            input_value=value,
-        )
 
     async def _pagination_lease(
         self,
@@ -1476,43 +1096,6 @@ class CapabilityExecutor:
         ):
             raise RuntimeError("The queued pagination lease does not match this atomic call.")
         return lease
-
-    @staticmethod
-    def _replayed_output[OutputT: StrictModel](
-        call: CallStart,
-        output_type: type[OutputT],
-    ) -> OutputT | None:
-        if call.created:
-            return None
-        if call.status is CallStatus.COMPLETED and call.output is not None:
-            return output_type.model_validate(call.output).model_copy(update={"replayed": True})
-        if call.status is CallStatus.STARTED:
-            raise IdempotencyConflictError("An identical request is already executing.")
-        message = call.error_message or "The previous attempt failed."
-        raise IdempotencyConflictError(
-            f"This request ID belongs to a failed attempt: {message} Use a new request ID."
-        )
-
-    async def _record_failure(self, call_id: str, error: Exception) -> None:
-        if isinstance(error, LinkedInMCPError):
-            code = error.code.value
-            message = error.safe_message
-        else:
-            code = ErrorCode.INTERNAL_ERROR.value
-            message = "The capability failed unexpectedly."
-        try:
-            await self._repository.fail_call(
-                call_id=call_id,
-                error_code=code,
-                error_message=message,
-            )
-        except Exception as recording_error:
-            logger.error(
-                "capability_failure_recording_failed",
-                call_id=call_id,
-                original_error_code=code,
-                recording_error_type=type(recording_error).__name__,
-            )
 
 
 def safe_capability_error(error: Exception) -> LinkedInMCPError:

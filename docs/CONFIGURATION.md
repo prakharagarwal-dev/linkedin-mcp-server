@@ -201,13 +201,11 @@ does not implement HTTP authentication.
 
 ## Process-local state
 
-Read-call replay, evidence, queue state, and continuation cursors exist only in
-shared-runtime memory. A runtime restart clears them; disconnecting one client
-does not. Read request identity and cursors belong to the MCP session that
-created them. Account-changing calls are deliberately new actions on every
-invocation and are not replayed or deduplicated by the server. The persistent
-browser profile, managed browser cache, and explicitly selected local assets
-survive.
+The server does not retain call results or evidence. Every tool invocation is
+executed freshly. Queue state, navigation pacing, and continuation cursors exist
+only in shared-runtime memory; a runtime restart clears them. Cursors belong to
+the MCP session that created them. The persistent browser profile, managed
+browser cache, and explicitly selected local assets survive.
 
 After an uncertain or hard-interrupted action, inspect LinkedIn's visible state
 before invoking the tool again. Never blindly retry an account-changing call.

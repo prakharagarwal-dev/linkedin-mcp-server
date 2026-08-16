@@ -1,4 +1,4 @@
-"""Application services coordinating policy, operation state, and page adapters."""
+"""Application services coordinating policy, execution, and page adapters."""
 
 from .client_context import (
     ClientExecutionContext,

@@ -2002,7 +2002,6 @@ class SourceReference(StrictModel):
     source_type: SourceType
     source_url: HttpUrl
     captured_at: datetime
-    resource_uri: str
 
 
 class PaginationMetadata(StrictModel):
@@ -2027,24 +2026,6 @@ class PaginationMetadata(StrictModel):
         if self.returned_count > self.page_size:
             raise ValueError("returned_count cannot exceed page_size")
         return self
-
-
-class CapturedSource(StrictModel):
-    source_id: Identifier
-    source_type: SourceType
-    source_url: HttpUrl
-    captured_at: datetime
-    captured_text: Annotated[str, Field(min_length=1)]
-    content: dict[str, object]
-
-    def reference(self) -> SourceReference:
-        return SourceReference(
-            source_id=self.source_id,
-            source_type=self.source_type,
-            source_url=self.source_url,
-            captured_at=self.captured_at,
-            resource_uri=f"linkedin://sources/{self.source_id}",
-        )
 
 
 class EvidenceField(StrictModel):
@@ -2102,7 +2083,6 @@ class JobSearchOutput(StrictModel):
     coverage: JobSearchCoverage
     pagination: PaginationMetadata
     sources: tuple[SourceReference, ...]
-    replayed: bool = False
 
 
 class JobDetailObservation(StrictModel):
@@ -2133,7 +2113,6 @@ class JobDetailOutput(StrictModel):
     request_id: Identifier
     job: JobDetailObservation
     sources: tuple[SourceReference, ...]
-    replayed: bool = False
 
 
 class PersonSummary(StrictModel):
@@ -2171,7 +2150,6 @@ class PeopleSearchOutput(StrictModel):
     coverage: PeopleSearchCoverage
     pagination: PaginationMetadata
     sources: tuple[SourceReference, ...]
-    replayed: bool = False
 
 
 class PersonProfileLink(StrictModel):
@@ -2281,7 +2259,6 @@ class PeopleGetOutput(StrictModel):
     request_id: Identifier
     person: PersonProfileObservation
     sources: tuple[SourceReference, ...]
-    replayed: bool = False
 
 
 class CompanySummary(StrictModel):
@@ -2314,7 +2291,6 @@ class CompanySearchOutput(StrictModel):
     coverage: CompanySearchCoverage
     pagination: PaginationMetadata
     sources: tuple[SourceReference, ...]
-    replayed: bool = False
 
 
 class CompanyProfileEvidence(StrictModel):
@@ -2366,7 +2342,6 @@ class CompanyGetOutput(StrictModel):
     request_id: Identifier
     company: CompanyProfileObservation
     sources: tuple[SourceReference, ...]
-    replayed: bool = False
 
 
 class PostAuthor(StrictModel):
@@ -2500,7 +2475,6 @@ class PostSearchOutput(StrictModel):
     coverage: PostSearchCoverage
     pagination: PaginationMetadata
     sources: tuple[SourceReference, ...]
-    replayed: bool = False
 
 
 class PostDetailCoverage(StrictModel):
@@ -2599,7 +2573,6 @@ class PostGetOutput(StrictModel):
     request_id: Identifier
     post: PostObservation
     sources: tuple[SourceReference, ...]
-    replayed: bool = False
 
 
 class CommentAttachmentObservation(StrictModel):
@@ -2666,7 +2639,6 @@ class PostCommentsListOutput(StrictModel):
     coverage: PostCommentsCoverage
     pagination: PaginationMetadata
     sources: tuple[SourceReference, ...]
-    replayed: bool = False
 
 
 class InvitationEntity(StrictModel):
@@ -2852,7 +2824,6 @@ class InvitationListOutput(StrictModel):
     coverage: InvitationListCoverage
     pagination: PaginationMetadata
     sources: tuple[SourceReference, ...]
-    replayed: bool = False
 
     @model_validator(mode="after")
     def validate_live_page(self) -> InvitationListOutput:
@@ -2907,7 +2878,6 @@ class ConnectionsListOutput(StrictModel):
     coverage: ConnectionsListCoverage
     pagination: PaginationMetadata
     sources: tuple[SourceReference, ...]
-    replayed: bool = False
 
 
 class ConnectionsSearchOutput(PeopleSearchOutput):
@@ -2955,7 +2925,6 @@ class ConversationSearchOutput(StrictModel):
     coverage: ConversationSearchCoverage
     pagination: PaginationMetadata
     sources: tuple[SourceReference, ...]
-    replayed: bool = False
 
 
 class MessageAttachmentObservation(StrictModel):
@@ -3033,7 +3002,6 @@ class ConversationGetOutput(StrictModel):
     request_id: Identifier
     conversation: ConversationObservation
     sources: tuple[SourceReference, ...]
-    replayed: bool = False
 
 
 class ActionTarget(StrictModel):

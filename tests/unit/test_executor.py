@@ -7,10 +7,8 @@ from typing import Any
 import pytest
 from pydantic import HttpUrl
 
-import linkedin_mcp.application.executor as executor_module
 from linkedin_mcp.application import CapabilityExecutor
 from linkedin_mcp.application.executor import safe_capability_error
-from linkedin_mcp.capabilities import create_default_registry
 from linkedin_mcp.config import Settings
 from linkedin_mcp.domain.models import (
     CURRENT_RECEIVED_INVITATION_VIEWS,
@@ -95,13 +93,11 @@ from linkedin_mcp.domain.models import (
     TextPostContent,
 )
 from linkedin_mcp.errors import (
-    IdempotencyConflictError,
     InternalServerError,
     InvalidCursorError,
     InvalidTargetError,
     ParserDriftError,
 )
-from linkedin_mcp.persistence import MemoryRepository
 
 
 class FakeJobSearch:
@@ -1158,18 +1154,6 @@ class FakeConversation:
         return _page_result("message_sent")
 
 
-class FailureRecordingRepository(MemoryRepository):
-    async def fail_call(
-        self,
-        *,
-        call_id: str,
-        error_code: str,
-        error_message: str,
-    ) -> None:
-        del call_id, error_code, error_message
-        raise RuntimeError("runtime store unavailable")
-
-
 def _action_capture(profile_slug: str) -> ActionInspection:
     return ActionInspection(
         target=ActionTarget(
@@ -1201,7 +1185,6 @@ def _settings() -> Settings:
 
 
 def _executor(
-    repository: MemoryRepository,
     search: FakeJobSearch,
     detail: FakeJobDetail,
     people_search: FakePeopleSearch | None = None,
@@ -1221,8 +1204,6 @@ def _executor(
 ) -> CapabilityExecutor:
     return CapabilityExecutor(
         settings=_settings(),
-        registry=create_default_registry(),
-        repository=repository,
         job_search=search,
         job_detail=detail,
         people_search=people_search or FakePeopleSearch(),
@@ -1390,7 +1371,7 @@ _READ_FAILURE_CASES: tuple[tuple[str, str, str, object], ...] = (
 )
 @pytest.mark.parametrize("cancelled", [False, True], ids=["safe-error", "cancelled"])
 @pytest.mark.asyncio
-async def test_read_failures_are_recorded_and_never_silently_retried(
+async def test_read_failures_are_not_cached_and_each_invocation_executes(
     provider_attribute: str,
     provider_method: str,
     executor_method: str,
@@ -1398,11 +1379,13 @@ async def test_read_failures_are_recorded_and_never_silently_retried(
     cancelled: bool,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    repository = MemoryRepository()
-    executor = _executor(repository, FakeJobSearch(), FakeJobDetail())
+    executor = _executor(FakeJobSearch(), FakeJobDetail())
     provider = getattr(executor, provider_attribute)
+    attempts = 0
 
     async def fail(_request: object, **_kwargs: object) -> Any:
+        nonlocal attempts
+        attempts += 1
         if cancelled:
             raise asyncio.CancelledError
         raise InvalidTargetError("The visible LinkedIn target changed.")
@@ -1411,17 +1394,16 @@ async def test_read_failures_are_recorded_and_never_silently_retried(
     invoke = getattr(executor, executor_method)
 
     expected_error = asyncio.CancelledError if cancelled else InvalidTargetError
-    with pytest.raises(expected_error):
-        await invoke(capability_request)
-    with pytest.raises(IdempotencyConflictError, match="failed attempt"):
-        await invoke(capability_request)
+    for _ in range(2):
+        with pytest.raises(expected_error):
+            await invoke(capability_request)
+    assert attempts == 2
 
 
 @pytest.mark.asyncio
-async def test_job_search_is_persisted_and_replayed_without_provider_call() -> None:
-    repository = MemoryRepository()
+async def test_repeated_job_search_executes_provider_each_time() -> None:
     search = FakeJobSearch()
-    executor = _executor(repository, search, FakeJobDetail())
+    executor = _executor(search, FakeJobDetail())
     request = JobSearchInput(
         context_id="context-1",
         request_id="request-1",
@@ -1430,19 +1412,16 @@ async def test_job_search_is_persisted_and_replayed_without_provider_call() -> N
     )
 
     first = await executor.search_jobs(request)
-    replay = await executor.search_jobs(request)
+    second = await executor.search_jobs(request)
 
-    assert first.replayed is False
-    assert replay.replayed is True
-    assert replay.jobs == first.jobs
-    assert search.calls == 1
+    assert second.jobs == first.jobs
+    assert search.calls == 2
 
 
 @pytest.mark.asyncio
-async def test_job_search_cursor_walks_live_prefix_without_duplicates_and_replays_pages() -> None:
-    repository = MemoryRepository()
+async def test_job_search_cursor_walks_live_prefix_without_duplicates() -> None:
     search = PaginatedFakeJobSearch()
-    executor = _executor(repository, search, FakeJobDetail())
+    executor = _executor(search, FakeJobDetail())
     first_request = JobSearchInput(
         context_id="pagination-context",
         request_id="jobs-page-1",
@@ -1492,19 +1471,15 @@ async def test_job_search_cursor_walks_live_prefix_without_duplicates_and_replay
     assert third.pagination.has_more is False
     assert third.pagination.next_cursor is None
 
-    replay = await executor.search_jobs(second_request)
-    assert replay.replayed is True
-    assert replay.jobs == second.jobs
-    assert replay.pagination == second.pagination
+    with pytest.raises(InvalidCursorError, match="consumed"):
+        await executor.search_jobs(second_request)
     assert search.result_limits == [3, 5, 7]
 
 
 @pytest.mark.asyncio
 async def test_invitation_cursor_walks_live_prefix_without_duplicates() -> None:
-    repository = MemoryRepository()
     invitations = PaginatedFakeInvitationList()
     executor = _executor(
-        repository,
         FakeJobSearch(),
         FakeJobDetail(),
         invitation_list=invitations,
@@ -1593,20 +1568,16 @@ async def test_invitation_cursor_walks_live_prefix_without_duplicates() -> None:
     assert third.coverage.stop_reason is StopReason.VISIBLE_PAGE_COMPLETE
     assert third.coverage.result_count == 2
 
-    replay = await executor.list_invitations(second_request)
-    assert replay.replayed is True
-    assert replay.invitations == second.invitations
-    assert replay.pagination == second.pagination
+    with pytest.raises(InvalidCursorError, match="consumed"):
+        await executor.list_invitations(second_request)
     assert invitations.calls == 3
     assert invitations.result_limits == [3, 4, 6]
 
 
 @pytest.mark.asyncio
 async def test_unadvertised_empty_invitation_view_survives_executor_evidence() -> None:
-    repository = MemoryRepository()
     invitations = ImplicitEmptyInvitationList()
     executor = _executor(
-        repository,
         FakeJobSearch(),
         FakeJobDetail(),
         invitation_list=invitations,
@@ -1632,9 +1603,8 @@ async def test_unadvertised_empty_invitation_view_survives_executor_evidence() -
 
 @pytest.mark.asyncio
 async def test_job_detail_accepts_any_valid_job_id_without_prior_search() -> None:
-    repository = MemoryRepository()
     detail = FakeJobDetail()
-    executor = _executor(repository, FakeJobSearch(), detail)
+    executor = _executor(FakeJobSearch(), detail)
 
     output = await executor.get_job(
         JobDetailInput(
@@ -1645,16 +1615,14 @@ async def test_job_detail_accepts_any_valid_job_id_without_prior_search() -> Non
     )
 
     assert output.job.job_id == "4100000001"
-    assert output.sources[0].resource_uri.startswith("linkedin://sources/")
+    assert str(output.sources[0].source_url).startswith("https://www.linkedin.com/jobs/view/")
     assert detail.calls == 1
 
 
 @pytest.mark.asyncio
-async def test_people_search_is_persisted_and_replayed_without_provider_call() -> None:
-    repository = MemoryRepository()
+async def test_repeated_people_search_executes_provider_each_time() -> None:
     people_search = FakePeopleSearch()
     executor = _executor(
-        repository,
         FakeJobSearch(),
         FakeJobDetail(),
         people_search=people_search,
@@ -1667,21 +1635,17 @@ async def test_people_search_is_persisted_and_replayed_without_provider_call() -
     )
 
     first = await executor.search_people(request)
-    replay = await executor.search_people(request)
+    second = await executor.search_people(request)
 
-    assert first.replayed is False
-    assert replay.replayed is True
-    assert replay.people == first.people
+    assert second.people == first.people
     assert first.people[0].profile_slug == "jane-doe"
-    assert people_search.calls == 1
+    assert people_search.calls == 2
 
 
 @pytest.mark.asyncio
-async def test_connections_search_has_independent_replay_identity() -> None:
-    repository = MemoryRepository()
+async def test_repeated_connections_search_executes_provider_each_time() -> None:
     people_search = FakePeopleSearch()
     executor = _executor(
-        repository,
         FakeJobSearch(),
         FakeJobDetail(),
         people_search=people_search,
@@ -1696,19 +1660,17 @@ async def test_connections_search_has_independent_replay_identity() -> None:
     )
 
     first = await executor.search_connections(request)
-    replay = await executor.search_connections(request)
+    second = await executor.search_connections(request)
 
-    assert first.replayed is False
-    assert replay.replayed is True
+    assert second.people == first.people
     assert first.people[0].profile_slug == "jane-doe"
     assert first.coverage.filters.connection_degrees == (PeopleSearchConnectionDegree.FIRST,)
-    assert people_search.calls == 1
+    assert people_search.calls == 2
 
 
 @pytest.mark.asyncio
 async def test_connections_search_rejects_non_first_degree_results() -> None:
     executor = _executor(
-        MemoryRepository(),
         FakeJobSearch(),
         FakeJobDetail(),
         people_search=FakeNonConnectionPeopleSearch(),
@@ -1725,11 +1687,9 @@ async def test_connections_search_rejects_non_first_degree_results() -> None:
 
 
 @pytest.mark.asyncio
-async def test_person_profile_is_direct_and_persists_every_captured_page() -> None:
-    repository = MemoryRepository()
+async def test_person_profile_returns_metadata_for_every_captured_page() -> None:
     person_profile = FakePersonProfile()
     executor = _executor(
-        repository,
         FakeJobSearch(),
         FakeJobDetail(),
         person_profile=person_profile,
@@ -1746,16 +1706,17 @@ async def test_person_profile_is_direct_and_persists_every_captured_page() -> No
     assert output.person.profile_slug == "jane-doe"
     assert output.person.about == "Builds reliable systems."
     assert len(output.sources) == 2
-    assert all(source.resource_uri.startswith("linkedin://sources/") for source in output.sources)
+    assert all(
+        str(source.source_url).startswith("https://www.linkedin.com/in/")
+        for source in output.sources
+    )
     assert person_profile.calls == 1
 
 
 @pytest.mark.asyncio
-async def test_person_profile_section_selection_is_part_of_idempotency_fingerprint() -> None:
-    repository = MemoryRepository()
+async def test_same_request_id_can_execute_with_different_profile_sections() -> None:
     person_profile = FakePersonProfile()
     executor = _executor(
-        repository,
         FakeJobSearch(),
         FakeJobDetail(),
         person_profile=person_profile,
@@ -1768,21 +1729,17 @@ async def test_person_profile_section_selection_is_part_of_idempotency_fingerpri
     )
 
     await executor.get_person(overview_request)
-
-    with pytest.raises(IdempotencyConflictError, match="different arguments"):
-        await executor.get_person(
-            overview_request.model_copy(update={"sections": (PersonProfileSectionSelector.SKILLS,)})
-        )
-    assert person_profile.calls == 1
+    await executor.get_person(
+        overview_request.model_copy(update={"sections": (PersonProfileSectionSelector.SKILLS,)})
+    )
+    assert person_profile.calls == 2
 
 
 @pytest.mark.asyncio
-async def test_company_reads_persist_evidence_replay_and_idempotency() -> None:
-    repository = MemoryRepository()
+async def test_company_reads_execute_fresh_and_return_source_metadata() -> None:
     company_search = FakeCompanySearch()
     company_profile = FakeCompanyProfile()
     executor = _executor(
-        repository,
         FakeJobSearch(),
         FakeJobDetail(),
         company_search=company_search,
@@ -1795,37 +1752,36 @@ async def test_company_reads_persist_evidence_replay_and_idempotency() -> None:
     )
 
     search = await executor.search_companies(search_request)
-    search_replay = await executor.search_companies(search_request)
+    second_search = await executor.search_companies(search_request)
     profile_request = CompanyGetInput(
         context_id="company-context",
         request_id="company-get-1",
         company_slug="acme-cloud",
     )
     profile = await executor.get_company(profile_request)
-    profile_replay = await executor.get_company(profile_request)
+    second_profile = await executor.get_company(profile_request)
 
     assert search.companies[0].company_slug == "acme-cloud"
-    assert search_replay.replayed is True
-    assert company_search.calls == 1
+    assert second_search.companies == search.companies
+    assert company_search.calls == 2
     assert profile.company.company_size_range == "1,001-5,000 employees"
-    assert profile.sources[0].resource_uri.startswith("linkedin://sources/")
-    assert profile_replay.replayed is True
-    assert company_profile.calls == 1
+    assert str(profile.sources[0].source_url).startswith("https://www.linkedin.com/company/")
+    assert second_profile.company.company_slug == profile.company.company_slug
+    assert company_profile.calls == 2
 
-    with pytest.raises(IdempotencyConflictError, match="different arguments"):
-        await executor.get_company(
-            profile_request.model_copy(update={"company_slug": "example-labs"})
-        )
+    changed = await executor.get_company(
+        profile_request.model_copy(update={"company_slug": "example-labs"})
+    )
+    assert changed.company.company_slug == "example-labs"
+    assert company_profile.calls == 3
 
 
 @pytest.mark.asyncio
-async def test_post_discussion_reads_persist_exact_evidence_and_replay() -> None:
-    repository = MemoryRepository()
+async def test_post_discussion_reads_execute_fresh_with_exact_evidence() -> None:
     post_search = FakePostSearch()
     post_detail = FakePostDetail()
     post_comments = FakePostComments()
     executor = _executor(
-        repository,
         FakeJobSearch(),
         FakeJobDetail(),
         post_search=post_search,
@@ -1853,9 +1809,9 @@ async def test_post_discussion_reads_persist_exact_evidence_and_replay() -> None
     post_detail_output = await executor.get_post(detail_request)
     comments_output = await executor.list_post_comments(comments_request)
 
-    assert (await executor.search_posts(search_request)).replayed is True
-    assert (await executor.get_post(detail_request)).replayed is True
-    assert (await executor.list_post_comments(comments_request)).replayed is True
+    await executor.search_posts(search_request)
+    await executor.get_post(detail_request)
+    await executor.list_post_comments(comments_request)
     assert post_search_output.posts[0].post_ref == post_ref
     assert post_search_output.coverage.unsupported_result_count == 1
     assert post_detail_output.post.evidence[1].quote in post_detail_output.post.visible_text
@@ -1871,15 +1827,13 @@ async def test_post_discussion_reads_persist_exact_evidence_and_replay() -> None
         "linkedin_post",
         "linkedin_post_comments",
     }
-    assert (post_search.calls, post_detail.calls, post_comments.calls) == (1, 1, 1)
+    assert (post_search.calls, post_detail.calls, post_comments.calls) == (2, 2, 2)
 
 
 @pytest.mark.asyncio
-async def test_connection_and_messaging_reads_are_persisted_and_replayed() -> None:
-    repository = MemoryRepository()
+async def test_connection_and_messaging_reads_execute_fresh() -> None:
     invitations = FakeInvitationList()
     executor = _executor(
-        repository,
         FakeJobSearch(),
         FakeJobDetail(),
         invitation_list=invitations,
@@ -1891,42 +1845,45 @@ async def test_connection_and_messaging_reads_are_persisted_and_replayed() -> No
         direction=InvitationDirection.RECEIVED,
     )
     first = await executor.list_invitations(invitation_request)
-    replay = await executor.list_invitations(invitation_request)
+    second_invitations = await executor.list_invitations(invitation_request)
     connections_request = ConnectionsListInput(
         context_id="connections-context",
         request_id="connections-1",
     )
     connections = await executor.list_connections(connections_request)
-    connections_replay = await executor.list_connections(connections_request)
+    second_connections = await executor.list_connections(connections_request)
     inbox_request = ConversationSearchInput(
         context_id="messaging-context",
         request_id="inbox-1",
         filter=ConversationFilter.UNREAD,
     )
     inbox = await executor.search_messages(inbox_request)
-    inbox_replay = await executor.search_messages(inbox_request)
+    second_inbox = await executor.search_messages(inbox_request)
     conversation_request = ConversationGetInput(
         context_id="messaging-context",
         request_id="conversation-1",
         conversation_id="thread-123",
     )
     conversation = await executor.get_conversation(conversation_request)
-    conversation_replay = await executor.get_conversation(conversation_request)
+    second_conversation = await executor.get_conversation(conversation_request)
 
     assert first.invitations[0].note == "Hi, let us connect."
-    assert replay.replayed is True
-    assert invitations.calls == 1
+    assert second_invitations.invitations[0].note == first.invitations[0].note
+    assert invitations.calls == 2
     assert connections.connections[0].profile_slug == "jane-doe"
-    assert connections_replay.replayed is True
+    assert second_connections.connections[0].profile_slug == "jane-doe"
     assert inbox.conversations[0].unread is True
-    assert inbox_replay.replayed is True
+    assert second_inbox.conversations[0].conversation_id == "thread-123"
     assert [message.direction for message in conversation.conversation.messages] == [
         MessageDirection.INCOMING,
         MessageDirection.OUTGOING,
     ]
-    assert conversation_replay.replayed is True
+    assert [message.direction for message in second_conversation.conversation.messages] == [
+        MessageDirection.INCOMING,
+        MessageDirection.OUTGOING,
+    ]
     assert all(
-        source.resource_uri.startswith("linkedin://sources/")
+        str(source.source_url).startswith("https://www.linkedin.com/")
         for output in (first, connections, inbox, conversation)
         for source in output.sources
     )
@@ -1939,7 +1896,6 @@ async def test_all_seven_actions_run_directly_with_typed_evidence() -> None:
     engagement = FakePostEngagement()
     messaging = FakeConversation()
     executor = _executor(
-        MemoryRepository(),
         FakeJobSearch(),
         FakeJobDetail(),
         invitation_actions=actions,
@@ -2022,10 +1978,9 @@ async def test_all_seven_actions_run_directly_with_typed_evidence() -> None:
 
 
 @pytest.mark.asyncio
-async def test_repeated_write_request_is_a_new_action_not_a_replay() -> None:
+async def test_repeated_write_request_executes_a_new_action() -> None:
     actions = FakeInvitationActions()
     executor = _executor(
-        MemoryRepository(),
         FakeJobSearch(),
         FakeJobDetail(),
         invitation_actions=actions,
@@ -2047,7 +2002,6 @@ async def test_repeated_write_request_is_a_new_action_not_a_replay() -> None:
 @pytest.mark.asyncio
 async def test_incoming_invitation_action_requires_exact_visible_reference() -> None:
     executor = _executor(
-        MemoryRepository(),
         FakeJobSearch(),
         FakeJobDetail(),
         invitation_actions=MissingReferenceActions(),
@@ -2069,7 +2023,6 @@ async def test_interrupted_action_is_uncertain_but_cancellation_propagates(
     cancelled: bool,
 ) -> None:
     executor = _executor(
-        MemoryRepository(),
         FakeJobSearch(),
         FakeJobDetail(),
         invitation_actions=InterruptedInvitationActions(cancelled=cancelled),
@@ -2094,7 +2047,6 @@ async def test_interrupted_action_is_uncertain_but_cancellation_propagates(
 @pytest.mark.asyncio
 async def test_known_precondition_error_is_not_misreported_as_uncertain() -> None:
     executor = _executor(
-        MemoryRepository(),
         FakeJobSearch(),
         FakeJobDetail(),
         invitation_actions=RejectedInvitationActions(),
@@ -2106,38 +2058,6 @@ async def test_known_precondition_error_is_not_misreported_as_uncertain() -> Non
                 context_id="rejected-action",
                 request_id="invite",
                 profile_slug="jane-doe",
-            )
-        )
-
-
-@pytest.mark.asyncio
-async def test_failure_recording_never_replaces_original_capability_error(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    repository = FailureRecordingRepository()
-    search = FakeJobSearch()
-    executor = _executor(repository, search, FakeJobDetail())
-
-    async def unexpected(
-        _request: JobSearchInput,
-        *,
-        result_limit: int | None = None,
-    ) -> tuple[tuple[JobSummary, ...], JobSearchCoverage, str, str]:
-        del result_limit
-        raise RuntimeError("sensitive implementation detail")
-
-    def discard_log(_event: str, **values: object) -> None:
-        del values
-
-    monkeypatch.setattr(search, "collect", unexpected)
-    monkeypatch.setattr(executor_module.logger, "error", discard_log)
-
-    with pytest.raises(RuntimeError, match="sensitive implementation detail"):
-        await executor.search_jobs(
-            JobSearchInput(
-                context_id="failure-context",
-                request_id="failure-recording",
-                query="python",
             )
         )
 

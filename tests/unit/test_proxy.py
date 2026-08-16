@@ -67,7 +67,7 @@ class FakeUpstream:
         return types.ListResourcesResult(
             resources=[
                 types.Resource(
-                    uri=AnyUrl("linkedin://sources/test"),
+                    uri=AnyUrl("example://resources/test"),
                     name="test evidence",
                 )
             ]
@@ -77,8 +77,8 @@ class FakeUpstream:
         return types.ListResourceTemplatesResult(
             resourceTemplates=[
                 types.ResourceTemplate(
-                    uriTemplate="linkedin://sources/{source_id}",
-                    name="LinkedIn evidence",
+                    uriTemplate="example://resources/{resource_id}",
+                    name="Example resource",
                 )
             ]
         )
@@ -155,7 +155,7 @@ async def test_proxy_forwards_the_complete_public_mcp_surface() -> None:
         )
         resources = await session.list_resources()
         templates = await session.list_resource_templates()
-        resource = await session.read_resource(AnyUrl("linkedin://sources/test"))
+        resource = await session.read_resource(AnyUrl("example://resources/test"))
         prompts = await session.list_prompts()
         prompt = await session.get_prompt("test-prompt", {"topic": "python"})
 
@@ -165,7 +165,7 @@ async def test_proxy_forwards_the_complete_public_mcp_surface() -> None:
     assert upstream.progress_forwarded is True
     assert observed_progress == [(1.0, 1.0, "done")]
     assert resources.resources[0].name == "test evidence"
-    assert templates.resourceTemplates[0].name == "LinkedIn evidence"
+    assert templates.resourceTemplates[0].name == "Example resource"
     resource_content = resource.contents[0]
     assert isinstance(resource_content, types.TextResourceContents)
     assert resource_content.text == "visible evidence"
@@ -176,14 +176,14 @@ async def test_proxy_forwards_the_complete_public_mcp_surface() -> None:
 def test_proxy_decodes_text_and_binary_resource_contents() -> None:
     text = _read_resource_content(
         types.TextResourceContents(
-            uri=AnyUrl("linkedin://sources/text"),
+            uri=AnyUrl("example://resources/text"),
             mimeType="text/plain",
             text="visible",
         )
     )
     blob = _read_resource_content(
         types.BlobResourceContents(
-            uri=AnyUrl("linkedin://sources/blob"),
+            uri=AnyUrl("example://resources/blob"),
             mimeType="application/octet-stream",
             blob=base64.b64encode(b"binary").decode("ascii"),
         )

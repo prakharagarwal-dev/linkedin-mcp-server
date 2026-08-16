@@ -17,9 +17,9 @@ Trust is split between:
 - LinkedIn's visible web UI, which supplies identity, current state, data, and
   postconditions.
 
-The server has no database, application-secret service, scope allowlist, or
-server-side approval ledger. Read-call replay, cursors, and evidence live only
-in process memory.
+The server has no database, application-secret service, scope allowlist,
+server-side approval ledger, call-result cache, or evidence store. Only active
+queue coordination, pacing, and cursors live in process memory.
 
 ## Authentication profile
 
@@ -158,15 +158,13 @@ the worker round-robins lanes between atomic calls. It never interrupts one
 browser call to serve another. Queue entries and pacing history are not
 durable.
 
-The process-local operation store retains read request replay and evidence only
-while the shared runtime is alive. Read replay is scoped to the internal MCP
-session. Every account-changing invocation gets a unique internal call record
-and is not replayed or deduplicated. This limits local data retention and
-removes database credentials and services, but it also means:
+Every MCP tool invocation gets its own queue item and executes freshly. The
+server does not cache completed reads, coalesce duplicate submissions, record
+terminal calls, or retain captured evidence. Consequently:
 
-- request IDs do not deduplicate after restart;
-- evidence resources disappear after restart;
-- write request IDs never deduplicate, even within one runtime; and
+- request IDs never deduplicate, even within one runtime;
+- repeating a read invokes LinkedIn again;
+- no MCP resource can retrieve evidence after the tool response; and
 - uncertain action outcomes are not durable across restart.
 
 Collection cursors are also process-local authentication-adjacent state. They
@@ -194,7 +192,7 @@ operation, the server:
 - revalidates the target and visible precondition;
 - performs only the capability's one narrow final action;
 - requires a visible postcondition; and
-- returns `verified`, `failed`, or `uncertain` with immutable evidence.
+- returns `verified`, `failed`, or `uncertain` with source metadata and typed evidence.
 
 MCP annotations identify these tools as destructive but cannot attest how a
 specific call was approved. Writes should use stdio or an equivalently trusted
@@ -206,23 +204,24 @@ policy. It receives a direct action call only after the client permits it.
 
 ## Evidence and client-visible data
 
-Each captured source includes:
+Each tool response includes source metadata:
 
 - source type;
 - exact validated LinkedIn URL;
-- capture time;
-- retained visible text;
-- normalized structured content;
-- field-level quotes where the contract requires them.
+- capture time; and
+- a stable identifier for that capture.
 
-Action-execution source IDs also bind to the unique process-local execution
-identity. Separate account-changing invocations therefore retain distinct
-evidence even when their visible capture text and wall-clock timestamp match.
+Typed results also include the visible data and field-level quotes required by
+their contracts. Internal captured text is used transiently to validate those
+quotes and is discarded after the result is built.
 
-Evidence objects are immutable after insertion, but available only through the
-same live runtime at `linkedin://sources/{source_id}`. Clients that need durable
-audit records must copy the required structured data into their own authorized
-store before runtime exit.
+Action-execution source IDs bind to a unique execution identity. Separate
+account-changing invocations therefore return distinct source identities even
+when their visible capture text and wall-clock timestamp match.
+
+The server does not retain evidence or expose evidence resources. Clients that
+need durable audit records must store the tool response in their own authorized
+system.
 
 Logs contain operational metadata and safe error categories. They must not
 contain cookies, credentials, browser-profile contents, raw environment
@@ -245,8 +244,8 @@ stdio is the recommended local transport.
 Streamable HTTP is restricted to `127.0.0.1`, `::1`, or `localhost`. This
 release has no HTTP authentication and must not be exposed on a LAN or public
 interface. Stdio bridges and direct HTTP clients share the same account,
-browser context, pacing, and fair queue. Read request IDs and cursors remain
-isolated by their server-assigned MCP-session identities.
+browser context, pacing, and fair queue. Cursors remain isolated by their
+server-assigned MCP-session identities.
 
 ## Reporting a vulnerability
 

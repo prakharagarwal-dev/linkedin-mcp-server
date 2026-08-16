@@ -192,7 +192,6 @@ EXPECTED_ERROR_CODES = frozenset(
         "configuration_error",
         "access_paused",
         "authentication_required",
-        "idempotency_conflict",
         "invalid_cursor",
         "invalid_target",
         "restriction_detected",

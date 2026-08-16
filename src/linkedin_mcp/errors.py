@@ -9,7 +9,6 @@ class ErrorCode(StrEnum):
     CONFIGURATION_ERROR = "configuration_error"
     ACCESS_PAUSED = "access_paused"
     AUTHENTICATION_REQUIRED = "authentication_required"
-    IDEMPOTENCY_CONFLICT = "idempotency_conflict"
     INVALID_CURSOR = "invalid_cursor"
     INVALID_TARGET = "invalid_target"
     RESTRICTION_DETECTED = "restriction_detected"
@@ -49,11 +48,6 @@ class AccessPausedError(LinkedInMCPError):
 class AuthenticationRequiredError(LinkedInMCPError):
     def __init__(self, message: str = "LinkedIn authentication is required.") -> None:
         super().__init__(ErrorCode.AUTHENTICATION_REQUIRED, message, pause_required=True)
-
-
-class IdempotencyConflictError(LinkedInMCPError):
-    def __init__(self, message: str) -> None:
-        super().__init__(ErrorCode.IDEMPOTENCY_CONFLICT, message)
 
 
 class InvalidCursorError(LinkedInMCPError):

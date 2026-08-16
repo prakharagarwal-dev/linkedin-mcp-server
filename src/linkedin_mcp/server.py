@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Annotated, Any, Literal
 
 from mcp.server.fastmcp import Context, FastMCP
-from mcp.server.fastmcp.exceptions import ResourceError, ToolError
+from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
@@ -134,9 +134,8 @@ def create_mcp_server(
         instructions=(
             "Each account-changing tool performs one complete LinkedIn action. Every invocation "
             "is new, so do not retry an uncertain action blindly. Use only registered typed "
-            "LinkedIn capabilities. Cursors belong to the MCP session that created them. "
-            "Operation state exists only for this server process; evidence is at "
-            "linkedin://sources/{source_id}."
+            "LinkedIn capabilities. Every read invocation executes freshly. Cursors belong to "
+            "the MCP session that created them."
         ),
         json_response=True,
         stateless_http=False,
@@ -1143,24 +1142,6 @@ def create_mcp_server(
         await ctx.report_progress(100, 100, "Message action reached a terminal outcome")
         return result
 
-    @mcp.resource(
-        "linkedin://sources/{source_id}",
-        name="LinkedIn Captured Source",
-        description="Read immutable captured LinkedIn evidence from this server process.",
-        mime_type="application/json",
-    )
-    async def _captured_source(source_id: str) -> str:
-        try:
-            source = await container.repository.get_source(
-                account_id=container.settings.account_id,
-                source_id=source_id,
-            )
-        except Exception as error:
-            raise ResourceError("The captured source could not be loaded.") from error
-        if source is None:
-            raise ResourceError("The captured source does not exist for this account.")
-        return source.model_dump_json(indent=2)
-
     registered_handlers = (
         _server_status,
         _list_capabilities,
@@ -1186,7 +1167,6 @@ def create_mcp_server(
         _search_messages,
         _get_conversation,
         _send_message,
-        _captured_source,
     )
     del registered_handlers
     _install_client_context_binding(mcp, container)

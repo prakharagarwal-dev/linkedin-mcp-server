@@ -167,7 +167,7 @@ Verification proceeds from narrowest to broadest:
 5. Official MCP client tests for schemas and structured output.
 6. Cursor workflow tests proving disjoint identities, cumulative counts,
    client/account/filter binding, pre-queue reservation, single-use cursors,
-   same-request replay, terminal metadata, and honest truncation.
+   fresh repeated invocation, terminal metadata, and honest truncation.
 7. Semantic simulator workflows using production page objects.
 8. The complete offline verification suite and package build.
 
@@ -205,7 +205,7 @@ A collection change may be called complete only when all of these are true:
 - raw candidate normalization occurs before private bounds;
 - offline fixtures include the observed failure shape;
 - page-object, executor, MCP, cursor, simulator, and complete-suite checks pass;
-- a low-volume production-MCP replay passes when live acceptance is in scope;
+- a low-volume repeated production-MCP invocation passes when live acceptance is in scope;
 - the capability matrix, changelog, and relevant durable documentation are updated;
   and
 - no live personal data or authentication material was retained.

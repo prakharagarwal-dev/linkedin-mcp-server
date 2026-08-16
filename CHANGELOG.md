@@ -8,6 +8,10 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Remove the process-local call/evidence repository, completed-read replay,
+  duplicate-call coalescing, replay flags, and captured-source MCP resource.
+  Every tool invocation now executes freshly and returns its result with source
+  metadata directly.
 - Support native Windows runtime ownership, CIM-brokered startup that survives
   client-owned Job Objects, console handling, and graceful instance-bound
   shutdown alongside POSIX platforms. Run the full

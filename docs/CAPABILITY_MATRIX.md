@@ -90,7 +90,7 @@ message reactions are outside the current contract.
 
 ## Result contract
 
-Reads return typed data, bounded coverage, source references, and pagination
+Reads return typed data, bounded coverage, source metadata, and pagination
 where applicable. Account-changing tools return exactly one terminal outcome:
 
 - `verified`: the exact visible postcondition was observed;
