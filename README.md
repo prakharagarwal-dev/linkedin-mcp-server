@@ -46,6 +46,13 @@ Find remote software engineering jobs in India posted this week.
 
 ## Tools
 
+> [!TIP]
+> **What “verified” means:** The tool passed the latest end-to-end compatibility
+> check through its public MCP interface against LinkedIn's visible web UI using
+> isolated test accounts. Reads returned the expected typed data; writes
+> produced and visibly verified the requested result. The accompanying date
+> shows when the check ran.
+
 | Area | Function | MCP tool | LinkedIn UI compatibility | What it does |
 | --- | --- | --- | --- | --- |
 | **Jobs** | Search jobs | `linkedin.jobs.search` | ![LinkedIn UI compatibility][status-linkedin-jobs-search]<br>![Compatibility check date][status-checked-on] | Search by keywords, location, distance, date, workplace, experience, employment type, company, industry, function, title, benefits, Easy Apply, verification, applicant count, network, and other visible filters. |
