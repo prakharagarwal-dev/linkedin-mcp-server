@@ -23,14 +23,14 @@ your network, publish and engage with posts, and read or send messages.
 
 ## ⚡ Quickstart
 
-### 1. 🔌 Connect Claude Code
+### 1. Connect Claude Code
 
 ```bash
 claude mcp add --scope user --transport stdio linkedin-mcp -- \
   uvx --from linkedin-mcp-local linkedin-mcp serve --transport stdio
 ```
 
-### 2. 🔐 Sign in to LinkedIn
+### 2. Sign in to LinkedIn
 
 Restart Claude Code. A dedicated browser window opens automatically—sign in to
 LinkedIn and complete any required verification.
@@ -38,7 +38,7 @@ LinkedIn and complete any required verification.
 > [!NOTE]
 > Your session is saved locally and reused automatically.
 
-### 3. 🚀 Try your first request
+### 3. Try your first request
 
 ```text
 Find remote software engineering jobs in India posted this week.
@@ -314,31 +314,31 @@ See the [Warp MCP documentation](https://docs.warp.dev/agent-platform/capabiliti
 
 ## 💡 Examples
 
-### 💼 Find jobs
+### Find jobs
 
 ```text
 Find remote software engineering jobs in India posted this week with Easy Apply.
 ```
 
-### 👥 Research people
+### Research people
 
 ```text
 Find engineering managers at Stripe in India and show me their relevant experience.
 ```
 
-### 🏢 Research companies
+### Research companies
 
 ```text
 Find fintech companies in Bengaluru with 51–200 employees and summarize each company.
 ```
 
-### 📝 Explore posts
+### Explore posts
 
 ```text
 Find recent LinkedIn posts about AI agents and summarize the most useful discussions.
 ```
 
-### 🤝 Manage your network
+### Manage your network
 
 ```text
 Show my latest received connection requests.
@@ -348,7 +348,7 @@ Show my latest received connection requests.
 Send a connection request to <profile URL> with the note <note>.
 ```
 
-### 💬 Send messages
+### Send messages
 
 ```text
 Send <message> to <profile URL>.
