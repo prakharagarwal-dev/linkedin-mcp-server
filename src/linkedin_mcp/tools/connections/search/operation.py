@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Protocol
+
 from linkedin_mcp.app.pagination import (
     PaginationLease,
     select_page,
@@ -13,16 +15,28 @@ from linkedin_mcp.tools._shared.models import (
     StopReason,
 )
 from linkedin_mcp.tools.connections.search.evidence import source_from_people_search
-from linkedin_mcp.tools.connections.search.models import (
+from linkedin_mcp.tools.connections.search.models.connections_search_input import (
     ConnectionsSearchInput,
-    ConnectionsSearchOutput,
-    PersonConnectionDegree,
 )
-from linkedin_mcp.tools.people.search.operation import PeopleSearchProvider
+from linkedin_mcp.tools.connections.search.models.connections_search_output import (
+    ConnectionsSearchOutput,
+)
+from linkedin_mcp.tools.people.models.person_connection_degree import PersonConnectionDegree
+from linkedin_mcp.tools.people.search.models.people_search_coverage import PeopleSearchCoverage
+from linkedin_mcp.tools.people.search.models.person_summary import PersonSummary
+
+
+class ConnectionsSearchProvider(Protocol):
+    async def collect(
+        self,
+        request: ConnectionsSearchInput,
+        *,
+        result_limit: int | None = None,
+    ) -> tuple[tuple[PersonSummary, ...], PeopleSearchCoverage, str, str]: ...
 
 
 class SearchConnectionsOperation(OperationSupport):
-    _connections_search: PeopleSearchProvider
+    _connections_search: ConnectionsSearchProvider
 
     async def search_connections(
         self,
@@ -31,9 +45,8 @@ class SearchConnectionsOperation(OperationSupport):
         lease: PaginationLease | None = None
         try:
             lease = await self._pagination_lease(CapabilityName.CONNECTIONS_SEARCH, request)
-            people_request = request.as_people_search_input()
             people, coverage, captured_text, source_url = await self._connections_search.collect(
-                people_request,
+                request,
                 result_limit=self._pagination.traversal_limit(lease, request.page_size),
             )
             if any(

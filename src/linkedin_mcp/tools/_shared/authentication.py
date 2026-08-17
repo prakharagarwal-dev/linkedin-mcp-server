@@ -13,7 +13,9 @@ from linkedin_mcp.errors import (
     BrowserUnavailableError,
     LinkedInMCPError,
 )
-from linkedin_mcp.tools._shared.status import SessionAuthenticationState
+from linkedin_mcp.tools.session.status.models.session_authentication_state import (
+    SessionAuthenticationState,
+)
 
 logger = structlog.get_logger(__name__)
 

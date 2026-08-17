@@ -3,7 +3,10 @@
 from linkedin_mcp.errors import ParserDriftError
 from linkedin_mcp.tools._shared.models import SourceReference, SourceType
 from linkedin_mcp.tools._shared.source import source_reference
-from linkedin_mcp.tools.invitations.list.models import InvitationListCoverage, InvitationSummary
+from linkedin_mcp.tools.invitations.list.models.invitation_list_coverage import (
+    InvitationListCoverage,
+)
+from linkedin_mcp.tools.invitations.list.models.invitation_summary import InvitationSummary
 
 
 def source_from_invitation_list(

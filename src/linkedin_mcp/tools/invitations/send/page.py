@@ -18,11 +18,9 @@ from linkedin_mcp.tools._shared.actions import (
     ActionTarget,
     InvitationSendPayload,
 )
-from linkedin_mcp.tools._shared.network_models import (
-    InvitationSendInput,
-)
 from linkedin_mcp.tools._shared.urls import canonical_profile_url
 from linkedin_mcp.tools.invitations.action_surface import InvitationActionSurface
+from linkedin_mcp.tools.invitations.send.models.invitation_send_input import InvitationSendInput
 
 
 async def _visible_text(page: Page) -> str:

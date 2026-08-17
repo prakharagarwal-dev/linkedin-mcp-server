@@ -15,7 +15,7 @@ from linkedin_mcp.tools._shared.tool import (
     IdentifierArgument,
     tool_result,
 )
-from linkedin_mcp.tools.invitations.ignore.models import (
+from linkedin_mcp.tools.invitations.ignore.models.invitation_ignore_input import (
     InvitationIgnoreInput,
 )
 

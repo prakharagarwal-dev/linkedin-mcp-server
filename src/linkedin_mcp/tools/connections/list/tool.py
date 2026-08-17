@@ -14,11 +14,9 @@ from linkedin_mcp.tools._shared.tool import (
     PageSizeArgument,
     tool_result,
 )
-from linkedin_mcp.tools.connections.list.models import (
-    ConnectionsListInput,
-    ConnectionsListOutput,
-    ConnectionsSortBy,
-)
+from linkedin_mcp.tools.connections.list.models.connections_list_input import ConnectionsListInput
+from linkedin_mcp.tools.connections.list.models.connections_list_output import ConnectionsListOutput
+from linkedin_mcp.tools.connections.list.models.connections_sort_by import ConnectionsSortBy
 
 
 def register(

@@ -14,7 +14,9 @@ from linkedin_mcp.tools._shared.actions import (
 )
 from linkedin_mcp.tools._shared.execution import OperationSupport
 from linkedin_mcp.tools._shared.models import CapabilityName
-from linkedin_mcp.tools.invitations.accept.models import InvitationAcceptInput
+from linkedin_mcp.tools.invitations.accept.models.invitation_accept_input import (
+    InvitationAcceptInput,
+)
 
 
 class InvitationAcceptProvider(Protocol):

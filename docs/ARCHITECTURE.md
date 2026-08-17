@@ -172,15 +172,15 @@ linkedin_mcp/
         └── send/
 ```
 
-Browser-backed company, job, messaging, people, and post leaves contain
-`tool.py`, `operation.py`, a `models/` package, `page.py`, and `evidence.py`.
-The tool module owns the FastMCP definition; the operation owns application
-flow; the page module contains that tool's concrete typed Playwright adapter;
-and models and evidence define that capability's contract. Every tool-owned
-model, enum, or contract type has its own snake-case module under `models/`,
-and consumers import that exact module. A model used by multiple tools is
-defined once in the nearest domain `models/` package and imported by those
-leaves. Named domain modules such as `posts/surface.py` or
+Every capability leaf contains a `models/` package with one owned type per
+snake-case module. Browser-backed leaves additionally contain `tool.py`,
+`operation.py`, `page.py`, and `evidence.py`. The tool module owns the FastMCP
+definition; the operation owns application flow; the page module contains that
+tool's concrete typed Playwright adapter; and models and evidence define that
+capability's contract. Consumers import the exact model module rather than a
+forwarding `models.py` facade. A model used by multiple tools is defined once
+in the nearest domain `models/` package and imported by those leaves. Named
+domain modules such as `posts/surface.py` or
 `messaging/conversation_surface.py` contain only visible-UI mechanics that are
 genuinely shared by multiple concrete page adapters. Domain `_shared/`
 packages and forwarding-only page modules are not used. The global

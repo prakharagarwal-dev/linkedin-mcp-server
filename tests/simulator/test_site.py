@@ -21,13 +21,11 @@ from linkedin_mcp.tools.companies.get.models.company_get_input import CompanyGet
 from linkedin_mcp.tools.companies.get.page import CompanyProfilePage
 from linkedin_mcp.tools.companies.search.models.company_search_input import CompanySearchInput
 from linkedin_mcp.tools.companies.search.page import CompanySearchPage
-from linkedin_mcp.tools.connections.list.models import ConnectionsListInput
+from linkedin_mcp.tools.connections.list.models.connections_list_input import ConnectionsListInput
 from linkedin_mcp.tools.connections.list.page import ConnectionsListPage
-from linkedin_mcp.tools.invitations.list.models import (
-    InvitationDirection,
-    InvitationFilter,
-    InvitationListInput,
-)
+from linkedin_mcp.tools.invitations.list.models.invitation_direction import InvitationDirection
+from linkedin_mcp.tools.invitations.list.models.invitation_filter import InvitationFilter
+from linkedin_mcp.tools.invitations.list.models.invitation_list_input import InvitationListInput
 from linkedin_mcp.tools.invitations.list.page import InvitationListPage
 from linkedin_mcp.tools.jobs.get.models.job_detail_input import JobDetailInput
 from linkedin_mcp.tools.jobs.get.page import JobDetailPage

@@ -22,13 +22,13 @@ from linkedin_mcp.tools._shared.collections import (
     wait_for_collection_interaction,
 )
 from linkedin_mcp.tools._shared.models import StopReason
-from linkedin_mcp.tools._shared.network_models import (
-    ConnectionsListCoverage,
-    ConnectionsListInput,
-    ConnectionsSortBy,
-    ConnectionSummary,
-)
 from linkedin_mcp.tools._shared.urls import canonical_profile_url, profile_slug_from_url
+from linkedin_mcp.tools.connections.list.models.connection_summary import ConnectionSummary
+from linkedin_mcp.tools.connections.list.models.connections_list_coverage import (
+    ConnectionsListCoverage,
+)
+from linkedin_mcp.tools.connections.list.models.connections_list_input import ConnectionsListInput
+from linkedin_mcp.tools.connections.list.models.connections_sort_by import ConnectionsSortBy
 
 _CONNECTIONS_URL = "https://www.linkedin.com/mynetwork/invite-connect/connections/"
 

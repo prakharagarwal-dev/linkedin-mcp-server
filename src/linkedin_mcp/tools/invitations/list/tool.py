@@ -14,12 +14,10 @@ from linkedin_mcp.tools._shared.tool import (
     PageSizeArgument,
     tool_result,
 )
-from linkedin_mcp.tools.invitations.list.models import (
-    InvitationDirection,
-    InvitationFilter,
-    InvitationListInput,
-    InvitationListOutput,
-)
+from linkedin_mcp.tools.invitations.list.models.invitation_direction import InvitationDirection
+from linkedin_mcp.tools.invitations.list.models.invitation_filter import InvitationFilter
+from linkedin_mcp.tools.invitations.list.models.invitation_list_input import InvitationListInput
+from linkedin_mcp.tools.invitations.list.models.invitation_list_output import InvitationListOutput
 
 
 def register(

@@ -15,9 +15,13 @@ from linkedin_mcp.tools._shared.tool import (
     PageSizeArgument,
     tool_result,
 )
-from linkedin_mcp.tools.connections.search.models import (
+from linkedin_mcp.tools.connections.search.models.connections_search_filters import (
     ConnectionsSearchFilters,
+)
+from linkedin_mcp.tools.connections.search.models.connections_search_input import (
     ConnectionsSearchInput,
+)
+from linkedin_mcp.tools.connections.search.models.connections_search_output import (
     ConnectionsSearchOutput,
 )
 

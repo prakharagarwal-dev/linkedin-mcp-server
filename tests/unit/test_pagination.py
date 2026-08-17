@@ -7,11 +7,9 @@ import pytest
 from linkedin_mcp.app.pagination import PaginationManager, select_page
 from linkedin_mcp.errors import InvalidCursorError
 from linkedin_mcp.tools._shared.models import CapabilityName
-from linkedin_mcp.tools.connections.list.models import ConnectionsListInput
-from linkedin_mcp.tools.invitations.list.models import (
-    InvitationFilter,
-    InvitationListInput,
-)
+from linkedin_mcp.tools.connections.list.models.connections_list_input import ConnectionsListInput
+from linkedin_mcp.tools.invitations.list.models.invitation_filter import InvitationFilter
+from linkedin_mcp.tools.invitations.list.models.invitation_list_input import InvitationListInput
 from linkedin_mcp.tools.jobs.search.models.job_search_input import JobSearchInput
 
 

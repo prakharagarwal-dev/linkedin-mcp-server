@@ -2,7 +2,10 @@
 
 from linkedin_mcp.tools._shared.models import SourceReference, SourceType
 from linkedin_mcp.tools._shared.source import source_reference, verify_visible_items
-from linkedin_mcp.tools.connections.list.models import ConnectionsListCoverage, ConnectionSummary
+from linkedin_mcp.tools.connections.list.models.connection_summary import ConnectionSummary
+from linkedin_mcp.tools.connections.list.models.connections_list_coverage import (
+    ConnectionsListCoverage,
+)
 
 
 def source_from_connections(

@@ -17,19 +17,23 @@ from linkedin_mcp.errors import BrowserUnavailableError, ParserDriftError
 from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.tools._shared.collections import wait_for_collection_change
 from linkedin_mcp.tools._shared.models import StopReason
-from linkedin_mcp.tools._shared.network_models import (
-    CURRENT_RECEIVED_INVITATION_VIEWS,
+from linkedin_mcp.tools.invitations.list.models.invitation_available_action import (
     InvitationAvailableAction,
-    InvitationDirection,
-    InvitationEntity,
-    InvitationEntityType,
-    InvitationEvidence,
-    InvitationFilter,
-    InvitationListCoverage,
-    InvitationListInput,
-    InvitationSummary,
-    InvitationType,
 )
+from linkedin_mcp.tools.invitations.list.models.invitation_direction import InvitationDirection
+from linkedin_mcp.tools.invitations.list.models.invitation_entity import InvitationEntity
+from linkedin_mcp.tools.invitations.list.models.invitation_entity_type import InvitationEntityType
+from linkedin_mcp.tools.invitations.list.models.invitation_evidence import InvitationEvidence
+from linkedin_mcp.tools.invitations.list.models.invitation_filter import (
+    CURRENT_RECEIVED_INVITATION_VIEWS,
+    InvitationFilter,
+)
+from linkedin_mcp.tools.invitations.list.models.invitation_list_coverage import (
+    InvitationListCoverage,
+)
+from linkedin_mcp.tools.invitations.list.models.invitation_list_input import InvitationListInput
+from linkedin_mcp.tools.invitations.list.models.invitation_summary import InvitationSummary
+from linkedin_mcp.tools.invitations.list.models.invitation_type import InvitationType
 
 InvitationProgressReporter = Callable[[int, int, str], Awaitable[None]]
 

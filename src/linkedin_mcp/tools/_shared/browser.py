@@ -37,8 +37,10 @@ from linkedin_mcp.errors import (
 from linkedin_mcp.tools._shared.authentication import AuthenticationCoordinator
 from linkedin_mcp.tools._shared.pacing import NavigationPacer
 from linkedin_mcp.tools._shared.safety import assert_safe_linkedin_page
-from linkedin_mcp.tools._shared.status import SessionAuthenticationState
 from linkedin_mcp.tools._shared.urls import validate_linkedin_url
+from linkedin_mcp.tools.session.status.models.session_authentication_state import (
+    SessionAuthenticationState,
+)
 
 logger = structlog.get_logger(__name__)
 

@@ -12,10 +12,10 @@ from linkedin_mcp.tools._shared.actions import (
     ActionPageResult,
     InvitationAcceptPayload,
 )
-from linkedin_mcp.tools._shared.network_models import (
+from linkedin_mcp.tools._shared.urls import canonical_profile_url
+from linkedin_mcp.tools.invitations.accept.models.invitation_accept_input import (
     InvitationAcceptInput,
 )
-from linkedin_mcp.tools._shared.urls import canonical_profile_url
 from linkedin_mcp.tools.invitations.action_surface import InvitationActionSurface
 
 

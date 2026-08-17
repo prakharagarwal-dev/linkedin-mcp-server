@@ -14,7 +14,7 @@ from linkedin_mcp.tools._shared.actions import (
 )
 from linkedin_mcp.tools._shared.execution import OperationSupport
 from linkedin_mcp.tools._shared.models import CapabilityName
-from linkedin_mcp.tools.invitations.send.models import InvitationSendInput
+from linkedin_mcp.tools.invitations.send.models.invitation_send_input import InvitationSendInput
 
 
 class InvitationSendProvider(Protocol):

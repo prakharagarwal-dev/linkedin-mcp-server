@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import email
 import json
 import re
@@ -117,30 +118,22 @@ def test_source_layout_keeps_infrastructure_and_linkedin_features_separate() -> 
         "linkedin.messaging.send": "messaging/send",
     }
     status_tools = {"linkedin.server.status", "linkedin.session.status"}
-    split_model_domains = {"companies", "jobs", "messaging", "people", "posts"}
     for tool_name, relative_path in capability_paths.items():
         capability = tools / relative_path
         required_files = {"__init__.py", "tool.py"}
         if tool_name not in status_tools:
             required_files.update({"evidence.py", "operation.py", "page.py"})
         assert required_files <= {path.name for path in capability.glob("*.py")}
-        domain = relative_path.split("/", maxsplit=1)[0]
-        if domain in split_model_domains:
-            model_package = capability / "models"
-            assert (model_package / "__init__.py").is_file()
-            assert not (capability / "models.py").exists()
-            assert any(path.name != "__init__.py" for path in model_package.glob("*.py"))
-        else:
-            assert (capability / "models.py").is_file()
+        model_package = capability / "models"
+        assert (model_package / "__init__.py").is_file()
+        assert not (capability / "models.py").exists()
+        assert any(path.name != "__init__.py" for path in model_package.glob("*.py"))
         assert f'name="{tool_name}"' in (capability / "tool.py").read_text(encoding="utf-8")
         if tool_name not in status_tools:
             page_source = (capability / "page.py").read_text(encoding="utf-8")
             assert "class " in page_source
             assert "Capability-owned exports from" not in page_source
             assert "._shared.pages" not in page_source
-
-    for domain in split_model_domains:
-        assert not (tools / domain / "_shared" / "models.py").exists()
 
     server_source = (package / "mcp" / "server.py").read_text(encoding="utf-8")
     assert "attach_tools(mcp, container)" in server_source
@@ -161,8 +154,21 @@ def test_source_layout_keeps_infrastructure_and_linkedin_features_separate() -> 
     production_sources = "\n".join(
         path.read_text(encoding="utf-8") for path in package.rglob("*.py")
     )
+    assert not (tools / "_shared" / "network_models.py").exists()
+    assert not (tools / "_shared" / "status.py").exists()
     assert "linkedin_mcp.tools._shared.model_exports" not in production_sources
     assert "linkedin_mcp.tools._shared.network_operations" not in production_sources
+    for source_path in package.rglob("*.py"):
+        tree = ast.parse(source_path.read_text(encoding="utf-8"))
+        aggregate_model_imports = [
+            node.module
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom)
+            and node.module is not None
+            and node.module.endswith(".models")
+            and node.module != "linkedin_mcp.tools._shared.models"
+        ]
+        assert aggregate_model_imports == [], source_path
 
     browser = package / "browser"
     assert {path.name for path in browser.glob("*.py")} == {

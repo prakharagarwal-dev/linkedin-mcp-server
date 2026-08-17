@@ -14,7 +14,9 @@ from linkedin_mcp.tools._shared.actions import (
 )
 from linkedin_mcp.tools._shared.execution import OperationSupport
 from linkedin_mcp.tools._shared.models import CapabilityName
-from linkedin_mcp.tools.invitations.ignore.models import InvitationIgnoreInput
+from linkedin_mcp.tools.invitations.ignore.models.invitation_ignore_input import (
+    InvitationIgnoreInput,
+)
 
 
 class InvitationIgnoreProvider(Protocol):

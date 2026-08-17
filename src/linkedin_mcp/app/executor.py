@@ -16,7 +16,10 @@ from linkedin_mcp.tools.connections.list.operation import (
     ConnectionsListProvider,
     ListConnectionsOperation,
 )
-from linkedin_mcp.tools.connections.search.operation import SearchConnectionsOperation
+from linkedin_mcp.tools.connections.search.operation import (
+    ConnectionsSearchProvider,
+    SearchConnectionsOperation,
+)
 from linkedin_mcp.tools.invitations.accept.operation import (
     AcceptInvitationOperation,
     InvitationAcceptProvider,
@@ -90,7 +93,7 @@ class CapabilityExecutor(
         job_search: JobSearchProvider,
         job_detail: JobDetailProvider,
         people_search: PeopleSearchProvider,
-        connections_search: PeopleSearchProvider,
+        connections_search: ConnectionsSearchProvider,
         person_profile: PersonProfileProvider,
         company_search: CompanySearchProvider,
         company_profile: CompanyProfileProvider,
@@ -147,6 +150,7 @@ __all__ = [
     "CompanyProfileProvider",
     "CompanySearchProvider",
     "ConnectionsListProvider",
+    "ConnectionsSearchProvider",
     "ConversationReadProvider",
     "ConversationSearchProvider",
     "InvitationAcceptProvider",

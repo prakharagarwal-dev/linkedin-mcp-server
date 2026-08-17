@@ -27,16 +27,18 @@ from linkedin_mcp.tools._shared.actions import (
 )
 from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.tools._shared.models import StopReason
-from linkedin_mcp.tools.connections.list.models import (
-    ConnectionsListInput,
-    ConnectionsSortBy,
-)
+from linkedin_mcp.tools.connections.list.models.connections_list_input import ConnectionsListInput
+from linkedin_mcp.tools.connections.list.models.connections_sort_by import ConnectionsSortBy
 from linkedin_mcp.tools.connections.list.page import ConnectionsListPage
-from linkedin_mcp.tools.invitations.accept.models import InvitationAcceptInput
+from linkedin_mcp.tools.invitations.accept.models.invitation_accept_input import (
+    InvitationAcceptInput,
+)
 from linkedin_mcp.tools.invitations.accept.page import AcceptInvitationPage
-from linkedin_mcp.tools.invitations.ignore.models import InvitationIgnoreInput
+from linkedin_mcp.tools.invitations.ignore.models.invitation_ignore_input import (
+    InvitationIgnoreInput,
+)
 from linkedin_mcp.tools.invitations.ignore.page import IgnoreInvitationPage
-from linkedin_mcp.tools.invitations.send.models import InvitationSendInput
+from linkedin_mcp.tools.invitations.send.models.invitation_send_input import InvitationSendInput
 from linkedin_mcp.tools.invitations.send.page import SendInvitationPage
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"

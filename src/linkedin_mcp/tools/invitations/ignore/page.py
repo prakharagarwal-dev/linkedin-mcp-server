@@ -12,11 +12,11 @@ from linkedin_mcp.tools._shared.actions import (
     ActionPageResult,
     InvitationIgnorePayload,
 )
-from linkedin_mcp.tools._shared.network_models import (
-    InvitationIgnoreInput,
-)
 from linkedin_mcp.tools._shared.urls import canonical_profile_url
 from linkedin_mcp.tools.invitations.action_surface import InvitationActionSurface
+from linkedin_mcp.tools.invitations.ignore.models.invitation_ignore_input import (
+    InvitationIgnoreInput,
+)
 
 
 def _received_invitation_ref(profile_slug: str) -> str:

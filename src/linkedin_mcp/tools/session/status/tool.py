@@ -6,9 +6,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
 from linkedin_mcp.app.container import AppContainer
-from linkedin_mcp.tools.session.status.models import (
-    SessionStatusOutput,
-)
+from linkedin_mcp.tools.session.status.models.session_status_output import SessionStatusOutput
 
 
 def register(

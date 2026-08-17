@@ -22,15 +22,23 @@ from linkedin_mcp.tools.companies.get.models.company_get_input import CompanyGet
 from linkedin_mcp.tools.companies.get.models.company_get_output import CompanyGetOutput
 from linkedin_mcp.tools.companies.search.models.company_search_input import CompanySearchInput
 from linkedin_mcp.tools.companies.search.models.company_search_output import CompanySearchOutput
-from linkedin_mcp.tools.connections.list.models import ConnectionsListInput, ConnectionsListOutput
-from linkedin_mcp.tools.connections.search.models import (
+from linkedin_mcp.tools.connections.list.models.connections_list_input import ConnectionsListInput
+from linkedin_mcp.tools.connections.list.models.connections_list_output import ConnectionsListOutput
+from linkedin_mcp.tools.connections.search.models.connections_search_input import (
     ConnectionsSearchInput,
+)
+from linkedin_mcp.tools.connections.search.models.connections_search_output import (
     ConnectionsSearchOutput,
 )
-from linkedin_mcp.tools.invitations.accept.models import InvitationAcceptInput
-from linkedin_mcp.tools.invitations.ignore.models import InvitationIgnoreInput
-from linkedin_mcp.tools.invitations.list.models import InvitationListInput, InvitationListOutput
-from linkedin_mcp.tools.invitations.send.models import InvitationSendInput
+from linkedin_mcp.tools.invitations.accept.models.invitation_accept_input import (
+    InvitationAcceptInput,
+)
+from linkedin_mcp.tools.invitations.ignore.models.invitation_ignore_input import (
+    InvitationIgnoreInput,
+)
+from linkedin_mcp.tools.invitations.list.models.invitation_list_input import InvitationListInput
+from linkedin_mcp.tools.invitations.list.models.invitation_list_output import InvitationListOutput
+from linkedin_mcp.tools.invitations.send.models.invitation_send_input import InvitationSendInput
 from linkedin_mcp.tools.jobs.get.models.job_detail_input import JobDetailInput
 from linkedin_mcp.tools.jobs.get.models.job_detail_output import JobDetailOutput
 from linkedin_mcp.tools.jobs.search.models.job_search_input import JobSearchInput

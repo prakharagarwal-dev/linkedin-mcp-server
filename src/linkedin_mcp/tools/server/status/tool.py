@@ -7,9 +7,7 @@ from mcp.types import ToolAnnotations
 
 from linkedin_mcp import __version__
 from linkedin_mcp.app.container import AppContainer
-from linkedin_mcp.tools.server.status.models import (
-    ServerStatusOutput,
-)
+from linkedin_mcp.tools.server.status.models.server_status_output import ServerStatusOutput
 
 
 def register(

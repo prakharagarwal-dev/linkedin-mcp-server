@@ -14,12 +14,12 @@ from linkedin_mcp.tools._shared.models import (
     StopReason,
 )
 from linkedin_mcp.tools.connections.list.evidence import source_from_connections
-from linkedin_mcp.tools.connections.list.models import (
+from linkedin_mcp.tools.connections.list.models.connection_summary import ConnectionSummary
+from linkedin_mcp.tools.connections.list.models.connections_list_coverage import (
     ConnectionsListCoverage,
-    ConnectionsListInput,
-    ConnectionsListOutput,
-    ConnectionSummary,
 )
+from linkedin_mcp.tools.connections.list.models.connections_list_input import ConnectionsListInput
+from linkedin_mcp.tools.connections.list.models.connections_list_output import ConnectionsListOutput
 
 
 class ConnectionsListProvider(Protocol):

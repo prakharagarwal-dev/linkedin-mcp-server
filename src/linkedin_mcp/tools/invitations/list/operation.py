@@ -18,12 +18,12 @@ from linkedin_mcp.tools._shared.models import (
     StopReason,
 )
 from linkedin_mcp.tools.invitations.list.evidence import source_from_invitation_list
-from linkedin_mcp.tools.invitations.list.models import (
+from linkedin_mcp.tools.invitations.list.models.invitation_list_coverage import (
     InvitationListCoverage,
-    InvitationListInput,
-    InvitationListOutput,
-    InvitationSummary,
 )
+from linkedin_mcp.tools.invitations.list.models.invitation_list_input import InvitationListInput
+from linkedin_mcp.tools.invitations.list.models.invitation_list_output import InvitationListOutput
+from linkedin_mcp.tools.invitations.list.models.invitation_summary import InvitationSummary
 
 ProgressReporter = Callable[[int, int, str], Awaitable[None]]
 

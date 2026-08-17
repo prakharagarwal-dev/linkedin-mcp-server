@@ -14,16 +14,18 @@ from pydantic import ValidationError
 from linkedin_mcp.errors import ParserDriftError
 from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.tools._shared.models import StopReason
-from linkedin_mcp.tools.connections.search.models import (
+from linkedin_mcp.tools.connections.search.models.connections_search_filters import (
     ConnectionsSearchFilters,
+)
+from linkedin_mcp.tools.connections.search.models.connections_search_input import (
     ConnectionsSearchInput,
-    PersonConnectionDegree,
 )
 from linkedin_mcp.tools.people.get.models.people_get_input import PeopleGetInput
 from linkedin_mcp.tools.people.get.models.person_profile_section_selector import (
     PersonProfileSectionSelector,
 )
 from linkedin_mcp.tools.people.get.page import PersonProfilePage
+from linkedin_mcp.tools.people.models.person_connection_degree import PersonConnectionDegree
 from linkedin_mcp.tools.people.search.models.people_search_connection_degree import (
     PeopleSearchConnectionDegree,
 )

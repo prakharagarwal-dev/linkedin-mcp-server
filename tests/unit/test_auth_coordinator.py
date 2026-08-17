@@ -6,7 +6,9 @@ import pytest
 
 from linkedin_mcp.errors import AuthenticationRequiredError, RestrictionDetectedError
 from linkedin_mcp.tools._shared.authentication import AuthenticationCoordinator
-from linkedin_mcp.tools._shared.status import SessionAuthenticationState
+from linkedin_mcp.tools.session.status.models.session_authentication_state import (
+    SessionAuthenticationState,
+)
 
 
 @pytest.mark.asyncio

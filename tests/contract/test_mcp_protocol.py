@@ -65,26 +65,34 @@ from linkedin_mcp.tools.companies.get.models.company_profile_page_capture import
 from linkedin_mcp.tools.companies.search.models.company_search_coverage import CompanySearchCoverage
 from linkedin_mcp.tools.companies.search.models.company_search_input import CompanySearchInput
 from linkedin_mcp.tools.companies.search.models.company_summary import CompanySummary
-from linkedin_mcp.tools.connections.list.models import (
+from linkedin_mcp.tools.connections.list.models.connection_summary import ConnectionSummary
+from linkedin_mcp.tools.connections.list.models.connections_list_coverage import (
     ConnectionsListCoverage,
-    ConnectionsListInput,
-    ConnectionSummary,
 )
-from linkedin_mcp.tools.connections.search.models import PersonConnectionDegree
-from linkedin_mcp.tools.invitations.accept.models import InvitationAcceptInput
-from linkedin_mcp.tools.invitations.ignore.models import InvitationIgnoreInput
-from linkedin_mcp.tools.invitations.list.models import (
+from linkedin_mcp.tools.connections.list.models.connections_list_input import ConnectionsListInput
+from linkedin_mcp.tools.connections.search.models.connections_search_input import (
+    ConnectionsSearchInput,
+)
+from linkedin_mcp.tools.invitations.accept.models.invitation_accept_input import (
+    InvitationAcceptInput,
+)
+from linkedin_mcp.tools.invitations.ignore.models.invitation_ignore_input import (
+    InvitationIgnoreInput,
+)
+from linkedin_mcp.tools.invitations.list.models.invitation_available_action import (
     InvitationAvailableAction,
-    InvitationDirection,
-    InvitationEntity,
-    InvitationEntityType,
-    InvitationFilter,
-    InvitationListCoverage,
-    InvitationListInput,
-    InvitationSummary,
-    InvitationType,
 )
-from linkedin_mcp.tools.invitations.send.models import InvitationSendInput
+from linkedin_mcp.tools.invitations.list.models.invitation_direction import InvitationDirection
+from linkedin_mcp.tools.invitations.list.models.invitation_entity import InvitationEntity
+from linkedin_mcp.tools.invitations.list.models.invitation_entity_type import InvitationEntityType
+from linkedin_mcp.tools.invitations.list.models.invitation_filter import InvitationFilter
+from linkedin_mcp.tools.invitations.list.models.invitation_list_coverage import (
+    InvitationListCoverage,
+)
+from linkedin_mcp.tools.invitations.list.models.invitation_list_input import InvitationListInput
+from linkedin_mcp.tools.invitations.list.models.invitation_summary import InvitationSummary
+from linkedin_mcp.tools.invitations.list.models.invitation_type import InvitationType
+from linkedin_mcp.tools.invitations.send.models.invitation_send_input import InvitationSendInput
 from linkedin_mcp.tools.jobs.get.models.job_detail_input import JobDetailInput
 from linkedin_mcp.tools.jobs.get.models.job_detail_observation import JobDetailObservation
 from linkedin_mcp.tools.jobs.search.models.job_search_coverage import JobSearchCoverage
@@ -117,6 +125,7 @@ from linkedin_mcp.tools.people.get.models.person_profile_observation import Pers
 from linkedin_mcp.tools.people.get.models.person_profile_page_capture import (
     PersonProfilePageCapture,
 )
+from linkedin_mcp.tools.people.models.person_connection_degree import PersonConnectionDegree
 from linkedin_mcp.tools.people.search.models.people_search_coverage import PeopleSearchCoverage
 from linkedin_mcp.tools.people.search.models.people_search_input import PeopleSearchInput
 from linkedin_mcp.tools.people.search.models.person_summary import PersonSummary
@@ -193,11 +202,13 @@ class ProtocolJobDetail:
 class ProtocolPeopleSearch:
     async def collect(
         self,
-        request: PeopleSearchInput,
+        request: PeopleSearchInput | ConnectionsSearchInput,
         *,
         result_limit: int | None = None,
     ) -> tuple[tuple[PersonSummary, ...], PeopleSearchCoverage, str, str]:
         del result_limit
+        if isinstance(request, ConnectionsSearchInput):
+            request = request.as_people_search_input()
         person = PersonSummary(
             profile_slug="jane-doe",
             profile_url=HttpUrl("https://www.linkedin.com/in/jane-doe/"),
