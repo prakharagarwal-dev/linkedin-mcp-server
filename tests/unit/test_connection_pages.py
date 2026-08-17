@@ -27,14 +27,17 @@ from linkedin_mcp.tools._shared.actions import (
 )
 from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.tools._shared.models import StopReason
-from linkedin_mcp.tools.connections._shared.pages import ConnectionsListPage, InvitationActionPage
 from linkedin_mcp.tools.connections.list.models import (
     ConnectionsListInput,
     ConnectionsSortBy,
 )
+from linkedin_mcp.tools.connections.list.page import ConnectionsListPage
 from linkedin_mcp.tools.invitations.accept.models import InvitationAcceptInput
+from linkedin_mcp.tools.invitations.accept.page import AcceptInvitationPage
 from linkedin_mcp.tools.invitations.ignore.models import InvitationIgnoreInput
+from linkedin_mcp.tools.invitations.ignore.page import IgnoreInvitationPage
 from linkedin_mcp.tools.invitations.send.models import InvitationSendInput
+from linkedin_mcp.tools.invitations.send.page import SendInvitationPage
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 ACTION_FIXTURES = FIXTURES / "invitations" / "actions" / "latest"
@@ -384,7 +387,7 @@ async def test_invite_inspection_reads_current_dialog_without_sending(
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
-        adapter = InvitationActionPage(
+        adapter = SendInvitationPage(
             cast(
                 BrowserManager,
                 ConnectionFixtureBrowser(page, {"/in/jane-doe/": html}),
@@ -438,7 +441,7 @@ async def test_invite_inspection_selects_current_identity_bound_button_among_rec
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
-        adapter = InvitationActionPage(
+        adapter = SendInvitationPage(
             cast(
                 BrowserManager,
                 ConnectionFixtureBrowser(page, {"/in/jane-doe/": html}),
@@ -477,7 +480,7 @@ async def test_invite_inspection_waits_for_current_profile_action_hydration() ->
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
-        adapter = InvitationActionPage(
+        adapter = SendInvitationPage(
             cast(
                 BrowserManager,
                 ConnectionFixtureBrowser(page, {"/in/jane-doe/": html}),
@@ -508,7 +511,7 @@ async def test_invite_action_uses_current_dialog_and_exact_pending_postcondition
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         fixture_browser = ConnectionFixtureBrowser(page, {"/in/jane-doe/": html})
-        adapter = InvitationActionPage(cast(BrowserManager, fixture_browser))
+        adapter = SendInvitationPage(cast(BrowserManager, fixture_browser))
         try:
             result = await adapter.perform_send(_invite_command(note))
         finally:
@@ -541,7 +544,7 @@ async def test_invite_fails_closed_for_current_dialog_drift_and_changed_target()
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         try:
-            wrong_adapter = InvitationActionPage(
+            wrong_adapter = SendInvitationPage(
                 cast(
                     BrowserManager,
                     ConnectionFixtureBrowser(page, {"/in/jane-doe/": wrong_link}),
@@ -556,7 +559,7 @@ async def test_invite_fails_closed_for_current_dialog_drift_and_changed_target()
                     )
                 )
 
-            counter_adapter = InvitationActionPage(
+            counter_adapter = SendInvitationPage(
                 cast(
                     BrowserManager,
                     ConnectionFixtureBrowser(page, {"/in/jane-doe/": no_counter}),
@@ -573,7 +576,7 @@ async def test_invite_fails_closed_for_current_dialog_drift_and_changed_target()
                 )
 
             with pytest.raises(ParserDriftError, match="did not visibly commit"):
-                await InvitationActionPage(
+                await SendInvitationPage(
                     cast(
                         BrowserManager,
                         ConnectionFixtureBrowser(page, {"/in/jane-doe/": stale_counter}),
@@ -588,7 +591,7 @@ async def test_invite_fails_closed_for_current_dialog_drift_and_changed_target()
                 )
 
             with pytest.raises(ParserDriftError, match="not actionable"):
-                await InvitationActionPage(
+                await SendInvitationPage(
                     cast(
                         BrowserManager,
                         ConnectionFixtureBrowser(page, {"/in/jane-doe/": disabled_send}),
@@ -601,7 +604,7 @@ async def test_invite_fails_closed_for_current_dialog_drift_and_changed_target()
                     )
                 )
 
-            changed = await InvitationActionPage(
+            changed = await SendInvitationPage(
                 cast(
                     BrowserManager,
                     ConnectionFixtureBrowser(
@@ -699,7 +702,7 @@ async def test_invite_inspection_covers_current_dialog_safety_failures(
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
-        adapter = InvitationActionPage(
+        adapter = SendInvitationPage(
             cast(
                 BrowserManager,
                 ConnectionFixtureBrowser(page, {"/in/jane-doe/": html}),
@@ -727,7 +730,7 @@ async def test_invite_click_interruption_is_uncertain_and_fresh_connect_is_faile
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         try:
-            interrupted = await InvitationActionPage(
+            interrupted = await SendInvitationPage(
                 cast(
                     BrowserManager,
                     FailingConnectionClickBrowser(
@@ -737,7 +740,7 @@ async def test_invite_click_interruption_is_uncertain_and_fresh_connect_is_faile
                     ),
                 )
             ).perform_send(_invite_command())
-            failed = await InvitationActionPage(
+            failed = await SendInvitationPage(
                 cast(
                     BrowserManager,
                     ConnectionFixtureBrowser(page, {"/in/jane-doe/": not_sent}),
@@ -764,13 +767,13 @@ async def test_invite_action_reports_missing_dialog_and_typed_click_uncertainty(
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         try:
-            no_dialog = await InvitationActionPage(
+            no_dialog = await SendInvitationPage(
                 cast(
                     BrowserManager,
                     ConnectionFixtureBrowser(page, {"/in/jane-doe/": missing_dialog}),
                 )
             ).perform_send(_invite_command())
-            interrupted = await InvitationActionPage(
+            interrupted = await SendInvitationPage(
                 cast(
                     BrowserManager,
                     FailingConnectionClickBrowser(
@@ -800,7 +803,7 @@ async def test_invite_final_click_authentication_failure_is_not_swallowed() -> N
         page = await browser.new_page()
         try:
             with pytest.raises(AuthenticationRequiredError):
-                await InvitationActionPage(
+                await SendInvitationPage(
                     cast(
                         BrowserManager,
                         FailingConnectionClickBrowser(
@@ -830,13 +833,13 @@ async def test_invite_action_rejects_disabled_send_and_uncommitted_note_before_c
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         try:
-            disabled_result = await InvitationActionPage(
+            disabled_result = await SendInvitationPage(
                 cast(
                     BrowserManager,
                     ConnectionFixtureBrowser(page, {"/in/jane-doe/": disabled}),
                 )
             ).perform_send(_invite_command())
-            stale_result = await InvitationActionPage(
+            stale_result = await SendInvitationPage(
                 cast(
                     BrowserManager,
                     ConnectionFixtureBrowser(page, {"/in/jane-doe/": stale_counter}),
@@ -929,7 +932,7 @@ async def test_invite_action_fails_before_dispatch_for_current_ui_safety_errors(
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         try:
-            result = await InvitationActionPage(
+            result = await SendInvitationPage(
                 cast(
                     BrowserManager,
                     ConnectionFixtureBrowser(page, {"/in/jane-doe/": html}),
@@ -968,7 +971,7 @@ async def test_invite_action_is_a_verified_noop_for_existing_terminal_state(
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         try:
-            result = await InvitationActionPage(
+            result = await SendInvitationPage(
                 cast(
                     BrowserManager,
                     ConnectionFixtureBrowser(page, {"/in/jane-doe/": html}),
@@ -1006,7 +1009,7 @@ async def test_invite_post_click_reload_failure_is_uncertain_with_retained_evide
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         try:
-            result = await InvitationActionPage(
+            result = await SendInvitationPage(
                 cast(
                     BrowserManager,
                     ReloadFailingConnectionBrowser(
@@ -1054,7 +1057,7 @@ async def test_invite_fresh_profile_ambiguous_state_is_uncertain(
         page = await browser.new_page()
         fixture_browser = SequencedConnectionFixtureBrowser(page, (initial, fresh))
         try:
-            result = await InvitationActionPage(cast(BrowserManager, fixture_browser)).perform_send(
+            result = await SendInvitationPage(cast(BrowserManager, fixture_browser)).perform_send(
                 _invite_command()
             )
         finally:
@@ -1075,7 +1078,7 @@ async def test_invite_post_click_authentication_failure_is_not_swallowed() -> No
         page = await browser.new_page()
         try:
             with pytest.raises(AuthenticationRequiredError):
-                await InvitationActionPage(
+                await SendInvitationPage(
                     cast(
                         BrowserManager,
                         ReloadFailingConnectionBrowser(
@@ -1095,21 +1098,19 @@ async def test_accept_and_ignore_inspect_exact_current_profile_controls() -> Non
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
-        adapter = InvitationActionPage(
-            cast(
-                BrowserManager,
-                ConnectionFixtureBrowser(page, {"/in/jane-doe/": html}),
-            )
+        fixture_browser = cast(
+            BrowserManager,
+            ConnectionFixtureBrowser(page, {"/in/jane-doe/": html}),
         )
         try:
-            accepted = await adapter.inspect_accept(
+            accepted = await AcceptInvitationPage(fixture_browser).inspect_accept(
                 InvitationAcceptInput(
                     context_id="connections-context",
                     request_id="action-accept",
                     profile_slug="jane-doe",
                 )
             )
-            ignored = await adapter.inspect_ignore(
+            ignored = await IgnoreInvitationPage(fixture_browser).inspect_ignore(
                 InvitationIgnoreInput(
                     context_id="connections-context",
                     request_id="action-ignore",
@@ -1133,7 +1134,7 @@ async def test_accept_action_verifies_exact_profile_terminal_state_after_reload(
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
-        adapter = InvitationActionPage(
+        adapter = AcceptInvitationPage(
             cast(
                 BrowserManager,
                 ConnectionFixtureBrowser(page, {"/in/jane-doe/": html}),
@@ -1156,7 +1157,7 @@ async def test_ignore_action_verifies_request_removed_without_connection_after_r
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
-        adapter = InvitationActionPage(
+        adapter = IgnoreInvitationPage(
             cast(
                 BrowserManager,
                 ConnectionFixtureBrowser(page, {"/in/jane-doe/": html}),
@@ -1189,7 +1190,7 @@ async def test_incoming_actions_fail_closed_for_missing_pair_identity_and_click_
         page = await browser.new_page()
         try:
             with pytest.raises(ParserDriftError, match="incomplete"):
-                await InvitationActionPage(
+                await AcceptInvitationPage(
                     cast(
                         BrowserManager,
                         ConnectionFixtureBrowser(page, {"/in/jane-doe/": missing_pair}),
@@ -1202,13 +1203,13 @@ async def test_incoming_actions_fail_closed_for_missing_pair_identity_and_click_
                     )
                 )
 
-            changed = await InvitationActionPage(
+            changed = await AcceptInvitationPage(
                 cast(
                     BrowserManager,
                     ConnectionFixtureBrowser(page, {"/in/jane-doe/": changed_identity}),
                 )
             ).perform_accept(_accept_command())
-            interrupted_accept = await InvitationActionPage(
+            interrupted_accept = await AcceptInvitationPage(
                 cast(
                     BrowserManager,
                     FailingConnectionClickBrowser(
@@ -1218,7 +1219,7 @@ async def test_incoming_actions_fail_closed_for_missing_pair_identity_and_click_
                     ),
                 )
             ).perform_accept(_accept_command())
-            interrupted_ignore = await InvitationActionPage(
+            interrupted_ignore = await IgnoreInvitationPage(
                 cast(
                     BrowserManager,
                     FailingConnectionClickBrowser(
@@ -1254,7 +1255,7 @@ async def test_incoming_actions_require_their_distinct_fresh_profile_postconditi
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         try:
-            accepted = await InvitationActionPage(
+            accepted = await AcceptInvitationPage(
                 cast(
                     BrowserManager,
                     ConnectionFixtureBrowser(
@@ -1264,7 +1265,7 @@ async def test_incoming_actions_require_their_distinct_fresh_profile_postconditi
                 )
             ).perform_accept(_accept_command())
             await page.evaluate("sessionStorage.clear()")
-            ignored = await InvitationActionPage(
+            ignored = await IgnoreInvitationPage(
                 cast(
                     BrowserManager,
                     ConnectionFixtureBrowser(
@@ -1284,15 +1285,18 @@ async def test_incoming_actions_require_their_distinct_fresh_profile_postconditi
 
 @pytest.mark.asyncio
 async def test_connection_action_payload_types_and_references_are_enforced() -> None:
-    adapter = InvitationActionPage(cast(BrowserManager, object()))
+    browser = cast(BrowserManager, object())
+    send = SendInvitationPage(browser)
+    accept = AcceptInvitationPage(browser)
+    ignore = IgnoreInvitationPage(browser)
 
     with pytest.raises(InvalidTargetError, match="invitation action payload"):
-        await adapter.perform_send(_accept_command())
+        await send.perform_send(_accept_command())
     with pytest.raises(InvalidTargetError, match="acceptance action payload"):
-        await adapter.perform_accept(_invite_command())
+        await accept.perform_accept(_invite_command())
     with pytest.raises(InvalidTargetError, match="ignore action payload"):
-        await adapter.perform_ignore(_accept_command())
+        await ignore.perform_ignore(_accept_command())
     with pytest.raises(InvalidTargetError, match="acceptance payload does not match"):
-        await adapter.perform_accept(_accept_command("invitation:" + "f" * 24))
+        await accept.perform_accept(_accept_command("invitation:" + "f" * 24))
     with pytest.raises(InvalidTargetError, match="ignore payload does not match"):
-        await adapter.perform_ignore(_ignore_command("invitation:" + "f" * 24))
+        await ignore.perform_ignore(_ignore_command("invitation:" + "f" * 24))

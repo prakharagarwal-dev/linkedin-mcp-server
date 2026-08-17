@@ -20,12 +20,16 @@ from linkedin_mcp.app.container import AppContainer
 from linkedin_mcp.app.executor import (
     CapabilityExecutor,
     ConnectionsListProvider,
-    ConversationProvider,
+    ConversationReadProvider,
     ConversationSearchProvider,
-    InvitationActionProvider,
+    InvitationAcceptProvider,
+    InvitationIgnoreProvider,
     InvitationListProvider,
-    PostEngagementProvider,
+    InvitationSendProvider,
+    MessageSendProvider,
+    PostCommentProvider,
     PostPublishingProvider,
+    PostReactionProvider,
 )
 from linkedin_mcp.config import Settings
 from linkedin_mcp.mcp.server import create_mcp_server
@@ -683,6 +687,7 @@ def protocol_container(root: Path) -> AppContainer:
     )
     browser = BrowserManager(settings)
     network = ProtocolNetwork()
+    people_search = ProtocolPeopleSearch()
     pagination = PaginationManager(
         ttl_seconds=settings.pagination_cursor_ttl_seconds,
         max_active_cursors=settings.pagination_max_active_cursors,
@@ -692,7 +697,8 @@ def protocol_container(root: Path) -> AppContainer:
         settings=settings,
         job_search=ProtocolJobSearch(),
         job_detail=ProtocolJobDetail(),
-        people_search=ProtocolPeopleSearch(),
+        people_search=people_search,
+        connections_search=people_search,
         person_profile=ProtocolPersonProfile(),
         company_search=ProtocolCompanySearch(),
         company_profile=ProtocolCompanyProfile(),
@@ -700,12 +706,16 @@ def protocol_container(root: Path) -> AppContainer:
         post_detail=ProtocolPostDetail(),
         post_comments=ProtocolPostComments(),
         post_publishing=cast(PostPublishingProvider, network),
-        post_engagement=cast(PostEngagementProvider, network),
+        post_comment=cast(PostCommentProvider, network),
+        post_reaction=cast(PostReactionProvider, network),
         invitation_list=cast(InvitationListProvider, network),
         connections_list=cast(ConnectionsListProvider, network),
-        invitation_actions=cast(InvitationActionProvider, network),
+        invitation_send=cast(InvitationSendProvider, network),
+        invitation_accept=cast(InvitationAcceptProvider, network),
+        invitation_ignore=cast(InvitationIgnoreProvider, network),
         conversation_search=cast(ConversationSearchProvider, network),
-        conversation=cast(ConversationProvider, network),
+        conversation_read=cast(ConversationReadProvider, network),
+        message_send=cast(MessageSendProvider, network),
         pagination=pagination,
     )
     worker = CapabilityWorker(

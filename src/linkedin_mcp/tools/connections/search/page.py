@@ -1,9 +1,24 @@
-"""Capability-owned exports from `linkedin_mcp.tools.people._shared.pages`."""
+"""Visible LinkedIn page implementation for `linkedin.connections.search`."""
 
-from linkedin_mcp.tools.people._shared.pages import (
-    PeopleSearchPage,
-)
+from __future__ import annotations
 
-__all__ = [
-    "PeopleSearchPage",
-]
+from linkedin_mcp.tools._shared.browser import BrowserManager
+from linkedin_mcp.tools.people.search.models.people_search_coverage import PeopleSearchCoverage
+from linkedin_mcp.tools.people.search.models.people_search_input import PeopleSearchInput
+from linkedin_mcp.tools.people.search.models.person_summary import PersonSummary
+from linkedin_mcp.tools.people.search.page import PeopleSearchPage
+
+
+class ConnectionsSearchPage:
+    """Run the first-degree-only connection search on LinkedIn's People surface."""
+
+    def __init__(self, browser: BrowserManager, *, max_pages: int) -> None:
+        self._people = PeopleSearchPage(browser, max_pages=max_pages)
+
+    async def collect(
+        self,
+        request: PeopleSearchInput,
+        *,
+        result_limit: int | None = None,
+    ) -> tuple[tuple[PersonSummary, ...], PeopleSearchCoverage, str, str]:
+        return await self._people.collect(request, result_limit=result_limit)

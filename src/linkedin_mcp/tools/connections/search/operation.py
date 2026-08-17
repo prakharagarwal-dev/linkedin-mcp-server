@@ -22,7 +22,7 @@ from linkedin_mcp.tools.people.search.operation import PeopleSearchProvider
 
 
 class SearchConnectionsOperation(OperationSupport):
-    _people_search: PeopleSearchProvider
+    _connections_search: PeopleSearchProvider
 
     async def search_connections(
         self,
@@ -32,7 +32,7 @@ class SearchConnectionsOperation(OperationSupport):
         try:
             lease = await self._pagination_lease(CapabilityName.CONNECTIONS_SEARCH, request)
             people_request = request.as_people_search_input()
-            people, coverage, captured_text, source_url = await self._people_search.collect(
+            people, coverage, captured_text, source_url = await self._connections_search.collect(
                 people_request,
                 result_limit=self._pagination.traversal_limit(lease, request.page_size),
             )

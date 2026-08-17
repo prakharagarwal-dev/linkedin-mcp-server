@@ -13,14 +13,18 @@ from linkedin_mcp.app.executor import (
     CompanyProfileProvider,
     CompanySearchProvider,
     ConnectionsListProvider,
-    ConversationProvider,
+    ConversationReadProvider,
     ConversationSearchProvider,
-    InvitationActionProvider,
+    InvitationAcceptProvider,
+    InvitationIgnoreProvider,
     InvitationListProvider,
+    InvitationSendProvider,
+    MessageSendProvider,
+    PostCommentProvider,
     PostCommentsProvider,
     PostDetailProvider,
-    PostEngagementProvider,
     PostPublishingProvider,
+    PostReactionProvider,
     PostSearchProvider,
 )
 from linkedin_mcp.config import Settings
@@ -50,11 +54,13 @@ def create_simulator_container(
     )
     browser = BrowserManager(settings)
     network = StatefulProtocolNetwork(state)
+    people_search = ProtocolPeopleSearch()
     executor = CapabilityExecutor(
         settings=settings,
         job_search=StatefulProtocolJobSearch(state),
         job_detail=ProtocolJobDetail(),
-        people_search=ProtocolPeopleSearch(),
+        people_search=people_search,
+        connections_search=people_search,
         person_profile=ProtocolPersonProfile(),
         company_search=cast(CompanySearchProvider, object()),
         company_profile=cast(CompanyProfileProvider, object()),
@@ -62,12 +68,16 @@ def create_simulator_container(
         post_detail=cast(PostDetailProvider, object()),
         post_comments=cast(PostCommentsProvider, object()),
         post_publishing=cast(PostPublishingProvider, network),
-        post_engagement=cast(PostEngagementProvider, network),
+        post_comment=cast(PostCommentProvider, network),
+        post_reaction=cast(PostReactionProvider, network),
         invitation_list=cast(InvitationListProvider, network),
         connections_list=cast(ConnectionsListProvider, network),
-        invitation_actions=cast(InvitationActionProvider, network),
+        invitation_send=cast(InvitationSendProvider, network),
+        invitation_accept=cast(InvitationAcceptProvider, network),
+        invitation_ignore=cast(InvitationIgnoreProvider, network),
         conversation_search=cast(ConversationSearchProvider, network),
-        conversation=cast(ConversationProvider, network),
+        conversation_read=cast(ConversationReadProvider, network),
+        message_send=cast(MessageSendProvider, network),
     )
     worker = CapabilityWorker(executor, queue_capacity=settings.queue_capacity)
     return AppContainer(

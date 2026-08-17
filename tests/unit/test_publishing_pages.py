@@ -29,7 +29,6 @@ from linkedin_mcp.tools._shared.actions import (
     PostMentionInput,
 )
 from linkedin_mcp.tools._shared.browser import BrowserManager
-from linkedin_mcp.tools.posts._shared.publishing import PostPublishingPage
 from linkedin_mcp.tools.posts.create.models.celebration_post_content import CelebrationPostContent
 from linkedin_mcp.tools.posts.create.models.celebration_type import CelebrationType
 from linkedin_mcp.tools.posts.create.models.document_post_content import DocumentPostContent
@@ -49,6 +48,7 @@ from linkedin_mcp.tools.posts.create.models.post_image_tag_input import PostImag
 from linkedin_mcp.tools.posts.create.models.text_post_content import TextPostContent
 from linkedin_mcp.tools.posts.create.models.video_caption_mode import VideoCaptionMode
 from linkedin_mcp.tools.posts.create.models.video_post_content import VideoPostContent
+from linkedin_mcp.tools.posts.create.page import PostPublishingPage
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 COMPOSER_HTML = (FIXTURES / "posts/latest/composer.html").read_text(encoding="utf-8")

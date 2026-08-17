@@ -14,16 +14,17 @@ from pydantic import ValidationError
 from linkedin_mcp.errors import ParserDriftError
 from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.tools._shared.models import StopReason
-from linkedin_mcp.tools.companies._shared.pages import CompanyProfilePage, CompanySearchPage
 from linkedin_mcp.tools.companies.get.evidence import sources_from_company_profile
 from linkedin_mcp.tools.companies.get.models.company_get_input import CompanyGetInput
 from linkedin_mcp.tools.companies.get.models.company_profile_evidence import CompanyProfileEvidence
 from linkedin_mcp.tools.companies.get.models.company_profile_observation import (
     CompanyProfileObservation,
 )
+from linkedin_mcp.tools.companies.get.page import CompanyProfilePage
 from linkedin_mcp.tools.companies.search.models.company_search_filters import CompanySearchFilters
 from linkedin_mcp.tools.companies.search.models.company_search_input import CompanySearchInput
 from linkedin_mcp.tools.companies.search.models.company_size import CompanySize
+from linkedin_mcp.tools.companies.search.page import CompanySearchPage
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 COMPANY_FIXTURES = FIXTURES / "companies" / "latest"

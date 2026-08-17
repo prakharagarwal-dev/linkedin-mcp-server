@@ -175,15 +175,18 @@ linkedin_mcp/
 Browser-backed company, job, messaging, people, and post leaves contain
 `tool.py`, `operation.py`, a `models/` package, `page.py`, and `evidence.py`.
 The tool module owns the FastMCP definition; the operation owns application
-flow; the page module exposes the typed Playwright adapter; and models and
-evidence define that capability's contract. Every tool-owned model, enum, or
-contract type has its own snake-case module under `models/`, and consumers
-import that exact module. A model used by multiple tools is defined once in the
-nearest domain `models/` package and imported by those leaves. Domain
-`_shared/` packages retain page/parser implementation only, while the global
-`tools/_shared/` package—including the network and status contracts—remains
-unchanged. There is no second registry, broad operations facade, or aggregate
-model implementation module.
+flow; the page module contains that tool's concrete typed Playwright adapter;
+and models and evidence define that capability's contract. Every tool-owned
+model, enum, or contract type has its own snake-case module under `models/`,
+and consumers import that exact module. A model used by multiple tools is
+defined once in the nearest domain `models/` package and imported by those
+leaves. Named domain modules such as `posts/surface.py` or
+`messaging/conversation_surface.py` contain only visible-UI mechanics that are
+genuinely shared by multiple concrete page adapters. Domain `_shared/`
+packages and forwarding-only page modules are not used. The global
+`tools/_shared/` package remains the home of cross-domain primitives. There is
+no second registry, broad operations facade, or aggregate model or page
+implementation module.
 
 For example, the full implementation boundary for `linkedin.jobs.search` is
 `tools/jobs/search/`. `mcp/server.py` only creates FastMCP and attaches leaf

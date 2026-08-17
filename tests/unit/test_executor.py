@@ -1236,11 +1236,16 @@ def _executor(
     conversation_search: FakeConversationSearch | None = None,
     conversation: FakeConversation | None = None,
 ) -> CapabilityExecutor:
+    selected_people_search = people_search or FakePeopleSearch()
+    selected_post_engagement = post_engagement or FakePostEngagement()
+    selected_invitation_actions = invitation_actions or FakeInvitationActions()
+    selected_conversation = conversation or FakeConversation()
     return CapabilityExecutor(
         settings=_settings(),
         job_search=search,
         job_detail=detail,
-        people_search=people_search or FakePeopleSearch(),
+        people_search=selected_people_search,
+        connections_search=selected_people_search,
         person_profile=person_profile or FakePersonProfile(),
         company_search=company_search or FakeCompanySearch(),
         company_profile=company_profile or FakeCompanyProfile(),
@@ -1248,12 +1253,16 @@ def _executor(
         post_detail=post_detail or FakePostDetail(),
         post_comments=post_comments or FakePostComments(),
         post_publishing=post_publishing or FakePostPublishing(),
-        post_engagement=post_engagement or FakePostEngagement(),
+        post_comment=selected_post_engagement,
+        post_reaction=selected_post_engagement,
         invitation_list=invitation_list or FakeInvitationList(),
         connections_list=connections_list or FakeConnectionsList(),
-        invitation_actions=invitation_actions or FakeInvitationActions(),
+        invitation_send=selected_invitation_actions,
+        invitation_accept=selected_invitation_actions,
+        invitation_ignore=selected_invitation_actions,
         conversation_search=conversation_search or FakeConversationSearch(),
-        conversation=conversation or FakeConversation(),
+        conversation_read=selected_conversation,
+        message_send=selected_conversation,
     )
 
 

@@ -15,18 +15,23 @@ from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.tools.companies.get.page import CompanyProfilePage
 from linkedin_mcp.tools.companies.search.page import CompanySearchPage
 from linkedin_mcp.tools.connections.list.page import ConnectionsListPage
+from linkedin_mcp.tools.connections.search.page import ConnectionsSearchPage
+from linkedin_mcp.tools.invitations.accept.page import AcceptInvitationPage
+from linkedin_mcp.tools.invitations.ignore.page import IgnoreInvitationPage
 from linkedin_mcp.tools.invitations.list.page import InvitationListPage
-from linkedin_mcp.tools.invitations.send.page import InvitationActionPage
+from linkedin_mcp.tools.invitations.send.page import SendInvitationPage
 from linkedin_mcp.tools.jobs.get.page import JobDetailPage
 from linkedin_mcp.tools.jobs.search.page import JobSearchPage
-from linkedin_mcp.tools.messaging.conversation.get.page import ConversationPage
+from linkedin_mcp.tools.messaging.conversation.get.page import ConversationGetPage
 from linkedin_mcp.tools.messaging.search.page import ConversationSearchPage
+from linkedin_mcp.tools.messaging.send.page import MessageSendPage
 from linkedin_mcp.tools.people.get.page import PersonProfilePage
 from linkedin_mcp.tools.people.search.page import PeopleSearchPage
-from linkedin_mcp.tools.posts.comment.page import PostEngagementPage
+from linkedin_mcp.tools.posts.comment.page import PostCommentPage
 from linkedin_mcp.tools.posts.comments.list.page import PostCommentsPage
 from linkedin_mcp.tools.posts.create.page import PostPublishingPage
 from linkedin_mcp.tools.posts.get.page import PostDetailPage
+from linkedin_mcp.tools.posts.react.page import PostReactionPage
 from linkedin_mcp.tools.posts.search.page import PostSearchPage
 
 
@@ -107,6 +112,10 @@ def create_production_container(settings: Settings) -> AppContainer:
             browser,
             max_pages=settings.people_search_max_pages_per_call,
         ),
+        connections_search=ConnectionsSearchPage(
+            browser,
+            max_pages=settings.people_search_max_pages_per_call,
+        ),
         person_profile=PersonProfilePage(
             browser,
             max_detail_pages=settings.profile_max_detail_pages_per_call,
@@ -129,15 +138,26 @@ def create_production_container(settings: Settings) -> AppContainer:
             browser,
             asset_store,
         ),
-        post_engagement=PostEngagementPage(
+        post_comment=PostCommentPage(
+            browser,
+            asset_store,
+        ),
+        post_reaction=PostReactionPage(
             browser,
             asset_store,
         ),
         invitation_list=invitation_list,
         connections_list=connections_list,
-        invitation_actions=InvitationActionPage(browser),
+        invitation_send=SendInvitationPage(browser),
+        invitation_accept=AcceptInvitationPage(browser),
+        invitation_ignore=IgnoreInvitationPage(browser),
         conversation_search=conversation_search,
-        conversation=ConversationPage(
+        conversation_read=ConversationGetPage(
+            browser,
+            conversation_search=conversation_search,
+            max_history_rounds=settings.messaging_max_scroll_rounds_per_call,
+        ),
+        message_send=MessageSendPage(
             browser,
             asset_store,
             conversation_search=conversation_search,

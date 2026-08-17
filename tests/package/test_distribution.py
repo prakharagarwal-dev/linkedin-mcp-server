@@ -133,6 +133,11 @@ def test_source_layout_keeps_infrastructure_and_linkedin_features_separate() -> 
         else:
             assert (capability / "models.py").is_file()
         assert f'name="{tool_name}"' in (capability / "tool.py").read_text(encoding="utf-8")
+        if tool_name not in status_tools:
+            page_source = (capability / "page.py").read_text(encoding="utf-8")
+            assert "class " in page_source
+            assert "Capability-owned exports from" not in page_source
+            assert "._shared.pages" not in page_source
 
     for domain in split_model_domains:
         assert not (tools / domain / "_shared" / "models.py").exists()
@@ -141,16 +146,18 @@ def test_source_layout_keeps_infrastructure_and_linkedin_features_separate() -> 
     assert "attach_tools(mcp, container)" in server_source
     assert "@mcp.tool" not in server_source
 
-    for domain in (
-        "jobs",
-        "people",
-        "companies",
-        "posts",
-        "invitations",
-        "connections",
-        "messaging",
-    ):
-        assert {path.name for path in (tools / domain).glob("*.py")} == {"__init__.py"}
+    domain_modules = {
+        "jobs": {"__init__.py", "surface.py"},
+        "people": {"__init__.py", "surface.py"},
+        "companies": {"__init__.py", "surface.py"},
+        "posts": {"__init__.py", "engagement_surface.py", "surface.py"},
+        "invitations": {"__init__.py", "action_surface.py"},
+        "connections": {"__init__.py"},
+        "messaging": {"__init__.py", "conversation_surface.py"},
+    }
+    for domain, expected_modules in domain_modules.items():
+        assert {path.name for path in (tools / domain).glob("*.py")} == expected_modules
+        assert not (tools / domain / "_shared").exists()
     production_sources = "\n".join(
         path.read_text(encoding="utf-8") for path in package.rglob("*.py")
     )

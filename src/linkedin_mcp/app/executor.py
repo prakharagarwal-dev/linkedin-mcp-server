@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Protocol
-
 from linkedin_mcp.app.pagination import PaginationManager
 from linkedin_mcp.config import Settings
 from linkedin_mcp.tools.companies.get.operation import (
@@ -60,23 +58,6 @@ from linkedin_mcp.tools.posts.react.operation import PostReactionProvider, React
 from linkedin_mcp.tools.posts.search.operation import PostSearchProvider, SearchPostsOperation
 
 
-class PostEngagementProvider(PostCommentProvider, PostReactionProvider, Protocol):
-    """Provide the two independent post-engagement actions."""
-
-
-class InvitationActionProvider(
-    InvitationSendProvider,
-    InvitationAcceptProvider,
-    InvitationIgnoreProvider,
-    Protocol,
-):
-    """Provide the three independent invitation actions."""
-
-
-class ConversationProvider(ConversationReadProvider, MessageSendProvider, Protocol):
-    """Provide conversation reads and message sends."""
-
-
 class CapabilityExecutor(
     SearchJobsOperation,
     GetJobOperation,
@@ -109,6 +90,7 @@ class CapabilityExecutor(
         job_search: JobSearchProvider,
         job_detail: JobDetailProvider,
         people_search: PeopleSearchProvider,
+        connections_search: PeopleSearchProvider,
         person_profile: PersonProfileProvider,
         company_search: CompanySearchProvider,
         company_profile: CompanyProfileProvider,
@@ -116,18 +98,23 @@ class CapabilityExecutor(
         post_detail: PostDetailProvider,
         post_comments: PostCommentsProvider,
         post_publishing: PostPublishingProvider,
-        post_engagement: PostEngagementProvider,
+        post_comment: PostCommentProvider,
+        post_reaction: PostReactionProvider,
         invitation_list: InvitationListProvider,
         connections_list: ConnectionsListProvider,
-        invitation_actions: InvitationActionProvider,
+        invitation_send: InvitationSendProvider,
+        invitation_accept: InvitationAcceptProvider,
+        invitation_ignore: InvitationIgnoreProvider,
         conversation_search: ConversationSearchProvider,
-        conversation: ConversationProvider,
+        conversation_read: ConversationReadProvider,
+        message_send: MessageSendProvider,
         pagination: PaginationManager | None = None,
     ) -> None:
         self._settings = settings
         self._job_search = job_search
         self._job_detail = job_detail
         self._people_search = people_search
+        self._connections_search = connections_search
         self._person_profile = person_profile
         self._company_search = company_search
         self._company_profile = company_profile
@@ -135,16 +122,16 @@ class CapabilityExecutor(
         self._post_detail = post_detail
         self._post_comments = post_comments
         self._post_publishing = post_publishing
-        self._post_comment = post_engagement
-        self._post_reaction = post_engagement
+        self._post_comment = post_comment
+        self._post_reaction = post_reaction
         self._invitation_list = invitation_list
         self._connections_list = connections_list
-        self._invitation_send = invitation_actions
-        self._invitation_accept = invitation_actions
-        self._invitation_ignore = invitation_actions
+        self._invitation_send = invitation_send
+        self._invitation_accept = invitation_accept
+        self._invitation_ignore = invitation_ignore
         self._conversation_search = conversation_search
-        self._conversation_read = conversation
-        self._message_send = conversation
+        self._conversation_read = conversation_read
+        self._message_send = message_send
         self._pagination = pagination or PaginationManager(
             ttl_seconds=settings.pagination_cursor_ttl_seconds,
             max_active_cursors=settings.pagination_max_active_cursors,
@@ -160,18 +147,22 @@ __all__ = [
     "CompanyProfileProvider",
     "CompanySearchProvider",
     "ConnectionsListProvider",
-    "ConversationProvider",
+    "ConversationReadProvider",
     "ConversationSearchProvider",
-    "InvitationActionProvider",
+    "InvitationAcceptProvider",
+    "InvitationIgnoreProvider",
     "InvitationListProvider",
+    "InvitationSendProvider",
     "JobDetailProvider",
     "JobSearchProvider",
+    "MessageSendProvider",
     "PeopleSearchProvider",
     "PersonProfileProvider",
+    "PostCommentProvider",
     "PostCommentsProvider",
     "PostDetailProvider",
-    "PostEngagementProvider",
     "PostPublishingProvider",
+    "PostReactionProvider",
     "PostSearchProvider",
     "ProgressReporter",
 ]
