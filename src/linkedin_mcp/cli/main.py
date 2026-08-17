@@ -12,7 +12,7 @@ from pydantic import ValidationError
 from linkedin_mcp.cli.commands import register as register_commands
 from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import LinkedInMCPError
-from linkedin_mcp.observability import configure_logging
+from linkedin_mcp.logging import configure_logging
 
 type CommandHandler = Callable[[argparse.Namespace, Settings], int | None]
 

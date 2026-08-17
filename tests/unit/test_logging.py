@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import pytest
 
-import linkedin_mcp.observability as observability
+import linkedin_mcp.logging as logging_config
 
 
 def test_stderr_logger_factory_uses_current_standard_error(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    logger = observability._stderr_logger_factory(  # pyright: ignore[reportPrivateUsage]
+    logger = logging_config._stderr_logger_factory(  # pyright: ignore[reportPrivateUsage]
         "ignored-structlog-argument"
     )
 
