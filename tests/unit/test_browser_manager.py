@@ -7,6 +7,7 @@ from typing import Any, cast
 
 import pytest
 
+import linkedin_mcp.browser.runtime as runtime_module
 import linkedin_mcp.linkedin.browser as manager_module
 from linkedin_mcp.browser import BrowserRuntimeBootstrap
 from linkedin_mcp.browser.profile import BrowserProfileManager, BrowserProfileStatus
@@ -416,7 +417,7 @@ async def test_automatic_first_run_login_validates_and_reuses_one_persistent_con
     async def safe_page(_: object, __: tuple[str, ...]) -> None:
         return
 
-    monkeypatch.setattr(manager_module, "async_playwright", cast(Any, fake_async_playwright))
+    monkeypatch.setattr(runtime_module, "async_playwright", cast(Any, fake_async_playwright))
     monkeypatch.setattr(manager_module, "assert_safe_linkedin_page", safe_page)
 
     manager = BrowserManager(
@@ -570,7 +571,7 @@ async def test_browser_manager_pauses_on_expired_login_and_restriction_text(
             await manager.navigate(page, "https://www.linkedin.com/jobs/search/")
         assert manager.paused is True
 
-    await manager.close(persist_state=False)
+    await manager.close()
 
 
 @pytest.mark.timeout(20)

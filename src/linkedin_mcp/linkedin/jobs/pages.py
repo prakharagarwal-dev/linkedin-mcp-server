@@ -12,7 +12,7 @@ from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
-from linkedin_mcp.browser.convergence import CollectionSettleOutcome
+from linkedin_mcp.automation.collections import CollectionSettleOutcome
 from linkedin_mcp.errors import ParserDriftError
 from linkedin_mcp.linkedin.browser import BrowserManager
 from linkedin_mcp.linkedin.common import EvidenceField, StopReason

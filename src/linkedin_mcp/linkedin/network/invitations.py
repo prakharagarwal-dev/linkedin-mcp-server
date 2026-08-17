@@ -13,7 +13,7 @@ from urllib.parse import parse_qs, unquote, urljoin, urlsplit
 from playwright.async_api import Locator, Page
 from pydantic import HttpUrl
 
-from linkedin_mcp.browser.convergence import wait_for_collection_change
+from linkedin_mcp.automation.collections import wait_for_collection_change
 from linkedin_mcp.errors import BrowserUnavailableError, ParserDriftError
 from linkedin_mcp.linkedin.browser import BrowserManager
 from linkedin_mcp.linkedin.common import StopReason

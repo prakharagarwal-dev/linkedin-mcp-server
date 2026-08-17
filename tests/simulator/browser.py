@@ -118,8 +118,7 @@ class SimulatorBrowser:
     async def assert_safe(self, page: Page) -> None:
         await assert_safe_linkedin_page(page, ("www.linkedin.com", "linkedin.com"))
 
-    async def close(self, *, persist_state: bool = True) -> None:
-        del persist_state
+    async def close(self) -> None:
         context, self._context = self._context, None
         browser, self._browser = self._browser, None
         playwright, self._playwright = self._playwright, None

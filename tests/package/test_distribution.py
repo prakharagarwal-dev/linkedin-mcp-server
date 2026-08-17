@@ -103,10 +103,22 @@ def test_source_layout_keeps_infrastructure_and_linkedin_features_separate() -> 
         assert "linkedin_mcp.linkedin.models" not in feature_sources
         assert "linkedin_mcp.linkedin.operations" not in feature_sources
 
-    browser_sources = "\n".join(
-        path.read_text(encoding="utf-8") for path in (package / "browser").glob("*.py")
-    )
+    browser = package / "browser"
+    assert {path.name for path in browser.glob("*.py")} == {
+        "__init__.py",
+        "bootstrap.py",
+        "profile.py",
+        "runtime.py",
+    }
+    browser_sources = "\n".join(path.read_text(encoding="utf-8") for path in browser.glob("*.py"))
     assert "linkedin_mcp.linkedin" not in browser_sources
+
+    automation = package / "automation"
+    assert {path.name for path in automation.glob("*.py")} == {
+        "__init__.py",
+        "collections.py",
+        "pacing.py",
+    }
 
     cli = package / "cli"
     commands = cli / "commands"

@@ -1,6 +1,6 @@
 """Compatibility imports for LinkedIn feature-owned data contracts."""
 
-from linkedin_mcp.browser.models import BrowserSetupState
+from linkedin_mcp.browser.bootstrap import BrowserSetupState
 
 from .actions import (
     ActionCommand,

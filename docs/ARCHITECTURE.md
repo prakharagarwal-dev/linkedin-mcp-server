@@ -125,10 +125,12 @@ controls.
 
 ## Browser safety
 
-`BrowserManager` owns one Playwright persistent context and creates a fresh
-page for each operation. Navigation is restricted to configured LinkedIn
-hosts. The public MCP surface never exposes URLs, selectors, arbitrary clicks,
-JavaScript, requests, or browser pages.
+`BrowserRuntime` owns one Playwright persistent context and creates a fresh
+page lease for each serialized operation. `BrowserManager` layers LinkedIn
+authentication, navigation pacing, and visible-UI safety checks over that
+runtime. Navigation is restricted to configured LinkedIn hosts. The public MCP
+surface never exposes URLs, selectors, arbitrary clicks, JavaScript, requests,
+or browser pages.
 
 The authentication coordinator pauses capability execution when the visible
 session expires, LinkedIn shows a checkpoint or restriction, or browser setup
@@ -144,7 +146,8 @@ LinkedIn feature:
 linkedin_mcp/
 ├── mcp/                 FastMCP server, client context, and stdio transport bridge
 ├── app/                 process-local queue, scheduling, pagination, assets, composition
-├── browser/             generic Playwright installation, profile, pacing, convergence
+├── browser/             generic Playwright installation, profile, and serialized runtime
+├── automation/          shared LinkedIn UI pacing and bounded collection settling
 ├── runtime/             shared-process ownership, lifecycle, and private entry point
 ├── cli/                 public CLI assembly and commands/ hierarchy
 │   └── commands/        flat public commands; nested profile/ subcommands
@@ -158,7 +161,8 @@ linkedin_mcp/
 ```
 
 The feature packages are vertical slices: a job UI change stays under
-`linkedin/jobs/`, while generic Chromium lifecycle code stays under `browser/`.
+`linkedin/jobs/`, generic Chromium lifecycle code stays under `browser/`, and
+shared LinkedIn Playwright behavior stays under `automation/`.
 `linkedin/operations.py` and `linkedin/models.py` are composition/compatibility
 facades, not registries or parallel implementations. URL validation,
 authentication, shared action execution, and source construction remain common

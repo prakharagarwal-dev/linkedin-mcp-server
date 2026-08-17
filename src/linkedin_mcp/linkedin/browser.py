@@ -22,10 +22,10 @@ from playwright.async_api import (
     TimeoutError as PlaywrightTimeoutError,
 )
 
-from linkedin_mcp.browser.bootstrap import BrowserRuntimeBootstrap
-from linkedin_mcp.browser.models import BrowserSetupState
-from linkedin_mcp.browser.pacing import NavigationPacer
+from linkedin_mcp.automation.pacing import NavigationPacer
+from linkedin_mcp.browser.bootstrap import BrowserRuntimeBootstrap, BrowserSetupState
 from linkedin_mcp.browser.profile import BrowserProfileManager
+from linkedin_mcp.browser.runtime import BrowserRuntime
 from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import (
     AccessPausedError,
@@ -88,7 +88,7 @@ async def _enable_persistent_login(page: Page) -> None:
 
 
 class BrowserManager:
-    """Own one persistent LinkedIn browser profile and serialize page interactions."""
+    """Coordinate LinkedIn session safety over the generic browser runtime."""
 
     def __init__(
         self,
@@ -99,16 +99,12 @@ class BrowserManager:
         login_runner: LoginRunner | None = None,
     ) -> None:
         self._settings = settings
-        self._browser_bootstrap = browser_bootstrap or BrowserRuntimeBootstrap(settings)
-        self._browser_profile = browser_profile or BrowserProfileManager(
+        self._runtime = BrowserRuntime(
             settings,
-            self._browser_bootstrap,
+            browser_bootstrap=browser_bootstrap,
+            browser_profile=browser_profile,
         )
         self._login_runner = login_runner
-        self._playwright: Playwright | None = None
-        self._context: BrowserContext | None = None
-        self._operation_lock = asyncio.Lock()
-        self._start_lock = asyncio.Lock()
         self._pacer = NavigationPacer(
             account_id=settings.account_id,
             interval_seconds=settings.minimum_navigation_interval_seconds,
@@ -125,7 +121,7 @@ class BrowserManager:
 
     @property
     def started(self) -> bool:
-        return self._playwright is not None and self._context is not None
+        return self._runtime.started
 
     @property
     def paused(self) -> bool:
@@ -149,13 +145,13 @@ class BrowserManager:
 
     @property
     def browser_setup_state(self) -> BrowserSetupState:
-        return self._browser_bootstrap.state
+        return self._runtime.setup_state
 
     def profile_present(self) -> bool:
-        return self._browser_profile.inspect().initialized
+        return self._runtime.profile_present()
 
     def start_session_bootstrap(self) -> None:
-        self._browser_bootstrap.start()
+        self._runtime.start_setup()
         self._authentication.start()
 
     def pause(self, reason: str) -> None:
@@ -166,74 +162,15 @@ class BrowserManager:
         self._paused = False
         self._pause_reason = None
 
-    async def _start(self, *, allow_paused: bool = False) -> BrowserContext:
-        if self._paused and not allow_paused:
-            raise AccessPausedError(
-                f"LinkedIn access is paused: {self._pause_reason or 'operator review required'}"
-            )
-        if self.started:
-            assert self._context is not None
-            return self._context
-        async with self._start_lock:
-            if self.started:
-                assert self._context is not None
-                return self._context
-            await self._close_browser(persist_state=False)
-            await self._browser_bootstrap.ensure_ready()
-            await self._browser_profile.ensure_created()
-            try:
-                self._playwright = await async_playwright().start()
-                self._context = await self._playwright.chromium.launch_persistent_context(
-                    user_data_dir=str(self._settings.browser_profile_path),
-                    headless=self._settings.browser_headless,
-                )
-                self._context.set_default_timeout(self._settings.browser_timeout_seconds * 1_000)
-                self._context.set_default_navigation_timeout(
-                    self._settings.browser_timeout_seconds * 1_000
-                )
-            except Exception as error:
-                await self._close_browser(persist_state=False)
-                raise BrowserUnavailableError("Chromium could not start.") from error
-            return self._context
-
     @asynccontextmanager
     async def page(self) -> AsyncGenerator[Page]:
         await self._authentication.ensure_ready()
-        async with self._operation_lock:
-            context = await self._start()
-            existing_page_urls = {
-                id(existing_page): existing_page.url
-                for existing_page in context.pages
-                if not existing_page.is_closed()
-            }
-            page = next(
-                (
-                    existing_page
-                    for existing_page in context.pages
-                    if not existing_page.is_closed() and existing_page.url == "about:blank"
-                ),
-                None,
+        if self._paused:
+            raise AccessPausedError(
+                f"LinkedIn access is paused: {self._pause_reason or 'operator review required'}"
             )
-            if page is None:
-                try:
-                    page = await context.new_page()
-                except Exception as error:
-                    raise BrowserUnavailableError(
-                        "A Chromium page could not be created."
-                    ) from error
-            try:
-                yield page
-            finally:
-                owned_pages = [
-                    candidate
-                    for candidate in context.pages
-                    if candidate is page
-                    or id(candidate) not in existing_page_urls
-                    or existing_page_urls[id(candidate)] != candidate.url
-                ]
-                for owned_page in reversed(owned_pages):
-                    if not owned_page.is_closed():
-                        await owned_page.close()
+        async with self._runtime.page() as page:
+            yield page
 
     async def navigate(self, page: Page, url: str) -> None:
         target = validate_linkedin_url(url, self._settings.allowed_hosts)
@@ -302,10 +239,9 @@ class BrowserManager:
             self._handle_access_error(error, page.url)
             raise
 
-    async def close(self, *, persist_state: bool = True) -> None:
+    async def close(self) -> None:
         await self._authentication.close()
-        await self._close_browser(persist_state=persist_state)
-        await self._browser_bootstrap.close()
+        await self._runtime.close()
         self._pacer.close()
 
     def _handle_access_error(self, error: LinkedInMCPError, url: str) -> None:
@@ -321,29 +257,21 @@ class BrowserManager:
             self._authentication.mark_attention_required(error)
 
     async def _reset_for_authentication(self) -> None:
-        async with self._operation_lock:
-            await self._close_browser(persist_state=False)
+        await self._runtime.stop()
 
     async def _login_for_authentication(self) -> None:
         runner = self._login_runner or login_interactively
         try:
-            await self._browser_profile.ensure_created()
-            await runner(self._settings, self._browser_bootstrap)
+            await self._runtime.ensure_profile()
+            await runner(self._settings, self._runtime.bootstrap)
         except LinkedInMCPError as error:
             if error.pause_required:
                 self.pause(error.safe_message)
             raise
 
     async def _validate_saved_session(self) -> None:
-        async with self._operation_lock:
-            context = await self._start(allow_paused=True)
-            try:
-                page = await context.new_page()
-            except Exception as error:
-                raise BrowserUnavailableError(
-                    "A Chromium page could not be created for session validation."
-                ) from error
-            try:
+        try:
+            async with self._runtime.page() as page:
                 target = validate_linkedin_url(
                     _SESSION_VALIDATION_URL,
                     self._settings.allowed_hosts,
@@ -359,29 +287,15 @@ class BrowserManager:
                             "LinkedIn requires login or human verification."
                         ) from error
                     raise
-            except LinkedInMCPError as error:
-                if error.pause_required:
-                    self.pause(error.safe_message)
-                raise
-            except Exception as error:
-                raise BrowserUnavailableError(
-                    "The saved LinkedIn session could not be validated."
-                ) from error
-            finally:
-                if not page.is_closed():
-                    await page.close()
+        except LinkedInMCPError as error:
+            if error.pause_required:
+                self.pause(error.safe_message)
+            raise
+        except Exception as error:
+            raise BrowserUnavailableError(
+                "The saved LinkedIn session could not be validated."
+            ) from error
         self.resume()
-
-    async def _close_browser(self, *, persist_state: bool) -> None:
-        del persist_state
-        context = self._context
-        playwright = self._playwright
-        self._context = None
-        self._playwright = None
-        if context is not None:
-            await context.close()
-        if playwright is not None:
-            await playwright.stop()
 
 
 async def login_interactively(

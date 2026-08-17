@@ -8,12 +8,12 @@ import os
 import subprocess
 import sys
 from contextlib import suppress
+from enum import StrEnum
 from pathlib import Path
 from typing import cast
 
 import playwright
 
-from linkedin_mcp.browser.models import BrowserSetupState
 from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import BrowserUnavailableError
 
@@ -21,6 +21,16 @@ _BROWSER_PREFIXES = {
     "chromium": "chromium-",
     "chromium-headless-shell": "chromium_headless_shell-",
 }
+
+
+class BrowserSetupState(StrEnum):
+    """Installation state for the Playwright Chromium runtime."""
+
+    DISABLED = "disabled"
+    NOT_STARTED = "not_started"
+    INSTALLING = "installing"
+    READY = "ready"
+    FAILED = "failed"
 
 
 class BrowserRuntimeBootstrap:
