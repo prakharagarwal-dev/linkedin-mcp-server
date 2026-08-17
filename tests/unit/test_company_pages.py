@@ -12,17 +12,19 @@ from playwright.async_api import Locator, Page, async_playwright
 from pydantic import ValidationError
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.linkedin.browser import BrowserManager
-from linkedin_mcp.linkedin.companies.evidence import sources_from_company_profile
-from linkedin_mcp.linkedin.companies.pages import CompanyProfilePage, CompanySearchPage
-from linkedin_mcp.linkedin.models import (
+from linkedin_mcp.tools._shared.browser import BrowserManager
+from linkedin_mcp.tools._shared.models import StopReason
+from linkedin_mcp.tools.companies._shared.pages import CompanyProfilePage, CompanySearchPage
+from linkedin_mcp.tools.companies.get.evidence import sources_from_company_profile
+from linkedin_mcp.tools.companies.get.models import (
     CompanyGetInput,
     CompanyProfileEvidence,
     CompanyProfileObservation,
+)
+from linkedin_mcp.tools.companies.search.models import (
     CompanySearchFilters,
     CompanySearchInput,
     CompanySize,
-    StopReason,
 )
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"

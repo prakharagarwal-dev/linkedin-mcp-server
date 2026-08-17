@@ -8,9 +8,7 @@ from typing import cast
 
 from linkedin_mcp.app import CapabilityWorker
 from linkedin_mcp.app.container import AppContainer
-from linkedin_mcp.config import Settings
-from linkedin_mcp.linkedin.browser import BrowserManager
-from linkedin_mcp.linkedin.operations import (
+from linkedin_mcp.app.executor import (
     CapabilityExecutor,
     CompanyProfileProvider,
     CompanySearchProvider,
@@ -25,7 +23,9 @@ from linkedin_mcp.linkedin.operations import (
     PostPublishingProvider,
     PostSearchProvider,
 )
+from linkedin_mcp.config import Settings
 from linkedin_mcp.runtime import AccountProcessLock
+from linkedin_mcp.tools._shared.browser import BrowserManager
 from tests.contract.test_mcp_protocol import (
     ProtocolJobDetail,
     ProtocolPeopleSearch,

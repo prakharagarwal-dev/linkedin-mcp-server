@@ -139,43 +139,59 @@ the CLI.
 
 ## Code layout
 
-The package is split first by infrastructure versus LinkedIn behavior, then by
-LinkedIn feature:
+Infrastructure is separated from the public LinkedIn capabilities. Inside
+`tools/`, every public MCP name maps directly to one directory after removing
+the `linkedin.` prefix:
 
 ```text
 linkedin_mcp/
-├── mcp/                 FastMCP server, client context, and stdio transport bridge
-├── app/                 process-local queue, scheduling, pagination, assets, composition
-├── browser/             generic Playwright installation, profile, and serialized runtime
-├── automation/          shared LinkedIn UI pacing and bounded collection settling
-├── runtime/             shared-process ownership, lifecycle, and private entry point
-├── cli/                 public CLI assembly and commands/ hierarchy
-│   └── commands/        flat public commands; nested profile/ subcommands
-└── linkedin/            all LinkedIn-specific behavior
-    ├── jobs/            models, evidence, operations, and page implementation
-    ├── people/          models, evidence, operations, and page implementation
-    ├── companies/       models, evidence, operations, and page implementation
-    ├── posts/           models, evidence, operations, pages, publishing, engagement
-    ├── network/         models, evidence, operations, connections, invitations
-    └── messaging/       models, evidence, operations, and page implementation
+├── mcp/                     FastMCP composition, client context, and transports
+├── app/                     queue, scheduling, pagination, assets, and composition
+├── browser/                 Playwright installation, profile, and browser runtime
+├── runtime/                 shared-process ownership and lifecycle
+├── cli/                     CLI assembly and command hierarchy
+└── tools/
+    ├── _shared/             primitives genuinely reused across capabilities
+    ├── server/status/       linkedin.server.status
+    ├── session/status/      linkedin.session.status
+    ├── jobs/
+    │   ├── search/          linkedin.jobs.search
+    │   └── get/             linkedin.jobs.get
+    ├── people/{search,get}/
+    ├── companies/{search,get}/
+    ├── posts/
+    │   ├── search/          linkedin.posts.search
+    │   ├── get/             linkedin.posts.get
+    │   ├── comments/list/   linkedin.posts.comments.list
+    │   └── {create,comment,react}/
+    ├── invitations/{list,send,accept,ignore}/
+    ├── connections/{list,search}/
+    └── messaging/
+        ├── search/
+        ├── conversation/get/
+        └── send/
 ```
 
-The feature packages are vertical slices: a job UI change stays under
-`linkedin/jobs/`, generic Chromium lifecycle code stays under `browser/`, and
-shared LinkedIn Playwright behavior stays under `automation/`.
-`linkedin/operations.py` and `linkedin/models.py` are composition/compatibility
-facades, not registries or parallel implementations. URL validation,
-authentication, shared action execution, and source construction remain common
-LinkedIn support because every feature uses the same rules.
+Each browser-backed leaf contains `tool.py`, `operation.py`, `models.py`,
+`page.py`, and `evidence.py`. The tool module owns the FastMCP definition; the
+operation owns application flow; the page module exposes the typed Playwright
+adapter; and models and evidence define that capability's contract. Domain
+`_shared/` packages hold parser and model primitives used by more than one leaf.
+There is no second registry, broad operations facade, or aggregate model facade.
+
+For example, the full implementation boundary for `linkedin.jobs.search` is
+`tools/jobs/search/`. `mcp/server.py` only creates FastMCP and attaches leaf
+tools, while `app/executor.py` only composes leaf operations for the worker.
+Generic Chromium lifecycle code remains under `browser/`.
 
 ## Adding a capability
 
-A new capability belongs in its LinkedIn feature package and needs:
+A new capability gets a directory matching its public MCP name and needs:
 
 1. strict input and output models;
 2. a narrow provider/page-object contract;
-3. a feature-owned operation and worker wiring;
-4. one MCP tool with accurate annotations;
+3. a leaf-owned operation and worker wiring;
+4. a leaf-owned FastMCP definition with accurate annotations;
 5. synthetic current-UI fixtures and failure variants;
 6. evidence and bounded-completeness behavior; and
 7. contract, page, runtime, and workflow tests as applicable.

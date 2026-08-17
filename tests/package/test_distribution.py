@@ -86,22 +86,64 @@ def test_build_configuration_packages_only_the_standalone_server() -> None:
 
 def test_source_layout_keeps_infrastructure_and_linkedin_features_separate() -> None:
     package = ROOT / "src" / "linkedin_mcp"
-    retired_layers = ("application", "auth", "domain", "policy")
+    retired_layers = ("application", "auth", "automation", "domain", "linkedin", "policy")
     for layer in retired_layers:
         assert not tuple((package / layer).glob("*.py"))
 
-    linkedin = package / "linkedin"
-    for feature in ("jobs", "people", "companies", "posts", "network", "messaging"):
-        feature_root = linkedin / feature
-        assert (feature_root / "models.py").is_file()
-        assert (feature_root / "evidence.py").is_file()
-        assert (feature_root / "operations.py").is_file()
+    tools = package / "tools"
+    capability_paths = {
+        "linkedin.server.status": "server/status",
+        "linkedin.session.status": "session/status",
+        "linkedin.jobs.search": "jobs/search",
+        "linkedin.jobs.get": "jobs/get",
+        "linkedin.people.search": "people/search",
+        "linkedin.people.get": "people/get",
+        "linkedin.companies.search": "companies/search",
+        "linkedin.companies.get": "companies/get",
+        "linkedin.posts.search": "posts/search",
+        "linkedin.posts.get": "posts/get",
+        "linkedin.posts.comments.list": "posts/comments/list",
+        "linkedin.posts.create": "posts/create",
+        "linkedin.posts.comment": "posts/comment",
+        "linkedin.posts.react": "posts/react",
+        "linkedin.invitations.list": "invitations/list",
+        "linkedin.invitations.send": "invitations/send",
+        "linkedin.invitations.accept": "invitations/accept",
+        "linkedin.invitations.ignore": "invitations/ignore",
+        "linkedin.connections.list": "connections/list",
+        "linkedin.connections.search": "connections/search",
+        "linkedin.messaging.search": "messaging/search",
+        "linkedin.messaging.conversation.get": "messaging/conversation/get",
+        "linkedin.messaging.send": "messaging/send",
+    }
+    status_tools = {"linkedin.server.status", "linkedin.session.status"}
+    for tool_name, relative_path in capability_paths.items():
+        capability = tools / relative_path
+        required_files = {"__init__.py", "models.py", "tool.py"}
+        if tool_name not in status_tools:
+            required_files.update({"evidence.py", "operation.py", "page.py"})
+        assert required_files <= {path.name for path in capability.glob("*.py")}
+        assert f'name="{tool_name}"' in (capability / "tool.py").read_text(encoding="utf-8")
 
-        feature_sources = "\n".join(
-            path.read_text(encoding="utf-8") for path in feature_root.glob("*.py")
-        )
-        assert "linkedin_mcp.linkedin.models" not in feature_sources
-        assert "linkedin_mcp.linkedin.operations" not in feature_sources
+    server_source = (package / "mcp" / "server.py").read_text(encoding="utf-8")
+    assert "attach_tools(mcp, container)" in server_source
+    assert "@mcp.tool" not in server_source
+
+    for domain in (
+        "jobs",
+        "people",
+        "companies",
+        "posts",
+        "invitations",
+        "connections",
+        "messaging",
+    ):
+        assert {path.name for path in (tools / domain).glob("*.py")} == {"__init__.py"}
+    production_sources = "\n".join(
+        path.read_text(encoding="utf-8") for path in package.rglob("*.py")
+    )
+    assert "linkedin_mcp.tools._shared.model_exports" not in production_sources
+    assert "linkedin_mcp.tools._shared.network_operations" not in production_sources
 
     browser = package / "browser"
     assert {path.name for path in browser.glob("*.py")} == {
@@ -112,13 +154,6 @@ def test_source_layout_keeps_infrastructure_and_linkedin_features_separate() -> 
     }
     browser_sources = "\n".join(path.read_text(encoding="utf-8") for path in browser.glob("*.py"))
     assert "linkedin_mcp.linkedin" not in browser_sources
-
-    automation = package / "automation"
-    assert {path.name for path in automation.glob("*.py")} == {
-        "__init__.py",
-        "collections.py",
-        "pacing.py",
-    }
 
     cli = package / "cli"
     commands = cli / "commands"
@@ -321,7 +356,8 @@ def test_wheel_excludes_tests_profiles_secrets_and_other_repositories(tmp_path: 
         names = tuple(archive.namelist())
         lowered = tuple(name.casefold() for name in names)
         assert "linkedin_mcp/mcp/server.py" in names
-        assert "linkedin_mcp/linkedin/jobs/operations.py" in names
+        assert "linkedin_mcp/tools/jobs/search/tool.py" in names
+        assert "linkedin_mcp/tools/jobs/search/operation.py" in names
         assert any(name.endswith(".dist-info/entry_points.txt") for name in names)
         assert not any(name.startswith("tests/") for name in names)
         assert not any("simulator" in name for name in lowered)

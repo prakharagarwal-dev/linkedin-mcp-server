@@ -11,66 +11,90 @@ from pydantic import HttpUrl
 
 from linkedin_mcp.app import CapabilityRunner, CapabilityWorker, PaginationManager
 from linkedin_mcp.errors import BrowserUnavailableError
-from linkedin_mcp.linkedin.models import (
+from linkedin_mcp.mcp.context import bind_client_execution
+from linkedin_mcp.tools._shared.actions import (
     ActionOutcome,
     ActionOutput,
     ActionResult,
     ActionType,
+    ReactionState,
+)
+from linkedin_mcp.tools._shared.models import (
     CapabilityName,
+    EvidenceField,
+    PaginatedInput,
+    PaginationMetadata,
+    StopReason,
+)
+from linkedin_mcp.tools.companies.get.models import (
     CompanyGetInput,
     CompanyGetOutput,
     CompanyProfileCoverage,
     CompanyProfileObservation,
+)
+from linkedin_mcp.tools.companies.search.models import (
     CompanySearchCoverage,
     CompanySearchInput,
     CompanySearchOutput,
-    ConnectionsListInput,
+)
+from linkedin_mcp.tools.connections.list.models import ConnectionsListInput
+from linkedin_mcp.tools.connections.search.models import (
     ConnectionsSearchFilters,
     ConnectionsSearchInput,
     ConnectionsSearchOutput,
-    ConversationGetInput,
-    ConversationSearchInput,
-    EvidenceField,
-    InvitationAcceptInput,
-    InvitationIgnoreInput,
-    InvitationListInput,
-    InvitationSendInput,
+)
+from linkedin_mcp.tools.invitations.accept.models import InvitationAcceptInput
+from linkedin_mcp.tools.invitations.ignore.models import InvitationIgnoreInput
+from linkedin_mcp.tools.invitations.list.models import InvitationListInput
+from linkedin_mcp.tools.invitations.send.models import InvitationSendInput
+from linkedin_mcp.tools.jobs.get.models import (
     JobDetailInput,
     JobDetailObservation,
     JobDetailOutput,
+)
+from linkedin_mcp.tools.jobs.search.models import (
     JobSearchCoverage,
     JobSearchInput,
     JobSearchOutput,
-    MessageSendInput,
-    PaginatedInput,
-    PaginationMetadata,
+)
+from linkedin_mcp.tools.messaging.conversation.get.models import ConversationGetInput
+from linkedin_mcp.tools.messaging.search.models import ConversationSearchInput
+from linkedin_mcp.tools.messaging.send.models import MessageSendInput
+from linkedin_mcp.tools.people.get.models import (
     PeopleGetInput,
     PeopleGetOutput,
+    PersonProfileCoverage,
+    PersonProfileObservation,
+)
+from linkedin_mcp.tools.people.search.models import (
     PeopleSearchCoverage,
     PeopleSearchInput,
     PeopleSearchOutput,
-    PersonProfileCoverage,
-    PersonProfileObservation,
-    PostAuthor,
-    PostAuthorType,
-    PostCommentInput,
+)
+from linkedin_mcp.tools.posts.comment.models import PostCommentInput
+from linkedin_mcp.tools.posts.comments.list.models import (
     PostCommentsCoverage,
     PostCommentsListInput,
     PostCommentsListOutput,
+)
+from linkedin_mcp.tools.posts.create.models import (
     PostCreateInput,
+    TextPostContent,
+)
+from linkedin_mcp.tools.posts.get.models import (
+    PostAuthor,
+    PostAuthorType,
     PostDetailCoverage,
     PostGetInput,
     PostGetOutput,
     PostObservation,
-    PostReactionInput,
+)
+from linkedin_mcp.tools.posts.react.models import PostReactionInput
+from linkedin_mcp.tools.posts.search.models import (
     PostSearchCoverage,
     PostSearchInput,
     PostSearchOutput,
-    ReactionState,
-    StopReason,
-    TextPostContent,
 )
-from linkedin_mcp.mcp.context import bind_client_execution
 
 
 def _pagination(request: PaginatedInput) -> PaginationMetadata:

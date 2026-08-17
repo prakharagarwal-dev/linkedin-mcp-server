@@ -10,22 +10,24 @@ from playwright.async_api import Locator, Page, Route, async_playwright
 from pydantic import ValidationError
 
 from linkedin_mcp.app.assets import LocalAssetStore
-from linkedin_mcp.linkedin.browser import BrowserManager
-from linkedin_mcp.linkedin.models import (
+from linkedin_mcp.tools._shared.actions import (
     ActionCommand,
     ActionOutcome,
     ActionType,
     CommentCreatePayload,
-    CommentGifAttachment,
-    CommentPhotoAttachment,
-    PostCommentInput,
     PostMentionInput,
-    PostReactionInput,
     ReactionSetPayload,
     ReactionState,
 )
-from linkedin_mcp.linkedin.posts import engagement as engagement_page
-from linkedin_mcp.linkedin.posts.engagement import PostEngagementPage
+from linkedin_mcp.tools._shared.browser import BrowserManager
+from linkedin_mcp.tools.posts._shared import engagement as engagement_page
+from linkedin_mcp.tools.posts._shared.engagement import PostEngagementPage
+from linkedin_mcp.tools.posts.comment.models import (
+    CommentGifAttachment,
+    CommentPhotoAttachment,
+    PostCommentInput,
+)
+from linkedin_mcp.tools.posts.react.models import PostReactionInput
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 ENGAGEMENT_HTML = (FIXTURES / "posts/latest/engagement.html").read_text(encoding="utf-8")

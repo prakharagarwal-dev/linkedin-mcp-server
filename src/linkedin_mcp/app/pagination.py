@@ -12,8 +12,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from linkedin_mcp.errors import InvalidCursorError
-from linkedin_mcp.linkedin.common import CapabilityName, PaginatedInput, PaginationMetadata
-from linkedin_mcp.linkedin.network.models import InvitationListInput
+from linkedin_mcp.tools._shared.models import CapabilityName, PaginatedInput, PaginationMetadata
+from linkedin_mcp.tools.invitations.list.models import InvitationListInput
 
 Clock = Callable[[], datetime]
 DEFAULT_CLIENT_ID = "direct-local-client"

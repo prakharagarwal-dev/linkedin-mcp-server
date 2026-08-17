@@ -13,36 +13,38 @@ from playwright.async_api import Locator, Page, Route, async_playwright
 from pydantic import HttpUrl, ValidationError
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.linkedin.browser import BrowserManager
-from linkedin_mcp.linkedin.models import (
+from linkedin_mcp.tools._shared.actions import ReactionState
+from linkedin_mcp.tools._shared.browser import BrowserManager
+from linkedin_mcp.tools._shared.models import StopReason
+from linkedin_mcp.tools._shared.urls import post_reference_from_value
+from linkedin_mcp.tools.posts._shared.pages import (
+    PostCommentsPage,
+    PostDetailPage,
+    PostSearchPage,
+)
+from linkedin_mcp.tools.posts.comments.list.evidence import source_from_post_comments
+from linkedin_mcp.tools.posts.comments.list.models import (
     CommentSort,
-    PostAuthorType,
     PostCommentsListInput,
-    PostContentType,
+)
+from linkedin_mcp.tools.posts.get.evidence import source_from_post
+from linkedin_mcp.tools.posts.get.models import (
+    PostAuthorType,
     PostDetailCoverage,
     PostGetInput,
     PostObservation,
     PostPollState,
+)
+from linkedin_mcp.tools.posts.search.evidence import source_from_post_search
+from linkedin_mcp.tools.posts.search.models import (
+    PostContentType,
     PostSearchContentType,
     PostSearchDate,
     PostSearchFilters,
     PostSearchInput,
     PostSearchPostedBy,
     PostSearchSort,
-    ReactionState,
-    StopReason,
 )
-from linkedin_mcp.linkedin.posts.evidence import (
-    source_from_post,
-    source_from_post_comments,
-    source_from_post_search,
-)
-from linkedin_mcp.linkedin.posts.pages import (
-    PostCommentsPage,
-    PostDetailPage,
-    PostSearchPage,
-)
-from linkedin_mcp.linkedin.urls import post_reference_from_value
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 POST_REF = "activity:7312345678901234567"

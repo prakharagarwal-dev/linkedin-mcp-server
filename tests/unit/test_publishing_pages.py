@@ -13,42 +13,44 @@ from pydantic import HttpUrl, ValidationError
 
 from linkedin_mcp.app.assets import LocalAssetStore
 from linkedin_mcp.errors import InvalidTargetError
-from linkedin_mcp.linkedin.browser import BrowserManager
-from linkedin_mcp.linkedin.models import (
+from linkedin_mcp.tools._shared.actions import (
     ActionCommand,
     ActionOutcome,
     ActionPageResult,
     ActionType,
+    EventPostContent,
+    ExpertRequestPostContent,
+    HiringPostContent,
+    PostAudience,
+    PostCollaboratorInput,
+    PostCommentControl,
+    PostCreatePayload,
+    PostGroupTarget,
+    PostMentionInput,
+)
+from linkedin_mcp.tools._shared.browser import BrowserManager
+from linkedin_mcp.tools.posts._shared.publishing import PostPublishingPage
+from linkedin_mcp.tools.posts.create.models import (
     CelebrationPostContent,
     CelebrationType,
     DocumentPostContent,
     EventFormat,
-    EventPostContent,
     EventSpeakerInput,
     EventType,
     ExpertRequestCategory,
-    ExpertRequestPostContent,
-    HiringPostContent,
     ImagePostContent,
     PollDuration,
     PollPostContent,
-    PostAudience,
-    PostCollaboratorInput,
-    PostCommentControl,
     PostCreateInput,
-    PostCreatePayload,
-    PostGroupTarget,
     PostImageAspectRatio,
     PostImageEditInput,
     PostImageFilter,
     PostImageInput,
     PostImageTagInput,
-    PostMentionInput,
     TextPostContent,
     VideoCaptionMode,
     VideoPostContent,
 )
-from linkedin_mcp.linkedin.posts.publishing import PostPublishingPage
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 COMPOSER_HTML = (FIXTURES / "posts/latest/composer.html").read_text(encoding="utf-8")

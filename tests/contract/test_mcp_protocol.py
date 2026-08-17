@@ -17,85 +17,7 @@ from pydantic import HttpUrl
 from linkedin_mcp import __version__
 from linkedin_mcp.app import CapabilityWorker, PaginationManager
 from linkedin_mcp.app.container import AppContainer
-from linkedin_mcp.config import Settings
-from linkedin_mcp.linkedin.browser import BrowserManager
-from linkedin_mcp.linkedin.models import (
-    ActionCommand,
-    ActionInspection,
-    ActionOutcome,
-    ActionPageResult,
-    ActionTarget,
-    CommentCreatePayload,
-    CommentObservation,
-    CommentThread,
-    CompanyGetInput,
-    CompanyProfileCoverage,
-    CompanyProfileObservation,
-    CompanyProfilePageCapture,
-    CompanySearchCoverage,
-    CompanySearchInput,
-    CompanySummary,
-    ConnectionsListCoverage,
-    ConnectionsListInput,
-    ConnectionSummary,
-    ConversationCoverage,
-    ConversationGetInput,
-    ConversationObservation,
-    ConversationSearchCoverage,
-    ConversationSearchInput,
-    ConversationSummary,
-    EvidenceField,
-    InvitationAcceptInput,
-    InvitationAcceptPayload,
-    InvitationAvailableAction,
-    InvitationDirection,
-    InvitationEntity,
-    InvitationEntityType,
-    InvitationFilter,
-    InvitationIgnoreInput,
-    InvitationIgnorePayload,
-    InvitationListCoverage,
-    InvitationListInput,
-    InvitationSendInput,
-    InvitationSendPayload,
-    InvitationSummary,
-    InvitationType,
-    JobDetailInput,
-    JobDetailObservation,
-    JobSearchCoverage,
-    JobSearchInput,
-    JobSummary,
-    MessageDirection,
-    MessageObservation,
-    MessageSendInput,
-    MessageSendPayload,
-    PeopleGetInput,
-    PeopleSearchCoverage,
-    PeopleSearchInput,
-    PersonConnectionDegree,
-    PersonProfileCoverage,
-    PersonProfileObservation,
-    PersonProfilePageCapture,
-    PersonSummary,
-    PostAuthor,
-    PostAuthorType,
-    PostCommentInput,
-    PostCommentsCoverage,
-    PostCommentsListInput,
-    PostCreateInput,
-    PostCreatePayload,
-    PostDetailCoverage,
-    PostGetInput,
-    PostObservation,
-    PostReactionInput,
-    PostSearchCoverage,
-    PostSearchInput,
-    PostSummary,
-    ReactionSetPayload,
-    ReactionState,
-    StopReason,
-)
-from linkedin_mcp.linkedin.operations import (
+from linkedin_mcp.app.executor import (
     CapabilityExecutor,
     ConnectionsListProvider,
     ConversationProvider,
@@ -105,8 +27,114 @@ from linkedin_mcp.linkedin.operations import (
     PostEngagementProvider,
     PostPublishingProvider,
 )
+from linkedin_mcp.config import Settings
 from linkedin_mcp.mcp.server import create_mcp_server
 from linkedin_mcp.runtime import AccountProcessLock
+from linkedin_mcp.tools._shared.actions import (
+    ActionCommand,
+    ActionInspection,
+    ActionOutcome,
+    ActionPageResult,
+    ActionTarget,
+    CommentCreatePayload,
+    InvitationAcceptPayload,
+    InvitationIgnorePayload,
+    InvitationSendPayload,
+    MessageSendPayload,
+    PostCreatePayload,
+    ReactionSetPayload,
+    ReactionState,
+)
+from linkedin_mcp.tools._shared.browser import BrowserManager
+from linkedin_mcp.tools._shared.models import (
+    EvidenceField,
+    StopReason,
+)
+from linkedin_mcp.tools.companies.get.models import (
+    CompanyGetInput,
+    CompanyProfileCoverage,
+    CompanyProfileObservation,
+    CompanyProfilePageCapture,
+)
+from linkedin_mcp.tools.companies.search.models import (
+    CompanySearchCoverage,
+    CompanySearchInput,
+    CompanySummary,
+)
+from linkedin_mcp.tools.connections.list.models import (
+    ConnectionsListCoverage,
+    ConnectionsListInput,
+    ConnectionSummary,
+)
+from linkedin_mcp.tools.connections.search.models import PersonConnectionDegree
+from linkedin_mcp.tools.invitations.accept.models import InvitationAcceptInput
+from linkedin_mcp.tools.invitations.ignore.models import InvitationIgnoreInput
+from linkedin_mcp.tools.invitations.list.models import (
+    InvitationAvailableAction,
+    InvitationDirection,
+    InvitationEntity,
+    InvitationEntityType,
+    InvitationFilter,
+    InvitationListCoverage,
+    InvitationListInput,
+    InvitationSummary,
+    InvitationType,
+)
+from linkedin_mcp.tools.invitations.send.models import InvitationSendInput
+from linkedin_mcp.tools.jobs.get.models import (
+    JobDetailInput,
+    JobDetailObservation,
+)
+from linkedin_mcp.tools.jobs.search.models import (
+    JobSearchCoverage,
+    JobSearchInput,
+    JobSummary,
+)
+from linkedin_mcp.tools.messaging.conversation.get.models import (
+    ConversationCoverage,
+    ConversationGetInput,
+    ConversationObservation,
+    MessageDirection,
+    MessageObservation,
+)
+from linkedin_mcp.tools.messaging.search.models import (
+    ConversationSearchCoverage,
+    ConversationSearchInput,
+    ConversationSummary,
+)
+from linkedin_mcp.tools.messaging.send.models import MessageSendInput
+from linkedin_mcp.tools.people.get.models import (
+    PeopleGetInput,
+    PersonProfileCoverage,
+    PersonProfileObservation,
+    PersonProfilePageCapture,
+)
+from linkedin_mcp.tools.people.search.models import (
+    PeopleSearchCoverage,
+    PeopleSearchInput,
+    PersonSummary,
+)
+from linkedin_mcp.tools.posts.comment.models import PostCommentInput
+from linkedin_mcp.tools.posts.comments.list.models import (
+    CommentObservation,
+    CommentThread,
+    PostCommentsCoverage,
+    PostCommentsListInput,
+)
+from linkedin_mcp.tools.posts.create.models import PostCreateInput
+from linkedin_mcp.tools.posts.get.models import (
+    PostAuthor,
+    PostAuthorType,
+    PostDetailCoverage,
+    PostGetInput,
+    PostObservation,
+)
+from linkedin_mcp.tools.posts.react.models import PostReactionInput
+from linkedin_mcp.tools.posts.search.models import (
+    PostSearchCoverage,
+    PostSearchInput,
+    PostSummary,
+)
 
 ROOT = Path(__file__).parents[2]
 

@@ -8,7 +8,7 @@ from typing import Any, cast
 import pytest
 
 import linkedin_mcp.browser.runtime as runtime_module
-import linkedin_mcp.linkedin.browser as manager_module
+import linkedin_mcp.tools._shared.browser as manager_module
 from linkedin_mcp.browser import BrowserRuntimeBootstrap
 from linkedin_mcp.browser.profile import BrowserProfileManager, BrowserProfileStatus
 from linkedin_mcp.config import Settings
@@ -21,7 +21,7 @@ from linkedin_mcp.errors import (
     ParserDriftError,
     RestrictionDetectedError,
 )
-from linkedin_mcp.linkedin.browser import (
+from linkedin_mcp.tools._shared.browser import (
     BrowserManager,
     login_interactively,
     logout_interactively,

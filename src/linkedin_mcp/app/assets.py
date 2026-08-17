@@ -7,15 +7,14 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from linkedin_mcp.errors import InvalidTargetError
-from linkedin_mcp.linkedin.common import AssetReference
-from linkedin_mcp.linkedin.posts.models import (
+from linkedin_mcp.tools._shared.models import AssetReference
+from linkedin_mcp.tools.posts._shared.models import PostAssetRole
+from linkedin_mcp.tools.posts.comment.models import CommentAttachment, CommentPhotoAttachment
+from linkedin_mcp.tools.posts.create.models import (
     CelebrationPostContent,
-    CommentAttachment,
-    CommentPhotoAttachment,
     DocumentPostContent,
     EventPostContent,
     ImagePostContent,
-    PostAssetRole,
     PostCreateContent,
     VideoPostContent,
 )

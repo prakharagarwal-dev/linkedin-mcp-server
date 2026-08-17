@@ -10,31 +10,37 @@ import pytest
 from playwright.async_api import Locator, Page, Route, async_playwright
 from pydantic import HttpUrl, ValidationError
 
-import linkedin_mcp.linkedin.messaging.pages as messaging_pages
+import linkedin_mcp.tools.messaging._shared.pages as messaging_pages
 from linkedin_mcp.app.assets import LocalAssetStore
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
-from linkedin_mcp.linkedin.browser import BrowserManager
-from linkedin_mcp.linkedin.messaging.evidence import source_from_conversation
-from linkedin_mcp.linkedin.messaging.pages import (
-    ConversationPage,
-    ConversationSearchPage,
-)
-from linkedin_mcp.linkedin.models import (
+from linkedin_mcp.tools._shared.actions import (
     ActionCommand,
     ActionOutcome,
     ActionTarget,
     ActionType,
-    ConversationCategory,
-    ConversationFilter,
-    ConversationGetInput,
-    ConversationSearchInput,
     InvitationSendPayload,
+    MessageGifInput,
+    MessageSendPayload,
+)
+from linkedin_mcp.tools._shared.browser import BrowserManager
+from linkedin_mcp.tools.messaging._shared.pages import (
+    ConversationPage,
+    ConversationSearchPage,
+)
+from linkedin_mcp.tools.messaging.conversation.get.evidence import source_from_conversation
+from linkedin_mcp.tools.messaging.conversation.get.models import (
+    ConversationGetInput,
     MessageAttachmentKind,
     MessageDirection,
+)
+from linkedin_mcp.tools.messaging.search.models import (
+    ConversationCategory,
+    ConversationFilter,
+    ConversationSearchInput,
+)
+from linkedin_mcp.tools.messaging.send.models import (
     MessageFileInput,
-    MessageGifInput,
     MessageSendInput,
-    MessageSendPayload,
 )
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"

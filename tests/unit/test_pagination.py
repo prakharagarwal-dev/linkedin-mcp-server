@@ -6,13 +6,13 @@ import pytest
 
 from linkedin_mcp.app.pagination import PaginationManager, select_page
 from linkedin_mcp.errors import InvalidCursorError
-from linkedin_mcp.linkedin.models import (
-    CapabilityName,
-    ConnectionsListInput,
+from linkedin_mcp.tools._shared.models import CapabilityName
+from linkedin_mcp.tools.connections.list.models import ConnectionsListInput
+from linkedin_mcp.tools.invitations.list.models import (
     InvitationFilter,
     InvitationListInput,
-    JobSearchInput,
 )
+from linkedin_mcp.tools.jobs.search.models import JobSearchInput
 
 
 class MutableClock:

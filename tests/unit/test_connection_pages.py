@@ -16,23 +16,25 @@ from linkedin_mcp.errors import (
     InvalidTargetError,
     ParserDriftError,
 )
-from linkedin_mcp.linkedin.browser import BrowserManager
-from linkedin_mcp.linkedin.models import (
+from linkedin_mcp.tools._shared.actions import (
     ActionCommand,
     ActionOutcome,
     ActionTarget,
     ActionType,
+    InvitationAcceptPayload,
+    InvitationIgnorePayload,
+    InvitationSendPayload,
+)
+from linkedin_mcp.tools._shared.browser import BrowserManager
+from linkedin_mcp.tools._shared.models import StopReason
+from linkedin_mcp.tools.connections._shared.pages import ConnectionsListPage, InvitationActionPage
+from linkedin_mcp.tools.connections.list.models import (
     ConnectionsListInput,
     ConnectionsSortBy,
-    InvitationAcceptInput,
-    InvitationAcceptPayload,
-    InvitationIgnoreInput,
-    InvitationIgnorePayload,
-    InvitationSendInput,
-    InvitationSendPayload,
-    StopReason,
 )
-from linkedin_mcp.linkedin.network.connections import ConnectionsListPage, InvitationActionPage
+from linkedin_mcp.tools.invitations.accept.models import InvitationAcceptInput
+from linkedin_mcp.tools.invitations.ignore.models import InvitationIgnoreInput
+from linkedin_mcp.tools.invitations.send.models import InvitationSendInput
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 ACTION_FIXTURES = FIXTURES / "invitations" / "actions" / "latest"

@@ -12,59 +12,45 @@ from typing import Protocol
 from linkedin_mcp.app.pagination import PaginationLease, PaginationManager
 from linkedin_mcp.app.scheduler import FairClientScheduler, SchedulerClosedError
 from linkedin_mcp.errors import BrowserUnavailableError
-from linkedin_mcp.linkedin.actions import ActionOutput
-from linkedin_mcp.linkedin.common import CapabilityName, PaginatedInput
-from linkedin_mcp.linkedin.companies.models import (
-    CompanyGetInput,
-    CompanyGetOutput,
-    CompanySearchInput,
-    CompanySearchOutput,
-)
-from linkedin_mcp.linkedin.jobs.models import (
-    JobDetailInput,
-    JobDetailOutput,
-    JobSearchInput,
-    JobSearchOutput,
-)
-from linkedin_mcp.linkedin.messaging.models import (
-    ConversationGetInput,
-    ConversationGetOutput,
-    ConversationSearchInput,
-    ConversationSearchOutput,
-    MessageSendInput,
-)
-from linkedin_mcp.linkedin.network.models import (
-    ConnectionsListInput,
-    ConnectionsListOutput,
-    ConnectionsSearchInput,
-    ConnectionsSearchOutput,
-    InvitationAcceptInput,
-    InvitationIgnoreInput,
-    InvitationListInput,
-    InvitationListOutput,
-    InvitationSendInput,
-)
-from linkedin_mcp.linkedin.people.models import (
-    PeopleGetInput,
-    PeopleGetOutput,
-    PeopleSearchInput,
-    PeopleSearchOutput,
-)
-from linkedin_mcp.linkedin.posts.models import (
-    PostCommentInput,
-    PostCommentsListInput,
-    PostCommentsListOutput,
-    PostCreateInput,
-    PostGetInput,
-    PostGetOutput,
-    PostReactionInput,
-    PostSearchInput,
-    PostSearchOutput,
-)
 from linkedin_mcp.mcp.context import (
     bind_client_execution,
     current_client_id,
 )
+from linkedin_mcp.tools._shared.actions import ActionOutput
+from linkedin_mcp.tools._shared.models import CapabilityName, PaginatedInput
+from linkedin_mcp.tools.companies.get.models import CompanyGetInput, CompanyGetOutput
+from linkedin_mcp.tools.companies.search.models import CompanySearchInput, CompanySearchOutput
+from linkedin_mcp.tools.connections.list.models import ConnectionsListInput, ConnectionsListOutput
+from linkedin_mcp.tools.connections.search.models import (
+    ConnectionsSearchInput,
+    ConnectionsSearchOutput,
+)
+from linkedin_mcp.tools.invitations.accept.models import InvitationAcceptInput
+from linkedin_mcp.tools.invitations.ignore.models import InvitationIgnoreInput
+from linkedin_mcp.tools.invitations.list.models import InvitationListInput, InvitationListOutput
+from linkedin_mcp.tools.invitations.send.models import InvitationSendInput
+from linkedin_mcp.tools.jobs.get.models import JobDetailInput, JobDetailOutput
+from linkedin_mcp.tools.jobs.search.models import JobSearchInput, JobSearchOutput
+from linkedin_mcp.tools.messaging.conversation.get.models import (
+    ConversationGetInput,
+    ConversationGetOutput,
+)
+from linkedin_mcp.tools.messaging.search.models import (
+    ConversationSearchInput,
+    ConversationSearchOutput,
+)
+from linkedin_mcp.tools.messaging.send.models import MessageSendInput
+from linkedin_mcp.tools.people.get.models import PeopleGetInput, PeopleGetOutput
+from linkedin_mcp.tools.people.search.models import PeopleSearchInput, PeopleSearchOutput
+from linkedin_mcp.tools.posts.comment.models import PostCommentInput
+from linkedin_mcp.tools.posts.comments.list.models import (
+    PostCommentsListInput,
+    PostCommentsListOutput,
+)
+from linkedin_mcp.tools.posts.create.models import PostCreateInput
+from linkedin_mcp.tools.posts.get.models import PostGetInput, PostGetOutput
+from linkedin_mcp.tools.posts.react.models import PostReactionInput
+from linkedin_mcp.tools.posts.search.models import PostSearchInput, PostSearchOutput
 
 CapabilityRequest = (
     JobSearchInput

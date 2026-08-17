@@ -7,20 +7,27 @@ from dataclasses import dataclass, field
 from linkedin_mcp import __version__
 from linkedin_mcp.app import CapabilityWorker, PaginationManager
 from linkedin_mcp.app.assets import LocalAssetStore
+from linkedin_mcp.app.executor import CapabilityExecutor
 from linkedin_mcp.config import Settings, runtime_configuration_fingerprint
-from linkedin_mcp.linkedin.browser import BrowserManager
-from linkedin_mcp.linkedin.companies.pages import CompanyProfilePage, CompanySearchPage
-from linkedin_mcp.linkedin.jobs.pages import JobDetailPage, JobSearchPage
-from linkedin_mcp.linkedin.messaging.pages import ConversationPage, ConversationSearchPage
-from linkedin_mcp.linkedin.network.connections import ConnectionsListPage, InvitationActionPage
-from linkedin_mcp.linkedin.network.invitations import InvitationListPage
-from linkedin_mcp.linkedin.operations import CapabilityExecutor
-from linkedin_mcp.linkedin.people.pages import PeopleSearchPage, PersonProfilePage
-from linkedin_mcp.linkedin.posts.engagement import PostEngagementPage
-from linkedin_mcp.linkedin.posts.pages import PostCommentsPage, PostDetailPage, PostSearchPage
-from linkedin_mcp.linkedin.posts.publishing import PostPublishingPage
 from linkedin_mcp.mcp.context import ClientSessionRegistry
 from linkedin_mcp.runtime import AccountProcessLock
+from linkedin_mcp.tools._shared.browser import BrowserManager
+from linkedin_mcp.tools.companies.get.page import CompanyProfilePage
+from linkedin_mcp.tools.companies.search.page import CompanySearchPage
+from linkedin_mcp.tools.connections.list.page import ConnectionsListPage
+from linkedin_mcp.tools.invitations.list.page import InvitationListPage
+from linkedin_mcp.tools.invitations.send.page import InvitationActionPage
+from linkedin_mcp.tools.jobs.get.page import JobDetailPage
+from linkedin_mcp.tools.jobs.search.page import JobSearchPage
+from linkedin_mcp.tools.messaging.conversation.get.page import ConversationPage
+from linkedin_mcp.tools.messaging.search.page import ConversationSearchPage
+from linkedin_mcp.tools.people.get.page import PersonProfilePage
+from linkedin_mcp.tools.people.search.page import PeopleSearchPage
+from linkedin_mcp.tools.posts.comment.page import PostEngagementPage
+from linkedin_mcp.tools.posts.comments.list.page import PostCommentsPage
+from linkedin_mcp.tools.posts.create.page import PostPublishingPage
+from linkedin_mcp.tools.posts.get.page import PostDetailPage
+from linkedin_mcp.tools.posts.search.page import PostSearchPage
 
 
 @dataclass(slots=True)

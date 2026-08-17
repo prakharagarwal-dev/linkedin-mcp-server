@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 from pydantic import HttpUrl
 
+from linkedin_mcp.app.executor import CapabilityExecutor
 from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import (
     InternalServerError,
@@ -14,89 +15,121 @@ from linkedin_mcp.errors import (
     InvalidTargetError,
     ParserDriftError,
 )
-from linkedin_mcp.linkedin.models import (
-    CURRENT_RECEIVED_INVITATION_VIEWS,
+from linkedin_mcp.tools._shared.actions import (
     ActionCommand,
     ActionInspection,
     ActionOutcome,
     ActionPageResult,
     ActionTarget,
-    CommentObservation,
-    CommentSort,
-    CommentThread,
+    ReactionSetPayload,
+    ReactionState,
+)
+from linkedin_mcp.tools._shared.models import (
+    EvidenceField,
+    StopReason,
+)
+from linkedin_mcp.tools._shared.tool import safe_capability_error
+from linkedin_mcp.tools.companies.get.models import (
     CompanyGetInput,
     CompanyProfileCoverage,
     CompanyProfileEvidence,
     CompanyProfileObservation,
     CompanyProfilePageCapture,
+)
+from linkedin_mcp.tools.companies.search.models import (
     CompanySearchCoverage,
     CompanySearchInput,
     CompanySummary,
+)
+from linkedin_mcp.tools.connections.list.models import (
     ConnectionsListCoverage,
     ConnectionsListInput,
+    ConnectionSummary,
+)
+from linkedin_mcp.tools.connections.search.models import (
     ConnectionsSearchFilters,
     ConnectionsSearchInput,
-    ConnectionSummary,
-    ConversationCoverage,
-    ConversationFilter,
-    ConversationGetInput,
-    ConversationObservation,
-    ConversationSearchCoverage,
-    ConversationSearchInput,
-    ConversationSummary,
-    EvidenceField,
-    InvitationAcceptInput,
+    PersonConnectionDegree,
+)
+from linkedin_mcp.tools.invitations.accept.models import InvitationAcceptInput
+from linkedin_mcp.tools.invitations.ignore.models import InvitationIgnoreInput
+from linkedin_mcp.tools.invitations.list.models import (
+    CURRENT_RECEIVED_INVITATION_VIEWS,
     InvitationAvailableAction,
     InvitationDirection,
     InvitationEntity,
     InvitationEntityType,
     InvitationEvidence,
     InvitationFilter,
-    InvitationIgnoreInput,
     InvitationListCoverage,
     InvitationListInput,
-    InvitationSendInput,
     InvitationSummary,
     InvitationType,
+)
+from linkedin_mcp.tools.invitations.send.models import InvitationSendInput
+from linkedin_mcp.tools.jobs.get.models import (
     JobDetailInput,
     JobDetailObservation,
+)
+from linkedin_mcp.tools.jobs.search.models import (
     JobSearchCoverage,
     JobSearchInput,
     JobSummary,
+)
+from linkedin_mcp.tools.messaging.conversation.get.models import (
+    ConversationCoverage,
+    ConversationGetInput,
+    ConversationObservation,
     MessageDirection,
     MessageObservation,
-    MessageSendInput,
+)
+from linkedin_mcp.tools.messaging.search.models import (
+    ConversationFilter,
+    ConversationSearchCoverage,
+    ConversationSearchInput,
+    ConversationSummary,
+)
+from linkedin_mcp.tools.messaging.send.models import MessageSendInput
+from linkedin_mcp.tools.people.get.models import (
     PeopleGetInput,
-    PeopleSearchConnectionDegree,
-    PeopleSearchCoverage,
-    PeopleSearchInput,
-    PersonConnectionDegree,
     PersonProfileCoverage,
     PersonProfileEvidence,
     PersonProfileObservation,
     PersonProfilePageCapture,
     PersonProfileSectionSelector,
+)
+from linkedin_mcp.tools.people.search.models import (
+    PeopleSearchConnectionDegree,
+    PeopleSearchCoverage,
+    PeopleSearchInput,
     PersonSummary,
-    PostAuthor,
-    PostAuthorType,
-    PostCommentInput,
+)
+from linkedin_mcp.tools.posts.comment.models import PostCommentInput
+from linkedin_mcp.tools.posts.comments.list.models import (
+    CommentObservation,
+    CommentSort,
+    CommentThread,
     PostCommentsCoverage,
     PostCommentsListInput,
+)
+from linkedin_mcp.tools.posts.create.models import (
     PostCreateInput,
+    TextPostContent,
+)
+from linkedin_mcp.tools.posts.get.models import (
+    PostAuthor,
+    PostAuthorType,
     PostDetailCoverage,
     PostEvidence,
     PostGetInput,
     PostObservation,
-    PostReactionInput,
+)
+from linkedin_mcp.tools.posts.react.models import PostReactionInput
+from linkedin_mcp.tools.posts.search.models import (
     PostSearchCoverage,
     PostSearchInput,
     PostSummary,
-    ReactionSetPayload,
-    ReactionState,
-    StopReason,
-    TextPostContent,
 )
-from linkedin_mcp.linkedin.operations import CapabilityExecutor, safe_capability_error
 
 
 class FakeJobSearch:
@@ -1352,7 +1385,7 @@ _READ_FAILURE_CASES: tuple[tuple[str, str, str, object], ...] = (
         ),
     ),
     (
-        "_conversation",
+        "_conversation_read",
         "read",
         "get_conversation",
         ConversationGetInput(
