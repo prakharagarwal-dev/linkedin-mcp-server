@@ -22,12 +22,10 @@ from linkedin_mcp.tools._shared.actions import (
 from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.tools.posts._shared import engagement as engagement_page
 from linkedin_mcp.tools.posts._shared.engagement import PostEngagementPage
-from linkedin_mcp.tools.posts.comment.models import (
-    CommentGifAttachment,
-    CommentPhotoAttachment,
-    PostCommentInput,
-)
-from linkedin_mcp.tools.posts.react.models import PostReactionInput
+from linkedin_mcp.tools.posts.comment.models.comment_gif_attachment import CommentGifAttachment
+from linkedin_mcp.tools.posts.comment.models.comment_photo_attachment import CommentPhotoAttachment
+from linkedin_mcp.tools.posts.comment.models.post_comment_input import PostCommentInput
+from linkedin_mcp.tools.posts.react.models.post_reaction_input import PostReactionInput
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 ENGAGEMENT_HTML = (FIXTURES / "posts/latest/engagement.html").read_text(encoding="utf-8")

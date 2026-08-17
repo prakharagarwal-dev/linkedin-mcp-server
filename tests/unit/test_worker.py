@@ -26,17 +26,15 @@ from linkedin_mcp.tools._shared.models import (
     PaginationMetadata,
     StopReason,
 )
-from linkedin_mcp.tools.companies.get.models import (
-    CompanyGetInput,
-    CompanyGetOutput,
-    CompanyProfileCoverage,
+from linkedin_mcp.tools.companies.get.models.company_get_input import CompanyGetInput
+from linkedin_mcp.tools.companies.get.models.company_get_output import CompanyGetOutput
+from linkedin_mcp.tools.companies.get.models.company_profile_coverage import CompanyProfileCoverage
+from linkedin_mcp.tools.companies.get.models.company_profile_observation import (
     CompanyProfileObservation,
 )
-from linkedin_mcp.tools.companies.search.models import (
-    CompanySearchCoverage,
-    CompanySearchInput,
-    CompanySearchOutput,
-)
+from linkedin_mcp.tools.companies.search.models.company_search_coverage import CompanySearchCoverage
+from linkedin_mcp.tools.companies.search.models.company_search_input import CompanySearchInput
+from linkedin_mcp.tools.companies.search.models.company_search_output import CompanySearchOutput
 from linkedin_mcp.tools.connections.list.models import ConnectionsListInput
 from linkedin_mcp.tools.connections.search.models import (
     ConnectionsSearchFilters,
@@ -47,54 +45,48 @@ from linkedin_mcp.tools.invitations.accept.models import InvitationAcceptInput
 from linkedin_mcp.tools.invitations.ignore.models import InvitationIgnoreInput
 from linkedin_mcp.tools.invitations.list.models import InvitationListInput
 from linkedin_mcp.tools.invitations.send.models import InvitationSendInput
-from linkedin_mcp.tools.jobs.get.models import (
-    JobDetailInput,
-    JobDetailObservation,
-    JobDetailOutput,
+from linkedin_mcp.tools.jobs.get.models.job_detail_input import JobDetailInput
+from linkedin_mcp.tools.jobs.get.models.job_detail_observation import JobDetailObservation
+from linkedin_mcp.tools.jobs.get.models.job_detail_output import JobDetailOutput
+from linkedin_mcp.tools.jobs.search.models.job_search_coverage import JobSearchCoverage
+from linkedin_mcp.tools.jobs.search.models.job_search_input import JobSearchInput
+from linkedin_mcp.tools.jobs.search.models.job_search_output import JobSearchOutput
+from linkedin_mcp.tools.messaging.conversation.get.models.conversation_get_input import (
+    ConversationGetInput,
 )
-from linkedin_mcp.tools.jobs.search.models import (
-    JobSearchCoverage,
-    JobSearchInput,
-    JobSearchOutput,
+from linkedin_mcp.tools.messaging.search.models.conversation_search_input import (
+    ConversationSearchInput,
 )
-from linkedin_mcp.tools.messaging.conversation.get.models import ConversationGetInput
-from linkedin_mcp.tools.messaging.search.models import ConversationSearchInput
-from linkedin_mcp.tools.messaging.send.models import MessageSendInput
-from linkedin_mcp.tools.people.get.models import (
-    PeopleGetInput,
-    PeopleGetOutput,
-    PersonProfileCoverage,
-    PersonProfileObservation,
-)
-from linkedin_mcp.tools.people.search.models import (
-    PeopleSearchCoverage,
-    PeopleSearchInput,
-    PeopleSearchOutput,
-)
-from linkedin_mcp.tools.posts.comment.models import PostCommentInput
-from linkedin_mcp.tools.posts.comments.list.models import (
+from linkedin_mcp.tools.messaging.send.models.message_send_input import MessageSendInput
+from linkedin_mcp.tools.people.get.models.people_get_input import PeopleGetInput
+from linkedin_mcp.tools.people.get.models.people_get_output import PeopleGetOutput
+from linkedin_mcp.tools.people.get.models.person_profile_coverage import PersonProfileCoverage
+from linkedin_mcp.tools.people.get.models.person_profile_observation import PersonProfileObservation
+from linkedin_mcp.tools.people.search.models.people_search_coverage import PeopleSearchCoverage
+from linkedin_mcp.tools.people.search.models.people_search_input import PeopleSearchInput
+from linkedin_mcp.tools.people.search.models.people_search_output import PeopleSearchOutput
+from linkedin_mcp.tools.posts.comment.models.post_comment_input import PostCommentInput
+from linkedin_mcp.tools.posts.comments.list.models.post_comments_coverage import (
     PostCommentsCoverage,
+)
+from linkedin_mcp.tools.posts.comments.list.models.post_comments_list_input import (
     PostCommentsListInput,
+)
+from linkedin_mcp.tools.posts.comments.list.models.post_comments_list_output import (
     PostCommentsListOutput,
 )
-from linkedin_mcp.tools.posts.create.models import (
-    PostCreateInput,
-    TextPostContent,
-)
-from linkedin_mcp.tools.posts.get.models import (
-    PostAuthor,
-    PostAuthorType,
-    PostDetailCoverage,
-    PostGetInput,
-    PostGetOutput,
-    PostObservation,
-)
-from linkedin_mcp.tools.posts.react.models import PostReactionInput
-from linkedin_mcp.tools.posts.search.models import (
-    PostSearchCoverage,
-    PostSearchInput,
-    PostSearchOutput,
-)
+from linkedin_mcp.tools.posts.create.models.post_create_input import PostCreateInput
+from linkedin_mcp.tools.posts.create.models.text_post_content import TextPostContent
+from linkedin_mcp.tools.posts.get.models.post_author_type import PostAuthorType
+from linkedin_mcp.tools.posts.get.models.post_detail_coverage import PostDetailCoverage
+from linkedin_mcp.tools.posts.get.models.post_get_input import PostGetInput
+from linkedin_mcp.tools.posts.get.models.post_get_output import PostGetOutput
+from linkedin_mcp.tools.posts.get.models.post_observation import PostObservation
+from linkedin_mcp.tools.posts.models.post_author import PostAuthor
+from linkedin_mcp.tools.posts.react.models.post_reaction_input import PostReactionInput
+from linkedin_mcp.tools.posts.search.models.post_search_coverage import PostSearchCoverage
+from linkedin_mcp.tools.posts.search.models.post_search_input import PostSearchInput
+from linkedin_mcp.tools.posts.search.models.post_search_output import PostSearchOutput
 
 
 def _pagination(request: PaginatedInput) -> PaginationMetadata:

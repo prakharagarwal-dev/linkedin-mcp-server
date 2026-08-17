@@ -13,10 +13,8 @@ from linkedin_mcp.tools._shared.tool import (
     IdentifierArgument,
     tool_result,
 )
-from linkedin_mcp.tools.jobs.get.models import (
-    JobDetailInput,
-    JobDetailOutput,
-)
+from linkedin_mcp.tools.jobs.get.models.job_detail_input import JobDetailInput
+from linkedin_mcp.tools.jobs.get.models.job_detail_output import JobDetailOutput
 
 
 def register(

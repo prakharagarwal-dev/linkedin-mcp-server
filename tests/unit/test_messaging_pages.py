@@ -28,20 +28,20 @@ from linkedin_mcp.tools.messaging._shared.pages import (
     ConversationSearchPage,
 )
 from linkedin_mcp.tools.messaging.conversation.get.evidence import source_from_conversation
-from linkedin_mcp.tools.messaging.conversation.get.models import (
+from linkedin_mcp.tools.messaging.conversation.get.models.conversation_get_input import (
     ConversationGetInput,
-    MessageAttachmentKind,
-    MessageDirection,
 )
-from linkedin_mcp.tools.messaging.search.models import (
-    ConversationCategory,
-    ConversationFilter,
+from linkedin_mcp.tools.messaging.conversation.get.models.message_attachment_kind import (
+    MessageAttachmentKind,
+)
+from linkedin_mcp.tools.messaging.conversation.get.models.message_direction import MessageDirection
+from linkedin_mcp.tools.messaging.search.models.conversation_category import ConversationCategory
+from linkedin_mcp.tools.messaging.search.models.conversation_filter import ConversationFilter
+from linkedin_mcp.tools.messaging.search.models.conversation_search_input import (
     ConversationSearchInput,
 )
-from linkedin_mcp.tools.messaging.send.models import (
-    MessageFileInput,
-    MessageSendInput,
-)
+from linkedin_mcp.tools.messaging.send.models.message_file_input import MessageFileInput
+from linkedin_mcp.tools.messaging.send.models.message_send_input import MessageSendInput
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 MESSAGING_FIXTURES = FIXTURES / "messaging" / "latest"

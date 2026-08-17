@@ -6,9 +6,13 @@ from typing import Protocol
 
 from linkedin_mcp.tools._shared.execution import OperationSupport
 from linkedin_mcp.tools.messaging.conversation.get.evidence import source_from_conversation
-from linkedin_mcp.tools.messaging.conversation.get.models import (
+from linkedin_mcp.tools.messaging.conversation.get.models.conversation_get_input import (
     ConversationGetInput,
+)
+from linkedin_mcp.tools.messaging.conversation.get.models.conversation_get_output import (
     ConversationGetOutput,
+)
+from linkedin_mcp.tools.messaging.conversation.get.models.conversation_observation import (
     ConversationObservation,
 )
 

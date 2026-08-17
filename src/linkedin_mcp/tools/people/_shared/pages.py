@@ -23,25 +23,31 @@ from linkedin_mcp.tools._shared.collections import (
 from linkedin_mcp.tools._shared.identifiers import PROFILE_SLUG_SEGMENT_PATTERN
 from linkedin_mcp.tools._shared.models import StopReason
 from linkedin_mcp.tools._shared.urls import canonical_profile_url, profile_slug_from_url
-from linkedin_mcp.tools.people._shared.models import (
-    PeopleGetInput,
-    PeopleSearchConnectionDegree,
-    PeopleSearchCoverage,
-    PeopleSearchFilters,
-    PeopleSearchInput,
-    PersonConnectionDegree,
-    PersonEducation,
-    PersonExperience,
-    PersonProfileCoverage,
-    PersonProfileEvidence,
-    PersonProfileLink,
-    PersonProfileObservation,
+from linkedin_mcp.tools.people.get.models.people_get_input import PeopleGetInput
+from linkedin_mcp.tools.people.get.models.person_education import PersonEducation
+from linkedin_mcp.tools.people.get.models.person_experience import PersonExperience
+from linkedin_mcp.tools.people.get.models.person_profile_coverage import PersonProfileCoverage
+from linkedin_mcp.tools.people.get.models.person_profile_evidence import PersonProfileEvidence
+from linkedin_mcp.tools.people.get.models.person_profile_link import PersonProfileLink
+from linkedin_mcp.tools.people.get.models.person_profile_observation import PersonProfileObservation
+from linkedin_mcp.tools.people.get.models.person_profile_page_capture import (
     PersonProfilePageCapture,
-    PersonProfileSection,
-    PersonProfileSectionEntry,
-    PersonProfileSectionSelector,
-    PersonSummary,
 )
+from linkedin_mcp.tools.people.get.models.person_profile_section import PersonProfileSection
+from linkedin_mcp.tools.people.get.models.person_profile_section_entry import (
+    PersonProfileSectionEntry,
+)
+from linkedin_mcp.tools.people.get.models.person_profile_section_selector import (
+    PersonProfileSectionSelector,
+)
+from linkedin_mcp.tools.people.models.person_connection_degree import PersonConnectionDegree
+from linkedin_mcp.tools.people.search.models.people_search_connection_degree import (
+    PeopleSearchConnectionDegree,
+)
+from linkedin_mcp.tools.people.search.models.people_search_coverage import PeopleSearchCoverage
+from linkedin_mcp.tools.people.search.models.people_search_filters import PeopleSearchFilters
+from linkedin_mcp.tools.people.search.models.people_search_input import PeopleSearchInput
+from linkedin_mcp.tools.people.search.models.person_summary import PersonSummary
 
 _CONNECTION_FILTER_CODES = {
     PeopleSearchConnectionDegree.FIRST: "F",

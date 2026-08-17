@@ -18,8 +18,10 @@ from linkedin_mcp.mcp.context import (
 )
 from linkedin_mcp.tools._shared.actions import ActionOutput
 from linkedin_mcp.tools._shared.models import CapabilityName, PaginatedInput
-from linkedin_mcp.tools.companies.get.models import CompanyGetInput, CompanyGetOutput
-from linkedin_mcp.tools.companies.search.models import CompanySearchInput, CompanySearchOutput
+from linkedin_mcp.tools.companies.get.models.company_get_input import CompanyGetInput
+from linkedin_mcp.tools.companies.get.models.company_get_output import CompanyGetOutput
+from linkedin_mcp.tools.companies.search.models.company_search_input import CompanySearchInput
+from linkedin_mcp.tools.companies.search.models.company_search_output import CompanySearchOutput
 from linkedin_mcp.tools.connections.list.models import ConnectionsListInput, ConnectionsListOutput
 from linkedin_mcp.tools.connections.search.models import (
     ConnectionsSearchInput,
@@ -29,28 +31,40 @@ from linkedin_mcp.tools.invitations.accept.models import InvitationAcceptInput
 from linkedin_mcp.tools.invitations.ignore.models import InvitationIgnoreInput
 from linkedin_mcp.tools.invitations.list.models import InvitationListInput, InvitationListOutput
 from linkedin_mcp.tools.invitations.send.models import InvitationSendInput
-from linkedin_mcp.tools.jobs.get.models import JobDetailInput, JobDetailOutput
-from linkedin_mcp.tools.jobs.search.models import JobSearchInput, JobSearchOutput
-from linkedin_mcp.tools.messaging.conversation.get.models import (
+from linkedin_mcp.tools.jobs.get.models.job_detail_input import JobDetailInput
+from linkedin_mcp.tools.jobs.get.models.job_detail_output import JobDetailOutput
+from linkedin_mcp.tools.jobs.search.models.job_search_input import JobSearchInput
+from linkedin_mcp.tools.jobs.search.models.job_search_output import JobSearchOutput
+from linkedin_mcp.tools.messaging.conversation.get.models.conversation_get_input import (
     ConversationGetInput,
+)
+from linkedin_mcp.tools.messaging.conversation.get.models.conversation_get_output import (
     ConversationGetOutput,
 )
-from linkedin_mcp.tools.messaging.search.models import (
+from linkedin_mcp.tools.messaging.search.models.conversation_search_input import (
     ConversationSearchInput,
+)
+from linkedin_mcp.tools.messaging.search.models.conversation_search_output import (
     ConversationSearchOutput,
 )
-from linkedin_mcp.tools.messaging.send.models import MessageSendInput
-from linkedin_mcp.tools.people.get.models import PeopleGetInput, PeopleGetOutput
-from linkedin_mcp.tools.people.search.models import PeopleSearchInput, PeopleSearchOutput
-from linkedin_mcp.tools.posts.comment.models import PostCommentInput
-from linkedin_mcp.tools.posts.comments.list.models import (
+from linkedin_mcp.tools.messaging.send.models.message_send_input import MessageSendInput
+from linkedin_mcp.tools.people.get.models.people_get_input import PeopleGetInput
+from linkedin_mcp.tools.people.get.models.people_get_output import PeopleGetOutput
+from linkedin_mcp.tools.people.search.models.people_search_input import PeopleSearchInput
+from linkedin_mcp.tools.people.search.models.people_search_output import PeopleSearchOutput
+from linkedin_mcp.tools.posts.comment.models.post_comment_input import PostCommentInput
+from linkedin_mcp.tools.posts.comments.list.models.post_comments_list_input import (
     PostCommentsListInput,
+)
+from linkedin_mcp.tools.posts.comments.list.models.post_comments_list_output import (
     PostCommentsListOutput,
 )
-from linkedin_mcp.tools.posts.create.models import PostCreateInput
-from linkedin_mcp.tools.posts.get.models import PostGetInput, PostGetOutput
-from linkedin_mcp.tools.posts.react.models import PostReactionInput
-from linkedin_mcp.tools.posts.search.models import PostSearchInput, PostSearchOutput
+from linkedin_mcp.tools.posts.create.models.post_create_input import PostCreateInput
+from linkedin_mcp.tools.posts.get.models.post_get_input import PostGetInput
+from linkedin_mcp.tools.posts.get.models.post_get_output import PostGetOutput
+from linkedin_mcp.tools.posts.react.models.post_reaction_input import PostReactionInput
+from linkedin_mcp.tools.posts.search.models.post_search_input import PostSearchInput
+from linkedin_mcp.tools.posts.search.models.post_search_output import PostSearchOutput
 
 CapabilityRequest = (
     JobSearchInput

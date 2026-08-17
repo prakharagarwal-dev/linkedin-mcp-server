@@ -15,13 +15,13 @@ from linkedin_mcp.tools._shared.models import (
     StopReason,
     StrictModel,
 )
-from linkedin_mcp.tools.people._shared.models import (
+from linkedin_mcp.tools.people.search.models.people_search_connection_degree import (
     PeopleSearchConnectionDegree,
-    PeopleSearchFilterBase,
-    PeopleSearchFilters,
-    PeopleSearchInput,
-    PeopleSearchOutput,
 )
+from linkedin_mcp.tools.people.search.models.people_search_filter_base import PeopleSearchFilterBase
+from linkedin_mcp.tools.people.search.models.people_search_filters import PeopleSearchFilters
+from linkedin_mcp.tools.people.search.models.people_search_input import PeopleSearchInput
+from linkedin_mcp.tools.people.search.models.people_search_output import PeopleSearchOutput
 
 
 class InvitationDirection(StrEnum):

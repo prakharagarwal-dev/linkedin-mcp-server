@@ -14,10 +14,8 @@ from linkedin_mcp.tools._shared.tool import (
     IdentifierArgument,
     tool_result,
 )
-from linkedin_mcp.tools.posts.react.models import (
-    PostReactionInput,
-    ReactionState,
-)
+from linkedin_mcp.tools.posts.react.models.post_reaction_input import PostReactionInput
+from linkedin_mcp.tools.posts.react.models.reaction_state import ReactionState
 
 
 def register(

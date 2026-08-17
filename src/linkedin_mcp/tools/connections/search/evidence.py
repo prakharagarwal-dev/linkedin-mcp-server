@@ -2,7 +2,8 @@
 
 from linkedin_mcp.tools._shared.models import SourceReference, SourceType
 from linkedin_mcp.tools._shared.source import source_reference, verify_visible_items
-from linkedin_mcp.tools.people.search.models import PeopleSearchCoverage, PersonSummary
+from linkedin_mcp.tools.people.search.models.people_search_coverage import PeopleSearchCoverage
+from linkedin_mcp.tools.people.search.models.person_summary import PersonSummary
 
 
 def source_from_people_search(

@@ -3,8 +3,8 @@
 from linkedin_mcp.errors import ParserDriftError
 from linkedin_mcp.tools._shared.models import SourceReference, SourceType
 from linkedin_mcp.tools._shared.source import source_reference
-from linkedin_mcp.tools.people.get.models import (
-    PersonProfileObservation,
+from linkedin_mcp.tools.people.get.models.person_profile_observation import PersonProfileObservation
+from linkedin_mcp.tools.people.get.models.person_profile_page_capture import (
     PersonProfilePageCapture,
 )
 

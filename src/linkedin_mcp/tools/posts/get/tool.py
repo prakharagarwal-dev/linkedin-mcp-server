@@ -13,10 +13,8 @@ from linkedin_mcp.tools._shared.tool import (
     IdentifierArgument,
     tool_result,
 )
-from linkedin_mcp.tools.posts.get.models import (
-    PostGetInput,
-    PostGetOutput,
-)
+from linkedin_mcp.tools.posts.get.models.post_get_input import PostGetInput
+from linkedin_mcp.tools.posts.get.models.post_get_output import PostGetOutput
 
 
 def register(

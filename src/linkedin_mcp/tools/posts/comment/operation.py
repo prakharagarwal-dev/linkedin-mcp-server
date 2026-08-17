@@ -14,7 +14,7 @@ from linkedin_mcp.tools._shared.actions import (
 )
 from linkedin_mcp.tools._shared.execution import OperationSupport
 from linkedin_mcp.tools._shared.models import CapabilityName
-from linkedin_mcp.tools.posts.comment.models import PostCommentInput
+from linkedin_mcp.tools.posts.comment.models.post_comment_input import PostCommentInput
 
 
 class PostCommentProvider(Protocol):

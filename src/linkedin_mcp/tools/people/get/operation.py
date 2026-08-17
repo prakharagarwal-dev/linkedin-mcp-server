@@ -6,10 +6,10 @@ from typing import Protocol
 
 from linkedin_mcp.tools._shared.execution import OperationSupport
 from linkedin_mcp.tools.people.get.evidence import sources_from_person_profile
-from linkedin_mcp.tools.people.get.models import (
-    PeopleGetInput,
-    PeopleGetOutput,
-    PersonProfileObservation,
+from linkedin_mcp.tools.people.get.models.people_get_input import PeopleGetInput
+from linkedin_mcp.tools.people.get.models.people_get_output import PeopleGetOutput
+from linkedin_mcp.tools.people.get.models.person_profile_observation import PersonProfileObservation
+from linkedin_mcp.tools.people.get.models.person_profile_page_capture import (
     PersonProfilePageCapture,
 )
 

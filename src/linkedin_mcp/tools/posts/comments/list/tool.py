@@ -15,9 +15,11 @@ from linkedin_mcp.tools._shared.tool import (
     PageSizeArgument,
     tool_result,
 )
-from linkedin_mcp.tools.posts.comments.list.models import (
-    CommentSort,
+from linkedin_mcp.tools.posts.comments.list.models.comment_sort import CommentSort
+from linkedin_mcp.tools.posts.comments.list.models.post_comments_list_input import (
     PostCommentsListInput,
+)
+from linkedin_mcp.tools.posts.comments.list.models.post_comments_list_output import (
     PostCommentsListOutput,
 )
 

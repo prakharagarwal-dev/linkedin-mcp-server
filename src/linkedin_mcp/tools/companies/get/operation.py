@@ -6,10 +6,12 @@ from typing import Protocol
 
 from linkedin_mcp.tools._shared.execution import OperationSupport
 from linkedin_mcp.tools.companies.get.evidence import sources_from_company_profile
-from linkedin_mcp.tools.companies.get.models import (
-    CompanyGetInput,
-    CompanyGetOutput,
+from linkedin_mcp.tools.companies.get.models.company_get_input import CompanyGetInput
+from linkedin_mcp.tools.companies.get.models.company_get_output import CompanyGetOutput
+from linkedin_mcp.tools.companies.get.models.company_profile_observation import (
     CompanyProfileObservation,
+)
+from linkedin_mcp.tools.companies.get.models.company_profile_page_capture import (
     CompanyProfilePageCapture,
 )
 

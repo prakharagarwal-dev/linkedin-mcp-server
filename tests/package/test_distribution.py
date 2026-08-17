@@ -117,13 +117,25 @@ def test_source_layout_keeps_infrastructure_and_linkedin_features_separate() -> 
         "linkedin.messaging.send": "messaging/send",
     }
     status_tools = {"linkedin.server.status", "linkedin.session.status"}
+    split_model_domains = {"companies", "jobs", "messaging", "people", "posts"}
     for tool_name, relative_path in capability_paths.items():
         capability = tools / relative_path
-        required_files = {"__init__.py", "models.py", "tool.py"}
+        required_files = {"__init__.py", "tool.py"}
         if tool_name not in status_tools:
             required_files.update({"evidence.py", "operation.py", "page.py"})
         assert required_files <= {path.name for path in capability.glob("*.py")}
+        domain = relative_path.split("/", maxsplit=1)[0]
+        if domain in split_model_domains:
+            model_package = capability / "models"
+            assert (model_package / "__init__.py").is_file()
+            assert not (capability / "models.py").exists()
+            assert any(path.name != "__init__.py" for path in model_package.glob("*.py"))
+        else:
+            assert (capability / "models.py").is_file()
         assert f'name="{tool_name}"' in (capability / "tool.py").read_text(encoding="utf-8")
+
+    for domain in split_model_domains:
+        assert not (tools / domain / "_shared" / "models.py").exists()
 
     server_source = (package / "mcp" / "server.py").read_text(encoding="utf-8")
     assert "attach_tools(mcp, container)" in server_source

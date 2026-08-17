@@ -15,8 +15,8 @@ from linkedin_mcp.errors import AuthenticationRequiredError, BrowserUnavailableE
 from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.tools._shared.models import StopReason
 from linkedin_mcp.tools.companies._shared.pages import CompanyProfilePage, CompanySearchPage
-from linkedin_mcp.tools.companies.get.models import CompanyGetInput
-from linkedin_mcp.tools.companies.search.models import CompanySearchInput
+from linkedin_mcp.tools.companies.get.models.company_get_input import CompanyGetInput
+from linkedin_mcp.tools.companies.search.models.company_search_input import CompanySearchInput
 from linkedin_mcp.tools.connections._shared.pages import ConnectionsListPage
 from linkedin_mcp.tools.connections.list.models import ConnectionsListInput
 from linkedin_mcp.tools.invitations._shared.pages import InvitationListPage
@@ -26,21 +26,27 @@ from linkedin_mcp.tools.invitations.list.models import (
     InvitationListInput,
 )
 from linkedin_mcp.tools.jobs._shared.pages import JobDetailPage, JobSearchPage
-from linkedin_mcp.tools.jobs.get.models import JobDetailInput
-from linkedin_mcp.tools.jobs.search.models import JobSearchInput
+from linkedin_mcp.tools.jobs.get.models.job_detail_input import JobDetailInput
+from linkedin_mcp.tools.jobs.search.models.job_search_input import JobSearchInput
 from linkedin_mcp.tools.messaging._shared.pages import ConversationPage, ConversationSearchPage
-from linkedin_mcp.tools.messaging.conversation.get.models import ConversationGetInput
-from linkedin_mcp.tools.messaging.search.models import ConversationSearchInput
+from linkedin_mcp.tools.messaging.conversation.get.models.conversation_get_input import (
+    ConversationGetInput,
+)
+from linkedin_mcp.tools.messaging.search.models.conversation_search_input import (
+    ConversationSearchInput,
+)
 from linkedin_mcp.tools.people._shared.pages import PeopleSearchPage, PersonProfilePage
-from linkedin_mcp.tools.people.get.models import (
-    PeopleGetInput,
+from linkedin_mcp.tools.people.get.models.people_get_input import PeopleGetInput
+from linkedin_mcp.tools.people.get.models.person_profile_section_selector import (
     PersonProfileSectionSelector,
 )
-from linkedin_mcp.tools.people.search.models import PeopleSearchInput
+from linkedin_mcp.tools.people.search.models.people_search_input import PeopleSearchInput
 from linkedin_mcp.tools.posts._shared.pages import PostCommentsPage, PostDetailPage, PostSearchPage
-from linkedin_mcp.tools.posts.comments.list.models import PostCommentsListInput
-from linkedin_mcp.tools.posts.get.models import PostGetInput
-from linkedin_mcp.tools.posts.search.models import PostSearchInput
+from linkedin_mcp.tools.posts.comments.list.models.post_comments_list_input import (
+    PostCommentsListInput,
+)
+from linkedin_mcp.tools.posts.get.models.post_get_input import PostGetInput
+from linkedin_mcp.tools.posts.search.models.post_search_input import PostSearchInput
 from tests.simulator import SimulatorBrowser, standard_scenario
 from tests.simulator.state import SimulatorFault
 

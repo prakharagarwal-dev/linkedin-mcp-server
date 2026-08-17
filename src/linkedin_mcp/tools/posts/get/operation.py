@@ -6,11 +6,9 @@ from typing import Protocol
 
 from linkedin_mcp.tools._shared.execution import OperationSupport
 from linkedin_mcp.tools.posts.get.evidence import source_from_post
-from linkedin_mcp.tools.posts.get.models import (
-    PostGetInput,
-    PostGetOutput,
-    PostObservation,
-)
+from linkedin_mcp.tools.posts.get.models.post_get_input import PostGetInput
+from linkedin_mcp.tools.posts.get.models.post_get_output import PostGetOutput
+from linkedin_mcp.tools.posts.get.models.post_observation import PostObservation
 
 
 class PostDetailProvider(Protocol):

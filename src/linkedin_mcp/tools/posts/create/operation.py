@@ -14,7 +14,7 @@ from linkedin_mcp.tools._shared.actions import (
 )
 from linkedin_mcp.tools._shared.execution import OperationSupport
 from linkedin_mcp.tools._shared.models import CapabilityName
-from linkedin_mcp.tools.posts.create.models import PostCreateInput
+from linkedin_mcp.tools.posts.create.models.post_create_input import PostCreateInput
 
 
 class PostPublishingProvider(Protocol):

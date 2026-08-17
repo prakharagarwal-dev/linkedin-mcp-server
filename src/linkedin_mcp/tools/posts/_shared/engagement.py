@@ -29,16 +29,6 @@ from linkedin_mcp.tools._shared.urls import (
     canonical_profile_url,
     profile_slug_from_url,
 )
-from linkedin_mcp.tools.posts._shared.models import (
-    CommentAttachmentType,
-    CommentGifAttachment,
-    CommentObservation,
-    CommentPhotoAttachment,
-    PostCommentInput,
-    PostMentionInput,
-    PostReactionInput,
-    ReactionState,
-)
 from linkedin_mcp.tools.posts._shared.pages import (
     comment_from_region,
     comment_regions,
@@ -46,6 +36,16 @@ from linkedin_mcp.tools.posts._shared.pages import (
     post_author_from_region,
     region_for_post,
 )
+from linkedin_mcp.tools.posts.comment.models.comment_gif_attachment import CommentGifAttachment
+from linkedin_mcp.tools.posts.comment.models.comment_photo_attachment import CommentPhotoAttachment
+from linkedin_mcp.tools.posts.comment.models.post_comment_input import PostCommentInput
+from linkedin_mcp.tools.posts.comments.list.models.comment_attachment_type import (
+    CommentAttachmentType,
+)
+from linkedin_mcp.tools.posts.comments.list.models.comment_observation import CommentObservation
+from linkedin_mcp.tools.posts.models.post_mention_input import PostMentionInput
+from linkedin_mcp.tools.posts.react.models.post_reaction_input import PostReactionInput
+from linkedin_mcp.tools.posts.react.models.reaction_state import ReactionState
 
 _REACTION_LABELS = {
     ReactionState.LIKE: "Like",

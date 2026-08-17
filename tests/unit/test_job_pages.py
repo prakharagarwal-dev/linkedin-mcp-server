@@ -17,20 +17,16 @@ from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.tools._shared.models import StopReason
 from linkedin_mcp.tools.jobs._shared.pages import JobDetailPage, JobSearchPage
 from linkedin_mcp.tools.jobs.get.evidence import source_from_job_detail
-from linkedin_mcp.tools.jobs.get.models import (
-    JobApplyMethod,
-    JobDetailInput,
-    JobWorkplaceType,
-)
-from linkedin_mcp.tools.jobs.search.models import (
-    JobBenefit,
-    JobCommitment,
-    JobEmploymentType,
-    JobExperienceLevel,
-    JobSearchFilters,
-    JobSearchInput,
-    JobSearchSort,
-)
+from linkedin_mcp.tools.jobs.get.models.job_apply_method import JobApplyMethod
+from linkedin_mcp.tools.jobs.get.models.job_detail_input import JobDetailInput
+from linkedin_mcp.tools.jobs.models.job_workplace_type import JobWorkplaceType
+from linkedin_mcp.tools.jobs.search.models.job_benefit import JobBenefit
+from linkedin_mcp.tools.jobs.search.models.job_commitment import JobCommitment
+from linkedin_mcp.tools.jobs.search.models.job_employment_type import JobEmploymentType
+from linkedin_mcp.tools.jobs.search.models.job_experience_level import JobExperienceLevel
+from linkedin_mcp.tools.jobs.search.models.job_search_filters import JobSearchFilters
+from linkedin_mcp.tools.jobs.search.models.job_search_input import JobSearchInput
+from linkedin_mcp.tools.jobs.search.models.job_search_sort import JobSearchSort
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 JOB_FIXTURES = FIXTURES / "jobs" / "latest"

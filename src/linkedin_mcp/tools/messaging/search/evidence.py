@@ -2,10 +2,10 @@
 
 from linkedin_mcp.tools._shared.models import SourceReference, SourceType
 from linkedin_mcp.tools._shared.source import source_reference, verify_visible_items
-from linkedin_mcp.tools.messaging.search.models import (
+from linkedin_mcp.tools.messaging.search.models.conversation_search_coverage import (
     ConversationSearchCoverage,
-    ConversationSummary,
 )
+from linkedin_mcp.tools.messaging.search.models.conversation_summary import ConversationSummary
 
 
 def source_from_conversation_search(

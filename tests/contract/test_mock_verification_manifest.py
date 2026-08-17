@@ -8,14 +8,16 @@ from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import ErrorCode
 from linkedin_mcp.mcp.server import create_mcp_server
 from linkedin_mcp.tools._shared.models import CapabilityName, StrictModel
-from linkedin_mcp.tools.companies.search.models import CompanySearchFilters
+from linkedin_mcp.tools.companies.search.models.company_search_filters import CompanySearchFilters
 from linkedin_mcp.tools.connections.search.models import ConnectionsSearchFilters
-from linkedin_mcp.tools.jobs.search.models import JobSearchFilters
-from linkedin_mcp.tools.people.get.models import PersonProfileSectionSelector
-from linkedin_mcp.tools.people.search.models import PeopleSearchFilters
-from linkedin_mcp.tools.posts.create.models import PostCreateMode
-from linkedin_mcp.tools.posts.react.models import ReactionState
-from linkedin_mcp.tools.posts.search.models import PostSearchFilters
+from linkedin_mcp.tools.jobs.search.models.job_search_filters import JobSearchFilters
+from linkedin_mcp.tools.people.get.models.person_profile_section_selector import (
+    PersonProfileSectionSelector,
+)
+from linkedin_mcp.tools.people.search.models.people_search_filters import PeopleSearchFilters
+from linkedin_mcp.tools.posts.create.models.post_create_mode import PostCreateMode
+from linkedin_mcp.tools.posts.react.models.reaction_state import ReactionState
+from linkedin_mcp.tools.posts.search.models.post_search_filters import PostSearchFilters
 from tests.simulator import standard_scenario
 from tests.verification_manifest import MOCK_VERIFICATION, missing_test_files
 

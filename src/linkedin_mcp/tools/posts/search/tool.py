@@ -15,11 +15,9 @@ from linkedin_mcp.tools._shared.tool import (
     PageSizeArgument,
     tool_result,
 )
-from linkedin_mcp.tools.posts.search.models import (
-    PostSearchFilters,
-    PostSearchInput,
-    PostSearchOutput,
-)
+from linkedin_mcp.tools.posts.search.models.post_search_filters import PostSearchFilters
+from linkedin_mcp.tools.posts.search.models.post_search_input import PostSearchInput
+from linkedin_mcp.tools.posts.search.models.post_search_output import PostSearchOutput
 
 
 def register(

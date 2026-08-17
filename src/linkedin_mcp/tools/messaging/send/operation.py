@@ -14,7 +14,7 @@ from linkedin_mcp.tools._shared.actions import (
 )
 from linkedin_mcp.tools._shared.execution import OperationSupport
 from linkedin_mcp.tools._shared.models import CapabilityName
-from linkedin_mcp.tools.messaging.send.models import MessageSendInput
+from linkedin_mcp.tools.messaging.send.models.message_send_input import MessageSendInput
 
 
 class MessageSendProvider(Protocol):

@@ -6,11 +6,9 @@ from typing import Protocol
 
 from linkedin_mcp.tools._shared.execution import OperationSupport
 from linkedin_mcp.tools.jobs.get.evidence import source_from_job_detail
-from linkedin_mcp.tools.jobs.get.models import (
-    JobDetailInput,
-    JobDetailObservation,
-    JobDetailOutput,
-)
+from linkedin_mcp.tools.jobs.get.models.job_detail_input import JobDetailInput
+from linkedin_mcp.tools.jobs.get.models.job_detail_observation import JobDetailObservation
+from linkedin_mcp.tools.jobs.get.models.job_detail_output import JobDetailOutput
 
 
 class JobDetailProvider(Protocol):

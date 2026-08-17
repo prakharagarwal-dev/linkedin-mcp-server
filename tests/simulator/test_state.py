@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from linkedin_mcp.tools.messaging.conversation.get.models import MessageDirection
-from linkedin_mcp.tools.posts.react.models import ReactionState
+from linkedin_mcp.tools.messaging.conversation.get.models.message_direction import MessageDirection
+from linkedin_mcp.tools.posts.react.models.reaction_state import ReactionState
 from tests.simulator.state import SimulatorFault, SimulatorState
 
 

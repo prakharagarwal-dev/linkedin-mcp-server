@@ -34,37 +34,43 @@ from linkedin_mcp.tools._shared.urls import (
     profile_slug_from_url,
     validate_linkedin_url,
 )
-from linkedin_mcp.tools.posts._shared.models import (
+from linkedin_mcp.tools.posts.comments.list.models.comment_attachment_observation import (
     CommentAttachmentObservation,
-    CommentAttachmentType,
-    CommentObservation,
-    CommentSort,
-    CommentThread,
-    PostAttachment,
-    PostAuthor,
-    PostAuthorType,
-    PostCommentsCoverage,
-    PostCommentsListInput,
-    PostContentType,
-    PostDetailCoverage,
-    PostEvidence,
-    PostGetInput,
-    PostLink,
-    PostObservation,
-    PostPoll,
-    PostPollOption,
-    PostPollState,
-    PostResharedContent,
-    PostSearchContentType,
-    PostSearchCoverage,
-    PostSearchDate,
-    PostSearchFilters,
-    PostSearchInput,
-    PostSearchPostedBy,
-    PostSearchSort,
-    PostSummary,
-    ReactionState,
 )
+from linkedin_mcp.tools.posts.comments.list.models.comment_attachment_type import (
+    CommentAttachmentType,
+)
+from linkedin_mcp.tools.posts.comments.list.models.comment_observation import CommentObservation
+from linkedin_mcp.tools.posts.comments.list.models.comment_sort import CommentSort
+from linkedin_mcp.tools.posts.comments.list.models.comment_thread import CommentThread
+from linkedin_mcp.tools.posts.comments.list.models.post_comments_coverage import (
+    PostCommentsCoverage,
+)
+from linkedin_mcp.tools.posts.comments.list.models.post_comments_list_input import (
+    PostCommentsListInput,
+)
+from linkedin_mcp.tools.posts.get.models.post_attachment import PostAttachment
+from linkedin_mcp.tools.posts.get.models.post_author_type import PostAuthorType
+from linkedin_mcp.tools.posts.get.models.post_detail_coverage import PostDetailCoverage
+from linkedin_mcp.tools.posts.get.models.post_evidence import PostEvidence
+from linkedin_mcp.tools.posts.get.models.post_get_input import PostGetInput
+from linkedin_mcp.tools.posts.get.models.post_link import PostLink
+from linkedin_mcp.tools.posts.get.models.post_observation import PostObservation
+from linkedin_mcp.tools.posts.get.models.post_poll import PostPoll
+from linkedin_mcp.tools.posts.get.models.post_poll_option import PostPollOption
+from linkedin_mcp.tools.posts.get.models.post_poll_state import PostPollState
+from linkedin_mcp.tools.posts.get.models.post_reshared_content import PostResharedContent
+from linkedin_mcp.tools.posts.models.post_author import PostAuthor
+from linkedin_mcp.tools.posts.react.models.reaction_state import ReactionState
+from linkedin_mcp.tools.posts.search.models.post_content_type import PostContentType
+from linkedin_mcp.tools.posts.search.models.post_search_content_type import PostSearchContentType
+from linkedin_mcp.tools.posts.search.models.post_search_coverage import PostSearchCoverage
+from linkedin_mcp.tools.posts.search.models.post_search_date import PostSearchDate
+from linkedin_mcp.tools.posts.search.models.post_search_filters import PostSearchFilters
+from linkedin_mcp.tools.posts.search.models.post_search_input import PostSearchInput
+from linkedin_mcp.tools.posts.search.models.post_search_posted_by import PostSearchPostedBy
+from linkedin_mcp.tools.posts.search.models.post_search_sort import PostSearchSort
+from linkedin_mcp.tools.posts.search.models.post_summary import PostSummary
 
 _CONTENT_SEARCH_URL = "https://www.linkedin.com/search/results/content/"
 _COUNT_PATTERNS = {

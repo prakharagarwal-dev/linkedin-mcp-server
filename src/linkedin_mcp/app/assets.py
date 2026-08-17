@@ -8,16 +8,15 @@ from pathlib import Path
 
 from linkedin_mcp.errors import InvalidTargetError
 from linkedin_mcp.tools._shared.models import AssetReference
-from linkedin_mcp.tools.posts._shared.models import PostAssetRole
-from linkedin_mcp.tools.posts.comment.models import CommentAttachment, CommentPhotoAttachment
-from linkedin_mcp.tools.posts.create.models import (
-    CelebrationPostContent,
-    DocumentPostContent,
-    EventPostContent,
-    ImagePostContent,
-    PostCreateContent,
-    VideoPostContent,
-)
+from linkedin_mcp.tools.posts.comment.models.comment_attachment import CommentAttachment
+from linkedin_mcp.tools.posts.comment.models.comment_photo_attachment import CommentPhotoAttachment
+from linkedin_mcp.tools.posts.create.models.celebration_post_content import CelebrationPostContent
+from linkedin_mcp.tools.posts.create.models.document_post_content import DocumentPostContent
+from linkedin_mcp.tools.posts.create.models.event_post_content import EventPostContent
+from linkedin_mcp.tools.posts.create.models.image_post_content import ImagePostContent
+from linkedin_mcp.tools.posts.create.models.post_asset_role import PostAssetRole
+from linkedin_mcp.tools.posts.create.models.post_create_content import PostCreateContent
+from linkedin_mcp.tools.posts.create.models.video_post_content import VideoPostContent
 
 _MIB = 1024 * 1024
 _ROLE_LIMITS: dict[PostAssetRole, tuple[int, int]] = {

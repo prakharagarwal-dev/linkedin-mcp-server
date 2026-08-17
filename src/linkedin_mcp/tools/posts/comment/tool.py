@@ -14,11 +14,9 @@ from linkedin_mcp.tools._shared.tool import (
     IdentifierArgument,
     tool_result,
 )
-from linkedin_mcp.tools.posts.comment.models import (
-    CommentAttachment,
-    PostCommentInput,
-    PostMentionInput,
-)
+from linkedin_mcp.tools.posts.comment.models.comment_attachment import CommentAttachment
+from linkedin_mcp.tools.posts.comment.models.post_comment_input import PostCommentInput
+from linkedin_mcp.tools.posts.models.post_mention_input import PostMentionInput
 
 
 def register(

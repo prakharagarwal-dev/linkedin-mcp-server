@@ -15,14 +15,12 @@ from linkedin_mcp.tools._shared.tool import (
     IdentifierArgument,
     tool_result,
 )
-from linkedin_mcp.tools.posts.create.models import (
-    PostAudience,
-    PostCollaboratorInput,
-    PostCommentControl,
-    PostCreateContent,
-    PostCreateInput,
-    PostGroupTarget,
-)
+from linkedin_mcp.tools.posts.create.models.post_audience import PostAudience
+from linkedin_mcp.tools.posts.create.models.post_collaborator_input import PostCollaboratorInput
+from linkedin_mcp.tools.posts.create.models.post_comment_control import PostCommentControl
+from linkedin_mcp.tools.posts.create.models.post_create_content import PostCreateContent
+from linkedin_mcp.tools.posts.create.models.post_create_input import PostCreateInput
+from linkedin_mcp.tools.posts.create.models.post_group_target import PostGroupTarget
 
 
 def register(

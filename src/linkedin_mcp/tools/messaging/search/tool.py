@@ -15,10 +15,12 @@ from linkedin_mcp.tools._shared.tool import (
     PageSizeArgument,
     tool_result,
 )
-from linkedin_mcp.tools.messaging.search.models import (
-    ConversationCategory,
-    ConversationFilter,
+from linkedin_mcp.tools.messaging.search.models.conversation_category import ConversationCategory
+from linkedin_mcp.tools.messaging.search.models.conversation_filter import ConversationFilter
+from linkedin_mcp.tools.messaging.search.models.conversation_search_input import (
     ConversationSearchInput,
+)
+from linkedin_mcp.tools.messaging.search.models.conversation_search_output import (
     ConversationSearchOutput,
 )
 

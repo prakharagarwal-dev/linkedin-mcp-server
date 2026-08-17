@@ -3,7 +3,7 @@
 from linkedin_mcp.errors import ParserDriftError
 from linkedin_mcp.tools._shared.models import SourceReference, SourceType
 from linkedin_mcp.tools._shared.source import source_reference
-from linkedin_mcp.tools.jobs.get.models import JobDetailObservation
+from linkedin_mcp.tools.jobs.get.models.job_detail_observation import JobDetailObservation
 
 
 def source_from_job_detail(observation: JobDetailObservation) -> SourceReference:

@@ -4,7 +4,7 @@ from linkedin_mcp.errors import ParserDriftError
 from linkedin_mcp.tools._shared.models import SourceReference, SourceType
 from linkedin_mcp.tools._shared.source import source_reference
 from linkedin_mcp.tools._shared.urls import post_reference_from_value
-from linkedin_mcp.tools.posts.get.models import PostObservation
+from linkedin_mcp.tools.posts.get.models.post_observation import PostObservation
 
 
 def source_from_post(observation: PostObservation) -> SourceReference:

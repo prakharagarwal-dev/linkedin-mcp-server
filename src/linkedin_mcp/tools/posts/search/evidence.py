@@ -3,7 +3,8 @@
 from linkedin_mcp.errors import ParserDriftError
 from linkedin_mcp.tools._shared.models import SourceReference, SourceType
 from linkedin_mcp.tools._shared.source import source_reference, verify_visible_items
-from linkedin_mcp.tools.posts.search.models import PostSearchCoverage, PostSummary
+from linkedin_mcp.tools.posts.search.models.post_search_coverage import PostSearchCoverage
+from linkedin_mcp.tools.posts.search.models.post_summary import PostSummary
 
 
 def source_from_post_search(

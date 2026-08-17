@@ -14,12 +14,10 @@ from linkedin_mcp.tools._shared.models import (
     StopReason,
 )
 from linkedin_mcp.tools.posts.search.evidence import source_from_post_search
-from linkedin_mcp.tools.posts.search.models import (
-    PostSearchCoverage,
-    PostSearchInput,
-    PostSearchOutput,
-    PostSummary,
-)
+from linkedin_mcp.tools.posts.search.models.post_search_coverage import PostSearchCoverage
+from linkedin_mcp.tools.posts.search.models.post_search_input import PostSearchInput
+from linkedin_mcp.tools.posts.search.models.post_search_output import PostSearchOutput
+from linkedin_mcp.tools.posts.search.models.post_summary import PostSummary
 
 
 class PostSearchProvider(Protocol):

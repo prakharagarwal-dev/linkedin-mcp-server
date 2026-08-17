@@ -13,10 +13,8 @@ from linkedin_mcp.tools._shared.tool import (
     IdentifierArgument,
     tool_result,
 )
-from linkedin_mcp.tools.companies.get.models import (
-    CompanyGetInput,
-    CompanyGetOutput,
-)
+from linkedin_mcp.tools.companies.get.models.company_get_input import CompanyGetInput
+from linkedin_mcp.tools.companies.get.models.company_get_output import CompanyGetOutput
 
 
 def register(

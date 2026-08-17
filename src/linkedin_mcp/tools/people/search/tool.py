@@ -15,11 +15,9 @@ from linkedin_mcp.tools._shared.tool import (
     PageSizeArgument,
     tool_result,
 )
-from linkedin_mcp.tools.people.search.models import (
-    PeopleSearchFilters,
-    PeopleSearchInput,
-    PeopleSearchOutput,
-)
+from linkedin_mcp.tools.people.search.models.people_search_filters import PeopleSearchFilters
+from linkedin_mcp.tools.people.search.models.people_search_input import PeopleSearchInput
+from linkedin_mcp.tools.people.search.models.people_search_output import PeopleSearchOutput
 
 
 def register(

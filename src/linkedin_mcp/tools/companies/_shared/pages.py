@@ -25,18 +25,20 @@ from linkedin_mcp.tools._shared.urls import (
     canonical_company_url,
     company_slug_from_url,
 )
-from linkedin_mcp.tools.companies._shared.models import (
-    CompanyGetInput,
-    CompanyProfileCoverage,
-    CompanyProfileEvidence,
+from linkedin_mcp.tools.companies.get.models.company_get_input import CompanyGetInput
+from linkedin_mcp.tools.companies.get.models.company_profile_coverage import CompanyProfileCoverage
+from linkedin_mcp.tools.companies.get.models.company_profile_evidence import CompanyProfileEvidence
+from linkedin_mcp.tools.companies.get.models.company_profile_observation import (
     CompanyProfileObservation,
-    CompanyProfilePageCapture,
-    CompanySearchCoverage,
-    CompanySearchFilters,
-    CompanySearchInput,
-    CompanySize,
-    CompanySummary,
 )
+from linkedin_mcp.tools.companies.get.models.company_profile_page_capture import (
+    CompanyProfilePageCapture,
+)
+from linkedin_mcp.tools.companies.search.models.company_search_coverage import CompanySearchCoverage
+from linkedin_mcp.tools.companies.search.models.company_search_filters import CompanySearchFilters
+from linkedin_mcp.tools.companies.search.models.company_search_input import CompanySearchInput
+from linkedin_mcp.tools.companies.search.models.company_size import CompanySize
+from linkedin_mcp.tools.companies.search.models.company_summary import CompanySummary
 
 _COMPANY_SEARCH_URL = "https://www.linkedin.com/search/results/companies/"
 _COMPANY_SIZE_CODES = {

@@ -40,22 +40,36 @@ from linkedin_mcp.tools._shared.urls import (
     conversation_id_from_url,
     profile_slug_from_url,
 )
-from linkedin_mcp.tools.messaging._shared.models import (
-    ConversationCategory,
+from linkedin_mcp.tools.messaging.conversation.get.models.conversation_coverage import (
     ConversationCoverage,
-    ConversationFilter,
-    ConversationGetInput,
-    ConversationObservation,
-    ConversationSearchCoverage,
-    ConversationSearchInput,
-    ConversationSummary,
-    MessageAttachmentKind,
-    MessageAttachmentObservation,
-    MessageDirection,
-    MessageGifInput,
-    MessageObservation,
-    MessageSendInput,
 )
+from linkedin_mcp.tools.messaging.conversation.get.models.conversation_get_input import (
+    ConversationGetInput,
+)
+from linkedin_mcp.tools.messaging.conversation.get.models.conversation_observation import (
+    ConversationObservation,
+)
+from linkedin_mcp.tools.messaging.conversation.get.models.message_attachment_kind import (
+    MessageAttachmentKind,
+)
+from linkedin_mcp.tools.messaging.conversation.get.models.message_attachment_observation import (
+    MessageAttachmentObservation,
+)
+from linkedin_mcp.tools.messaging.conversation.get.models.message_direction import MessageDirection
+from linkedin_mcp.tools.messaging.conversation.get.models.message_observation import (
+    MessageObservation,
+)
+from linkedin_mcp.tools.messaging.search.models.conversation_category import ConversationCategory
+from linkedin_mcp.tools.messaging.search.models.conversation_filter import ConversationFilter
+from linkedin_mcp.tools.messaging.search.models.conversation_search_coverage import (
+    ConversationSearchCoverage,
+)
+from linkedin_mcp.tools.messaging.search.models.conversation_search_input import (
+    ConversationSearchInput,
+)
+from linkedin_mcp.tools.messaging.search.models.conversation_summary import ConversationSummary
+from linkedin_mcp.tools.messaging.send.models.message_gif_input import MessageGifInput
+from linkedin_mcp.tools.messaging.send.models.message_send_input import MessageSendInput
 
 _MESSAGING_URL = "https://www.linkedin.com/messaging/"
 _COMPOSER_SELECTOR = '[contenteditable]:not([contenteditable="false"]), textarea'

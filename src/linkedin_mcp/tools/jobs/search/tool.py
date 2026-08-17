@@ -15,11 +15,9 @@ from linkedin_mcp.tools._shared.tool import (
     PageSizeArgument,
     tool_result,
 )
-from linkedin_mcp.tools.jobs.search.models import (
-    JobSearchFilters,
-    JobSearchInput,
-    JobSearchOutput,
-)
+from linkedin_mcp.tools.jobs.search.models.job_search_filters import JobSearchFilters
+from linkedin_mcp.tools.jobs.search.models.job_search_input import JobSearchInput
+from linkedin_mcp.tools.jobs.search.models.job_search_output import JobSearchOutput
 
 
 def register(

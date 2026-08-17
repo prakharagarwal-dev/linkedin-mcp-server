@@ -14,12 +14,10 @@ from linkedin_mcp.tools._shared.models import (
     StopReason,
 )
 from linkedin_mcp.tools.people.search.evidence import source_from_people_search
-from linkedin_mcp.tools.people.search.models import (
-    PeopleSearchCoverage,
-    PeopleSearchInput,
-    PeopleSearchOutput,
-    PersonSummary,
-)
+from linkedin_mcp.tools.people.search.models.people_search_coverage import PeopleSearchCoverage
+from linkedin_mcp.tools.people.search.models.people_search_input import PeopleSearchInput
+from linkedin_mcp.tools.people.search.models.people_search_output import PeopleSearchOutput
+from linkedin_mcp.tools.people.search.models.person_summary import PersonSummary
 
 
 class PeopleSearchProvider(Protocol):

@@ -11,10 +11,14 @@ from linkedin_mcp.app.pagination import (
 from linkedin_mcp.tools._shared.execution import OperationSupport
 from linkedin_mcp.tools._shared.models import CapabilityName
 from linkedin_mcp.tools.posts.comments.list.evidence import source_from_post_comments
-from linkedin_mcp.tools.posts.comments.list.models import (
-    CommentThread,
+from linkedin_mcp.tools.posts.comments.list.models.comment_thread import CommentThread
+from linkedin_mcp.tools.posts.comments.list.models.post_comments_coverage import (
     PostCommentsCoverage,
+)
+from linkedin_mcp.tools.posts.comments.list.models.post_comments_list_input import (
     PostCommentsListInput,
+)
+from linkedin_mcp.tools.posts.comments.list.models.post_comments_list_output import (
     PostCommentsListOutput,
 )
 

@@ -14,12 +14,16 @@ from linkedin_mcp.tools._shared.models import (
     StopReason,
 )
 from linkedin_mcp.tools.messaging.search.evidence import source_from_conversation_search
-from linkedin_mcp.tools.messaging.search.models import (
+from linkedin_mcp.tools.messaging.search.models.conversation_search_coverage import (
     ConversationSearchCoverage,
-    ConversationSearchInput,
-    ConversationSearchOutput,
-    ConversationSummary,
 )
+from linkedin_mcp.tools.messaging.search.models.conversation_search_input import (
+    ConversationSearchInput,
+)
+from linkedin_mcp.tools.messaging.search.models.conversation_search_output import (
+    ConversationSearchOutput,
+)
+from linkedin_mcp.tools.messaging.search.models.conversation_summary import ConversationSummary
 
 
 class ConversationSearchProvider(Protocol):

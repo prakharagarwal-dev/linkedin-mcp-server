@@ -17,20 +17,20 @@ from linkedin_mcp.tools._shared.models import (
     SourceReference,
     StrictModel,
 )
-from linkedin_mcp.tools.messaging._shared.models import MessageGifInput
-from linkedin_mcp.tools.posts._shared.models import (
-    CommentAttachment,
-    EventPostContent,
+from linkedin_mcp.tools.messaging.send.models.message_gif_input import MessageGifInput
+from linkedin_mcp.tools.posts.comment.models.comment_attachment import CommentAttachment
+from linkedin_mcp.tools.posts.create.models.event_post_content import EventPostContent
+from linkedin_mcp.tools.posts.create.models.expert_request_post_content import (
     ExpertRequestPostContent,
-    HiringPostContent,
-    PostAudience,
-    PostCollaboratorInput,
-    PostCommentControl,
-    PostCreateContent,
-    PostGroupTarget,
-    PostMentionInput,
-    ReactionState,
 )
+from linkedin_mcp.tools.posts.create.models.hiring_post_content import HiringPostContent
+from linkedin_mcp.tools.posts.create.models.post_audience import PostAudience
+from linkedin_mcp.tools.posts.create.models.post_collaborator_input import PostCollaboratorInput
+from linkedin_mcp.tools.posts.create.models.post_comment_control import PostCommentControl
+from linkedin_mcp.tools.posts.create.models.post_create_content import PostCreateContent
+from linkedin_mcp.tools.posts.create.models.post_group_target import PostGroupTarget
+from linkedin_mcp.tools.posts.models.post_mention_input import PostMentionInput
+from linkedin_mcp.tools.posts.react.models.reaction_state import ReactionState
 
 
 class ActionType(StrEnum):

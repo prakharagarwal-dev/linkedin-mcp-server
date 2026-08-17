@@ -22,22 +22,20 @@ from linkedin_mcp.tools._shared.urls import (
     job_id_from_url,
     profile_slug_from_url,
 )
-from linkedin_mcp.tools.jobs._shared.models import (
-    JobApplyMethod,
-    JobBenefit,
-    JobCommitment,
-    JobDetailInput,
-    JobDetailObservation,
-    JobEmploymentType,
-    JobExperienceLevel,
-    JobHiringTeamMember,
-    JobSearchCoverage,
-    JobSearchFilters,
-    JobSearchInput,
-    JobSearchSort,
-    JobSummary,
-    JobWorkplaceType,
-)
+from linkedin_mcp.tools.jobs.get.models.job_apply_method import JobApplyMethod
+from linkedin_mcp.tools.jobs.get.models.job_detail_input import JobDetailInput
+from linkedin_mcp.tools.jobs.get.models.job_detail_observation import JobDetailObservation
+from linkedin_mcp.tools.jobs.get.models.job_hiring_team_member import JobHiringTeamMember
+from linkedin_mcp.tools.jobs.models.job_workplace_type import JobWorkplaceType
+from linkedin_mcp.tools.jobs.search.models.job_benefit import JobBenefit
+from linkedin_mcp.tools.jobs.search.models.job_commitment import JobCommitment
+from linkedin_mcp.tools.jobs.search.models.job_employment_type import JobEmploymentType
+from linkedin_mcp.tools.jobs.search.models.job_experience_level import JobExperienceLevel
+from linkedin_mcp.tools.jobs.search.models.job_search_coverage import JobSearchCoverage
+from linkedin_mcp.tools.jobs.search.models.job_search_filters import JobSearchFilters
+from linkedin_mcp.tools.jobs.search.models.job_search_input import JobSearchInput
+from linkedin_mcp.tools.jobs.search.models.job_search_sort import JobSearchSort
+from linkedin_mcp.tools.jobs.search.models.job_summary import JobSummary
 
 _LISTED_PATTERN = re.compile(
     r"\b(?:reposted\s+)?(?:\d+\s+)?(?:minute|hour|day|week|month)s?\s+ago\b|\breposted\b",

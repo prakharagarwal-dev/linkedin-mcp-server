@@ -12,7 +12,7 @@ from linkedin_mcp.tools.invitations.list.models import (
     InvitationFilter,
     InvitationListInput,
 )
-from linkedin_mcp.tools.jobs.search.models import JobSearchInput
+from linkedin_mcp.tools.jobs.search.models.job_search_input import JobSearchInput
 
 
 class MutableClock:

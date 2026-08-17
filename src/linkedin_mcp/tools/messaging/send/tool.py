@@ -15,11 +15,9 @@ from linkedin_mcp.tools._shared.tool import (
     IdentifierArgument,
     tool_result,
 )
-from linkedin_mcp.tools.messaging.send.models import (
-    MessageFileInput,
-    MessageGifInput,
-    MessageSendInput,
-)
+from linkedin_mcp.tools.messaging.send.models.message_file_input import MessageFileInput
+from linkedin_mcp.tools.messaging.send.models.message_gif_input import MessageGifInput
+from linkedin_mcp.tools.messaging.send.models.message_send_input import MessageSendInput
 
 
 def register(

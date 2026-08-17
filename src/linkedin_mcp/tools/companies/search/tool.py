@@ -15,11 +15,9 @@ from linkedin_mcp.tools._shared.tool import (
     PageSizeArgument,
     tool_result,
 )
-from linkedin_mcp.tools.companies.search.models import (
-    CompanySearchFilters,
-    CompanySearchInput,
-    CompanySearchOutput,
-)
+from linkedin_mcp.tools.companies.search.models.company_search_filters import CompanySearchFilters
+from linkedin_mcp.tools.companies.search.models.company_search_input import CompanySearchInput
+from linkedin_mcp.tools.companies.search.models.company_search_output import CompanySearchOutput
 
 
 def register(

@@ -5,7 +5,7 @@ from linkedin_mcp.tools._shared.network_models import (
     ConnectionsSearchInput,
     ConnectionsSearchOutput,
 )
-from linkedin_mcp.tools.people.search.models import PersonConnectionDegree
+from linkedin_mcp.tools.people.models.person_connection_degree import PersonConnectionDegree
 
 __all__ = [
     "ConnectionsSearchFilters",

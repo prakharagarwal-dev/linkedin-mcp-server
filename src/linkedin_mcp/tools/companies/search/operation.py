@@ -14,12 +14,10 @@ from linkedin_mcp.tools._shared.models import (
     StopReason,
 )
 from linkedin_mcp.tools.companies.search.evidence import source_from_company_search
-from linkedin_mcp.tools.companies.search.models import (
-    CompanySearchCoverage,
-    CompanySearchInput,
-    CompanySearchOutput,
-    CompanySummary,
-)
+from linkedin_mcp.tools.companies.search.models.company_search_coverage import CompanySearchCoverage
+from linkedin_mcp.tools.companies.search.models.company_search_input import CompanySearchInput
+from linkedin_mcp.tools.companies.search.models.company_search_output import CompanySearchOutput
+from linkedin_mcp.tools.companies.search.models.company_summary import CompanySummary
 
 
 class CompanySearchProvider(Protocol):
