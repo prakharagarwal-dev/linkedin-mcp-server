@@ -7,7 +7,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field
 
-from linkedin_mcp.browser.models import BrowserSetupState
+from linkedin_mcp.browser.bootstrap import BrowserSetupState
 from linkedin_mcp.linkedin.common import (
     CapabilityName,
     Identifier,

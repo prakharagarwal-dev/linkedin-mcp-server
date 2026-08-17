@@ -4,7 +4,7 @@ import time
 
 import pytest
 
-from linkedin_mcp.browser.pacing import NavigationPacer
+from linkedin_mcp.automation.pacing import NavigationPacer
 
 
 @pytest.mark.asyncio
