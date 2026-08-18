@@ -16,8 +16,8 @@ The server processes only data needed for the typed MCP capability you invoke:
 - LinkedIn source URLs, capture times, visible evidence, and typed operation
   results;
 - the target and exact payload of an account-changing tool you invoke;
-- local files that you explicitly place under the configured asset directory
-  and reference for a post, comment, or message; and
+- local files whose paths you explicitly provide for a post, comment, or
+  message; and
 - non-secret configuration and operational metadata needed to run the local
   process.
 
@@ -36,8 +36,8 @@ The server has no analytics, advertising, telemetry, database, call-result
 cache, evidence store, or external application-state service. Tool inputs,
 observations, and results are not retained after the invocation completes.
 Queue coordination, pacing, and continuation cursors remain temporarily in
-process memory. The Chromium profile and user-managed asset directory are the
-only locations where the server intentionally keeps user data across restarts.
+process memory. The Chromium profile is the only location where the server
+intentionally keeps user data across restarts.
 Your MCP client may retain tool inputs or results under that client's own
 settings and privacy policy.
 
@@ -46,9 +46,9 @@ settings and privacy policy.
 The server communicates with LinkedIn only through the visible web UI. LinkedIn
 receives the same page requests and, for a client-authorized write, the same
 content that a user would submit in the web interface. Tool results and
-evidence are returned to the MCP client that invoked the server. Local assets
-are sent to LinkedIn only during the exact account-changing action that
-references them.
+evidence are returned to the MCP client that invoked the server. Local files
+selected by path are sent to LinkedIn only during the exact account-changing
+action that references them.
 
 The project does not sell personal data or send LinkedIn content, cookies,
 credentials, messages, or local assets to the maintainer, advertisers, data
@@ -64,7 +64,8 @@ your MCP client's processing is governed by that client's policy.
   profile directory. `profile reset` archives the old directory as a sibling
   `*.backup-*` path; backups and failed-creation archives persist until you
   remove them. Treat all of these directories as sensitive authentication data.
-- Files in the configured asset directory remain until you remove them.
+- Client-selected upload files remain in their original locations under the
+  user's control; the server does not copy or retain them.
 - Playwright browser binaries and ordinary browser cache may persist in their
   configured local cache locations until you remove them.
 - Logs are emitted to the environment running the server and contain bounded
@@ -73,16 +74,16 @@ your MCP client's processing is governed by that client's policy.
   that environment.
 
 Use `linkedin-mcp status` and `linkedin-mcp stop` before deleting local profile
-or asset data. The locations are derived from your operating system's per-user
+data. Its location is derived from your operating system's per-user
 application-data directory and can be overridden with
-`LINKEDIN_MCP_BROWSER_PROFILE_PATH` and `LINKEDIN_MCP_ASSET_ROOT_PATH`.
+`LINKEDIN_MCP_BROWSER_PROFILE_PATH`.
 
 ## Your choices
 
 You can revoke the saved LinkedIn session with `linkedin-mcp logout`, delete the
-local browser profile and its archives, remove local assets at any time,
-disable tools in your MCP client, and stop the process to clear cursors, pacing,
-and queue state.
+local browser profile and its archives, disable tools in your MCP client, and
+stop the process to clear cursors, pacing, and queue state. You control the
+original files selected for upload and may remove them independently.
 
 ## Contact
 

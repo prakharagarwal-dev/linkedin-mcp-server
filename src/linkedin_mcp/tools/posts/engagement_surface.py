@@ -9,7 +9,6 @@ from urllib.parse import urljoin
 from playwright.async_api import Locator, Page
 from pydantic import HttpUrl
 
-from linkedin_mcp.assets import LocalAssetStore
 from linkedin_mcp.errors import ParserDriftError
 from linkedin_mcp.tools._shared.actions import (
     ActionOutcome,
@@ -75,9 +74,8 @@ async def _visible_text(page: Page) -> str:
 class PostEngagementSurface:
     """Shared visible-surface mechanics for PostEngagementSurface."""
 
-    def __init__(self, browser: BrowserManager, assets: LocalAssetStore) -> None:
+    def __init__(self, browser: BrowserManager) -> None:
         self._browser = browser
-        self._assets = assets
 
     async def _resolve_target(
         self,

@@ -26,10 +26,6 @@ def _default_browser_cache_path() -> Path:
     return user_cache_path("ms-playwright", appauthor=False, opinion=False)
 
 
-def _default_asset_root_path() -> Path:
-    return default_data_path() / "assets"
-
-
 def _default_runtime_lock_path() -> Path:
     return default_data_path() / "runtime.lock"
 
@@ -49,8 +45,6 @@ class Settings(BaseSettings):
     browser_auto_install: bool = True
     browser_install_timeout_seconds: float = Field(default=600, ge=30, le=1_800)
     auto_login_on_start: bool = True
-    asset_root_path: Path = Field(default_factory=_default_asset_root_path)
-
     allowed_hosts: tuple[str, ...] = ("www.linkedin.com", "linkedin.com")
 
     queue_capacity: int = Field(default=100, ge=1, le=10_000)

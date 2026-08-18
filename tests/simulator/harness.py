@@ -53,7 +53,6 @@ def create_simulator_server(
         auto_login_on_start=False,
         browser_auto_install=False,
         browser_profile_path=root / f"profile-{suffix}",
-        asset_root_path=root / f"assets-{suffix}",
         minimum_navigation_interval_seconds=0,
         runtime_lock_path=root / f"runtime-{suffix}.lock",
     )

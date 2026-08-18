@@ -153,7 +153,7 @@ def test_source_layout_keeps_infrastructure_and_linkedin_features_separate() -> 
     assert not (package / "container.py").exists()
     assert not (package / "pagination.py").exists()
     assert (infra_package / "cursor" / "store.py").is_file()
-    assert (package / "assets.py").is_file()
+    assert not (package / "assets.py").exists()
 
     domain_modules = {
         "jobs": {"__init__.py", "surface.py"},

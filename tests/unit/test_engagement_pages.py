@@ -10,7 +10,6 @@ from playwright.async_api import Locator, Page, Route, async_playwright
 from pydantic import ValidationError
 
 import linkedin_mcp.tools.posts.comment.page as engagement_page
-from linkedin_mcp.assets import LocalAssetStore
 from linkedin_mcp.tools._shared.actions import (
     ActionCommand,
     ActionOutcome,
@@ -191,7 +190,6 @@ async def test_top_level_comment_preserves_text_link_emoji_mention_and_target(
         page = await browser.new_page()
         adapter = PostCommentPage(
             cast(BrowserManager, EngagementFixtureBrowser(page)),
-            LocalAssetStore(tmp_path),
         )
         try:
             command = await _comment_command(adapter, request)
@@ -236,7 +234,6 @@ async def test_comment_requires_stable_reference_despite_visible_delta_and_clear
         )
         adapter = PostCommentPage(
             cast(BrowserManager, fixture_browser),
-            LocalAssetStore(tmp_path),
         )
         try:
             result = await adapter.perform_comment(await _comment_command(adapter, request))
@@ -273,7 +270,6 @@ async def test_comment_verifies_stable_reference_with_visible_expansion_affordan
         page = await browser.new_page()
         adapter = PostCommentPage(
             cast(BrowserManager, EngagementFixtureBrowser(page, html=html)),
-            LocalAssetStore(tmp_path),
         )
         try:
             result = await adapter.perform_comment(await _comment_command(adapter, request))
@@ -305,7 +301,6 @@ async def test_comment_submit_ignores_visible_comment_count_control(tmp_path: Pa
         page = await browser.new_page()
         adapter = PostCommentPage(
             cast(BrowserManager, EngagementFixtureBrowser(page, html=html)),
-            LocalAssetStore(tmp_path),
         )
         try:
             result = await adapter.perform_comment(await _comment_command(adapter, request))
@@ -340,7 +335,6 @@ async def test_comment_waits_for_async_composer_after_count_control(tmp_path: Pa
         page = await browser.new_page()
         adapter = PostCommentPage(
             cast(BrowserManager, EngagementFixtureBrowser(page, html=html)),
-            LocalAssetStore(tmp_path),
         )
         try:
             result = await adapter.perform_comment(await _comment_command(adapter, request))
@@ -378,7 +372,6 @@ async def test_comment_waits_for_async_named_active_member_link(tmp_path: Path) 
         page = await browser.new_page()
         adapter = PostCommentPage(
             cast(BrowserManager, EngagementFixtureBrowser(page, html=html)),
-            LocalAssetStore(tmp_path),
         )
         try:
             command = await _comment_command(adapter, request)
@@ -410,7 +403,6 @@ async def test_comment_verifies_native_ugc_discussion_alias_for_activity_url(
         page = await browser.new_page()
         adapter = PostCommentPage(
             cast(BrowserManager, EngagementFixtureBrowser(page, html=html)),
-            LocalAssetStore(tmp_path),
         )
         try:
             result = await adapter.perform_comment(await _comment_command(adapter, request))
@@ -449,7 +441,6 @@ async def test_comment_accepts_single_rendered_post_alias_for_requested_activity
         page = await browser.new_page()
         adapter = PostCommentPage(
             cast(BrowserManager, EngagementFixtureBrowser(page, html=html)),
-            LocalAssetStore(tmp_path),
         )
         try:
             result = await adapter.perform_comment(await _comment_command(adapter, request))
@@ -479,7 +470,6 @@ async def test_reaction_accepts_single_rendered_post_alias_for_requested_activit
         page = await browser.new_page()
         adapter = PostReactionPage(
             cast(BrowserManager, EngagementFixtureBrowser(page, html=html)),
-            LocalAssetStore(tmp_path),
         )
         try:
             result = await adapter.perform_reaction(await _reaction_command(adapter, request))
@@ -498,7 +488,7 @@ async def test_comment_photo_and_gif_are_exact_and_verifiable(
 ) -> None:
     if attachment_kind == "photo":
         (tmp_path / "comment.png").write_bytes(b"fixture-comment-image")
-        attachment = CommentPhotoAttachment(asset_ref="comment.png")
+        attachment = CommentPhotoAttachment(asset_ref=str(tmp_path / "comment.png"))
         expected = "Photo attachment"
     else:
         attachment = CommentGifAttachment(
@@ -517,7 +507,6 @@ async def test_comment_photo_and_gif_are_exact_and_verifiable(
         page = await browser.new_page()
         adapter = PostCommentPage(
             cast(BrowserManager, EngagementFixtureBrowser(page)),
-            LocalAssetStore(tmp_path),
         )
         try:
             command = await _comment_command(adapter, request)
@@ -558,7 +547,6 @@ async def test_post_supports_every_visible_linkedin_reaction(
         page = await browser.new_page()
         adapter = PostReactionPage(
             cast(BrowserManager, EngagementFixtureBrowser(page)),
-            LocalAssetStore(tmp_path),
         )
         try:
             command = await _reaction_command(adapter, request)
@@ -591,7 +579,6 @@ async def test_current_portaled_reaction_control_is_inspected_and_verified(
                 BrowserManager,
                 EngagementFixtureBrowser(page, html=CURRENT_REACTION_HTML),
             ),
-            LocalAssetStore(tmp_path),
         )
         try:
             command = await _reaction_command(adapter, request)
@@ -642,7 +629,6 @@ async def test_react_label_and_pressed_state_are_inspected_and_verified(
         page = await browser.new_page()
         adapter = PostReactionPage(
             cast(BrowserManager, EngagementFixtureBrowser(page, html=html)),
-            LocalAssetStore(tmp_path),
         )
         try:
             command = await _reaction_command(adapter, request)
@@ -686,7 +672,6 @@ async def test_post_reaction_removal_noop_and_change(
         page = await browser.new_page()
         adapter = PostReactionPage(
             cast(BrowserManager, EngagementFixtureBrowser(page, html=initially_liked)),
-            LocalAssetStore(tmp_path),
         )
         try:
             command = await _reaction_command(adapter, request)
@@ -730,7 +715,6 @@ async def test_reaction_refuses_state_drift_after_inspection(tmp_path: Path) -> 
                 BrowserManager,
                 EngagementFixtureBrowser(page, second_html=changed),
             ),
-            LocalAssetStore(tmp_path),
         )
         try:
             result = await adapter.perform_reaction(await _reaction_command(adapter, request))
@@ -765,7 +749,6 @@ async def test_reaction_reports_missing_preclick_control_as_not_changed(
                 BrowserManager,
                 EngagementFixtureBrowser(page, second_html=missing_control),
             ),
-            LocalAssetStore(tmp_path),
         )
         try:
             result = await adapter.perform_reaction(await _reaction_command(adapter, request))
@@ -798,7 +781,6 @@ async def test_comment_refuses_actor_or_content_target_drift(tmp_path: Path) -> 
                 BrowserManager,
                 EngagementFixtureBrowser(page, second_html=changed),
             ),
-            LocalAssetStore(tmp_path),
         )
         try:
             result = await adapter.perform_comment(await _comment_command(adapter, request))
@@ -827,7 +809,6 @@ async def test_interrupted_final_comment_click_is_uncertain(tmp_path: Path) -> N
                 BrowserManager,
                 EngagementFixtureBrowser(page, fail_final_click=True),
             ),
-            LocalAssetStore(tmp_path),
         )
         try:
             result = await adapter.perform_comment(await _comment_command(adapter, request))
@@ -839,20 +820,19 @@ async def test_interrupted_final_comment_click_is_uncertain(tmp_path: Path) -> N
     assert result.final_state == "comment_outcome_unknown"
 
 
-async def test_comment_upload_uses_current_attachment_file(tmp_path: Path) -> None:
+async def test_comment_upload_accepts_an_absolute_client_path(tmp_path: Path) -> None:
     (tmp_path / "comment.png").write_bytes(b"confirmed")
     request = PostCommentInput(
         context_id="engagement-context",
         request_id="action-direct-comment-attachment",
         post_ref=POST_REF,
-        attachment=CommentPhotoAttachment(asset_ref="comment.png"),
+        attachment=CommentPhotoAttachment(asset_ref=str(tmp_path / "comment.png")),
     )
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         adapter = PostCommentPage(
             cast(BrowserManager, EngagementFixtureBrowser(page)),
-            LocalAssetStore(tmp_path),
         )
         try:
             command = await _comment_command(adapter, request)

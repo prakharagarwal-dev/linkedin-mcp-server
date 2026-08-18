@@ -123,7 +123,6 @@ linkedin_mcp/
 │   ├── queue/               Task, Scheduler, Worker
 │   └── cursor/store.py      bounded process-local cursor state
 ├── cli/                     CLI assembly and commands
-├── assets.py                safe local attachment resolution
 └── tools/
     ├── action.py            shared single-attempt write helper
     ├── _shared/             cross-tool contracts and UI helpers

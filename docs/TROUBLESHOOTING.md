@@ -156,12 +156,13 @@ effect did not occur. Every later invocation is a new action.
 
 ## An attachment is rejected
 
-The file must be below `LINKEDIN_MCP_ASSET_ROOT_PATH` and referenced by a
-relative `asset_ref`. It must also satisfy the capability's visible media type
-and size constraints. Do not pass a raw Downloads/Desktop path to a tool.
+Pass a path that the server process can read. Absolute paths and paths outside
+the project are allowed. For Docker, pass the path as it appears inside the
+container and ensure the source directory is mounted there.
 
-The server resolves the current file immediately before upload. Correct its
-path, extension, or size, then invoke a new action.
+The relevant tool passes the path to its visible LinkedIn upload control;
+LinkedIn or Playwright may reject an unavailable file or a type or size that the
+surface does not support. Correct the path or file, then invoke a new action.
 
 ## Claude Desktop extension problems
 

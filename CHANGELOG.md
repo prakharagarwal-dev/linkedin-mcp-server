@@ -8,6 +8,11 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Remove the central asset store and `ASSET_ROOT_PATH` configuration. Typed
+  upload tools now pass client-selected paths directly to Playwright, including
+  absolute paths and paths outside the project; capability-specific visible UI
+  handling remains inside each tool and LinkedIn decides whether a file type or
+  size is accepted.
 - Remove the central `AppContainer`. The host now owns process lifecycle
   directly, transport accepts an already configured FastMCP server, and each
   tool receives only its scheduler, concrete page, and optional cursor store at
@@ -63,8 +68,8 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Remove server capability scopes, effect allowlists, draft previews, action
   IDs, write idempotency keys, and write replay. MCP clients now own tool
   availability and approval; the server retains exact visible target/state
-  inspection, attachment path/type/size checks, pacing, bounded execution, terminal
-  postcondition verification, and immutable evidence.
+  inspection, capability-specific upload handling, pacing, bounded execution,
+  terminal postcondition verification, and immutable evidence.
 - Limit `linkedin.posts.comment` to top-level post comments. Read-only
   discussion results continue to include visible replies and their exact parent
   references.

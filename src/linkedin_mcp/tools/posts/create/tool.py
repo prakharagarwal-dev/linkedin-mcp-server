@@ -59,7 +59,8 @@ def register(
             "typed text/link, up to 20 edited photos with alt text and member/company tags, "
             "video with thumbnail/captions, document, poll, celebration, event, existing-job "
             "hiring, and expert-request content, plus audience/group, comment control, brand "
-            "partnership, collaborators, mentions, local assets, and scheduling. The content "
+            "partnership, collaborators, mentions, client-selected files, and scheduling. "
+            "The content "
             "discriminator is mode, not kind. Company Page publishing is excluded."
         ),
         annotations=annotations,

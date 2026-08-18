@@ -702,7 +702,6 @@ def protocol_server(
         auto_login_on_start=False,
         browser_auto_install=False,
         browser_profile_path=root / "profile",
-        asset_root_path=root / "assets",
         minimum_navigation_interval_seconds=0,
         runtime_lock_path=root / "runtime.lock",
     )

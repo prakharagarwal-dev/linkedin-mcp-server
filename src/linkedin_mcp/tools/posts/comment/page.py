@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, datetime
-from pathlib import Path
 
 from playwright.async_api import Locator, Page
 from pydantic import HttpUrl
@@ -120,7 +119,6 @@ class PostCommentPage(PostEngagementSurface):
         if not isinstance(command.payload, CommentCreatePayload):
             raise InvalidTargetError("The comment action payload is invalid.")
         payload = command.payload
-        paths = await self._assets.resolve_comment(payload.attachment)
         target_url = canonical_post_url(payload.post_ref)
         async with self._browser.page() as page:
             await self._browser.navigate(page, target_url)
@@ -154,7 +152,6 @@ class PostCommentPage(PostEngagementSurface):
                 page,
                 composer,
                 payload,
-                paths,
             )
             await self._wait_for_existing_comment_baseline(page, target.region)
             before = await self._matching_comment_refs(
@@ -282,7 +279,6 @@ class PostCommentPage(PostEngagementSurface):
         page: Page,
         composer: Locator,
         payload: CommentCreatePayload,
-        paths: dict[str, Path],
     ) -> None:
         region = await self._comment_composer_region(composer)
         if isinstance(payload.attachment, CommentPhotoAttachment):
@@ -297,10 +293,11 @@ class PostCommentPage(PostEngagementSurface):
                 async with page.expect_file_chooser(timeout=3_000) as chooser_info:
                     await self._browser.click_visible_control(page, photo)
                 chooser = await chooser_info.value
-                await chooser.set_files(str(paths[payload.attachment.asset_ref]))
+                await chooser.set_files(payload.attachment.asset_ref)
             except Exception as error:
                 raise ParserDriftError(
-                    "The current comment Share photo control exposed no file chooser."
+                    "The client-selected path could not be uploaded through the current "
+                    "comment Share photo control."
                 ) from error
         elif isinstance(payload.attachment, CommentGifAttachment):
             gif = await _unique_visible(

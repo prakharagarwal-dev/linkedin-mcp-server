@@ -11,7 +11,6 @@ from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
-from linkedin_mcp.assets import LocalAssetStore
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
 from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.tools._shared.urls import (
@@ -227,7 +226,6 @@ class ConversationSurface:
     def __init__(
         self,
         browser: BrowserManager,
-        asset_store: LocalAssetStore | None = None,
         *,
         conversation_search: ConversationSearchPage | None = None,
         max_history_rounds: int = 100,
@@ -235,7 +233,6 @@ class ConversationSurface:
         if max_history_rounds < 1:
             raise ValueError("Conversation history traversal must be bounded.")
         self._browser = browser
-        self._assets = asset_store
         self._conversation_search = conversation_search
         self._max_history_rounds = max_history_rounds
 

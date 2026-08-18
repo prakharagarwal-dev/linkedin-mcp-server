@@ -11,7 +11,6 @@ from playwright.async_api import Locator, Page, Route, async_playwright
 from pydantic import HttpUrl, ValidationError
 
 import linkedin_mcp.tools.messaging.search.page as messaging_pages
-from linkedin_mcp.assets import LocalAssetStore
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
 from linkedin_mcp.tools._shared.actions import (
     ActionCommand,
@@ -1077,9 +1076,8 @@ async def test_message_read_and_direct_file_send_cover_visible_attachments(
         request_id="attachment-action",
         conversation_id="thread-123",
         message="Here is the brief.",
-        attachments=(MessageFileInput(asset_ref=asset.name),),
+        attachments=(MessageFileInput(asset_ref=str(asset)),),
     )
-    asset_store = LocalAssetStore(tmp_path)
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -1090,7 +1088,6 @@ async def test_message_read_and_direct_file_send_cover_visible_attachments(
         )
         sender = MessageSendPage(
             fixture_browser,
-            asset_store=asset_store,
             max_history_rounds=1,
         )
         try:
@@ -1113,7 +1110,7 @@ async def test_message_read_and_direct_file_send_cover_visible_attachments(
                     target=capture.target,
                     payload=MessageSendPayload(
                         message=request.message,
-                        attachment_refs=(asset.name,),
+                        attachment_refs=(str(asset),),
                     ),
                 )
             )
@@ -1141,15 +1138,13 @@ async def test_image_send_verifies_with_duplicate_dom_wrappers_and_generic_previ
         request_id="image-action",
         conversation_id="thread-123",
         message="Here is the image.",
-        attachments=(MessageFileInput(asset_ref=asset.name),),
+        attachments=(MessageFileInput(asset_ref=str(asset)),),
     )
-    asset_store = LocalAssetStore(tmp_path)
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         adapter = MessageSendPage(
             cast(BrowserManager, MessagingFixtureBrowser(page, html)),
-            asset_store=asset_store,
         )
         try:
             capture = await adapter.inspect_message(request)
@@ -1159,7 +1154,7 @@ async def test_image_send_verifies_with_duplicate_dom_wrappers_and_generic_previ
                     target=capture.target,
                     payload=MessageSendPayload(
                         message=request.message,
-                        attachment_refs=(asset.name,),
+                        attachment_refs=(str(asset),),
                     ),
                 )
             )
@@ -1209,54 +1204,16 @@ async def test_message_gif_is_verified_as_one_immediate_send() -> None:
     assert uncertain.performed is None
 
 
-@pytest.mark.asyncio
-async def test_every_document_image_and_video_message_format_is_resolved_directly(
-    tmp_path: Path,
-) -> None:
-    extensions = (
-        ".ai",
-        ".bmp",
-        ".doc",
-        ".docx",
-        ".eml",
-        ".gif",
-        ".heic",
-        ".heif",
-        ".jpeg",
-        ".jpg",
-        ".mov",
-        ".mp4",
-        ".pdf",
-        ".png",
-        ".pps",
-        ".ppsx",
-        ".psd",
-        ".ppt",
-        ".pptx",
-        ".tif",
-        ".tiff",
-        ".txt",
-        ".webp",
-        ".xls",
-        ".xlsx",
+def test_message_contract_accepts_any_client_selected_file_path() -> None:
+    paths = (
+        "/etc/hosts",
+        "../../outside-the-project/file with spaces.custom",
+        r"C:\Users\client\Desktop\attachment.bin",
     )
-    for index, extension in enumerate(extensions):
-        path = tmp_path / f"asset-{index}{extension}"
-        path.write_bytes(b"fixture")
-        assets = await LocalAssetStore(tmp_path).resolve_message((path.name,))
-        assert assets[path.name] == path
 
+    attachments = tuple(MessageFileInput(asset_ref=path) for path in paths)
 
-@pytest.mark.asyncio
-async def test_message_attachment_resolution_uses_current_file(
-    tmp_path: Path,
-) -> None:
-    path = tmp_path / "brief.pdf"
-    path.write_bytes(b"confirmed")
-    asset_store = LocalAssetStore(tmp_path)
-    assert (await asset_store.resolve_message((path.name,)))[path.name] == path
-    path.write_bytes(b"changed")
-    assert (await asset_store.resolve_message((path.name,)))[path.name] == path
+    assert tuple(attachment.asset_ref for attachment in attachments) == paths
 
 
 def test_message_content_modes_are_exact_and_mutually_safe() -> None:
@@ -1277,16 +1234,6 @@ def test_message_content_modes_are_exact_and_mutually_safe() -> None:
                 result_title="Dancing robot GIF",
             ),
         )
-
-
-@pytest.mark.asyncio
-async def test_message_attachments_reject_combined_size_over_20_mb(tmp_path: Path) -> None:
-    refs = ("asset-0.pdf", "asset-1.pdf")
-    for ref in refs:
-        with (tmp_path / ref).open("wb") as stream:
-            stream.truncate(11 * 1024 * 1024)
-    with pytest.raises(InvalidTargetError, match="exceed 20 MB"):
-        await LocalAssetStore(tmp_path).resolve_message(refs)
 
 
 @pytest.mark.timeout(20)
