@@ -8,6 +8,8 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Rename the narrowly scoped `execution` package to `queue`; its existing
+  `Task` → FIFO `Scheduler` → single `Worker` behavior is unchanged.
 - Keep MCP protocol wiring in `transport`, and move shared-process lifecycle,
   account locking, and the private launcher into `host`. Remove redundant
   application-level MCP session identities and bind opaque pagination cursors

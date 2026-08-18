@@ -1,4 +1,4 @@
-"""Queued execution for one local LinkedIn worker."""
+"""One bounded task queue for the local LinkedIn worker."""
 
 from .scheduler import Scheduler
 from .task import Task

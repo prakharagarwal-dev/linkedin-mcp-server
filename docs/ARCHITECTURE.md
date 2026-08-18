@@ -116,7 +116,7 @@ profile through the CLI.
 
 ```text
 linkedin_mcp/
-├── execution/               Task, Scheduler, Worker
+├── queue/                   Task, Scheduler, Worker
 ├── browser/                 Playwright setup, profile, low-level runtime
 ├── transport/               FastMCP HTTP server and stdio bridge
 ├── host/                    shared-process lifecycle and account lock

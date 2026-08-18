@@ -8,7 +8,7 @@ from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 
 from linkedin_mcp.container import AppContainer
-from linkedin_mcp.execution import Task
+from linkedin_mcp.queue import Task
 from linkedin_mcp.tools._shared.tool import (
     CursorArgument,
     IdentifierArgument,

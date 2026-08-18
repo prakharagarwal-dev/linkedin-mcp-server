@@ -9,7 +9,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from linkedin_mcp.container import AppContainer
-from linkedin_mcp.execution import Task
+from linkedin_mcp.queue import Task
 from linkedin_mcp.tools._shared.tool import (
     CursorArgument,
     IdentifierArgument,

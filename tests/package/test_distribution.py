@@ -140,13 +140,14 @@ def test_source_layout_keeps_infrastructure_and_linkedin_features_separate() -> 
     assert "attach_tools(mcp, container)" in server_source
     assert "@mcp.tool" not in server_source
 
-    execution = package / "execution"
-    assert {path.name for path in execution.glob("*.py")} == {
+    queue_package = package / "queue"
+    assert {path.name for path in queue_package.glob("*.py")} == {
         "__init__.py",
         "scheduler.py",
         "task.py",
         "worker.py",
     }
+    assert not (package / "execution").exists()
     assert (package / "container.py").is_file()
     assert (package / "pagination.py").is_file()
     assert (package / "assets.py").is_file()
@@ -408,7 +409,7 @@ def test_wheel_excludes_tests_profiles_secrets_and_other_repositories(tmp_path: 
         assert "linkedin_mcp/host/manager.py" in names
         assert "linkedin_mcp/tools/jobs/search/tool.py" in names
         assert "linkedin_mcp/tools/jobs/search/pagination.py" in names
-        assert "linkedin_mcp/execution/task.py" in names
+        assert "linkedin_mcp/queue/task.py" in names
         assert any(name.endswith(".dist-info/entry_points.txt") for name in names)
         assert not any(name.startswith("tests/") for name in names)
         assert not any("simulator" in name for name in lowered)

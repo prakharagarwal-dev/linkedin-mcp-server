@@ -1,7 +1,7 @@
 # Low-Level Design
 
-This is the implemented design. It deliberately keeps execution generic and
-puts LinkedIn behavior inside the tool that owns it.
+This is the implemented design. It deliberately keeps the task queue generic
+and puts LinkedIn behavior inside the tool that owns it.
 
 ## Core classes
 
@@ -170,7 +170,7 @@ visible terminal state cannot be proven. The server never retries it.
 ```text
 host/ ──> transport/server.py ──> tools/*/tool.py
                                       │
-                                      ├──> execution/Task, Scheduler, Worker
+                                      ├──> queue/Task, Scheduler, Worker
                                       └──> tool-owned models, page, evidence, optional pagination
                                       │
                                       ▼

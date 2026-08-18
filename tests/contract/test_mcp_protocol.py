@@ -17,9 +17,9 @@ from pydantic import HttpUrl
 from linkedin_mcp import __version__
 from linkedin_mcp.config import Settings
 from linkedin_mcp.container import AppContainer
-from linkedin_mcp.execution import Scheduler, Worker
 from linkedin_mcp.host import AccountProcessLock
 from linkedin_mcp.pagination import PaginationManager
+from linkedin_mcp.queue import Scheduler, Worker
 from linkedin_mcp.tools._shared.actions import (
     ActionCommand,
     ActionInspection,

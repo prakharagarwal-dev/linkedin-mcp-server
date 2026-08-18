@@ -8,9 +8,9 @@ from typing import cast
 
 from linkedin_mcp.config import Settings
 from linkedin_mcp.container import AppContainer
-from linkedin_mcp.execution import Scheduler, Worker
 from linkedin_mcp.host import AccountProcessLock
 from linkedin_mcp.pagination import PaginationManager
+from linkedin_mcp.queue import Scheduler, Worker
 from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.tools.companies.get.page import CompanyProfilePage
 from linkedin_mcp.tools.companies.search.page import CompanySearchPage
