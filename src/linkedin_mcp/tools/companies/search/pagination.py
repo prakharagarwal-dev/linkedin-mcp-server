@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from linkedin_mcp.mcp.context import current_client_id
 from linkedin_mcp.pagination import (
     PaginationManager,
     select_page,
@@ -15,6 +14,7 @@ from linkedin_mcp.tools.companies.search.evidence import source_from_company_sea
 from linkedin_mcp.tools.companies.search.models.company_search_input import CompanySearchInput
 from linkedin_mcp.tools.companies.search.models.company_search_output import CompanySearchOutput
 from linkedin_mcp.tools.companies.search.page import CompanySearchPage
+from linkedin_mcp.transport.context import current_client_id
 
 
 async def execute(

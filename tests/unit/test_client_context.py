@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import gc
 
-from linkedin_mcp.mcp.context import (
+from linkedin_mcp.transport.context import (
     LOCAL_CLIENT_ID,
     ClientSessionRegistry,
     bind_client_execution,

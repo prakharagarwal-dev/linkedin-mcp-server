@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from linkedin_mcp.mcp.context import current_client_id
 from linkedin_mcp.pagination import (
     PaginationManager,
     select_page,
@@ -19,6 +18,7 @@ from linkedin_mcp.tools.messaging.search.models.conversation_search_output impor
     ConversationSearchOutput,
 )
 from linkedin_mcp.tools.messaging.search.page import ConversationSearchPage
+from linkedin_mcp.transport.context import current_client_id
 
 
 async def execute(

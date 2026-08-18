@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from types import FrameType
 
 from linkedin_mcp.config import Settings
-from linkedin_mcp.runtime.ownership import AccountProcessLock
+from linkedin_mcp.transport.ownership import AccountProcessLock
 
 
 @contextmanager

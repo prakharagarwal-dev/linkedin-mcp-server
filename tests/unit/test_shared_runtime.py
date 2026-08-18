@@ -10,11 +10,11 @@ import anyio
 import pytest
 import uvicorn
 
-import linkedin_mcp.runtime.shared as shared_runtime
+import linkedin_mcp.transport.shared as shared_runtime
 from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import ConfigurationError
-from linkedin_mcp.mcp.server import create_mcp_server
-from linkedin_mcp.runtime import AccountRuntimeOwner, AccountRuntimeStatus
+from linkedin_mcp.transport import AccountRuntimeOwner, AccountRuntimeStatus
+from linkedin_mcp.transport.server import create_mcp_server
 from tests.contract.test_mcp_protocol import protocol_container
 
 
@@ -568,7 +568,7 @@ def test_runtime_spawn_listener_and_owner_validation_helpers(
         assert kwargs["creationflags"]
         assert "start_new_session" not in kwargs
     else:
-        assert args == [shared_runtime.sys.executable, "-m", "linkedin_mcp.runtime"]
+        assert args == [shared_runtime.sys.executable, "-m", "linkedin_mcp.transport"]
         assert kwargs["start_new_session"] is True
         assert "creationflags" not in kwargs
     assert (tmp_path / "runtime.log").is_file()
@@ -638,7 +638,7 @@ def test_windows_runtime_uses_a_local_cim_broker_outside_client_jobs(
 
     environment = cast(dict[str, str], kwargs["env"])
     assert environment["LINKEDIN_MCP_INTERNAL_BROKER_COMMAND"] == subprocess.list2cmdline(
-        [shared_runtime.sys.executable, "-m", "linkedin_mcp.runtime"]
+        [shared_runtime.sys.executable, "-m", "linkedin_mcp.transport"]
     )
     assert environment["LINKEDIN_MCP_INTERNAL_BROKER_CWD"] == str(Path.cwd())
     assert environment["LINKEDIN_MCP_INTERNAL_BROKERED_RUNTIME"] == "1"

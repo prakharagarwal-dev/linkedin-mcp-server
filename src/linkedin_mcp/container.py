@@ -8,9 +8,7 @@ from linkedin_mcp import __version__
 from linkedin_mcp.assets import LocalAssetStore
 from linkedin_mcp.config import Settings, runtime_configuration_fingerprint
 from linkedin_mcp.execution import Scheduler, Worker
-from linkedin_mcp.mcp.context import ClientSessionRegistry
 from linkedin_mcp.pagination import PaginationManager
-from linkedin_mcp.runtime import AccountProcessLock
 from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.tools.companies.get.page import CompanyProfilePage
 from linkedin_mcp.tools.companies.search.page import CompanySearchPage
@@ -33,6 +31,8 @@ from linkedin_mcp.tools.posts.create.page import PostPublishingPage
 from linkedin_mcp.tools.posts.get.page import PostDetailPage
 from linkedin_mcp.tools.posts.react.page import PostReactionPage
 from linkedin_mcp.tools.posts.search.page import PostSearchPage
+from linkedin_mcp.transport import AccountProcessLock
+from linkedin_mcp.transport.context import ClientSessionRegistry
 
 
 @dataclass(slots=True)

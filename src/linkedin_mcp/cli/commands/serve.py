@@ -6,13 +6,13 @@ import sys
 
 from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import LinkedInMCPError
-from linkedin_mcp.mcp.transports.stdio import run_stdio_proxy
-from linkedin_mcp.runtime import inspect_account_runtime
-from linkedin_mcp.runtime.shared import (
+from linkedin_mcp.transport import inspect_account_runtime
+from linkedin_mcp.transport.shared import (
     ensure_shared_runtime,
     run_shared_runtime,
     wait_for_shared_runtime,
 )
+from linkedin_mcp.transport.stdio import run_stdio_proxy
 
 
 def configure(command: argparse.ArgumentParser) -> None:

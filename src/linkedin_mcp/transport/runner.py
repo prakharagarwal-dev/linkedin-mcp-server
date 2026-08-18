@@ -10,8 +10,8 @@ from pydantic import ValidationError
 from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import LinkedInMCPError
 from linkedin_mcp.logging import configure_logging
-from linkedin_mcp.runtime.ownership import inspect_account_runtime
-from linkedin_mcp.runtime.shared import (
+from linkedin_mcp.transport.ownership import inspect_account_runtime
+from linkedin_mcp.transport.shared import (
     brokered_runtime_output_required,
     redirect_brokered_runtime_output,
     run_shared_runtime,

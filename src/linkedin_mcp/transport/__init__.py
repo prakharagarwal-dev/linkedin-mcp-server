@@ -1,4 +1,4 @@
-"""Local process ownership and shared-runtime hosting."""
+"""MCP transports and shared-host lifecycle."""
 
 from .ownership import (
     AccountProcessLock,

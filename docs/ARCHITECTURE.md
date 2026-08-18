@@ -117,10 +117,9 @@ profile through the CLI.
 
 ```text
 linkedin_mcp/
-├── mcp/                     FastMCP composition, client context, transports
 ├── execution/               Task, Scheduler, Worker
 ├── browser/                 Playwright setup, profile, low-level runtime
-├── runtime/                 shared-process ownership and lifecycle
+├── transport/               FastMCP, client context, transports, shared host
 ├── cli/                     CLI assembly and commands
 ├── container.py             process-wide dependency composition
 ├── pagination.py            bounded process-local cursor state

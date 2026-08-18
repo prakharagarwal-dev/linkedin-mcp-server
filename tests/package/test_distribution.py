@@ -136,7 +136,7 @@ def test_source_layout_keeps_infrastructure_and_linkedin_features_separate() -> 
             assert "Capability-owned exports from" not in page_source
             assert "._shared.pages" not in page_source
 
-    server_source = (package / "mcp" / "server.py").read_text(encoding="utf-8")
+    server_source = (package / "transport" / "server.py").read_text(encoding="utf-8")
     assert "attach_tools(mcp, container)" in server_source
     assert "@mcp.tool" not in server_source
 
@@ -209,9 +209,20 @@ def test_source_layout_keeps_infrastructure_and_linkedin_features_separate() -> 
     for retired_cli_module in ("common.py", "types.py", "internal_runtime.py"):
         assert not (cli / retired_cli_module).exists()
 
-    runtime = package / "runtime"
-    for runtime_module in ("__main__.py", "owned_operation.py", "runner.py"):
-        assert (runtime / runtime_module).is_file()
+    transport = package / "transport"
+    for transport_module in (
+        "__main__.py",
+        "context.py",
+        "owned_operation.py",
+        "ownership.py",
+        "runner.py",
+        "server.py",
+        "shared.py",
+        "stdio.py",
+    ):
+        assert (transport / transport_module).is_file()
+    assert not (package / "mcp").exists()
+    assert not (package / "runtime").exists()
 
     main_source = (cli / "main.py").read_text(encoding="utf-8")
     assert "BrowserProfileManager" not in main_source
@@ -392,7 +403,7 @@ def test_wheel_excludes_tests_profiles_secrets_and_other_repositories(tmp_path: 
     with zipfile.ZipFile(wheels[0]) as archive:
         names = tuple(archive.namelist())
         lowered = tuple(name.casefold() for name in names)
-        assert "linkedin_mcp/mcp/server.py" in names
+        assert "linkedin_mcp/transport/server.py" in names
         assert "linkedin_mcp/tools/jobs/search/tool.py" in names
         assert "linkedin_mcp/tools/jobs/search/pagination.py" in names
         assert "linkedin_mcp/execution/task.py" in names

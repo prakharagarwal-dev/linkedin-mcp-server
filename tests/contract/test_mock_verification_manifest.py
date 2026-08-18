@@ -6,7 +6,6 @@ from pathlib import Path
 from linkedin_mcp.config import Settings
 from linkedin_mcp.container import create_production_container
 from linkedin_mcp.errors import ErrorCode
-from linkedin_mcp.mcp.server import create_mcp_server
 from linkedin_mcp.tools._shared.models import CapabilityName, StrictModel
 from linkedin_mcp.tools.companies.search.models.company_search_filters import CompanySearchFilters
 from linkedin_mcp.tools.connections.search.models.connections_search_filters import (
@@ -20,6 +19,7 @@ from linkedin_mcp.tools.people.search.models.people_search_filters import People
 from linkedin_mcp.tools.posts.create.models.post_create_mode import PostCreateMode
 from linkedin_mcp.tools.posts.react.models.reaction_state import ReactionState
 from linkedin_mcp.tools.posts.search.models.post_search_filters import PostSearchFilters
+from linkedin_mcp.transport.server import create_mcp_server
 from tests.simulator import standard_scenario
 from tests.verification_manifest import MOCK_VERIFICATION, missing_test_files
 

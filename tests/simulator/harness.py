@@ -10,7 +10,6 @@ from linkedin_mcp.config import Settings
 from linkedin_mcp.container import AppContainer
 from linkedin_mcp.execution import Scheduler, Worker
 from linkedin_mcp.pagination import PaginationManager
-from linkedin_mcp.runtime import AccountProcessLock
 from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.tools.companies.get.page import CompanyProfilePage
 from linkedin_mcp.tools.companies.search.page import CompanySearchPage
@@ -33,6 +32,7 @@ from linkedin_mcp.tools.posts.create.page import PostPublishingPage
 from linkedin_mcp.tools.posts.get.page import PostDetailPage
 from linkedin_mcp.tools.posts.react.page import PostReactionPage
 from linkedin_mcp.tools.posts.search.page import PostSearchPage
+from linkedin_mcp.transport import AccountProcessLock
 from tests.contract.test_mcp_protocol import (
     ProtocolJobDetail,
     ProtocolPeopleSearch,

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from linkedin_mcp.mcp.context import current_client_id
 from linkedin_mcp.pagination import (
     PaginationManager,
     select_page,
@@ -15,6 +14,7 @@ from linkedin_mcp.tools.connections.list.evidence import source_from_connections
 from linkedin_mcp.tools.connections.list.models.connections_list_input import ConnectionsListInput
 from linkedin_mcp.tools.connections.list.models.connections_list_output import ConnectionsListOutput
 from linkedin_mcp.tools.connections.list.page import ConnectionsListPage
+from linkedin_mcp.transport.context import current_client_id
 
 
 async def execute(

@@ -23,15 +23,15 @@ from linkedin_mcp import __version__
 from linkedin_mcp.config import Settings, runtime_configuration_fingerprint
 from linkedin_mcp.container import create_production_container
 from linkedin_mcp.errors import ConfigurationError
-from linkedin_mcp.mcp.server import create_mcp_server
-from linkedin_mcp.runtime.ownership import (
+from linkedin_mcp.transport.ownership import (
     AccountProcessLock,
     AccountRuntimeStatus,
     inspect_account_runtime,
 )
+from linkedin_mcp.transport.server import create_mcp_server
 
 _RUNTIME_OWNER_COMMAND = "shared-runtime"
-_RUNTIME_MODULE = "linkedin_mcp.runtime"
+_RUNTIME_MODULE = "linkedin_mcp.transport"
 _RUNTIME_TRANSPORT = "shared-loopback"
 # The OS lock becomes visible before its holder can fsync owner metadata.
 _LOCK_OWNER_PUBLICATION_GRACE_SECONDS = 5.0

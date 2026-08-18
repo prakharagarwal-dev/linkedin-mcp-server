@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from linkedin_mcp.mcp.context import current_client_id
 from linkedin_mcp.pagination import (
     PaginationManager,
     select_page,
@@ -16,6 +15,7 @@ from linkedin_mcp.tools.posts.comments.list.models.post_comments_list_output imp
     PostCommentsListOutput,
 )
 from linkedin_mcp.tools.posts.comments.list.page import PostCommentsPage
+from linkedin_mcp.transport.context import current_client_id
 
 
 async def execute(

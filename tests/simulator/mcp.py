@@ -10,7 +10,7 @@ import anyio
 from mcp import ClientSession
 from mcp.shared.message import SessionMessage
 
-from linkedin_mcp.mcp.server import create_mcp_server
+from linkedin_mcp.transport.server import create_mcp_server
 from tests.simulator.harness import create_simulator_container
 from tests.simulator.state import SimulatorState
 

@@ -7,7 +7,6 @@ from collections.abc import (
     Callable,
 )
 
-from linkedin_mcp.mcp.context import current_client_id
 from linkedin_mcp.pagination import (
     PaginationManager,
     select_page,
@@ -20,6 +19,7 @@ from linkedin_mcp.tools.invitations.list.evidence import source_from_invitation_
 from linkedin_mcp.tools.invitations.list.models.invitation_list_input import InvitationListInput
 from linkedin_mcp.tools.invitations.list.models.invitation_list_output import InvitationListOutput
 from linkedin_mcp.tools.invitations.list.page import InvitationListPage
+from linkedin_mcp.transport.context import current_client_id
 
 ProgressReporter = Callable[[int, int, str], Awaitable[None]]
 

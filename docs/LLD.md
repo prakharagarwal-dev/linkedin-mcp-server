@@ -168,7 +168,7 @@ visible terminal state cannot be proven. The server never retries it.
 ## Dependency direction
 
 ```text
-mcp/ and tools/*/tool.py
+transport/ and tools/*/tool.py
             │
             ├──> execution/Task, Scheduler, Worker
             └──> tool-owned models, page, evidence, optional pagination

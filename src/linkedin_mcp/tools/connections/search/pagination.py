@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.mcp.context import current_client_id
 from linkedin_mcp.pagination import (
     PaginationManager,
     select_page,
@@ -21,6 +20,7 @@ from linkedin_mcp.tools.connections.search.models.connections_search_output impo
 )
 from linkedin_mcp.tools.connections.search.page import ConnectionsSearchPage
 from linkedin_mcp.tools.people.models.person_connection_degree import PersonConnectionDegree
+from linkedin_mcp.transport.context import current_client_id
 
 
 async def execute(

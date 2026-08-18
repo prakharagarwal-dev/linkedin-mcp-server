@@ -3,10 +3,10 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-import linkedin_mcp.runtime.runner as runtime_runner
+import linkedin_mcp.transport.runner as runtime_runner
 from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import ConfigurationError
-from linkedin_mcp.runtime import AccountRuntimeStatus
+from linkedin_mcp.transport import AccountRuntimeStatus
 
 
 @pytest.mark.asyncio
