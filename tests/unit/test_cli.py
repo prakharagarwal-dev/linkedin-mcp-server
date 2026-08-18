@@ -20,11 +20,11 @@ import linkedin_mcp.cli.commands.setup as setup_command
 import linkedin_mcp.cli.commands.status as status_command
 import linkedin_mcp.cli.commands.stop as stop_command
 import linkedin_mcp.cli.main as cli
-import linkedin_mcp.transport.lock as owned_operation
+import linkedin_mcp.host.lock as owned_operation
 from linkedin_mcp.browser import BrowserProfileResetResult, BrowserProfileStatus
 from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import ConfigurationError
-from linkedin_mcp.transport import (
+from linkedin_mcp.host import (
     AccountProcessLock,
     AccountRuntimeOwner,
     AccountRuntimeStatus,
@@ -271,7 +271,7 @@ async def test_logout_and_owned_operation_complete_without_a_signal(
         return True
 
     monkeypatch.setattr(
-        "linkedin_mcp.transport.lock._wait_for_stop_signal",
+        "linkedin_mcp.host.lock._wait_for_stop_signal",
         no_signal,
     )
     monkeypatch.setattr(logout_command, "logout_interactively", logged_out)
@@ -535,7 +535,7 @@ async def test_owned_cli_operation_cleans_up_before_releasing_lock_on_stop_signa
         return signal.SIGTERM
 
     monkeypatch.setattr(
-        "linkedin_mcp.transport.lock._wait_for_stop_signal",
+        "linkedin_mcp.host.lock._wait_for_stop_signal",
         signal_after_start,
     )
 

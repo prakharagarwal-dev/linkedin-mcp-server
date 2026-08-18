@@ -14,8 +14,8 @@ from mcp.client.stdio import StdioServerParameters, stdio_client
 from mcp.client.streamable_http import streamable_http_client
 
 from linkedin_mcp import __version__
-from linkedin_mcp.transport import inspect_account_runtime, stop_account_runtime
-from linkedin_mcp.transport.host import host_is_healthy
+from linkedin_mcp.host import inspect_account_runtime, stop_account_runtime
+from linkedin_mcp.host.manager import host_is_healthy
 
 ROOT = Path(__file__).parents[2]
 

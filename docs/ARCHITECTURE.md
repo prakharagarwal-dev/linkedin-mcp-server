@@ -118,7 +118,8 @@ profile through the CLI.
 linkedin_mcp/
 ├── execution/               Task, Scheduler, Worker
 ├── browser/                 Playwright setup, profile, low-level runtime
-├── transport/               FastMCP, stdio bridge, shared host and lock
+├── transport/               FastMCP HTTP server and stdio bridge
+├── host/                    shared-process lifecycle and account lock
 ├── cli/                     CLI assembly and commands
 ├── container.py             process-wide dependency composition
 ├── pagination.py            bounded process-local cursor state

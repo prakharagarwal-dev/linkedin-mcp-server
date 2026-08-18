@@ -18,6 +18,7 @@ from linkedin_mcp import __version__
 from linkedin_mcp.config import Settings
 from linkedin_mcp.container import AppContainer
 from linkedin_mcp.execution import Scheduler, Worker
+from linkedin_mcp.host import AccountProcessLock
 from linkedin_mcp.pagination import PaginationManager
 from linkedin_mcp.tools._shared.actions import (
     ActionCommand,
@@ -154,7 +155,6 @@ from linkedin_mcp.tools.posts.search.models.post_search_coverage import PostSear
 from linkedin_mcp.tools.posts.search.models.post_search_input import PostSearchInput
 from linkedin_mcp.tools.posts.search.models.post_summary import PostSummary
 from linkedin_mcp.tools.posts.search.page import PostSearchPage
-from linkedin_mcp.transport import AccountProcessLock
 from linkedin_mcp.transport.server import create_mcp_server
 
 ROOT = Path(__file__).parents[2]

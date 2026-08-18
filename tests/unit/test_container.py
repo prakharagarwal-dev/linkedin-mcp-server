@@ -12,11 +12,11 @@ from types import ModuleType
 
 import pytest
 
-import linkedin_mcp.transport.lock as process_lock_module
+import linkedin_mcp.host.lock as process_lock_module
 from linkedin_mcp.config import Settings
 from linkedin_mcp.container import create_production_container
 from linkedin_mcp.errors import ConfigurationError
-from linkedin_mcp.transport import (
+from linkedin_mcp.host import (
     AccountProcessLock,
     AccountRuntimeOwner,
     AccountRuntimeStatus,
@@ -232,7 +232,7 @@ import asyncio
 import os
 import sys
 from pathlib import Path
-from linkedin_mcp.transport import AccountProcessLock
+from linkedin_mcp.host import AccountProcessLock
 
 lock = AccountProcessLock(Path(sys.argv[1]), account_id="personal", transport="stdio")
 lock.acquire()

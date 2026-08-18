@@ -10,7 +10,7 @@ from linkedin_mcp.browser import (
     BrowserSetupState,
 )
 from linkedin_mcp.config import Settings
-from linkedin_mcp.transport import inspect_account_runtime
+from linkedin_mcp.host import inspect_account_runtime
 
 
 def configure(command: argparse.ArgumentParser) -> None:

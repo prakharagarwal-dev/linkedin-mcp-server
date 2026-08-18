@@ -212,11 +212,15 @@ def test_source_layout_keeps_infrastructure_and_linkedin_features_separate() -> 
     transport = package / "transport"
     assert {path.name for path in transport.glob("*.py")} == {
         "__init__.py",
-        "__main__.py",
-        "host.py",
-        "lock.py",
         "server.py",
         "stdio.py",
+    }
+    host = package / "host"
+    assert {path.name for path in host.glob("*.py")} == {
+        "__init__.py",
+        "__main__.py",
+        "lock.py",
+        "manager.py",
     }
     assert not (package / "mcp").exists()
     assert not (package / "runtime").exists()
@@ -401,6 +405,7 @@ def test_wheel_excludes_tests_profiles_secrets_and_other_repositories(tmp_path: 
         names = tuple(archive.namelist())
         lowered = tuple(name.casefold() for name in names)
         assert "linkedin_mcp/transport/server.py" in names
+        assert "linkedin_mcp/host/manager.py" in names
         assert "linkedin_mcp/tools/jobs/search/tool.py" in names
         assert "linkedin_mcp/tools/jobs/search/pagination.py" in names
         assert "linkedin_mcp/execution/task.py" in names

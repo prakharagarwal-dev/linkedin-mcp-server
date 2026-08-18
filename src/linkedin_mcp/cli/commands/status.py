@@ -5,8 +5,8 @@ import asyncio
 import json
 
 from linkedin_mcp.config import Settings
-from linkedin_mcp.transport import inspect_account_runtime
-from linkedin_mcp.transport.host import read_host_status
+from linkedin_mcp.host import inspect_account_runtime
+from linkedin_mcp.host.manager import read_host_status
 
 
 def configure(command: argparse.ArgumentParser) -> None:

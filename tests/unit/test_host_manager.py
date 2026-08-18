@@ -10,10 +10,10 @@ import anyio
 import pytest
 import uvicorn
 
-import linkedin_mcp.transport.host as host
+import linkedin_mcp.host.manager as host
 from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import ConfigurationError
-from linkedin_mcp.transport import AccountRuntimeOwner, AccountRuntimeStatus
+from linkedin_mcp.host import AccountRuntimeOwner, AccountRuntimeStatus
 from linkedin_mcp.transport.server import create_mcp_server
 from tests.contract.test_mcp_protocol import protocol_container
 
@@ -491,19 +491,6 @@ async def test_run_host_owns_and_closes_its_listener(
         def close(self) -> None:
             events.append("listener-closed")
 
-    class FakeMcp:
-        @staticmethod
-        def streamable_http_app() -> object:
-            return object()
-
-    class FakeServer:
-        def __init__(self, _: object) -> None:
-            events.append("server-created")
-
-        async def serve(self, *, sockets: list[FakeListener]) -> None:
-            assert len(sockets) == 1
-            events.append("served")
-
     container = FakeContainer()
 
     def fake_container(_: Settings) -> Any:
@@ -512,19 +499,20 @@ async def test_run_host_owns_and_closes_its_listener(
     def fake_listener(_: str, __: int) -> Any:
         return FakeListener()
 
-    def fake_mcp(_: Any, *, manage_container_lifecycle: bool) -> Any:
-        assert manage_container_lifecycle is False
-        return FakeMcp()
-
-    def fake_config(*_: object, **__: object) -> object:
-        return object()
+    async def fake_serve_http(
+        served_container: Any,
+        listener: FakeListener,
+        wait_for_stop: Any,
+    ) -> None:
+        assert served_container is container
+        assert isinstance(listener, FakeListener)
+        assert callable(wait_for_stop)
+        events.append("served")
 
     monkeypatch.setattr(host, "AccountProcessLock", FakeLock)
     monkeypatch.setattr(host, "create_production_container", fake_container)
-    monkeypatch.setattr(host, "_bind_listener", fake_listener)
-    monkeypatch.setattr(host, "create_mcp_server", fake_mcp)
-    monkeypatch.setattr(host.uvicorn, "Config", fake_config)
-    monkeypatch.setattr(host.uvicorn, "Server", FakeServer)
+    monkeypatch.setattr(host, "bind_http_listener", fake_listener)
+    monkeypatch.setattr(host, "serve_http", fake_serve_http)
 
     settings = Settings(
         runtime_lock_path=tmp_path / "runtime.lock",
@@ -535,7 +523,6 @@ async def test_run_host_owns_and_closes_its_listener(
     assert events == [
         "lock-created",
         "started",
-        "server-created",
         "published:http://127.0.0.1:8123/mcp",
         "served",
         "listener-closed",
@@ -568,15 +555,10 @@ def test_runtime_spawn_listener_and_owner_validation_helpers(
         assert kwargs["creationflags"]
         assert "start_new_session" not in kwargs
     else:
-        assert args == [host.sys.executable, "-m", "linkedin_mcp.transport"]
+        assert args == [host.sys.executable, "-m", "linkedin_mcp.host"]
         assert kwargs["start_new_session"] is True
         assert "creationflags" not in kwargs
     assert (tmp_path / "runtime.log").is_file()
-
-    listener = host._bind_listener(  # pyright: ignore[reportPrivateUsage]
-        "127.0.0.1", 0
-    )
-    listener.close()
 
     with pytest.raises(ConfigurationError, match="invalid endpoint"):
         host.validate_host_endpoint("http://127.0.0.1:bad/mcp")
@@ -638,7 +620,7 @@ def test_windows_runtime_uses_a_local_cim_broker_outside_client_jobs(
 
     environment = cast(dict[str, str], kwargs["env"])
     assert environment["LINKEDIN_MCP_INTERNAL_BROKER_COMMAND"] == subprocess.list2cmdline(
-        [host.sys.executable, "-m", "linkedin_mcp.transport"]
+        [host.sys.executable, "-m", "linkedin_mcp.host"]
     )
     assert environment["LINKEDIN_MCP_INTERNAL_BROKER_CWD"] == str(Path.cwd())
     assert environment["LINKEDIN_MCP_INTERNAL_BROKERED_RUNTIME"] == "1"

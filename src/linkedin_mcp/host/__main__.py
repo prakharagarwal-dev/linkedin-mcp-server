@@ -9,14 +9,14 @@ from pydantic import ValidationError
 
 from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import LinkedInMCPError
-from linkedin_mcp.logging import configure_logging
-from linkedin_mcp.transport.host import (
+from linkedin_mcp.host.lock import inspect_account_runtime
+from linkedin_mcp.host.manager import (
     brokered_host_output_required,
     redirect_brokered_host_output,
     run_host,
     wait_for_host,
 )
-from linkedin_mcp.transport.lock import inspect_account_runtime
+from linkedin_mcp.logging import configure_logging
 
 
 async def run(settings: Settings) -> None:
