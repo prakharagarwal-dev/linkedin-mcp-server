@@ -15,98 +15,147 @@ from mcp.shared.message import SessionMessage
 from pydantic import HttpUrl
 
 from linkedin_mcp import __version__
-from linkedin_mcp.app import CapabilityWorker, PaginationManager
-from linkedin_mcp.app.container import AppContainer
 from linkedin_mcp.config import Settings
-from linkedin_mcp.linkedin.browser import BrowserManager
-from linkedin_mcp.linkedin.models import (
+from linkedin_mcp.container import AppContainer
+from linkedin_mcp.execution import Scheduler, Worker
+from linkedin_mcp.mcp.server import create_mcp_server
+from linkedin_mcp.pagination import PaginationManager
+from linkedin_mcp.runtime import AccountProcessLock
+from linkedin_mcp.tools._shared.actions import (
     ActionCommand,
     ActionInspection,
     ActionOutcome,
     ActionPageResult,
     ActionTarget,
     CommentCreatePayload,
-    CommentObservation,
-    CommentThread,
-    CompanyGetInput,
-    CompanyProfileCoverage,
-    CompanyProfileObservation,
-    CompanyProfilePageCapture,
-    CompanySearchCoverage,
-    CompanySearchInput,
-    CompanySummary,
-    ConnectionsListCoverage,
-    ConnectionsListInput,
-    ConnectionSummary,
-    ConversationCoverage,
-    ConversationGetInput,
-    ConversationObservation,
-    ConversationSearchCoverage,
-    ConversationSearchInput,
-    ConversationSummary,
-    EvidenceField,
-    InvitationAcceptInput,
     InvitationAcceptPayload,
-    InvitationAvailableAction,
-    InvitationDirection,
-    InvitationEntity,
-    InvitationEntityType,
-    InvitationFilter,
-    InvitationIgnoreInput,
     InvitationIgnorePayload,
-    InvitationListCoverage,
-    InvitationListInput,
-    InvitationSendInput,
     InvitationSendPayload,
-    InvitationSummary,
-    InvitationType,
-    JobDetailInput,
-    JobDetailObservation,
-    JobSearchCoverage,
-    JobSearchInput,
-    JobSummary,
-    MessageDirection,
-    MessageObservation,
-    MessageSendInput,
     MessageSendPayload,
-    PeopleGetInput,
-    PeopleSearchCoverage,
-    PeopleSearchInput,
-    PersonConnectionDegree,
-    PersonProfileCoverage,
-    PersonProfileObservation,
-    PersonProfilePageCapture,
-    PersonSummary,
-    PostAuthor,
-    PostAuthorType,
-    PostCommentInput,
-    PostCommentsCoverage,
-    PostCommentsListInput,
-    PostCreateInput,
     PostCreatePayload,
-    PostDetailCoverage,
-    PostGetInput,
-    PostObservation,
-    PostReactionInput,
-    PostSearchCoverage,
-    PostSearchInput,
-    PostSummary,
     ReactionSetPayload,
     ReactionState,
+)
+from linkedin_mcp.tools._shared.browser import BrowserManager
+from linkedin_mcp.tools._shared.models import (
+    EvidenceField,
     StopReason,
 )
-from linkedin_mcp.linkedin.operations import (
-    CapabilityExecutor,
-    ConnectionsListProvider,
-    ConversationProvider,
-    ConversationSearchProvider,
-    InvitationActionProvider,
-    InvitationListProvider,
-    PostEngagementProvider,
-    PostPublishingProvider,
+from linkedin_mcp.tools.companies.get.models.company_get_input import CompanyGetInput
+from linkedin_mcp.tools.companies.get.models.company_profile_coverage import CompanyProfileCoverage
+from linkedin_mcp.tools.companies.get.models.company_profile_observation import (
+    CompanyProfileObservation,
 )
-from linkedin_mcp.mcp.server import create_mcp_server
-from linkedin_mcp.runtime import AccountProcessLock
+from linkedin_mcp.tools.companies.get.models.company_profile_page_capture import (
+    CompanyProfilePageCapture,
+)
+from linkedin_mcp.tools.companies.get.page import CompanyProfilePage
+from linkedin_mcp.tools.companies.search.models.company_search_coverage import CompanySearchCoverage
+from linkedin_mcp.tools.companies.search.models.company_search_input import CompanySearchInput
+from linkedin_mcp.tools.companies.search.models.company_summary import CompanySummary
+from linkedin_mcp.tools.companies.search.page import CompanySearchPage
+from linkedin_mcp.tools.connections.list.models.connection_summary import ConnectionSummary
+from linkedin_mcp.tools.connections.list.models.connections_list_coverage import (
+    ConnectionsListCoverage,
+)
+from linkedin_mcp.tools.connections.list.models.connections_list_input import ConnectionsListInput
+from linkedin_mcp.tools.connections.list.page import ConnectionsListPage
+from linkedin_mcp.tools.connections.search.models.connections_search_input import (
+    ConnectionsSearchInput,
+)
+from linkedin_mcp.tools.connections.search.page import ConnectionsSearchPage
+from linkedin_mcp.tools.invitations.accept.models.invitation_accept_input import (
+    InvitationAcceptInput,
+)
+from linkedin_mcp.tools.invitations.accept.page import AcceptInvitationPage
+from linkedin_mcp.tools.invitations.ignore.models.invitation_ignore_input import (
+    InvitationIgnoreInput,
+)
+from linkedin_mcp.tools.invitations.ignore.page import IgnoreInvitationPage
+from linkedin_mcp.tools.invitations.list.models.invitation_available_action import (
+    InvitationAvailableAction,
+)
+from linkedin_mcp.tools.invitations.list.models.invitation_direction import InvitationDirection
+from linkedin_mcp.tools.invitations.list.models.invitation_entity import InvitationEntity
+from linkedin_mcp.tools.invitations.list.models.invitation_entity_type import InvitationEntityType
+from linkedin_mcp.tools.invitations.list.models.invitation_filter import InvitationFilter
+from linkedin_mcp.tools.invitations.list.models.invitation_list_coverage import (
+    InvitationListCoverage,
+)
+from linkedin_mcp.tools.invitations.list.models.invitation_list_input import InvitationListInput
+from linkedin_mcp.tools.invitations.list.models.invitation_summary import InvitationSummary
+from linkedin_mcp.tools.invitations.list.models.invitation_type import InvitationType
+from linkedin_mcp.tools.invitations.list.page import InvitationListPage
+from linkedin_mcp.tools.invitations.send.models.invitation_send_input import InvitationSendInput
+from linkedin_mcp.tools.invitations.send.page import SendInvitationPage
+from linkedin_mcp.tools.jobs.get.models.job_detail_input import JobDetailInput
+from linkedin_mcp.tools.jobs.get.models.job_detail_observation import JobDetailObservation
+from linkedin_mcp.tools.jobs.get.page import JobDetailPage
+from linkedin_mcp.tools.jobs.search.models.job_search_coverage import JobSearchCoverage
+from linkedin_mcp.tools.jobs.search.models.job_search_input import JobSearchInput
+from linkedin_mcp.tools.jobs.search.models.job_summary import JobSummary
+from linkedin_mcp.tools.jobs.search.page import JobSearchPage
+from linkedin_mcp.tools.messaging.conversation.get.models.conversation_coverage import (
+    ConversationCoverage,
+)
+from linkedin_mcp.tools.messaging.conversation.get.models.conversation_get_input import (
+    ConversationGetInput,
+)
+from linkedin_mcp.tools.messaging.conversation.get.models.conversation_observation import (
+    ConversationObservation,
+)
+from linkedin_mcp.tools.messaging.conversation.get.models.message_direction import MessageDirection
+from linkedin_mcp.tools.messaging.conversation.get.models.message_observation import (
+    MessageObservation,
+)
+from linkedin_mcp.tools.messaging.conversation.get.page import ConversationGetPage
+from linkedin_mcp.tools.messaging.search.models.conversation_search_coverage import (
+    ConversationSearchCoverage,
+)
+from linkedin_mcp.tools.messaging.search.models.conversation_search_input import (
+    ConversationSearchInput,
+)
+from linkedin_mcp.tools.messaging.search.models.conversation_summary import ConversationSummary
+from linkedin_mcp.tools.messaging.search.page import ConversationSearchPage
+from linkedin_mcp.tools.messaging.send.models.message_send_input import MessageSendInput
+from linkedin_mcp.tools.messaging.send.page import MessageSendPage
+from linkedin_mcp.tools.people.get.models.people_get_input import PeopleGetInput
+from linkedin_mcp.tools.people.get.models.person_profile_coverage import PersonProfileCoverage
+from linkedin_mcp.tools.people.get.models.person_profile_observation import PersonProfileObservation
+from linkedin_mcp.tools.people.get.models.person_profile_page_capture import (
+    PersonProfilePageCapture,
+)
+from linkedin_mcp.tools.people.get.page import PersonProfilePage
+from linkedin_mcp.tools.people.models.person_connection_degree import PersonConnectionDegree
+from linkedin_mcp.tools.people.search.models.people_search_coverage import PeopleSearchCoverage
+from linkedin_mcp.tools.people.search.models.people_search_input import PeopleSearchInput
+from linkedin_mcp.tools.people.search.models.person_summary import PersonSummary
+from linkedin_mcp.tools.people.search.page import PeopleSearchPage
+from linkedin_mcp.tools.posts.comment.models.post_comment_input import PostCommentInput
+from linkedin_mcp.tools.posts.comment.page import PostCommentPage
+from linkedin_mcp.tools.posts.comments.list.models.comment_observation import CommentObservation
+from linkedin_mcp.tools.posts.comments.list.models.comment_thread import CommentThread
+from linkedin_mcp.tools.posts.comments.list.models.post_comments_coverage import (
+    PostCommentsCoverage,
+)
+from linkedin_mcp.tools.posts.comments.list.models.post_comments_list_input import (
+    PostCommentsListInput,
+)
+from linkedin_mcp.tools.posts.comments.list.page import PostCommentsPage
+from linkedin_mcp.tools.posts.create.models.post_create_input import PostCreateInput
+from linkedin_mcp.tools.posts.create.page import PostPublishingPage
+from linkedin_mcp.tools.posts.get.models.post_author_type import PostAuthorType
+from linkedin_mcp.tools.posts.get.models.post_detail_coverage import PostDetailCoverage
+from linkedin_mcp.tools.posts.get.models.post_get_input import PostGetInput
+from linkedin_mcp.tools.posts.get.models.post_observation import PostObservation
+from linkedin_mcp.tools.posts.get.page import PostDetailPage
+from linkedin_mcp.tools.posts.models.post_author import PostAuthor
+from linkedin_mcp.tools.posts.react.models.post_reaction_input import PostReactionInput
+from linkedin_mcp.tools.posts.react.page import PostReactionPage
+from linkedin_mcp.tools.posts.search.models.post_search_coverage import PostSearchCoverage
+from linkedin_mcp.tools.posts.search.models.post_search_input import PostSearchInput
+from linkedin_mcp.tools.posts.search.models.post_summary import PostSummary
+from linkedin_mcp.tools.posts.search.page import PostSearchPage
 
 ROOT = Path(__file__).parents[2]
 
@@ -161,11 +210,13 @@ class ProtocolJobDetail:
 class ProtocolPeopleSearch:
     async def collect(
         self,
-        request: PeopleSearchInput,
+        request: PeopleSearchInput | ConnectionsSearchInput,
         *,
         result_limit: int | None = None,
     ) -> tuple[tuple[PersonSummary, ...], PeopleSearchCoverage, str, str]:
         del result_limit
+        if isinstance(request, ConnectionsSearchInput):
+            request = request.as_people_search_input()
         person = PersonSummary(
             profile_slug="jane-doe",
             profile_url=HttpUrl("https://www.linkedin.com/in/jane-doe/"),
@@ -655,43 +706,42 @@ def protocol_container(root: Path) -> AppContainer:
     )
     browser = BrowserManager(settings)
     network = ProtocolNetwork()
+    people_search = ProtocolPeopleSearch()
     pagination = PaginationManager(
         ttl_seconds=settings.pagination_cursor_ttl_seconds,
         max_active_cursors=settings.pagination_max_active_cursors,
         max_seen_items_per_cursor=settings.pagination_max_seen_items_per_cursor,
     )
-    executor = CapabilityExecutor(
-        settings=settings,
-        job_search=ProtocolJobSearch(),
-        job_detail=ProtocolJobDetail(),
-        people_search=ProtocolPeopleSearch(),
-        person_profile=ProtocolPersonProfile(),
-        company_search=ProtocolCompanySearch(),
-        company_profile=ProtocolCompanyProfile(),
-        post_search=ProtocolPostSearch(),
-        post_detail=ProtocolPostDetail(),
-        post_comments=ProtocolPostComments(),
-        post_publishing=cast(PostPublishingProvider, network),
-        post_engagement=cast(PostEngagementProvider, network),
-        invitation_list=cast(InvitationListProvider, network),
-        connections_list=cast(ConnectionsListProvider, network),
-        invitation_actions=cast(InvitationActionProvider, network),
-        conversation_search=cast(ConversationSearchProvider, network),
-        conversation=cast(ConversationProvider, network),
-        pagination=pagination,
-    )
-    worker = CapabilityWorker(
-        executor,
-        queue_capacity=settings.queue_capacity,
-        pagination=pagination,
-        account_id=settings.account_id,
-    )
+    worker = Worker()
+    scheduler = Scheduler(worker, capacity=settings.queue_capacity)
     return AppContainer(
         settings=settings,
         browser=browser,
-        executor=executor,
+        scheduler=scheduler,
         worker=worker,
+        pagination=pagination,
         process_lock=AccountProcessLock(settings.runtime_lock_path),
+        job_search=cast(JobSearchPage, ProtocolJobSearch()),
+        job_detail=cast(JobDetailPage, ProtocolJobDetail()),
+        people_search=cast(PeopleSearchPage, people_search),
+        connections_search=cast(ConnectionsSearchPage, people_search),
+        person_profile=cast(PersonProfilePage, ProtocolPersonProfile()),
+        company_search=cast(CompanySearchPage, ProtocolCompanySearch()),
+        company_profile=cast(CompanyProfilePage, ProtocolCompanyProfile()),
+        post_search=cast(PostSearchPage, ProtocolPostSearch()),
+        post_detail=cast(PostDetailPage, ProtocolPostDetail()),
+        post_comments=cast(PostCommentsPage, ProtocolPostComments()),
+        post_publishing=cast(PostPublishingPage, network),
+        post_comment=cast(PostCommentPage, network),
+        post_reaction=cast(PostReactionPage, network),
+        invitation_list=cast(InvitationListPage, network),
+        connections_list=cast(ConnectionsListPage, network),
+        invitation_send=cast(SendInvitationPage, network),
+        invitation_accept=cast(AcceptInvitationPage, network),
+        invitation_ignore=cast(IgnoreInvitationPage, network),
+        conversation_search=cast(ConversationSearchPage, network),
+        conversation_read=cast(ConversationGetPage, network),
+        message_send=cast(MessageSendPage, network),
     )
 
 

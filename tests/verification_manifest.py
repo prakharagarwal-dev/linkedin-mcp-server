@@ -53,7 +53,7 @@ MOCK_VERIFICATION: dict[str, ToolVerification] = {
         _READ,
         "tests/contract/test_mcp_protocol.py",
         "tests/unit/test_job_pages.py",
-        "tests/unit/test_executor.py",
+        "tests/unit/test_tool_execution.py",
     ),
     "linkedin.people.search": _entry(
         "people",
@@ -61,7 +61,7 @@ MOCK_VERIFICATION: dict[str, ToolVerification] = {
         _READ,
         "tests/contract/test_mcp_protocol.py",
         "tests/unit/test_people_pages.py",
-        "tests/unit/test_executor.py",
+        "tests/unit/test_tool_execution.py",
     ),
     "linkedin.people.get": _entry(
         "people",
@@ -69,7 +69,7 @@ MOCK_VERIFICATION: dict[str, ToolVerification] = {
         _READ,
         "tests/contract/test_mcp_protocol.py",
         "tests/unit/test_people_pages.py",
-        "tests/unit/test_executor.py",
+        "tests/unit/test_tool_execution.py",
     ),
     "linkedin.companies.search": _entry(
         "companies",
@@ -77,7 +77,7 @@ MOCK_VERIFICATION: dict[str, ToolVerification] = {
         _READ,
         "tests/contract/test_mcp_protocol.py",
         "tests/unit/test_company_pages.py",
-        "tests/unit/test_executor.py",
+        "tests/unit/test_tool_execution.py",
     ),
     "linkedin.companies.get": _entry(
         "companies",
@@ -85,7 +85,7 @@ MOCK_VERIFICATION: dict[str, ToolVerification] = {
         _READ,
         "tests/contract/test_mcp_protocol.py",
         "tests/unit/test_company_pages.py",
-        "tests/unit/test_executor.py",
+        "tests/unit/test_tool_execution.py",
     ),
     "linkedin.posts.search": _entry(
         "posts",
@@ -93,7 +93,7 @@ MOCK_VERIFICATION: dict[str, ToolVerification] = {
         _READ,
         "tests/contract/test_mcp_protocol.py",
         "tests/unit/test_post_pages.py",
-        "tests/unit/test_executor.py",
+        "tests/unit/test_tool_execution.py",
     ),
     "linkedin.posts.get": _entry(
         "posts",
@@ -101,7 +101,7 @@ MOCK_VERIFICATION: dict[str, ToolVerification] = {
         _READ,
         "tests/contract/test_mcp_protocol.py",
         "tests/unit/test_post_pages.py",
-        "tests/unit/test_executor.py",
+        "tests/unit/test_tool_execution.py",
     ),
     "linkedin.posts.comments.list": _entry(
         "posts",
@@ -109,7 +109,7 @@ MOCK_VERIFICATION: dict[str, ToolVerification] = {
         _READ,
         "tests/contract/test_mcp_protocol.py",
         "tests/unit/test_post_pages.py",
-        "tests/unit/test_executor.py",
+        "tests/unit/test_tool_execution.py",
     ),
     "linkedin.posts.create": _entry(
         "posts",
@@ -156,7 +156,7 @@ MOCK_VERIFICATION: dict[str, ToolVerification] = {
         _READ,
         "tests/contract/test_mcp_protocol.py",
         "tests/unit/test_people_pages.py",
-        "tests/unit/test_executor.py",
+        "tests/unit/test_tool_execution.py",
     ),
     "linkedin.invitations.send": _entry(
         "invitations",
@@ -186,7 +186,7 @@ MOCK_VERIFICATION: dict[str, ToolVerification] = {
         _READ,
         "tests/contract/test_mcp_protocol.py",
         "tests/unit/test_messaging_pages.py",
-        "tests/unit/test_executor.py",
+        "tests/unit/test_tool_execution.py",
     ),
     "linkedin.messaging.conversation.get": _entry(
         "messaging",
@@ -194,7 +194,7 @@ MOCK_VERIFICATION: dict[str, ToolVerification] = {
         _READ,
         "tests/contract/test_mcp_protocol.py",
         "tests/unit/test_messaging_pages.py",
-        "tests/unit/test_executor.py",
+        "tests/unit/test_tool_execution.py",
     ),
     "linkedin.messaging.send": _entry(
         "messaging",

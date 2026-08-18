@@ -417,9 +417,8 @@ async def test_runtime_status_and_stop_report_exact_owner(
         return {
             "connected_clients": 2,
             "queue_depth": 3,
-            "queued_clients": 2,
             "active_browser_operation": True,
-            "active_capability": "linkedin.jobs.search",
+            "active_task": "linkedin.jobs.search",
             "accepting_calls": True,
         }
 
@@ -434,7 +433,7 @@ async def test_runtime_status_and_stop_report_exact_owner(
         "account_id": "personal",
         "accepting_calls": True,
         "active_browser_operation": True,
-        "active_capability": "linkedin.jobs.search",
+        "active_task": "linkedin.jobs.search",
         "command": "shared-runtime",
         "connected_clients": 2,
         "endpoint": "http://127.0.0.1:8000/mcp",
@@ -442,7 +441,6 @@ async def test_runtime_status_and_stop_report_exact_owner(
         "lock_path": str(settings.runtime_lock_path),
         "pid": 4321,
         "queue_depth": 3,
-        "queued_clients": 2,
         "running": True,
         "started_at": "2026-08-03T10:00:00+00:00",
         "transport": "shared-loopback",

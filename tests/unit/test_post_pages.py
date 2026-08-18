@@ -13,36 +13,32 @@ from playwright.async_api import Locator, Page, Route, async_playwright
 from pydantic import HttpUrl, ValidationError
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.linkedin.browser import BrowserManager
-from linkedin_mcp.linkedin.models import (
-    CommentSort,
-    PostAuthorType,
+from linkedin_mcp.tools._shared.actions import ReactionState
+from linkedin_mcp.tools._shared.browser import BrowserManager
+from linkedin_mcp.tools._shared.models import StopReason
+from linkedin_mcp.tools._shared.urls import post_reference_from_value
+from linkedin_mcp.tools.posts.comments.list.evidence import source_from_post_comments
+from linkedin_mcp.tools.posts.comments.list.models.comment_sort import CommentSort
+from linkedin_mcp.tools.posts.comments.list.models.post_comments_list_input import (
     PostCommentsListInput,
-    PostContentType,
-    PostDetailCoverage,
-    PostGetInput,
-    PostObservation,
-    PostPollState,
-    PostSearchContentType,
-    PostSearchDate,
-    PostSearchFilters,
-    PostSearchInput,
-    PostSearchPostedBy,
-    PostSearchSort,
-    ReactionState,
-    StopReason,
 )
-from linkedin_mcp.linkedin.posts.evidence import (
-    source_from_post,
-    source_from_post_comments,
-    source_from_post_search,
-)
-from linkedin_mcp.linkedin.posts.pages import (
-    PostCommentsPage,
-    PostDetailPage,
-    PostSearchPage,
-)
-from linkedin_mcp.linkedin.urls import post_reference_from_value
+from linkedin_mcp.tools.posts.comments.list.page import PostCommentsPage
+from linkedin_mcp.tools.posts.get.evidence import source_from_post
+from linkedin_mcp.tools.posts.get.models.post_author_type import PostAuthorType
+from linkedin_mcp.tools.posts.get.models.post_detail_coverage import PostDetailCoverage
+from linkedin_mcp.tools.posts.get.models.post_get_input import PostGetInput
+from linkedin_mcp.tools.posts.get.models.post_observation import PostObservation
+from linkedin_mcp.tools.posts.get.models.post_poll_state import PostPollState
+from linkedin_mcp.tools.posts.get.page import PostDetailPage
+from linkedin_mcp.tools.posts.search.evidence import source_from_post_search
+from linkedin_mcp.tools.posts.search.models.post_content_type import PostContentType
+from linkedin_mcp.tools.posts.search.models.post_search_content_type import PostSearchContentType
+from linkedin_mcp.tools.posts.search.models.post_search_date import PostSearchDate
+from linkedin_mcp.tools.posts.search.models.post_search_filters import PostSearchFilters
+from linkedin_mcp.tools.posts.search.models.post_search_input import PostSearchInput
+from linkedin_mcp.tools.posts.search.models.post_search_posted_by import PostSearchPostedBy
+from linkedin_mcp.tools.posts.search.models.post_search_sort import PostSearchSort
+from linkedin_mcp.tools.posts.search.page import PostSearchPage
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 POST_REF = "activity:7312345678901234567"

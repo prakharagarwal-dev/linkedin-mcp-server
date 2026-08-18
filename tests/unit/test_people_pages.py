@@ -12,19 +12,26 @@ from playwright.async_api import Locator, Page, async_playwright
 from pydantic import ValidationError
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.linkedin.browser import BrowserManager
-from linkedin_mcp.linkedin.models import (
+from linkedin_mcp.tools._shared.browser import BrowserManager
+from linkedin_mcp.tools._shared.models import StopReason
+from linkedin_mcp.tools.connections.search.models.connections_search_filters import (
     ConnectionsSearchFilters,
-    ConnectionsSearchInput,
-    PeopleGetInput,
-    PeopleSearchConnectionDegree,
-    PeopleSearchFilters,
-    PeopleSearchInput,
-    PersonConnectionDegree,
-    PersonProfileSectionSelector,
-    StopReason,
 )
-from linkedin_mcp.linkedin.people.pages import PeopleSearchPage, PersonProfilePage
+from linkedin_mcp.tools.connections.search.models.connections_search_input import (
+    ConnectionsSearchInput,
+)
+from linkedin_mcp.tools.people.get.models.people_get_input import PeopleGetInput
+from linkedin_mcp.tools.people.get.models.person_profile_section_selector import (
+    PersonProfileSectionSelector,
+)
+from linkedin_mcp.tools.people.get.page import PersonProfilePage
+from linkedin_mcp.tools.people.models.person_connection_degree import PersonConnectionDegree
+from linkedin_mcp.tools.people.search.models.people_search_connection_degree import (
+    PeopleSearchConnectionDegree,
+)
+from linkedin_mcp.tools.people.search.models.people_search_filters import PeopleSearchFilters
+from linkedin_mcp.tools.people.search.models.people_search_input import PeopleSearchInput
+from linkedin_mcp.tools.people.search.page import PeopleSearchPage
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 

@@ -4,41 +4,56 @@ from typing import cast
 
 import pytest
 
-import linkedin_mcp.linkedin.companies.pages as company_pages
-import linkedin_mcp.linkedin.jobs.pages as job_pages
-import linkedin_mcp.linkedin.messaging.pages as messaging_pages
-import linkedin_mcp.linkedin.network.connections as connection_pages
-import linkedin_mcp.linkedin.network.invitations as invitation_pages
-import linkedin_mcp.linkedin.people.pages as people_pages
-import linkedin_mcp.linkedin.posts.pages as post_pages
+import linkedin_mcp.tools.companies.get.page as company_get_pages
+import linkedin_mcp.tools.companies.search.page as company_search_pages
+import linkedin_mcp.tools.connections.list.page as connection_pages
+import linkedin_mcp.tools.invitations.list.page as invitation_pages
+import linkedin_mcp.tools.jobs.search.page as job_pages
+import linkedin_mcp.tools.messaging.conversation.get.page as conversation_pages
+import linkedin_mcp.tools.messaging.search.page as messaging_pages
+import linkedin_mcp.tools.people.search.page as people_pages
+import linkedin_mcp.tools.posts.comments.list.page as post_comment_pages
+import linkedin_mcp.tools.posts.search.page as post_search_pages
 from linkedin_mcp.errors import AuthenticationRequiredError, BrowserUnavailableError
-from linkedin_mcp.linkedin.browser import BrowserManager
-from linkedin_mcp.linkedin.companies.pages import CompanyProfilePage, CompanySearchPage
-from linkedin_mcp.linkedin.jobs.pages import JobDetailPage, JobSearchPage
-from linkedin_mcp.linkedin.messaging.pages import ConversationPage, ConversationSearchPage
-from linkedin_mcp.linkedin.models import (
-    CompanyGetInput,
-    CompanySearchInput,
-    ConnectionsListInput,
+from linkedin_mcp.tools._shared.browser import BrowserManager
+from linkedin_mcp.tools._shared.models import StopReason
+from linkedin_mcp.tools.companies.get.models.company_get_input import CompanyGetInput
+from linkedin_mcp.tools.companies.get.page import CompanyProfilePage
+from linkedin_mcp.tools.companies.search.models.company_search_input import CompanySearchInput
+from linkedin_mcp.tools.companies.search.page import CompanySearchPage
+from linkedin_mcp.tools.connections.list.models.connections_list_input import ConnectionsListInput
+from linkedin_mcp.tools.connections.list.page import ConnectionsListPage
+from linkedin_mcp.tools.invitations.list.models.invitation_direction import InvitationDirection
+from linkedin_mcp.tools.invitations.list.models.invitation_filter import InvitationFilter
+from linkedin_mcp.tools.invitations.list.models.invitation_list_input import InvitationListInput
+from linkedin_mcp.tools.invitations.list.page import InvitationListPage
+from linkedin_mcp.tools.jobs.get.models.job_detail_input import JobDetailInput
+from linkedin_mcp.tools.jobs.get.page import JobDetailPage
+from linkedin_mcp.tools.jobs.search.models.job_search_input import JobSearchInput
+from linkedin_mcp.tools.jobs.search.page import JobSearchPage
+from linkedin_mcp.tools.messaging.conversation.get.models.conversation_get_input import (
     ConversationGetInput,
-    ConversationSearchInput,
-    InvitationDirection,
-    InvitationFilter,
-    InvitationListInput,
-    JobDetailInput,
-    JobSearchInput,
-    PeopleGetInput,
-    PeopleSearchInput,
-    PersonProfileSectionSelector,
-    PostCommentsListInput,
-    PostGetInput,
-    PostSearchInput,
-    StopReason,
 )
-from linkedin_mcp.linkedin.network.connections import ConnectionsListPage
-from linkedin_mcp.linkedin.network.invitations import InvitationListPage
-from linkedin_mcp.linkedin.people.pages import PeopleSearchPage, PersonProfilePage
-from linkedin_mcp.linkedin.posts.pages import PostCommentsPage, PostDetailPage, PostSearchPage
+from linkedin_mcp.tools.messaging.conversation.get.page import ConversationGetPage
+from linkedin_mcp.tools.messaging.search.models.conversation_search_input import (
+    ConversationSearchInput,
+)
+from linkedin_mcp.tools.messaging.search.page import ConversationSearchPage
+from linkedin_mcp.tools.people.get.models.people_get_input import PeopleGetInput
+from linkedin_mcp.tools.people.get.models.person_profile_section_selector import (
+    PersonProfileSectionSelector,
+)
+from linkedin_mcp.tools.people.get.page import PersonProfilePage
+from linkedin_mcp.tools.people.search.models.people_search_input import PeopleSearchInput
+from linkedin_mcp.tools.people.search.page import PeopleSearchPage
+from linkedin_mcp.tools.posts.comments.list.models.post_comments_list_input import (
+    PostCommentsListInput,
+)
+from linkedin_mcp.tools.posts.comments.list.page import PostCommentsPage
+from linkedin_mcp.tools.posts.get.models.post_get_input import PostGetInput
+from linkedin_mcp.tools.posts.get.page import PostDetailPage
+from linkedin_mcp.tools.posts.search.models.post_search_input import PostSearchInput
+from linkedin_mcp.tools.posts.search.page import PostSearchPage
 from tests.simulator import SimulatorBrowser, standard_scenario
 from tests.simulator.state import SimulatorFault
 
@@ -49,14 +64,17 @@ def _use_fast_synthetic_collection_clock(  # pyright: ignore[reportUnusedFunctio
 ) -> None:
     # These routes are deterministic local HTML. Keep every production polling
     # round while avoiding real-site delays that cannot reveal new fixture state.
-    monkeypatch.setattr(company_pages, "_INITIAL_RESULTS_POLL_DELAY_MS", 25)
+    monkeypatch.setattr(company_get_pages, "INITIAL_RESULTS_POLL_DELAY_MS", 25)
+    monkeypatch.setattr(company_search_pages, "INITIAL_RESULTS_POLL_DELAY_MS", 25)
     monkeypatch.setattr(connection_pages, "_SCROLL_PROGRESS_POLL_DELAY_MS", 25)
     monkeypatch.setattr(invitation_pages, "_INVENTORY_DELAY_MS", 25)
     monkeypatch.setattr(invitation_pages, "_SETTLE_DELAY_MS", 25)
     monkeypatch.setattr(job_pages, "_SEARCH_SETTLE_DELAY_MS", 25)
     monkeypatch.setattr(messaging_pages, "_SCROLL_PROGRESS_POLL_DELAY_MS", 25)
+    monkeypatch.setattr(conversation_pages, "_SCROLL_PROGRESS_POLL_DELAY_MS", 25)
     monkeypatch.setattr(people_pages, "_INITIAL_RESULTS_POLL_DELAY_MS", 25)
-    monkeypatch.setattr(post_pages, "_COLLECTION_POLL_DELAY_MS", 25)
+    monkeypatch.setattr(post_comment_pages, "COLLECTION_POLL_DELAY_MS", 25)
+    monkeypatch.setattr(post_search_pages, "COLLECTION_POLL_DELAY_MS", 25)
 
 
 @pytest.mark.timeout(60)
@@ -232,7 +250,7 @@ async def test_semantic_site_drives_network_discussion_and_company_feed_reads() 
                 page_size=1,
             )
         )
-        conversation = await ConversationPage(page_browser).read(
+        conversation = await ConversationGetPage(page_browser).read(
             ConversationGetInput(
                 context_id="simulator",
                 request_id="conversation",

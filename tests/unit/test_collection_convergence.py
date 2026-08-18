@@ -5,7 +5,7 @@ from typing import cast
 import pytest
 from playwright.async_api import Page
 
-from linkedin_mcp.automation.collections import (
+from linkedin_mcp.tools._shared.collections import (
     CollectionSettleOutcome,
     wait_for_collection_change,
     wait_for_collection_initial_state,

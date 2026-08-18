@@ -6,26 +6,33 @@ import uuid
 from pathlib import Path
 from typing import cast
 
-from linkedin_mcp.app import CapabilityWorker
-from linkedin_mcp.app.container import AppContainer
 from linkedin_mcp.config import Settings
-from linkedin_mcp.linkedin.browser import BrowserManager
-from linkedin_mcp.linkedin.operations import (
-    CapabilityExecutor,
-    CompanyProfileProvider,
-    CompanySearchProvider,
-    ConnectionsListProvider,
-    ConversationProvider,
-    ConversationSearchProvider,
-    InvitationActionProvider,
-    InvitationListProvider,
-    PostCommentsProvider,
-    PostDetailProvider,
-    PostEngagementProvider,
-    PostPublishingProvider,
-    PostSearchProvider,
-)
+from linkedin_mcp.container import AppContainer
+from linkedin_mcp.execution import Scheduler, Worker
+from linkedin_mcp.pagination import PaginationManager
 from linkedin_mcp.runtime import AccountProcessLock
+from linkedin_mcp.tools._shared.browser import BrowserManager
+from linkedin_mcp.tools.companies.get.page import CompanyProfilePage
+from linkedin_mcp.tools.companies.search.page import CompanySearchPage
+from linkedin_mcp.tools.connections.list.page import ConnectionsListPage
+from linkedin_mcp.tools.connections.search.page import ConnectionsSearchPage
+from linkedin_mcp.tools.invitations.accept.page import AcceptInvitationPage
+from linkedin_mcp.tools.invitations.ignore.page import IgnoreInvitationPage
+from linkedin_mcp.tools.invitations.list.page import InvitationListPage
+from linkedin_mcp.tools.invitations.send.page import SendInvitationPage
+from linkedin_mcp.tools.jobs.get.page import JobDetailPage
+from linkedin_mcp.tools.jobs.search.page import JobSearchPage
+from linkedin_mcp.tools.messaging.conversation.get.page import ConversationGetPage
+from linkedin_mcp.tools.messaging.search.page import ConversationSearchPage
+from linkedin_mcp.tools.messaging.send.page import MessageSendPage
+from linkedin_mcp.tools.people.get.page import PersonProfilePage
+from linkedin_mcp.tools.people.search.page import PeopleSearchPage
+from linkedin_mcp.tools.posts.comment.page import PostCommentPage
+from linkedin_mcp.tools.posts.comments.list.page import PostCommentsPage
+from linkedin_mcp.tools.posts.create.page import PostPublishingPage
+from linkedin_mcp.tools.posts.get.page import PostDetailPage
+from linkedin_mcp.tools.posts.react.page import PostReactionPage
+from linkedin_mcp.tools.posts.search.page import PostSearchPage
 from tests.contract.test_mcp_protocol import (
     ProtocolJobDetail,
     ProtocolPeopleSearch,
@@ -50,30 +57,40 @@ def create_simulator_container(
     )
     browser = BrowserManager(settings)
     network = StatefulProtocolNetwork(state)
-    executor = CapabilityExecutor(
-        settings=settings,
-        job_search=StatefulProtocolJobSearch(state),
-        job_detail=ProtocolJobDetail(),
-        people_search=ProtocolPeopleSearch(),
-        person_profile=ProtocolPersonProfile(),
-        company_search=cast(CompanySearchProvider, object()),
-        company_profile=cast(CompanyProfileProvider, object()),
-        post_search=cast(PostSearchProvider, object()),
-        post_detail=cast(PostDetailProvider, object()),
-        post_comments=cast(PostCommentsProvider, object()),
-        post_publishing=cast(PostPublishingProvider, network),
-        post_engagement=cast(PostEngagementProvider, network),
-        invitation_list=cast(InvitationListProvider, network),
-        connections_list=cast(ConnectionsListProvider, network),
-        invitation_actions=cast(InvitationActionProvider, network),
-        conversation_search=cast(ConversationSearchProvider, network),
-        conversation=cast(ConversationProvider, network),
+    people_search = ProtocolPeopleSearch()
+    pagination = PaginationManager(
+        ttl_seconds=settings.pagination_cursor_ttl_seconds,
+        max_active_cursors=settings.pagination_max_active_cursors,
+        max_seen_items_per_cursor=settings.pagination_max_seen_items_per_cursor,
     )
-    worker = CapabilityWorker(executor, queue_capacity=settings.queue_capacity)
+    worker = Worker()
+    scheduler = Scheduler(worker, capacity=settings.queue_capacity)
     return AppContainer(
         settings=settings,
         browser=browser,
-        executor=executor,
+        scheduler=scheduler,
         worker=worker,
+        pagination=pagination,
         process_lock=AccountProcessLock(settings.runtime_lock_path),
+        job_search=cast(JobSearchPage, StatefulProtocolJobSearch(state)),
+        job_detail=cast(JobDetailPage, ProtocolJobDetail()),
+        people_search=cast(PeopleSearchPage, people_search),
+        connections_search=cast(ConnectionsSearchPage, people_search),
+        person_profile=cast(PersonProfilePage, ProtocolPersonProfile()),
+        company_search=cast(CompanySearchPage, object()),
+        company_profile=cast(CompanyProfilePage, object()),
+        post_search=cast(PostSearchPage, object()),
+        post_detail=cast(PostDetailPage, object()),
+        post_comments=cast(PostCommentsPage, object()),
+        post_publishing=cast(PostPublishingPage, network),
+        post_comment=cast(PostCommentPage, network),
+        post_reaction=cast(PostReactionPage, network),
+        invitation_list=cast(InvitationListPage, network),
+        connections_list=cast(ConnectionsListPage, network),
+        invitation_send=cast(SendInvitationPage, network),
+        invitation_accept=cast(AcceptInvitationPage, network),
+        invitation_ignore=cast(IgnoreInvitationPage, network),
+        conversation_search=cast(ConversationSearchPage, network),
+        conversation_read=cast(ConversationGetPage, network),
+        message_send=cast(MessageSendPage, network),
     )

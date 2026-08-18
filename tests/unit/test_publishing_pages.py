@@ -11,44 +11,44 @@ from playwright.async_api import Locator, Page, Route, async_playwright
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl, ValidationError
 
-from linkedin_mcp.app.assets import LocalAssetStore
+from linkedin_mcp.assets import LocalAssetStore
 from linkedin_mcp.errors import InvalidTargetError
-from linkedin_mcp.linkedin.browser import BrowserManager
-from linkedin_mcp.linkedin.models import (
+from linkedin_mcp.tools._shared.actions import (
     ActionCommand,
     ActionOutcome,
     ActionPageResult,
     ActionType,
-    CelebrationPostContent,
-    CelebrationType,
-    DocumentPostContent,
-    EventFormat,
     EventPostContent,
-    EventSpeakerInput,
-    EventType,
-    ExpertRequestCategory,
     ExpertRequestPostContent,
     HiringPostContent,
-    ImagePostContent,
-    PollDuration,
-    PollPostContent,
     PostAudience,
     PostCollaboratorInput,
     PostCommentControl,
-    PostCreateInput,
     PostCreatePayload,
     PostGroupTarget,
-    PostImageAspectRatio,
-    PostImageEditInput,
-    PostImageFilter,
-    PostImageInput,
-    PostImageTagInput,
     PostMentionInput,
-    TextPostContent,
-    VideoCaptionMode,
-    VideoPostContent,
 )
-from linkedin_mcp.linkedin.posts.publishing import PostPublishingPage
+from linkedin_mcp.tools._shared.browser import BrowserManager
+from linkedin_mcp.tools.posts.create.models.celebration_post_content import CelebrationPostContent
+from linkedin_mcp.tools.posts.create.models.celebration_type import CelebrationType
+from linkedin_mcp.tools.posts.create.models.document_post_content import DocumentPostContent
+from linkedin_mcp.tools.posts.create.models.event_format import EventFormat
+from linkedin_mcp.tools.posts.create.models.event_speaker_input import EventSpeakerInput
+from linkedin_mcp.tools.posts.create.models.event_type import EventType
+from linkedin_mcp.tools.posts.create.models.expert_request_category import ExpertRequestCategory
+from linkedin_mcp.tools.posts.create.models.image_post_content import ImagePostContent
+from linkedin_mcp.tools.posts.create.models.poll_duration import PollDuration
+from linkedin_mcp.tools.posts.create.models.poll_post_content import PollPostContent
+from linkedin_mcp.tools.posts.create.models.post_create_input import PostCreateInput
+from linkedin_mcp.tools.posts.create.models.post_image_aspect_ratio import PostImageAspectRatio
+from linkedin_mcp.tools.posts.create.models.post_image_edit_input import PostImageEditInput
+from linkedin_mcp.tools.posts.create.models.post_image_filter import PostImageFilter
+from linkedin_mcp.tools.posts.create.models.post_image_input import PostImageInput
+from linkedin_mcp.tools.posts.create.models.post_image_tag_input import PostImageTagInput
+from linkedin_mcp.tools.posts.create.models.text_post_content import TextPostContent
+from linkedin_mcp.tools.posts.create.models.video_caption_mode import VideoCaptionMode
+from linkedin_mcp.tools.posts.create.models.video_post_content import VideoPostContent
+from linkedin_mcp.tools.posts.create.page import PostPublishingPage
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 COMPOSER_HTML = (FIXTURES / "posts/latest/composer.html").read_text(encoding="utf-8")

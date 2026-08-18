@@ -6,21 +6,21 @@ from datetime import UTC, datetime
 
 from pydantic import HttpUrl
 
-from linkedin_mcp.linkedin.models import (
+from linkedin_mcp.tools._shared.actions import (
     ActionCommand,
     ActionPageResult,
     CommentCreatePayload,
     InvitationAcceptPayload,
     InvitationIgnorePayload,
     InvitationSendPayload,
-    JobSearchCoverage,
-    JobSearchInput,
-    JobSummary,
     MessageSendPayload,
     PostCreatePayload,
     ReactionSetPayload,
-    StopReason,
 )
+from linkedin_mcp.tools._shared.models import StopReason
+from linkedin_mcp.tools.jobs.search.models.job_search_coverage import JobSearchCoverage
+from linkedin_mcp.tools.jobs.search.models.job_search_input import JobSearchInput
+from linkedin_mcp.tools.jobs.search.models.job_summary import JobSummary
 from tests.contract.test_mcp_protocol import ProtocolNetwork
 from tests.simulator.state import SimulatorState
 

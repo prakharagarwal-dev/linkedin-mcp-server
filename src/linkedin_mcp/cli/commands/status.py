@@ -39,9 +39,8 @@ async def execute(settings: Settings) -> None:
     if runtime_status is not None:
         report["connected_clients"] = runtime_status.get("connected_clients")
         report["queue_depth"] = runtime_status.get("queue_depth")
-        report["queued_clients"] = runtime_status.get("queued_clients")
         report["active_browser_operation"] = runtime_status.get("active_browser_operation")
-        report["active_capability"] = runtime_status.get("active_capability")
+        report["active_task"] = runtime_status.get("active_task")
         report["accepting_calls"] = runtime_status.get("accepting_calls")
     print(json.dumps(report, indent=2, sort_keys=True))
 

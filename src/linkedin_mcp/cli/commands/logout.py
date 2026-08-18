@@ -5,8 +5,8 @@ import asyncio
 import json
 
 from linkedin_mcp.config import Settings
-from linkedin_mcp.linkedin.browser import logout_interactively
 from linkedin_mcp.runtime.owned_operation import run_owned_operation
+from linkedin_mcp.tools._shared.browser import logout_interactively
 
 
 def configure(command: argparse.ArgumentParser) -> None:

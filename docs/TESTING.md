@@ -12,7 +12,7 @@ not mean the current LinkedIn site was contacted during CI.
 
 | Layer | What it verifies |
 | --- | --- |
-| `tests/unit/` | Models, identifiers, configuration, browser lifecycle, host restrictions, pacing, scheduler fairness, cursors, executor behavior, and Playwright page objects |
+| `tests/unit/` | Models, identifiers, configuration, browser lifecycle, host restrictions, pacing, FIFO scheduling, tasks, cursors, tool execution, and Playwright page objects |
 | `tests/contract/` | Tool discovery, schemas, annotations, fresh execution, stdio/HTTP behavior, shared-runtime attachment, client isolation, and direct action conformance |
 | `tests/simulator/` | Stateful LinkedIn-like data, synthetic HTML routing, controlled failures, and mutations |
 | `tests/workflows/` | Multi-tool job, referral, connection, messaging, publishing, and engagement journeys |
@@ -25,7 +25,7 @@ official MCP client                 Playwright Chromium
         │                                   │
 production FastMCP tools             production page objects
         │                                   │
-worker / executor                    synthetic LinkedIn HTML
+Scheduler / Worker                   synthetic LinkedIn HTML
         │                                   │
 stateful typed providers             accessible DOM assertions
 ```

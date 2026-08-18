@@ -4,181 +4,168 @@
 
 LinkedIn MCP Server is a local Python MCP server. It exposes narrow, typed
 LinkedIn tools and drives only visible LinkedIn web surfaces with Playwright.
-It does not contain an agent, LLM, planner, scheduler, database, external
-queue, or generic browser-control API.
+It does not contain an agent, LLM, planner, database, external queue, or
+generic browser-control API.
 
 ```text
-MCP clients
-    │ stdio bridges or loopback Streamable HTTP
+MCP client
+    │ stdio bridge or loopback Streamable HTTP
     ▼
-shared local MCP runtime
-    │ typed validation and client identity
+FastMCP tool
+    │ creates Task
     ▼
-fair in-process scheduler
-    │ one complete browser operation at a time
-    ▼
-Playwright page object ── visible UI ── LinkedIn
-    │
-    └── persistent Chromium profile (authentication only)
+Scheduler ── asyncio.Queue ──> Worker
+                                  │ calls the tool's execute function
+                                  ▼
+                         tool page object
+                                  │ visible UI
+                                  ▼
+                              LinkedIn
 ```
 
 One background runtime owns the configured Chromium profile. Stdio clients
 start or attach to that runtime through a loopback MCP endpoint. Direct
-Streamable HTTP clients can use the same loopback endpoint. The account lock
-prevents profile corruption by a second owner. It uses native advisory file
-locking on POSIX and Windows; graceful stop requests are instance-bound local
-files, so runtime lifecycle does not depend on POSIX process signals.
-
-On Windows, the first stdio bridge uses a short-lived local PowerShell CIM
-launcher to ask `Win32_Process.Create` for the background runtime. Windows does
-not associate that broker-created process with the bridge's Job Object, so the
-single Python runtime survives individual MCP-client teardown. The launcher
-passes the current process environment in memory, exits after the request, and
-does not add another long-lived service or runtime.
+Streamable HTTP clients use the same endpoint. The account lock prevents a
+second process from owning the profile at the same time.
 
 The loopback endpoint uses stateful Streamable HTTP with JSON responses. It
 does not expose the optional standalone GET event stream because the server has
-no unsolicited server-to-client messages; clients receive `405 Method Not
-Allowed` for that optional channel and continue using POST and DELETE. This
-also keeps repeated Windows client teardown bounded in the official SDK.
+no unsolicited server-to-client messages. On Windows, a short-lived local CIM
+launcher starts the background runtime so it can survive individual stdio
+client teardown.
 
 ## Request lifecycle
 
-Every tool call is one bounded operation:
+Every browser-backed tool call follows one short path:
 
-1. FastMCP validates the public input schema.
-2. The server binds the call to the current MCP client.
-3. The worker places it in the bounded fair scheduler.
-4. The scheduler applies global navigation pacing.
-5. The executor opens a temporary Playwright page in the shared browser
-   context.
-6. A capability-specific page object navigates and uses visible controls.
-7. The executor validates evidence and returns the typed result directly.
-8. The temporary page closes; the browser context and login profile remain.
+1. FastMCP validates the public arguments.
+2. `tool.py` builds the tool's typed input model.
+3. `tool.py` creates a `Task` around that tool's execution function.
+4. `Scheduler` puts the task in its bounded FIFO `asyncio.Queue`.
+5. `Scheduler` gives the next task to the one `Worker`.
+6. The tool's code calls its page object and builds evidence and output.
+7. The task's future resolves and FastMCP returns the typed result.
 
-Calls are atomic at the MCP boundary. A client does not own a browser tab
-between calls, and a cursor does not preserve a live page.
+There is no capability registry, central dispatcher, executor, or operation
+class between the worker and the tool. `Task` carries only a name, an async
+callable, its result future, and cancellation behavior.
+
+Only one browser task runs at a time. This protects the one browser context and
+makes account-changing actions atomic at the MCP boundary. A client never owns
+a browser tab between calls.
 
 ### Reads
 
-Reads collect visible data, coverage metadata, source URLs, and capture times.
-Every invocation executes the provider again. `request_id` is returned for
-caller correlation; it does not cache, deduplicate, or lock the request arguments.
+Reads collect current visible data, coverage metadata, source URLs, and capture
+times. Every invocation executes again; `request_id` is correlation data and
+does not cache or deduplicate a call.
 
-Collections return one page plus an opaque cursor. Cursors are:
-
-- process-local and expiring;
-- bound to the client, account, capability, and semantic filters;
-- single-use; and
-- backed by a bounded set of identities already returned.
+Collection tools keep their output and cursor assembly in a leaf-local
+`pagination.py`. Opaque cursors are process-local, expiring, single-use, and
+bound to the client, account, tool, and semantic filters. The cursor stores
+only the stable identities already returned. A failed collection does not
+consume its input cursor; a successful one does.
 
 A continuation may revisit LinkedIn's visible prefix because the UI exposes no
-snapshot token. Previously returned identities are removed before the next
-page is selected. Completion is reported only when the collection-specific
-inventory can be reconciled; otherwise the result exposes a safety bound or
+snapshot token. Previously returned identities are filtered before the next
+page is selected. Completion is reported only when the selected visible
+inventory can be reconciled; otherwise the output reports a safety bound or
 truncation.
 
 ### Account-changing actions
 
 Each write tool performs one complete action in one call:
 
-1. validate the typed request;
-2. resolve and inspect the exact visible target;
-3. reject ambiguous, missing, or incompatible state;
-4. invoke the one matching visible action;
-5. verify a visible postcondition; and
-6. return `verified`, `failed`, or `uncertain`.
+1. inspect the exact visible target;
+2. reject ambiguous, missing, or incompatible state;
+3. invoke the final matching control at most once;
+4. verify the visible postcondition; and
+5. return `verified`, `failed`, or `uncertain`.
 
-Write calls also execute once per invocation and are never retried by the
-server. Clients should not blindly retry an `uncertain` result. MCP annotations mark these tools as destructive so the
-client can apply its own approval policy; the server has no second approval or
-permission database.
-
-Local attachments are relative references under the configured asset root.
-The server resolves the current file, rejects path escape, validates the
-supported type and LinkedIn size limit, and passes the path to Playwright.
+Write tasks are non-interruptible after the worker starts them. If their MCP
+caller disconnects, the worker still lets the started action reach a terminal
+outcome. The server never retries a write automatically. The small shared
+`tools/action.py` helper builds the command, outcome, and evidence; it does not
+select or dispatch tools.
 
 ## Runtime state
 
-The server has no call-result or evidence repository. Runtime coordination is
-memory-only:
+The server has no result or evidence repository. Process-local state is limited
+to:
 
-- queued and active calls;
+- queued and active tasks;
 - pagination cursors;
-- queue ownership and progress; and
+- MCP session identities; and
 - navigation pacing.
 
-Restarting the shared runtime clears that state. The Chromium profile is the
-only persistent server-owned state and contains LinkedIn authentication data.
-It must be treated as sensitive.
-
-## Scheduling and pacing
-
-The runtime has one bounded `asyncio` scheduler and one browser worker. Calls
-from the same client remain FIFO. Ready clients rotate fairly, so one client
-cannot enqueue an entire pagination scan ahead of every other client.
-
-Only one browser operation runs at a time. A global minimum navigation
-interval is enforced across all clients and all tools. Delays inside a page
-object are bounded waits for visible UI convergence, not public pacing
-controls.
+Restarting clears that state. The Chromium profile is the only persistent
+server-owned state and contains LinkedIn authentication data.
 
 ## Browser safety
 
 `BrowserRuntime` owns one Playwright persistent context and creates a fresh
-page lease for each serialized operation. `BrowserManager` layers LinkedIn
-authentication, navigation pacing, and visible-UI safety checks over that
-runtime. Navigation is restricted to configured LinkedIn hosts. The public MCP
-surface never exposes URLs, selectors, arbitrary clicks, JavaScript, requests,
-or browser pages.
+page for each serialized task. `BrowserManager` adds authentication,
+navigation pacing, and visible-UI safety checks. Navigation is limited to the
+configured LinkedIn hosts. Public tools never expose URLs, selectors, arbitrary
+clicks, JavaScript, requests, or browser pages.
 
-The authentication coordinator pauses capability execution when the visible
-session expires, LinkedIn shows a checkpoint or restriction, or browser setup
-fails. Interactive login and logout use the same persistent profile through
-the CLI.
+Authentication expiry, checkpoints, restriction pages, and configuration
+failures pause LinkedIn access. Login and logout use the same persistent
+profile through the CLI.
 
 ## Code layout
 
-The package is split first by infrastructure versus LinkedIn behavior, then by
-LinkedIn feature:
-
 ```text
 linkedin_mcp/
-├── mcp/                 FastMCP server, client context, and stdio transport bridge
-├── app/                 process-local queue, scheduling, pagination, assets, composition
-├── browser/             generic Playwright installation, profile, and serialized runtime
-├── automation/          shared LinkedIn UI pacing and bounded collection settling
-├── runtime/             shared-process ownership, lifecycle, and private entry point
-├── cli/                 public CLI assembly and commands/ hierarchy
-│   └── commands/        flat public commands; nested profile/ subcommands
-└── linkedin/            all LinkedIn-specific behavior
-    ├── jobs/            models, evidence, operations, and page implementation
-    ├── people/          models, evidence, operations, and page implementation
-    ├── companies/       models, evidence, operations, and page implementation
-    ├── posts/           models, evidence, operations, pages, publishing, engagement
-    ├── network/         models, evidence, operations, connections, invitations
-    └── messaging/       models, evidence, operations, and page implementation
+├── mcp/                     FastMCP composition, client context, transports
+├── execution/               Task, Scheduler, Worker
+├── browser/                 Playwright setup, profile, low-level runtime
+├── runtime/                 shared-process ownership and lifecycle
+├── cli/                     CLI assembly and commands
+├── container.py             process-wide dependency composition
+├── pagination.py            bounded process-local cursor state
+├── assets.py                safe local attachment resolution
+└── tools/
+    ├── action.py            shared single-attempt write helper
+    ├── _shared/             cross-tool contracts and UI helpers
+    ├── server/status/
+    ├── session/status/
+    ├── jobs/{search,get}/
+    ├── people/{search,get}/
+    ├── companies/{search,get}/
+    ├── posts/{search,get,create,comment,react}/
+    ├── posts/comments/list/
+    ├── invitations/{list,send,accept,ignore}/
+    ├── connections/{list,search}/
+    └── messaging/{search,send}/ and messaging/conversation/get/
 ```
 
-The feature packages are vertical slices: a job UI change stays under
-`linkedin/jobs/`, generic Chromium lifecycle code stays under `browser/`, and
-shared LinkedIn Playwright behavior stays under `automation/`.
-`linkedin/operations.py` and `linkedin/models.py` are composition/compatibility
-facades, not registries or parallel implementations. URL validation,
-authentication, shared action execution, and source construction remain common
-LinkedIn support because every feature uses the same rules.
+Every public MCP name maps directly to a tool leaf after removing the
+`linkedin.` prefix. A browser-backed leaf contains:
+
+```text
+tool.py          FastMCP registration, typed request, Task creation
+page.py          Playwright behavior for this tool
+evidence.py      evidence construction for this tool
+models/          one owned model per file
+pagination.py    collection/output assembly, only when the tool paginates
+```
+
+Named domain modules such as `posts/surface.py` contain visible-UI mechanics
+that are genuinely shared by neighboring page objects. `tools/_shared/`
+contains only cross-domain contracts and helpers. There is no `operation.py`,
+capability registry, aggregate model facade, or central capability executor.
 
 ## Adding a capability
 
-A new capability belongs in its LinkedIn feature package and needs:
+A new capability gets a directory matching its public MCP name and needs:
 
 1. strict input and output models;
-2. a narrow provider/page-object contract;
-3. a feature-owned operation and worker wiring;
-4. one MCP tool with accurate annotations;
-5. synthetic current-UI fixtures and failure variants;
-6. evidence and bounded-completeness behavior; and
-7. contract, page, runtime, and workflow tests as applicable.
+2. `tool.py`, `page.py`, and `evidence.py`;
+3. `pagination.py` only for a collection;
+4. accurate MCP annotations;
+5. bounded visible-UI behavior and synthetic fixtures; and
+6. contract, page, execution, and workflow tests as applicable.
 
 Collection tools must also follow
 [COLLECTION_VERIFICATION_PROCESS.md](COLLECTION_VERIFICATION_PROCESS.md).

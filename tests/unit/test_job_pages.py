@@ -11,24 +11,23 @@ import pytest
 from playwright.async_api import Locator, Page, async_playwright
 from pydantic import ValidationError
 
-import linkedin_mcp.linkedin.jobs.pages as jobs_page_module
+import linkedin_mcp.tools.jobs.search.page as jobs_page_module
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.linkedin.browser import BrowserManager
-from linkedin_mcp.linkedin.jobs.evidence import source_from_job_detail
-from linkedin_mcp.linkedin.jobs.pages import JobDetailPage, JobSearchPage
-from linkedin_mcp.linkedin.models import (
-    JobApplyMethod,
-    JobBenefit,
-    JobCommitment,
-    JobDetailInput,
-    JobEmploymentType,
-    JobExperienceLevel,
-    JobSearchFilters,
-    JobSearchInput,
-    JobSearchSort,
-    JobWorkplaceType,
-    StopReason,
-)
+from linkedin_mcp.tools._shared.browser import BrowserManager
+from linkedin_mcp.tools._shared.models import StopReason
+from linkedin_mcp.tools.jobs.get.evidence import source_from_job_detail
+from linkedin_mcp.tools.jobs.get.models.job_apply_method import JobApplyMethod
+from linkedin_mcp.tools.jobs.get.models.job_detail_input import JobDetailInput
+from linkedin_mcp.tools.jobs.get.page import JobDetailPage
+from linkedin_mcp.tools.jobs.models.job_workplace_type import JobWorkplaceType
+from linkedin_mcp.tools.jobs.search.models.job_benefit import JobBenefit
+from linkedin_mcp.tools.jobs.search.models.job_commitment import JobCommitment
+from linkedin_mcp.tools.jobs.search.models.job_employment_type import JobEmploymentType
+from linkedin_mcp.tools.jobs.search.models.job_experience_level import JobExperienceLevel
+from linkedin_mcp.tools.jobs.search.models.job_search_filters import JobSearchFilters
+from linkedin_mcp.tools.jobs.search.models.job_search_input import JobSearchInput
+from linkedin_mcp.tools.jobs.search.models.job_search_sort import JobSearchSort
+from linkedin_mcp.tools.jobs.search.page import JobSearchPage
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 JOB_FIXTURES = FIXTURES / "jobs" / "latest"
