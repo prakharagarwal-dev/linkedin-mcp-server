@@ -6,7 +6,6 @@ import re
 from datetime import UTC, datetime
 
 from playwright.async_api import Error as PlaywrightError
-from playwright.async_api import Locator, Page
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
@@ -17,12 +16,14 @@ from linkedin_mcp.tools._shared.actions import (
     ActionPageResult,
     ReactionSetPayload,
 )
-from linkedin_mcp.tools._shared.urls import (
-    canonical_post_url,
-)
 from linkedin_mcp.tools.posts.engagement_surface import PostEngagementSurface
 from linkedin_mcp.tools.posts.react.models.post_reaction_input import PostReactionInput
 from linkedin_mcp.tools.posts.react.models.reaction_state import ReactionState
+from linkedin_mcp.ui import LinkedInLocator as Locator
+from linkedin_mcp.ui import LinkedInPage as Page
+from linkedin_mcp.ui.urls import (
+    canonical_post_url,
+)
 
 _REACTION_LABELS = {
     ReactionState.LIKE: "Like",
@@ -85,8 +86,8 @@ class PostReactionPage(PostEngagementSurface):
         request: PostReactionInput,
     ) -> ActionInspection:
         target_url = canonical_post_url(request.post_ref)
-        async with self._browser.page() as page:
-            await self._browser.navigate(page, target_url)
+        async with self._playwright.page() as page:
+            await page.goto(target_url)
             target = await self._resolve_target(page, request.post_ref)
             controls = await self._wait_for_visible_reaction_controls(target.region)
             if len(controls) != 1:
@@ -111,8 +112,8 @@ class PostReactionPage(PostEngagementSurface):
         if not isinstance(command.payload, ReactionSetPayload):
             raise InvalidTargetError("The reaction action payload is invalid.")
         payload = command.payload
-        async with self._browser.page() as page:
-            await self._browser.navigate(page, canonical_post_url(payload.post_ref))
+        async with self._playwright.page() as page:
+            await page.goto(canonical_post_url(payload.post_ref))
             target = await self._resolve_target(page, payload.post_ref)
             if not self._matches_inspected_target(command.target, target):
                 return await self._result(
@@ -172,7 +173,7 @@ class PostReactionPage(PostEngagementSurface):
                     ),
                 )
             try:
-                await self._browser.click_visible_control(page, control)
+                await control.click()
             except Exception:
                 return await self._result(
                     page,

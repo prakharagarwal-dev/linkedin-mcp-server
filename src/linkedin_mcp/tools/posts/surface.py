@@ -9,20 +9,10 @@ from typing import cast
 from urllib.parse import urljoin, urlsplit
 
 from playwright.async_api import Error as PlaywrightError
-from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
-from linkedin_mcp.tools._shared.urls import (
-    canonical_company_url,
-    comment_reference_from_value,
-    company_slug_from_url,
-    post_reference_from_comment_ref,
-    post_reference_from_value,
-    profile_slug_from_url,
-    validate_linkedin_url,
-)
 from linkedin_mcp.tools.posts.comments.list.models.comment_attachment_observation import (
     CommentAttachmentObservation,
 )
@@ -39,6 +29,17 @@ from linkedin_mcp.tools.posts.get.models.post_poll_state import PostPollState
 from linkedin_mcp.tools.posts.models.post_author import PostAuthor
 from linkedin_mcp.tools.posts.react.models.reaction_state import ReactionState
 from linkedin_mcp.tools.posts.search.models.post_content_type import PostContentType
+from linkedin_mcp.ui import LinkedInLocator as Locator
+from linkedin_mcp.ui import LinkedInPage as Page
+from linkedin_mcp.ui.urls import (
+    canonical_company_url,
+    comment_reference_from_value,
+    company_slug_from_url,
+    post_reference_from_comment_ref,
+    post_reference_from_value,
+    profile_slug_from_url,
+    validate_linkedin_url,
+)
 
 COUNT_PATTERNS = {
     "reaction": re.compile(

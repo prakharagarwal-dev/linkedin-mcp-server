@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import re
 
-from playwright.async_api import Locator
-
 from linkedin_mcp.tools.people.models.person_connection_degree import PersonConnectionDegree
+from linkedin_mcp.ui import LinkedInLocator as Locator
 
 CONNECTION_DEGREE_PATTERN = re.compile(r"\b(1st|2nd|3rd)\b", re.IGNORECASE)
 

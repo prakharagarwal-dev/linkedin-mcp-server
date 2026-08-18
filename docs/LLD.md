@@ -7,11 +7,11 @@ and puts LinkedIn behavior inside the tool that owns it.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
-│ host/manager.py: run_host                                        │
+│ HostManager                                                      │
 │                                                                  │
-│ constructs: BrowserManager, Scheduler, CursorStore               │
-│ lifecycle: AccountProcessLock, Scheduler, BrowserManager         │
-│ wiring: create FastMCP, attach tools, serve transport            │
+│ transport: attach stdio or own Streamable HTTP                   │
+│ startup: lock -> browser/login -> UI -> queue/tools -> listener  │
+│ shutdown: exact reverse order                                    │
 └──────────────┬───────────────────────────────────────────────────┘
                │ supplies each tool only its concrete dependencies
                ▼
@@ -54,8 +54,74 @@ Responsibilities are intentionally narrow:
 - `CursorStore` holds bounded, expiring, single-use continuation state for all
   collection tools in the process. It knows only strings, bindings, and stable
   item identities; it imports no tool contracts.
-- `run_host` owns startup and shutdown but stores no aggregate dependency
-  object. Tool registration captures explicit component references.
+- `HostManager` is the composition root, not a dependency container used by
+  tools. It owns process election, transport choice, startup, and shutdown;
+  tool registration captures explicit component references once.
+- `Worker` is the only component that executes tool browser work. The host uses
+  the browser only during awaited startup authentication and after worker
+  shutdown, so browser access needs no additional operation lock.
+
+## Browser and UI classes
+
+```text
+HostManager
+    │ start / login / logout / close
+    ▼
+BrowserManager ──> official Playwright ──> persistent BrowserContext
+                                             │ supplied once
+                                             ▼
+                                    LinkedInPlaywright
+                                      │            │
+                         page() owns  │            │ pacing/safety
+                                      ▼            ▼
+                                LinkedInPage ──> LinkedInLocator
+                                      │               │
+                                      └──── official Page/Locator
+```
+
+- `BrowserManager` owns Chromium installation readiness, the persistent
+  context, saved-session validation, visible login/logout, and browser close.
+- `LinkedInPlaywright` owns navigation pacing, exact-host validation, access
+  pause state, task-page creation, popup cleanup, and safety checks.
+- `LinkedInPage` and `LinkedInLocator` preserve familiar Playwright calls such
+  as `page.goto(...)` and `locator.click()` while routing guarded actions
+  through `LinkedInPlaywright`.
+- Tool page objects depend only on `LinkedInPlaywright`; they never call
+  `BrowserManager` or own a persistent context.
+
+## Startup and transport sequence
+
+```text
+stdio client                         Streamable HTTP client
+     │ starts CLI                              │ connects directly
+     ▼                                         │
+HostManager.ensure_host()                      │
+     │ attach to healthy owner, or             │
+     │ spawn `python -m linkedin_mcp`          │
+     │ with the private-host marker            │
+     ▼                                         │
+                 elected HostManager <─────────┘
+                         │ acquire account lock
+                         │ BrowserManager.start()
+                         │   validate saved session
+                         │   await visible login when required
+                         │   reopen and revalidate
+                         │ create LinkedInPlaywright
+                         │ create CursorStore, Scheduler, FastMCP/tools
+                         │ start Scheduler
+                         │ bind and publish loopback endpoint
+                         ▼
+                  ready Streamable HTTP host
+                         ▲
+                         │ MCP forwarding
+                  per-client stdio bridge
+```
+
+Both launch methods reach the same host, browser context, queue, and worker.
+The stdio bridge is only a transport adapter; disconnecting it does not close
+the shared host. `HostManager.close()` closes the listener, quiesces and closes
+the scheduler, closes cursor state and the UI facade, closes Chromium, then
+releases the account lock.
 
 Read tasks are interruptible. Write tasks set `interruptible=False`, so a
 caller cancellation cannot stop an action after its final LinkedIn control may
@@ -93,7 +159,7 @@ pagination.py
    └── returns JobSearchOutput
                     │
                     ▼
-page.py ──> BrowserManager ──> BrowserRuntime ──> Playwright
+page.py ──> LinkedInPlaywright ──> wrapped official Playwright controls
 ```
 
 A non-paginated read keeps its small `execute(...)` function directly in
@@ -171,21 +237,23 @@ visible terminal state cannot be proven. The server never retries it.
 ## Dependency direction
 
 ```text
-host/ ───────> transport/server.py
-  │
-  ├─────────> infra/queue
-  ├─────────> infra/cursor
-  ├─────────> browser runtime ──> Playwright
-  └─────────> tools/ (explicit registration dependencies)
-                    │
-                    ├──> infra/queue: Task, Scheduler
-                    ├──> infra/cursor: CursorStore (collections only)
-                    ├──> tool-owned models, page, evidence, optional pagination
-                    └──> shared LinkedIn UI helpers ──> browser runtime
+__main__.py ──> cli/ or private HostManager
+
+HostManager ──> transport/{server,stdio}
+      │
+      ├──────> browser/ ──> official Playwright
+      ├──────> ui/ ──> supplied BrowserContext
+      ├──────> infra/{queue,cursor}
+      └──────> tools/ (one-time explicit registration)
+                         │
+                         ├──> infra/queue: Task, Scheduler
+                         ├──> infra/cursor: CursorStore (collections only)
+                         ├──> ui/: LinkedInPlaywright Page/Locator facade
+                         └──> owned models, page, evidence, optional pagination
 
 transport/stdio.py ──> shared host endpoint
 ```
 
-Infrastructure and transport never import MCP tool definitions. Page objects
-never retain a Playwright `Page`; they obtain an operation-scoped page from the
-browser layer.
+Transport does not import MCP tool definitions; `HostManager` performs the
+single composition step. Page objects never retain a Playwright `Page`; they
+obtain a task-scoped wrapped page from `LinkedInPlaywright`.

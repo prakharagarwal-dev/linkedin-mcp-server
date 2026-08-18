@@ -7,7 +7,6 @@ import re
 from datetime import UTC, datetime
 from urllib.parse import parse_qs, urljoin, urlsplit
 
-from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
@@ -18,8 +17,10 @@ from linkedin_mcp.tools._shared.actions import (
     ActionPageResult,
     ActionTarget,
 )
-from linkedin_mcp.tools._shared.browser import BrowserManager
-from linkedin_mcp.tools._shared.urls import canonical_profile_url, profile_slug_from_url
+from linkedin_mcp.ui import LinkedInLocator as Locator
+from linkedin_mcp.ui import LinkedInPage as Page
+from linkedin_mcp.ui import LinkedInPlaywright
+from linkedin_mcp.ui.urls import canonical_profile_url, profile_slug_from_url
 
 _PROFILE_ACTION_SETTLE_ATTEMPTS = 24
 
@@ -62,15 +63,15 @@ async def _optional_unique_visible(
 class InvitationActionSurface:
     """Shared visible-surface mechanics for InvitationActionSurface."""
 
-    def __init__(self, browser: BrowserManager) -> None:
-        self._browser = browser
+    def __init__(self, playwright: LinkedInPlaywright) -> None:
+        self._playwright = playwright
 
     async def _inspect_received_request(
         self,
         profile_slug: str,
     ) -> ActionInspection:
-        async with self._browser.page() as page:
-            await self._browser.navigate(page, canonical_profile_url(profile_slug))
+        async with self._playwright.page() as page:
+            await page.goto(canonical_profile_url(profile_slug))
             main, name = await self._profile_identity(page)
             accept, ignore = await self._incoming_request_controls(main, name)
             if accept is None or ignore is None:
@@ -175,7 +176,7 @@ class InvitationActionSurface:
             return "connect_available", exact_invite_links[0]
         more = main.get_by_role("button", name=re.compile(r"^more(?: actions)?$", re.I))
         if await more.count() == 1:
-            await self._browser.click_visible_control(page, more)
+            await more.click()
             menu_connect = page.get_by_role(
                 "menuitem",
                 name=re.compile(r"^connect(?: with .+)?$", re.I),

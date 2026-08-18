@@ -14,9 +14,7 @@ from pydantic import HttpUrl, ValidationError
 
 from linkedin_mcp.errors import ParserDriftError
 from linkedin_mcp.tools._shared.actions import ReactionState
-from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.tools._shared.models import StopReason
-from linkedin_mcp.tools._shared.urls import post_reference_from_value
 from linkedin_mcp.tools.posts.comments.list.evidence import source_from_post_comments
 from linkedin_mcp.tools.posts.comments.list.models.comment_sort import CommentSort
 from linkedin_mcp.tools.posts.comments.list.models.post_comments_list_input import (
@@ -39,6 +37,9 @@ from linkedin_mcp.tools.posts.search.models.post_search_input import PostSearchI
 from linkedin_mcp.tools.posts.search.models.post_search_posted_by import PostSearchPostedBy
 from linkedin_mcp.tools.posts.search.models.post_search_sort import PostSearchSort
 from linkedin_mcp.tools.posts.search.page import PostSearchPage
+from linkedin_mcp.ui import LinkedInPlaywright
+from linkedin_mcp.ui.urls import post_reference_from_value
+from tests.support.playwright import adapt_browser
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 POST_REF = "activity:7312345678901234567"
@@ -255,9 +256,9 @@ def test_post_contracts_reject_unsafe_or_conflicting_requests() -> None:
         )
 
     with pytest.raises(ValueError, match="Post search page bound"):
-        PostSearchPage(cast(BrowserManager, object()), max_pages=0)
+        PostSearchPage(cast(LinkedInPlaywright, object()), max_pages=0)
     with pytest.raises(ValueError, match="Comment expansion bound"):
-        PostCommentsPage(cast(BrowserManager, object()), max_expansion_rounds=-1)
+        PostCommentsPage(cast(LinkedInPlaywright, object()), max_expansion_rounds=-1)
     with pytest.raises(ValidationError, match="conflict with pages_visited"):
         PostDetailCoverage(
             requested_post_ref=POST_REF,
@@ -348,7 +349,7 @@ async def test_post_search_resolves_all_named_facets_and_extracts_stable_results
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         fixture_browser = PostFixtureBrowser(page)
-        collector = PostSearchPage(cast(BrowserManager, fixture_browser), max_pages=2)
+        collector = PostSearchPage(adapt_browser(fixture_browser), max_pages=2)
         request = PostSearchInput(
             context_id="context-1",
             request_id="post-named-filters",
@@ -409,7 +410,7 @@ async def test_post_search_inventories_virtualized_prefix_before_expanding_cards
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         fixture_browser = PostFixtureBrowser(page)
-        collector = PostSearchPage(cast(BrowserManager, fixture_browser), max_pages=1)
+        collector = PostSearchPage(adapt_browser(fixture_browser), max_pages=1)
         try:
             posts, coverage, captured_text, _ = await collector.collect(
                 PostSearchInput(
@@ -467,7 +468,7 @@ async def test_post_search_waits_for_async_initial_results() -> None:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         collector = PostSearchPage(
-            cast(BrowserManager, StaticPostFixtureBrowser(page, html)),
+            adapt_browser(StaticPostFixtureBrowser(page, html)),
             max_pages=1,
         )
         try:
@@ -494,7 +495,7 @@ async def test_post_search_only_completes_empty_on_visible_end_state() -> None:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         collector = PostSearchPage(
-            cast(BrowserManager, StaticPostFixtureBrowser(page, html)),
+            adapt_browser(StaticPostFixtureBrowser(page, html)),
             max_pages=1,
         )
         try:
@@ -519,7 +520,7 @@ async def test_post_search_classifies_selected_card_with_unsupported_author_iden
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         collector = PostSearchPage(
-            cast(BrowserManager, StaticPostFixtureBrowser(page, html)),
+            adapt_browser(StaticPostFixtureBrowser(page, html)),
             max_pages=1,
         )
         try:
@@ -576,7 +577,7 @@ async def test_post_search_classifies_delayed_linkedin_short_link_as_unsupported
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         collector = PostSearchPage(
-            cast(BrowserManager, StaticPostFixtureBrowser(page, html)),
+            adapt_browser(StaticPostFixtureBrowser(page, html)),
             max_pages=1,
         )
         try:
@@ -603,7 +604,7 @@ async def test_post_detail_image_preserves_current_visible_contract_and_evidence
         browser = await playwright.chromium.launch(headless=True)
         detail_page = await browser.new_page()
         detail_browser = PostFixtureBrowser(detail_page)
-        reader = PostDetailPage(cast(BrowserManager, detail_browser))
+        reader = PostDetailPage(adapt_browser(detail_browser))
         try:
             post = await reader.read(
                 PostGetInput(
@@ -675,7 +676,7 @@ async def test_post_detail_extracts_current_video_document_article_and_poll_vari
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         fixture_browser = PostFixtureBrowser(page, detail_fixtures=fixtures)
-        reader = PostDetailPage(cast(BrowserManager, fixture_browser))
+        reader = PostDetailPage(adapt_browser(fixture_browser))
         try:
             observations = {
                 post_ref: await reader.read(
@@ -782,7 +783,7 @@ async def test_post_detail_reads_repost_wrapper_and_full_original_as_two_bounded
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         fixture_browser = PostFixtureBrowser(page, detail_fixtures=fixtures)
-        reader = PostDetailPage(cast(BrowserManager, fixture_browser))
+        reader = PostDetailPage(adapt_browser(fixture_browser))
         try:
             post = await reader.read(
                 PostGetInput(
@@ -860,12 +861,11 @@ async def test_post_detail_classifies_every_current_visible_link_card_family() -
             for expected_type, card_url in variants:
                 page = await browser.new_page()
                 reader = PostDetailPage(
-                    cast(
-                        BrowserManager,
+                    adapt_browser(
                         StaticPostFixtureBrowser(
                             page,
                             base.replace(original_url, card_url),
-                        ),
+                        )
                     )
                 )
                 try:
@@ -901,7 +901,7 @@ async def test_post_detail_preserves_a_single_page_activity_alias_without_invent
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
-        reader = PostDetailPage(cast(BrowserManager, StaticPostFixtureBrowser(page, html)))
+        reader = PostDetailPage(adapt_browser(StaticPostFixtureBrowser(page, html)))
         try:
             post = await reader.read(
                 PostGetInput(
@@ -940,7 +940,7 @@ async def test_post_detail_accepts_role_article_with_legacy_visible_body() -> No
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
-        reader = PostDetailPage(cast(BrowserManager, StaticPostFixtureBrowser(page, html)))
+        reader = PostDetailPage(adapt_browser(StaticPostFixtureBrowser(page, html)))
         try:
             post = await reader.read(
                 PostGetInput(
@@ -968,7 +968,7 @@ async def test_comments_open_and_parse_modern_stable_ids_and_nested_replies() ->
             (FIXTURES / "posts/latest/comments.html").read_text(encoding="utf-8"),
         )
         reader = PostCommentsPage(
-            cast(BrowserManager, fixture_browser),
+            adapt_browser(fixture_browser),
             max_expansion_rounds=1,
         )
         try:
@@ -1035,7 +1035,7 @@ async def test_comments_parse_current_article_data_id_container() -> None:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         reader = PostCommentsPage(
-            cast(BrowserManager, StaticPostFixtureBrowser(page, html)),
+            adapt_browser(StaticPostFixtureBrowser(page, html)),
             max_expansion_rounds=1,
         )
         try:
@@ -1069,7 +1069,7 @@ async def test_comments_bind_current_flattened_replies_to_nearest_root() -> None
             (FIXTURES / "posts/latest/comments-flat-threads.html").read_text(encoding="utf-8"),
         )
         reader = PostCommentsPage(
-            cast(BrowserManager, fixture_browser),
+            adapt_browser(fixture_browser),
             max_expansion_rounds=1,
         )
         try:
@@ -1144,7 +1144,7 @@ async def test_comments_wait_for_discussion_after_async_sort_rerender() -> None:
         page = await browser.new_page()
         fixture_browser = StaticPostFixtureBrowser(page, html)
         reader = PostCommentsPage(
-            cast(BrowserManager, fixture_browser),
+            adapt_browser(fixture_browser),
             max_expansion_rounds=1,
         )
         try:
@@ -1227,7 +1227,7 @@ async def test_comments_wait_for_async_load_more_render() -> None:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         reader = PostCommentsPage(
-            cast(BrowserManager, StaticPostFixtureBrowser(page, html)),
+            adapt_browser(StaticPostFixtureBrowser(page, html)),
             max_expansion_rounds=1,
         )
         try:
@@ -1285,7 +1285,7 @@ async def test_comments_expand_current_see_previous_replies_control() -> None:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         reader = PostCommentsPage(
-            cast(BrowserManager, StaticPostFixtureBrowser(page, html)),
+            adapt_browser(StaticPostFixtureBrowser(page, html)),
             max_expansion_rounds=2,
         )
         try:
@@ -1322,7 +1322,7 @@ async def test_comments_preserve_native_ugc_discussion_alias_for_activity_url() 
         page = await browser.new_page()
         fixture_browser = StaticPostFixtureBrowser(page, html)
         reader = PostCommentsPage(
-            cast(BrowserManager, fixture_browser),
+            adapt_browser(fixture_browser),
             max_expansion_rounds=1,
         )
         try:
@@ -1377,7 +1377,7 @@ async def test_comments_accept_single_rendered_post_alias_for_requested_activity
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         reader = PostCommentsPage(
-            cast(BrowserManager, StaticPostFixtureBrowser(page, html)),
+            adapt_browser(StaticPostFixtureBrowser(page, html)),
             max_expansion_rounds=1,
         )
         try:
@@ -1413,7 +1413,7 @@ async def test_post_detail_fails_closed_without_exact_requested_reference() -> N
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         fixture_browser = StaticPostFixtureBrowser(page, html)
-        reader = PostDetailPage(cast(BrowserManager, fixture_browser))
+        reader = PostDetailPage(adapt_browser(fixture_browser))
         try:
             with pytest.raises(ParserDriftError, match="exact visible requested post"):
                 await reader.read(
@@ -1482,7 +1482,7 @@ async def test_post_detail_fails_closed_on_current_ui_drift_and_safety_bounds() 
         try:
             for index, (html, post_ref, error_text) in enumerate(cases):
                 page = await browser.new_page()
-                reader = PostDetailPage(cast(BrowserManager, StaticPostFixtureBrowser(page, html)))
+                reader = PostDetailPage(adapt_browser(StaticPostFixtureBrowser(page, html)))
                 try:
                     with pytest.raises(ParserDriftError, match=error_text):
                         await reader.read(

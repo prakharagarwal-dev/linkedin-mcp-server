@@ -18,7 +18,10 @@ Scheduler ── asyncio.Queue ──> Worker
                                   │ calls the tool's execute function
                                   ▼
                          tool page object
-                                  │ visible UI
+                                  │ Playwright-style calls
+                                  ▼
+                         LinkedInPlaywright
+                                  │ paced, safety-checked visible UI
                                   ▼
                               LinkedIn
 ```
@@ -102,30 +105,41 @@ server-owned state and contains LinkedIn authentication data.
 
 ## Browser safety
 
-`BrowserRuntime` owns one Playwright persistent context and creates a fresh
-page for each serialized task. `BrowserManager` adds authentication,
-navigation pacing, and visible-UI safety checks. Navigation is limited to the
-configured LinkedIn hosts. Public tools never expose URLs, selectors, arbitrary
-clicks, JavaScript, requests, or browser pages.
+`BrowserManager` owns Playwright, the worker's one persistent Chromium context,
+visible login/logout, and clean shutdown. On startup it synchronously validates
+the saved session. If authentication is required, it closes the context, waits
+for visible headed login, reopens the configured context, and validates it
+again. `HostManager` does not start the queue or publish the endpoint until this
+finishes.
+
+`LinkedInPlaywright` sits above that context. It creates and cleans up a fresh
+page (including popups) for each task and wraps official Playwright `Page` and
+`Locator` calls with pacing, exact-host validation, and safety checks. Tool page
+objects use this Playwright-style facade and never interact with
+`BrowserManager`. The one queue worker serializes all tool browser operations,
+so there is no second browser lock.
 
 Authentication expiry, checkpoints, restriction pages, and configuration
-failures pause LinkedIn access. Login and logout use the same persistent
-profile through the CLI.
+failures pause an already running facade or fail startup. Navigation is limited
+to configured LinkedIn hosts. Public tools never expose URLs, selectors,
+arbitrary clicks, JavaScript, requests, or browser pages.
 
 ## Code layout
 
 ```text
 linkedin_mcp/
-├── browser/                 Playwright setup, profile, low-level runtime
+├── __main__.py              public CLI/private-host process dispatch
+├── browser/                 Chromium setup, profile, context, login/logout
+├── ui/                      paced/safe Playwright Page and Locator facade
 ├── transport/               FastMCP HTTP server and stdio bridge
-├── host/                    shared-process lifecycle and account lock
+├── host/                    HostManager and account process lock
 ├── infra/
 │   ├── queue/               Task, Scheduler, Worker
 │   └── cursor/store.py      bounded process-local cursor state
 ├── cli/                     CLI assembly and commands
 └── tools/
     ├── action.py            shared single-attempt write helper
-    ├── _shared/             cross-tool contracts and UI helpers
+    ├── _shared/             cross-tool contracts and MCP/action helpers
     ├── server/status/
     ├── session/status/
     ├── jobs/{search,get}/
@@ -138,10 +152,12 @@ linkedin_mcp/
     └── messaging/{search,send}/ and messaging/conversation/get/
 ```
 
-`host/manager.py` constructs the one browser, scheduler, and cursor store,
-starts only the components with an active lifecycle, and closes them in reverse
-order. It passes concrete dependencies once during tool registration. There is
-no dependency container, service locator, or module-global runtime singleton.
+`HostManager` is the process composition root. It handles stdio attachment or
+Streamable HTTP ownership, acquires the account lock, starts and authenticates
+the browser, creates `LinkedInPlaywright`, constructs the scheduler/cursor/MCP
+tools, starts the scheduler, and only then binds and publishes the endpoint. It
+closes those components in reverse order. There is no dependency container,
+service locator, browser runtime wrapper, or module-global runtime singleton.
 
 Every public MCP name maps directly to a tool leaf after removing the
 `linkedin.` prefix. A browser-backed leaf contains:
@@ -155,9 +171,11 @@ pagination.py    collection/output assembly, only when the tool paginates
 ```
 
 Named domain modules such as `posts/surface.py` contain visible-UI mechanics
-that are genuinely shared by neighboring page objects. `tools/_shared/`
-contains only cross-domain contracts and helpers. There is no `operation.py`,
-capability registry, aggregate model facade, or central capability executor.
+that are genuinely shared by neighboring page objects. Reusable Playwright
+mechanics live in `ui/`; `tools/_shared/` contains only cross-domain contracts,
+source/action evidence helpers, and MCP annotations. There is no
+`operation.py`, capability registry, aggregate model facade, or central
+capability executor.
 
 ## Adding a capability
 

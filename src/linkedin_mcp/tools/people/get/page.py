@@ -7,14 +7,11 @@ from datetime import UTC, datetime
 from typing import cast
 from urllib.parse import urljoin, urlsplit
 
-from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.tools._shared.identifiers import PROFILE_SLUG_SEGMENT_PATTERN
-from linkedin_mcp.tools._shared.urls import canonical_profile_url, profile_slug_from_url
 from linkedin_mcp.tools.people.get.models.people_get_input import PeopleGetInput
 from linkedin_mcp.tools.people.get.models.person_education import PersonEducation
 from linkedin_mcp.tools.people.get.models.person_experience import PersonExperience
@@ -42,6 +39,10 @@ from linkedin_mcp.tools.people.surface import (
     first_text,
     unique_lines,
 )
+from linkedin_mcp.ui import LinkedInLocator as Locator
+from linkedin_mcp.ui import LinkedInPage as Page
+from linkedin_mcp.ui import LinkedInPlaywright
+from linkedin_mcp.ui.urls import canonical_profile_url, profile_slug_from_url
 
 _DATE_RANGE_PATTERN = re.compile(
     r"\b(?:19|20)\d{2}\b|\bPresent\b|\b(?:\d+\s+)?(?:mos?|yrs?)\b",
@@ -913,10 +914,10 @@ def _merge_sections(
 
 
 class PersonProfilePage:
-    def __init__(self, browser: BrowserManager, *, max_detail_pages: int) -> None:
+    def __init__(self, playwright: LinkedInPlaywright, *, max_detail_pages: int) -> None:
         if max_detail_pages < 0:
             raise ValueError("Profile detail-page bound cannot be negative.")
-        self._browser = browser
+        self._playwright = playwright
         self._max_detail_pages = max_detail_pages
 
     async def read(
@@ -935,8 +936,8 @@ class PersonProfilePage:
                 if section is not PersonProfileSectionSelector.OVERVIEW
             }
         )
-        async with self._browser.page() as page:
-            await self._browser.navigate(page, canonical_profile_url(request.profile_slug))
+        async with self._playwright.page() as page:
+            await page.goto(canonical_profile_url(request.profile_slug))
             try:
                 await (
                     page.locator("main")
@@ -1009,7 +1010,7 @@ class PersonProfilePage:
             )
 
             for detail_url, _detail_key in visited_detail_pairs:
-                await self._browser.navigate(page, detail_url)
+                await page.goto(detail_url)
                 await _expand_and_scroll(page)
                 detail_text = await _visible_page_text(page)
                 page_sections = await _extract_sections(

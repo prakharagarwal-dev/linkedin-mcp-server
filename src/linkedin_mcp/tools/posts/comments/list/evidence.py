@@ -3,13 +3,13 @@
 from linkedin_mcp.errors import ParserDriftError
 from linkedin_mcp.tools._shared.models import SourceReference, SourceType
 from linkedin_mcp.tools._shared.source import source_reference
-from linkedin_mcp.tools._shared.urls import (
-    post_reference_from_comment_ref,
-    post_reference_from_value,
-)
 from linkedin_mcp.tools.posts.comments.list.models.comment_thread import CommentThread
 from linkedin_mcp.tools.posts.comments.list.models.post_comments_coverage import (
     PostCommentsCoverage,
+)
+from linkedin_mcp.ui.urls import (
+    post_reference_from_comment_ref,
+    post_reference_from_value,
 )
 
 

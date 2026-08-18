@@ -190,11 +190,35 @@ def test_source_layout_keeps_infrastructure_and_linkedin_features_separate() -> 
     assert {path.name for path in browser.glob("*.py")} == {
         "__init__.py",
         "bootstrap.py",
+        "login.py",
+        "logout.py",
+        "manager.py",
         "profile.py",
-        "runtime.py",
     }
     browser_sources = "\n".join(path.read_text(encoding="utf-8") for path in browser.glob("*.py"))
     assert "linkedin_mcp.linkedin" not in browser_sources
+
+    ui = package / "ui"
+    assert {path.name for path in ui.glob("*.py")} == {
+        "__init__.py",
+        "authentication_state.py",
+        "collections.py",
+        "locator.py",
+        "pacing.py",
+        "page.py",
+        "playwright.py",
+        "safety.py",
+        "urls.py",
+    }
+    for retired_shared_helper in (
+        "authentication.py",
+        "browser.py",
+        "collections.py",
+        "pacing.py",
+        "safety.py",
+        "urls.py",
+    ):
+        assert not (tools / "_shared" / retired_shared_helper).exists()
 
     cli = package / "cli"
     commands = cli / "commands"
@@ -222,7 +246,6 @@ def test_source_layout_keeps_infrastructure_and_linkedin_features_separate() -> 
     host = package / "host"
     assert {path.name for path in host.glob("*.py")} == {
         "__init__.py",
-        "__main__.py",
         "lock.py",
         "manager.py",
     }
@@ -329,6 +352,8 @@ def test_registry_and_bundle_metadata_share_the_release_identity() -> None:
     assert bundle["name"] == "linkedin-mcp-server"
     assert bundle["server"]["type"] == "uv"
     assert "live_enabled" not in bundle["user_config"]
+    assert "auto_login_on_start" not in bundle["user_config"]
+    assert "LINKEDIN_MCP_AUTO_LOGIN_ON_START" not in json.dumps(bundle)
     assert "LINKEDIN_MCP_LIVE_ENABLED" not in json.dumps(registry)
     assert "LINKEDIN_MCP_LIVE_ENABLED" not in json.dumps(bundle)
     assert bundle["privacy_policies"] == [

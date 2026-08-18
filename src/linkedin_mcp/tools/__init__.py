@@ -10,7 +10,6 @@ if TYPE_CHECKING:
     from linkedin_mcp.config import Settings
     from linkedin_mcp.infra.cursor import CursorStore
     from linkedin_mcp.infra.queue import Scheduler
-    from linkedin_mcp.tools._shared.browser import BrowserManager
     from linkedin_mcp.tools.companies.get.page import CompanyProfilePage
     from linkedin_mcp.tools.companies.search.page import CompanySearchPage
     from linkedin_mcp.tools.connections.list.page import ConnectionsListPage
@@ -32,13 +31,14 @@ if TYPE_CHECKING:
     from linkedin_mcp.tools.posts.get.page import PostDetailPage
     from linkedin_mcp.tools.posts.react.page import PostReactionPage
     from linkedin_mcp.tools.posts.search.page import PostSearchPage
+    from linkedin_mcp.ui import LinkedInPlaywright
 
 
 def attach_tools(
     mcp: FastMCP[None],
     *,
     settings: Settings,
-    browser: BrowserManager,
+    playwright: LinkedInPlaywright,
     scheduler: Scheduler,
     cursor_store: CursorStore,
 ) -> None:
@@ -67,62 +67,62 @@ def attach_tools(
     from linkedin_mcp.tools.posts.search.page import PostSearchPage
 
     conversation_search = ConversationSearchPage(
-        browser,
+        playwright,
         max_scroll_rounds=settings.messaging_max_scroll_rounds_per_call,
     )
     attach_tool_implementations(
         mcp,
         settings=settings,
-        browser=browser,
+        playwright=playwright,
         scheduler=scheduler,
         cursor_store=cursor_store,
-        job_search=JobSearchPage(browser, max_pages=settings.job_search_max_pages_per_call),
-        job_detail=JobDetailPage(browser),
+        job_search=JobSearchPage(playwright, max_pages=settings.job_search_max_pages_per_call),
+        job_detail=JobDetailPage(playwright),
         people_search=PeopleSearchPage(
-            browser,
+            playwright,
             max_pages=settings.people_search_max_pages_per_call,
         ),
         connections_search=ConnectionsSearchPage(
-            browser,
+            playwright,
             max_pages=settings.people_search_max_pages_per_call,
         ),
         person_profile=PersonProfilePage(
-            browser,
+            playwright,
             max_detail_pages=settings.profile_max_detail_pages_per_call,
         ),
         company_search=CompanySearchPage(
-            browser,
+            playwright,
             max_pages=settings.company_search_max_pages_per_call,
         ),
-        company_profile=CompanyProfilePage(browser),
-        post_search=PostSearchPage(browser, max_pages=settings.post_search_max_pages_per_call),
-        post_detail=PostDetailPage(browser),
+        company_profile=CompanyProfilePage(playwright),
+        post_search=PostSearchPage(playwright, max_pages=settings.post_search_max_pages_per_call),
+        post_detail=PostDetailPage(playwright),
         post_comments=PostCommentsPage(
-            browser,
+            playwright,
             max_expansion_rounds=settings.post_comments_max_expansion_rounds_per_call,
         ),
-        post_publishing=PostPublishingPage(browser),
-        post_comment=PostCommentPage(browser),
-        post_reaction=PostReactionPage(browser),
+        post_publishing=PostPublishingPage(playwright),
+        post_comment=PostCommentPage(playwright),
+        post_reaction=PostReactionPage(playwright),
         invitation_list=InvitationListPage(
-            browser,
+            playwright,
             max_scroll_rounds=settings.invitations_max_scroll_rounds_per_call,
         ),
         connections_list=ConnectionsListPage(
-            browser,
+            playwright,
             max_scroll_rounds=settings.connections_max_scroll_rounds_per_call,
         ),
-        invitation_send=SendInvitationPage(browser),
-        invitation_accept=AcceptInvitationPage(browser),
-        invitation_ignore=IgnoreInvitationPage(browser),
+        invitation_send=SendInvitationPage(playwright),
+        invitation_accept=AcceptInvitationPage(playwright),
+        invitation_ignore=IgnoreInvitationPage(playwright),
         conversation_search=conversation_search,
         conversation_read=ConversationGetPage(
-            browser,
+            playwright,
             conversation_search=conversation_search,
             max_history_rounds=settings.messaging_max_scroll_rounds_per_call,
         ),
         message_send=MessageSendPage(
-            browser,
+            playwright,
             conversation_search=conversation_search,
             max_history_rounds=settings.messaging_max_scroll_rounds_per_call,
         ),
@@ -133,7 +133,7 @@ def attach_tool_implementations(
     mcp: FastMCP[None],
     *,
     settings: Settings,
-    browser: BrowserManager,
+    playwright: LinkedInPlaywright,
     scheduler: Scheduler,
     cursor_store: CursorStore,
     job_search: JobSearchPage,
@@ -190,7 +190,7 @@ def attach_tool_implementations(
     annotations = tool_annotations()
     account_id = settings.account_id
     register_server_status(mcp, settings, scheduler, annotations.local_read)
-    register_session_status(mcp, settings, browser, annotations.local_read)
+    register_session_status(mcp, settings, playwright, annotations.local_read)
     register_jobs_search(
         mcp, scheduler, job_search, cursor_store, account_id, annotations.linkedin_read
     )

@@ -21,10 +21,12 @@ The server processes only data needed for the typed MCP capability you invoke:
 - non-secret configuration and operational metadata needed to run the local
   process.
 
-LinkedIn login happens directly in a Playwright Chromium window. The server
-does not request, read, log, or persist your LinkedIn password. Chromium stores
-the resulting session cookies and normal browser data in the local persistent
-profile.
+LinkedIn login happens in a visible Playwright Chromium window, either through
+the explicit CLI command or as awaited startup work when the saved session is
+missing or expired. The server does not request, read, log, or persist your
+LinkedIn password. Chromium stores the resulting session cookies and normal
+browser data in the local persistent profile. Tool requests are not accepted
+until startup login and clean-reopen validation have finished.
 
 ## How data is used and stored
 

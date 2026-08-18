@@ -77,7 +77,7 @@ async def test_doctor_reports_ready_browser_profile_and_process_local_state(
     (profile_path / "Preferences").write_text("{}", encoding="utf-8")
     monkeypatch.delenv("PLAYWRIGHT_BROWSERS_PATH", raising=False)
     monkeypatch.setattr(
-        doctor_command.BrowserRuntimeBootstrap,
+        doctor_command.BrowserBootstrap,
         "_expected_targets",
         staticmethod(lambda: _TARGETS),
     )
@@ -103,7 +103,7 @@ async def test_doctor_requires_browser_and_profile(
 ) -> None:
     monkeypatch.delenv("PLAYWRIGHT_BROWSERS_PATH", raising=False)
     monkeypatch.setattr(
-        doctor_command.BrowserRuntimeBootstrap,
+        doctor_command.BrowserBootstrap,
         "_expected_targets",
         staticmethod(lambda: _TARGETS),
     )
@@ -136,7 +136,7 @@ async def test_setup_forces_browser_install_and_reports_cache(
         async def ensure_ready(self, *, force: bool = False) -> None:
             calls.append(force)
 
-    monkeypatch.setattr(setup_command, "BrowserRuntimeBootstrap", FakeBootstrap)
+    monkeypatch.setattr(setup_command, "BrowserBootstrap", FakeBootstrap)
 
     await setup_command.execute(Settings())
     report = json.loads(capsys.readouterr().out)
@@ -163,7 +163,7 @@ def test_main_setup_login_and_serve_commands(
         serve_settings.append(settings)
 
     monkeypatch.setattr(setup_command, "execute", fake_setup)
-    monkeypatch.setattr(login_command, "login_interactively", fake_login)
+    monkeypatch.setattr(login_command, "execute", fake_login)
     monkeypatch.setattr(serve_command, "execute", fake_serve)
     monkeypatch.setenv("LINKEDIN_MCP_RUNTIME_LOCK_PATH", str(tmp_path / "runtime.lock"))
     monkeypatch.setattr(sys, "argv", ["linkedin-mcp", "setup"])
@@ -256,25 +256,21 @@ def test_main_dispatches_every_remaining_current_command(
 
 
 @pytest.mark.asyncio
-async def test_logout_and_owned_operation_complete_without_a_signal(
+async def test_logout_command_reports_the_host_manager_result(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     settings = Settings(runtime_lock_path=tmp_path / "runtime.lock")
 
-    async def no_signal() -> signal.Signals:
-        await asyncio.Event().wait()
-        raise AssertionError("unreachable")
+    class FakeHostManager:
+        def __init__(self, observed: Settings) -> None:
+            assert observed is settings
 
-    async def logged_out(_: Settings) -> bool:
-        return True
+        async def logout(self) -> bool:
+            return True
 
-    monkeypatch.setattr(
-        "linkedin_mcp.host.lock._wait_for_stop_signal",
-        no_signal,
-    )
-    monkeypatch.setattr(logout_command, "logout_interactively", logged_out)
+    monkeypatch.setattr(logout_command, "HostManager", FakeHostManager)
 
     await logout_command.execute(settings)
 
@@ -292,7 +288,7 @@ def test_main_projects_safe_configuration_errors_to_stderr(
     async def fail_login(_: Settings) -> None:
         raise ValueError("safe failure")
 
-    monkeypatch.setattr(login_command, "login_interactively", fail_login)
+    monkeypatch.setattr(login_command, "execute", fail_login)
     monkeypatch.setenv("LINKEDIN_MCP_RUNTIME_LOCK_PATH", str(tmp_path / "runtime.lock"))
     monkeypatch.setattr(sys, "argv", ["linkedin-mcp", "login"])
 
@@ -314,7 +310,7 @@ def test_main_does_not_project_unexpected_startup_details(
     async def fail_login(_: Settings) -> None:
         raise UnexpectedFailure("session-cookie-must-not-be-projected")
 
-    monkeypatch.setattr(login_command, "login_interactively", fail_login)
+    monkeypatch.setattr(login_command, "execute", fail_login)
     monkeypatch.setenv("LINKEDIN_MCP_RUNTIME_LOCK_PATH", str(tmp_path / "runtime.lock"))
     monkeypatch.setattr(sys, "argv", ["linkedin-mcp", "login"])
 
@@ -551,57 +547,28 @@ async def test_owned_cli_operation_cleans_up_before_releasing_lock_on_stop_signa
 
 
 @pytest.mark.asyncio
-async def test_stdio_serve_attaches_proxy_to_shared_runtime(
+async def test_serve_delegates_stdio_transport_to_host_manager(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    events: list[tuple[str, str | None]] = []
+    settings = Settings(transport="stdio")
+    observed: list[Settings] = []
 
-    async def fake_ensure(_: Settings) -> str:
-        events.append(("runtime-ready", None))
-        return "http://127.0.0.1:8123/mcp"
+    class FakeHostManager:
+        def __init__(self, configured: Settings) -> None:
+            observed.append(configured)
 
-    async def fake_proxy(endpoint: str) -> None:
-        events.append(("proxy-running", endpoint))
+        async def serve(self) -> None:
+            return None
 
-    monkeypatch.setattr(serve_command, "ensure_host", fake_ensure)
-    monkeypatch.setattr(serve_command, "run_stdio_proxy", fake_proxy)
+    monkeypatch.setattr(serve_command, "HostManager", FakeHostManager)
 
-    await serve_command.execute(Settings(transport="stdio"))
+    await serve_command.execute(settings)
 
-    assert events == [
-        ("runtime-ready", None),
-        ("proxy-running", "http://127.0.0.1:8123/mcp"),
-    ]
+    assert observed == [settings]
 
 
 @pytest.mark.asyncio
-async def test_streamable_http_starts_shared_runtime_when_no_owner_exists(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    events: list[str] = []
-
-    def fake_inspect(_: Path) -> AccountRuntimeStatus:
-        return AccountRuntimeStatus(running=False)
-
-    async def fake_runtime(_: Settings) -> None:
-        events.append("runtime-running")
-
-    monkeypatch.setattr(serve_command, "inspect_account_runtime", fake_inspect)
-    monkeypatch.setattr(serve_command, "run_host", fake_runtime)
-
-    await serve_command.execute(
-        Settings(
-            transport="streamable-http",
-            runtime_lock_path=tmp_path / "runtime.lock",
-        )
-    )
-
-    assert events == ["runtime-running"]
-
-
-@pytest.mark.asyncio
-async def test_streamable_http_reuses_an_owner_and_recovers_an_election_race(
+async def test_streamable_http_reports_an_attached_shared_runtime(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -612,31 +579,14 @@ async def test_streamable_http_reuses_an_owner_and_recovers_an_election_race(
     )
     endpoint = "http://127.0.0.1:8000/mcp"
 
-    def running(_: Path) -> AccountRuntimeStatus:
-        return AccountRuntimeStatus(running=True)
+    class FakeHostManager:
+        def __init__(self, configured: Settings) -> None:
+            assert configured is settings
 
-    async def wait(_: Settings) -> str:
-        return endpoint
+        async def serve(self) -> str:
+            return endpoint
 
-    monkeypatch.setattr(serve_command, "inspect_account_runtime", running)
-    monkeypatch.setattr(serve_command, "wait_for_host", wait)
-    await serve_command.execute(settings)
-    assert endpoint in capsys.readouterr().err
+    monkeypatch.setattr(serve_command, "HostManager", FakeHostManager)
 
-    inspections = iter(
-        (
-            AccountRuntimeStatus(running=False),
-            AccountRuntimeStatus(running=True),
-        )
-    )
-
-    def racing(_: Path) -> AccountRuntimeStatus:
-        return next(inspections)
-
-    async def lose_election(_: Settings) -> None:
-        raise ConfigurationError("another owner won")
-
-    monkeypatch.setattr(serve_command, "inspect_account_runtime", racing)
-    monkeypatch.setattr(serve_command, "run_host", lose_election)
     await serve_command.execute(settings)
     assert endpoint in capsys.readouterr().err

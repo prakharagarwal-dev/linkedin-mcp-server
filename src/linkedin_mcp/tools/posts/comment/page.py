@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 from datetime import UTC, datetime
 
-from playwright.async_api import Locator, Page
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
@@ -15,9 +14,6 @@ from linkedin_mcp.tools._shared.actions import (
     ActionOutcome,
     ActionPageResult,
     CommentCreatePayload,
-)
-from linkedin_mcp.tools._shared.urls import (
-    canonical_post_url,
 )
 from linkedin_mcp.tools.posts.comment.models.comment_gif_attachment import CommentGifAttachment
 from linkedin_mcp.tools.posts.comment.models.comment_photo_attachment import CommentPhotoAttachment
@@ -32,6 +28,11 @@ from linkedin_mcp.tools.posts.surface import (
     comment_from_region,
     comment_regions,
     discussion_post_reference,
+)
+from linkedin_mcp.ui import LinkedInLocator as Locator
+from linkedin_mcp.ui import LinkedInPage as Page
+from linkedin_mcp.ui.urls import (
+    canonical_post_url,
 )
 
 _COMMENT_ATTACHMENT_SELECTOR = (
@@ -102,8 +103,8 @@ class PostCommentPage(PostEngagementSurface):
         request: PostCommentInput,
     ) -> ActionInspection:
         target_url = canonical_post_url(request.post_ref)
-        async with self._browser.page() as page:
-            await self._browser.navigate(page, target_url)
+        async with self._playwright.page() as page:
+            await page.goto(target_url)
             target = await self._resolve_target(page, request.post_ref)
             composer = await self._open_comment_composer(page, target.region)
             await self._assert_comment_options(page, composer, request)
@@ -120,8 +121,8 @@ class PostCommentPage(PostEngagementSurface):
             raise InvalidTargetError("The comment action payload is invalid.")
         payload = command.payload
         target_url = canonical_post_url(payload.post_ref)
-        async with self._browser.page() as page:
-            await self._browser.navigate(page, target_url)
+        async with self._playwright.page() as page:
+            await page.goto(target_url)
             target = await self._resolve_target(page, payload.post_ref)
             if not self._matches_inspected_target(command.target, target):
                 return await self._result(
@@ -173,7 +174,7 @@ class PostCommentPage(PostEngagementSurface):
                 "Comment submission control",
             )
             try:
-                await self._browser.click_visible_control(page, final)
+                await final.click()
             except Exception:
                 return await self._result(
                     page,
@@ -233,7 +234,7 @@ class PostCommentPage(PostEngagementSurface):
                 ),
                 "Comment opener",
             )
-            await self._browser.click_visible_control(page, action)
+            await action.click()
             for _ in range(20):
                 composer = region.get_by_role("textbox", name=scoped_label)
                 visible = [
@@ -271,7 +272,7 @@ class PostCommentPage(PostEngagementSurface):
                 ),
                 "comment Open GIF picker control",
             )
-            await self._browser.click_visible_control(page, gif)
+            await gif.click()
             await self._resolve_gif(page, request.attachment, choose=False)
 
     async def _add_comment_attachment(
@@ -291,7 +292,7 @@ class PostCommentPage(PostEngagementSurface):
             )
             try:
                 async with page.expect_file_chooser(timeout=3_000) as chooser_info:
-                    await self._browser.click_visible_control(page, photo)
+                    await photo.click()
                 chooser = await chooser_info.value
                 await chooser.set_files(payload.attachment.asset_ref)
             except Exception as error:
@@ -307,7 +308,7 @@ class PostCommentPage(PostEngagementSurface):
                 ),
                 "comment Open GIF picker control",
             )
-            await self._browser.click_visible_control(page, gif)
+            await gif.click()
             await self._resolve_gif(page, payload.attachment, choose=True)
 
     async def _resolve_gif(
@@ -347,7 +348,7 @@ class PostCommentPage(PostEngagementSurface):
         if await result.count() != 1 or not await result.is_visible():
             raise ParserDriftError("The exact visible GIF result is not an operable button.")
         if choose:
-            await self._browser.click_visible_control(page, result)
+            await result.click()
         return result
 
     @staticmethod
@@ -388,10 +389,7 @@ class PostCommentPage(PostEngagementSurface):
                 else f'a[href*="/company/{mention.company_slug}/"]'
             )
             suggestion = page.locator("[role='listbox'], [role='menu']").locator(selector)
-            await self._browser.click_visible_control(
-                page,
-                await _unique_visible(suggestion, "exact comment @mention suggestion"),
-            )
+            await (await _unique_visible(suggestion, "exact comment @mention suggestion")).click()
             position = start + len(mention.token)
         await textbox.press_sequentially(text[position:])
 

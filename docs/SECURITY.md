@@ -13,7 +13,7 @@ Trust is split between:
 - the MCP client, which controls tool availability and approval for each
   account-changing call;
 - the server, which validates typed inputs, exact visible targets, attachment
-  boundaries, and action postconditions;
+  controls, and action postconditions;
 - LinkedIn's visible web UI, which supplies identity, current state, data, and
   postconditions.
 
@@ -36,12 +36,14 @@ passes the current process environment in memory, removes its two internal
 command-routing variables before runtime creation, and makes no network call.
 Only the elected Python runtime remains after the launcher exits.
 
-Normal `serve` startup creates this dedicated profile automatically when it is
-missing. The first client elects one runtime; subsequent clients attach instead
-of opening the profile again. Explicit `profile create`, `login`, `logout`, and
-`profile reset` commands acquire the same ownership lock, so maintenance and
-the runtime cannot operate the profile concurrently. The project does not
-import or adopt an existing general-purpose Chrome profile.
+The dedicated profile is created only through `profile create`. Interactive
+authentication can be invoked explicitly with `login` or synchronously by host
+startup when its saved-session validation requires it. The first client elects
+one runtime; subsequent clients attach instead of opening the profile again.
+`profile create`, `login`, `logout`, and `profile reset` acquire the same
+ownership lock, so maintenance and the runtime cannot operate the profile
+concurrently. The project does not import or adopt an existing general-purpose
+Chrome profile.
 
 The profile can contain:
 
@@ -67,10 +69,12 @@ checkpoint, and authwall surfaces. The login context is then closed normally,
 and the exact profile must still reach the authenticated feed after reopening
 in the configured headed or headless mode.
 
-Existing sessions are validated through a normal visible LinkedIn page. An
-expired login may open a headed reauthentication flow. Restriction-shaped
-pages pause work for operator attention rather than being treated as an
-ordinary login.
+`serve` synchronously validates an existing session through a normal visible
+LinkedIn page before starting its task scheduler. Missing or expired
+authentication closes that context and runs the same visible headed login flow
+before reopening and revalidating the persistent profile. The endpoint is not
+published during this work. Restriction-shaped pages fail startup or pause an
+already running host for operator attention; no bypass is attempted.
 
 Explicit logout uses LinkedIn's visible account menu and Sign Out link, waits
 for the session cookie to disappear, closes Chromium, and verifies the

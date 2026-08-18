@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import socket
 import subprocess
 import sys
 import time
@@ -12,18 +13,21 @@ from pathlib import Path
 from typing import BinaryIO, Protocol, TextIO
 from urllib.parse import urlsplit
 
+from mcp.server.fastmcp import FastMCP
+
 from linkedin_mcp import __version__
+from linkedin_mcp.browser import BrowserManager
 from linkedin_mcp.config import Settings, runtime_configuration_fingerprint
-from linkedin_mcp.errors import ConfigurationError
+from linkedin_mcp.errors import ConfigurationError, LinkedInMCPError
 from linkedin_mcp.host.lock import (
     AccountProcessLock,
     AccountRuntimeStatus,
     inspect_account_runtime,
+    run_owned_operation,
 )
 from linkedin_mcp.infra.cursor import CursorStore
 from linkedin_mcp.infra.queue import Scheduler, Worker
 from linkedin_mcp.tools import attach_tools
-from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.transport.server import (
     bind_http_listener,
     create_mcp_server,
@@ -31,10 +35,13 @@ from linkedin_mcp.transport.server import (
     read_http_server_status,
     serve_http,
 )
+from linkedin_mcp.transport.stdio import run_stdio_proxy
+from linkedin_mcp.ui import LinkedInPlaywright
 
 _RUNTIME_OWNER_COMMAND = "shared-runtime"
-_RUNTIME_MODULE = "linkedin_mcp.host"
+_RUNTIME_MODULE = "linkedin_mcp"
 _RUNTIME_TRANSPORT = "shared-loopback"
+_INTERNAL_HOST_ENV = "LINKEDIN_MCP_INTERNAL_HOST"
 # The OS lock becomes visible before its holder can fsync owner metadata.
 _LOCK_OWNER_PUBLICATION_GRACE_SECONDS = 5.0
 _WINDOWS_BROKER_COMMAND_ENV = "LINKEDIN_MCP_INTERNAL_BROKER_COMMAND"
@@ -75,6 +82,175 @@ class _BrokeredHostStarter:
     def poll(self) -> int | None:
         return_code = self._broker.poll()
         return return_code if return_code not in {None, 0} else None
+
+
+class HostManager:
+    """Own the process transport and every component used by the shared MCP host."""
+
+    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
+        self._process_lock: AccountProcessLock | None = None
+        self._browser: BrowserManager | None = None
+        self._playwright: LinkedInPlaywright | None = None
+        self._scheduler: Scheduler | None = None
+        self._scheduler_started = False
+        self._cursor_store: CursorStore | None = None
+        self._mcp: FastMCP[None] | None = None
+        self._listener: socket.socket | None = None
+
+    async def serve(self) -> str | None:
+        """Start or attach to the configured transport.
+
+        A returned endpoint means another process already owns the shared host.
+        ``None`` means this call served until the host was stopped, or the stdio
+        bridge ran until its client disconnected.
+        """
+
+        if self.settings.transport == "stdio":
+            endpoint = await self.ensure_host()
+            await run_stdio_proxy(endpoint)
+            return None
+
+        status = inspect_account_runtime(self.settings.runtime_lock_path)
+        if status.running:
+            return await self.wait_for_host()
+        try:
+            await self.run_http()
+        except LinkedInMCPError:
+            status = inspect_account_runtime(self.settings.runtime_lock_path)
+            if not status.running:
+                raise
+            return await self.wait_for_host()
+        return None
+
+    async def ensure_host(self) -> str:
+        """Return the shared endpoint, creating its owner process when necessary."""
+
+        return await ensure_host(self.settings)
+
+    async def wait_for_host(self) -> str:
+        """Wait for the elected shared owner to publish a healthy endpoint."""
+
+        return await wait_for_host(self.settings)
+
+    async def login(self) -> None:
+        """Perform visible login while exclusively owning the browser profile."""
+
+        async def operation() -> None:
+            browser = BrowserManager(self.settings)
+            try:
+                await browser.login()
+            finally:
+                await browser.close()
+
+        await run_owned_operation(self.settings, command="login", operation=operation)
+
+    async def logout(self) -> bool:
+        """Perform visible logout while exclusively owning the browser profile."""
+
+        async def operation() -> bool:
+            browser = BrowserManager(self.settings)
+            try:
+                return await browser.logout()
+            finally:
+                await browser.close()
+
+        return await run_owned_operation(self.settings, command="logout", operation=operation)
+
+    async def run_http(self) -> None:
+        """Start all infrastructure, then expose the ready host on loopback HTTP."""
+
+        endpoint = host_endpoint(self.settings)
+        host = _normalized_loopback_host(self.settings.http_host)
+        self._process_lock = AccountProcessLock(
+            self.settings.runtime_lock_path,
+            account_id=self.settings.account_id,
+            command=_RUNTIME_OWNER_COMMAND,
+            transport=_RUNTIME_TRANSPORT,
+            version=__version__,
+            configuration_fingerprint=runtime_configuration_fingerprint(self.settings),
+        )
+        self._process_lock.acquire()
+        try:
+            self._browser = BrowserManager(self.settings)
+            context = await self._browser.start()
+            self._playwright = LinkedInPlaywright(
+                context,
+                self.settings,
+                browser_setup_state=self._browser.setup_state,
+                profile_present=self._browser.profile_present(),
+            )
+            self._scheduler = Scheduler(Worker(), capacity=self.settings.queue_capacity)
+            self._cursor_store = CursorStore(
+                ttl_seconds=self.settings.pagination_cursor_ttl_seconds,
+                max_active_cursors=self.settings.pagination_max_active_cursors,
+                max_seen_items_per_cursor=self.settings.pagination_max_seen_items_per_cursor,
+            )
+            self._mcp = create_mcp_server(self.settings)
+            attach_tools(
+                self._mcp,
+                settings=self.settings,
+                playwright=self._playwright,
+                scheduler=self._scheduler,
+                cursor_store=self._cursor_store,
+            )
+            await self._scheduler.start()
+            self._scheduler_started = True
+            self._listener = bind_http_listener(host, self.settings.http_port)
+            self._process_lock.publish_endpoint(endpoint)
+            await serve_http(
+                self._mcp,
+                self.settings,
+                self._listener,
+                self._process_lock.wait_for_stop_request,
+            )
+        finally:
+            await self.close()
+
+    async def close(self) -> None:
+        """Close the host in reverse startup order; safe after partial startup."""
+
+        listener = self._listener
+        scheduler = self._scheduler
+        cursor_store = self._cursor_store
+        playwright = self._playwright
+        browser = self._browser
+        process_lock = self._process_lock
+        scheduler_started = self._scheduler_started
+
+        self._listener = None
+        self._scheduler = None
+        self._cursor_store = None
+        self._playwright = None
+        self._browser = None
+        self._process_lock = None
+        self._mcp = None
+        self._scheduler_started = False
+
+        if listener is not None:
+            listener.close()
+        try:
+            if scheduler is not None and scheduler_started:
+                await scheduler.quiesce()
+        finally:
+            try:
+                if scheduler is not None:
+                    await scheduler.close()
+            finally:
+                try:
+                    if cursor_store is not None:
+                        await cursor_store.close()
+                finally:
+                    try:
+                        if playwright is not None:
+                            await playwright.close()
+                    finally:
+                        try:
+                            if browser is not None:
+                                await browser.close()
+                        finally:
+                            if process_lock is not None:
+                                process_lock.release()
 
 
 def host_endpoint(settings: Settings) -> str:
@@ -159,65 +335,6 @@ async def read_host_status(
     return await read_http_server_status(validated, timeout_seconds=timeout_seconds)
 
 
-async def run_host(settings: Settings) -> None:
-    """Own the profile lock and serve stateful MCP sessions on loopback."""
-
-    endpoint = host_endpoint(settings)
-    host = _normalized_loopback_host(settings.http_host)
-    process_lock = AccountProcessLock(
-        settings.runtime_lock_path,
-        account_id=settings.account_id,
-        command=_RUNTIME_OWNER_COMMAND,
-        transport=_RUNTIME_TRANSPORT,
-        version=__version__,
-        configuration_fingerprint=runtime_configuration_fingerprint(settings),
-    )
-    browser = BrowserManager(settings)
-    scheduler = Scheduler(Worker(), capacity=settings.queue_capacity)
-    cursor_store = CursorStore(
-        ttl_seconds=settings.pagination_cursor_ttl_seconds,
-        max_active_cursors=settings.pagination_max_active_cursors,
-        max_seen_items_per_cursor=settings.pagination_max_seen_items_per_cursor,
-    )
-    mcp = create_mcp_server(settings)
-    attach_tools(
-        mcp,
-        settings=settings,
-        browser=browser,
-        scheduler=scheduler,
-        cursor_store=cursor_store,
-    )
-    process_lock.acquire()
-    try:
-        await scheduler.start()
-        browser.start_session_bootstrap()
-        listener = bind_http_listener(host, settings.http_port)
-        try:
-            process_lock.publish_endpoint(endpoint)
-            await serve_http(
-                mcp,
-                settings,
-                listener,
-                process_lock.wait_for_stop_request,
-            )
-        finally:
-            listener.close()
-    finally:
-        try:
-            await scheduler.quiesce()
-        finally:
-            try:
-                await scheduler.close()
-            finally:
-                try:
-                    await cursor_store.close()
-                finally:
-                    try:
-                        await browser.close()
-                    finally:
-                        process_lock.release()
-
-
 def validate_host_endpoint(endpoint: str) -> str:
     try:
         parsed = urlsplit(endpoint)
@@ -253,10 +370,12 @@ def _spawn_host(settings: Settings) -> _HostStarter:
         log_path.parent.chmod(0o700)
     log = log_path.open("ab", buffering=0)
     try:
+        environment = os.environ.copy()
+        environment[_INTERNAL_HOST_ENV] = "1"
         if os.name != "nt":
             os.fchmod(log.fileno(), 0o600)
         if os.name == "nt":
-            process: _HostStarter = _spawn_windows_host(log)
+            process: _HostStarter = _spawn_windows_host(log, environment=environment)
         else:
             process = subprocess.Popen(
                 [sys.executable, "-m", _RUNTIME_MODULE],
@@ -265,16 +384,22 @@ def _spawn_host(settings: Settings) -> _HostStarter:
                 stderr=log,
                 close_fds=True,
                 start_new_session=True,
+                env=environment,
             )
     finally:
         log.close()
     return process
 
 
-def _spawn_windows_host(log: BinaryIO) -> _BrokeredHostStarter:
+def _spawn_windows_host(
+    log: BinaryIO,
+    *,
+    environment: dict[str, str] | None = None,
+) -> _BrokeredHostStarter:
     """Ask local Windows CIM to create the runtime outside the caller's Job Object."""
 
-    environment = os.environ.copy()
+    environment = environment or os.environ.copy()
+    environment[_INTERNAL_HOST_ENV] = "1"
     environment[_WINDOWS_BROKER_COMMAND_ENV] = subprocess.list2cmdline(
         [sys.executable, "-m", _RUNTIME_MODULE]
     )
@@ -370,3 +495,45 @@ def _validate_running_owner(status: AccountRuntimeStatus, settings: Settings) ->
             "pacing, or transport settings. Make client configurations match, or run "
             "`linkedin-mcp stop` and restart with the intended settings."
         )
+
+
+def internal_host_requested() -> bool:
+    """Return whether the root module was launched as the private host owner."""
+
+    return os.environ.get(_INTERNAL_HOST_ENV) == "1"
+
+
+async def run_internal_host(settings: Settings) -> None:
+    """Run the elected HTTP owner, or wait for the process that won the race."""
+
+    values = settings.model_dump()
+    values["transport"] = "streamable-http"
+    host_settings = Settings.model_validate(values)
+    try:
+        await HostManager(host_settings).run_http()
+    except LinkedInMCPError:
+        status = inspect_account_runtime(host_settings.runtime_lock_path)
+        if not status.running:
+            raise
+        await wait_for_host(host_settings)
+
+
+def host_process_main() -> None:
+    """Root-module entrypoint used only by a spawned shared-host process."""
+
+    from pydantic import ValidationError
+
+    from linkedin_mcp.logging import configure_logging
+
+    try:
+        settings = Settings()
+        if brokered_host_output_required():
+            redirect_brokered_host_output(settings)
+        configure_logging(settings.log_level)
+        asyncio.run(run_internal_host(settings))
+    except (LinkedInMCPError, ValidationError, ValueError, RuntimeError) as error:
+        print(f"linkedin-mcp host: {error}", file=sys.stderr)
+        raise SystemExit(1) from error
+    except Exception as error:
+        print("linkedin-mcp host: an unexpected startup failure occurred", file=sys.stderr)
+        raise SystemExit(1) from error

@@ -7,7 +7,6 @@ import json
 import os
 import subprocess
 import sys
-from contextlib import suppress
 from enum import StrEnum
 from pathlib import Path
 from typing import cast
@@ -33,7 +32,7 @@ class BrowserSetupState(StrEnum):
     FAILED = "failed"
 
 
-class BrowserRuntimeBootstrap:
+class BrowserBootstrap:
     """Install and share one Chromium revision outside ephemeral package environments."""
 
     def __init__(self, settings: Settings) -> None:
@@ -43,9 +42,7 @@ class BrowserRuntimeBootstrap:
             if settings.browser_auto_install
             else BrowserSetupState.DISABLED
         )
-        self._task: asyncio.Task[None] | None = None
         self._lock = asyncio.Lock()
-        self._last_error: BrowserUnavailableError | None = None
 
     @property
     def state(self) -> BrowserSetupState:
@@ -74,21 +71,6 @@ class BrowserRuntimeBootstrap:
         )
         return self._state
 
-    def start(self) -> None:
-        """Schedule browser installation without delaying MCP initialization."""
-
-        if not self._settings.browser_auto_install:
-            return
-        current = self._task
-        if current is not None:
-            if not current.done():
-                return
-            self._consume_task(current)
-        self._task = asyncio.create_task(
-            self.ensure_ready(),
-            name="linkedin-playwright-browser-setup",
-        )
-
     async def ensure_ready(self, *, force: bool = False) -> None:
         """Wait until the configured Chromium revision is installed."""
 
@@ -98,39 +80,18 @@ class BrowserRuntimeBootstrap:
         self._configure_environment()
         if self._installation_ready():
             self._state = BrowserSetupState.READY
-            self._last_error = None
-            return
-        current = self._task
-        if current is not None and current is not asyncio.current_task() and not current.done():
-            await asyncio.shield(current)
-            self._raise_if_failed()
             return
         async with self._lock:
             if self._installation_ready():
                 self._state = BrowserSetupState.READY
-                self._last_error = None
                 return
             self._state = BrowserSetupState.INSTALLING
             try:
                 await asyncio.to_thread(self._install)
-            except BrowserUnavailableError as error:
+            except BrowserUnavailableError:
                 self._state = BrowserSetupState.FAILED
-                self._last_error = error
                 raise
             self._state = BrowserSetupState.READY
-            self._last_error = None
-
-    async def close(self) -> None:
-        task = self._task
-        self._task = None
-        if task is None:
-            return
-        if task.done():
-            self._consume_task(task)
-            return
-        task.cancel()
-        with suppress(asyncio.CancelledError):
-            await task
 
     def _configure_environment(self) -> None:
         operator_managed = bool(os.environ.get("PLAYWRIGHT_BROWSERS_PATH"))
@@ -199,12 +160,3 @@ class BrowserRuntimeBootstrap:
             if prefix is not None:
                 targets.append((prefix, str(revision)))
         return tuple(targets)
-
-    def _raise_if_failed(self) -> None:
-        if self._last_error is not None:
-            raise self._last_error
-
-    @staticmethod
-    def _consume_task(task: asyncio.Task[None]) -> None:
-        with suppress(asyncio.CancelledError):
-            task.exception()

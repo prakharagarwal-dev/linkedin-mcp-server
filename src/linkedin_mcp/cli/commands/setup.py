@@ -4,7 +4,7 @@ import argparse
 import asyncio
 import json
 
-from linkedin_mcp.browser import BrowserRuntimeBootstrap
+from linkedin_mcp.browser import BrowserBootstrap
 from linkedin_mcp.config import Settings
 
 
@@ -13,7 +13,7 @@ def configure(command: argparse.ArgumentParser) -> None:
 
 
 async def execute(settings: Settings) -> None:
-    bootstrap = BrowserRuntimeBootstrap(settings)
+    bootstrap = BrowserBootstrap(settings)
     await bootstrap.ensure_ready(force=True)
     print(
         json.dumps(

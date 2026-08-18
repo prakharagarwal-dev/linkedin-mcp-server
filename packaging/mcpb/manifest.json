@@ -35,7 +35,6 @@
         "stdio"
       ],
       "env": {
-        "LINKEDIN_MCP_AUTO_LOGIN_ON_START": "${user_config.auto_login_on_start}",
         "LINKEDIN_MCP_BROWSER_HEADLESS": "${user_config.browser_headless}"
       }
     }
@@ -64,13 +63,6 @@
     }
   },
   "user_config": {
-    "auto_login_on_start": {
-      "type": "boolean",
-      "title": "Recover login on startup",
-      "description": "Open the persistent headed login flow when the saved session needs attention.",
-      "default": true,
-      "required": false
-    },
     "browser_headless": {
       "type": "boolean",
       "title": "Use headless browser",

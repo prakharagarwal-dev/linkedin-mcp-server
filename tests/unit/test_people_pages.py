@@ -12,7 +12,6 @@ from playwright.async_api import Locator, Page, async_playwright
 from pydantic import ValidationError
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.tools._shared.models import StopReason
 from linkedin_mcp.tools.connections.search.models.connections_search_filters import (
     ConnectionsSearchFilters,
@@ -32,6 +31,7 @@ from linkedin_mcp.tools.people.search.models.people_search_connection_degree imp
 from linkedin_mcp.tools.people.search.models.people_search_filters import PeopleSearchFilters
 from linkedin_mcp.tools.people.search.models.people_search_input import PeopleSearchInput
 from linkedin_mcp.tools.people.search.page import PeopleSearchPage
+from tests.support.playwright import adapt_browser
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 
@@ -387,7 +387,7 @@ async def test_people_search_resolves_all_visible_named_and_toggle_filters() -> 
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         fixture_browser = CurrentPeopleSearchFixtureBrowser(page)
-        collector = PeopleSearchPage(cast(BrowserManager, fixture_browser), max_pages=2)
+        collector = PeopleSearchPage(adapt_browser(fixture_browser), max_pages=2)
         request = PeopleSearchInput(
             context_id="context-1",
             request_id="named-people-search",
@@ -482,10 +482,7 @@ async def test_people_search_waits_for_async_trailing_hyphen_result() -> None:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         collector = PeopleSearchPage(
-            cast(
-                BrowserManager,
-                PeopleFixtureBrowser(page, search_html=html),
-            ),
+            adapt_browser(PeopleFixtureBrowser(page, search_html=html)),
             max_pages=1,
         )
         try:
@@ -514,10 +511,7 @@ async def test_people_search_only_completes_empty_on_visible_end_state() -> None
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         collector = PeopleSearchPage(
-            cast(
-                BrowserManager,
-                PeopleFixtureBrowser(page, search_html=html),
-            ),
+            adapt_browser(PeopleFixtureBrowser(page, search_html=html)),
             max_pages=1,
         )
         try:
@@ -541,7 +535,7 @@ async def test_people_search_stops_cleanly_at_live_anonymous_result_boundary() -
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         fixture_browser = CurrentPeoplePaginationFixtureBrowser(page)
-        collector = PeopleSearchPage(cast(BrowserManager, fixture_browser), max_pages=5)
+        collector = PeopleSearchPage(adapt_browser(fixture_browser), max_pages=5)
         try:
             people, coverage, captured_text, _ = await collector.collect(
                 PeopleSearchInput(
@@ -574,7 +568,7 @@ async def test_people_search_name_resolution_fails_closed_when_choice_is_missing
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         fixture_browser = CurrentPeopleSearchFixtureBrowser(page)
-        collector = PeopleSearchPage(cast(BrowserManager, fixture_browser), max_pages=1)
+        collector = PeopleSearchPage(adapt_browser(fixture_browser), max_pages=1)
         try:
             with pytest.raises(ParserDriftError, match="use profile_language_ids instead"):
                 await collector.collect(
@@ -599,7 +593,7 @@ async def test_people_search_supports_current_filter_panel_and_result_layout() -
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         fixture_browser = CurrentPeopleSearchFixtureBrowser(page)
-        collector = PeopleSearchPage(cast(BrowserManager, fixture_browser), max_pages=1)
+        collector = PeopleSearchPage(adapt_browser(fixture_browser), max_pages=1)
         request = PeopleSearchInput(
             context_id="context-1",
             request_id="current-people-search",
@@ -651,7 +645,7 @@ async def test_people_search_current_panel_retries_one_dropped_submission() -> N
             page,
             submitted_urls=("https://www.linkedin.com/search/results/people/?keywords=engineer",),
         )
-        collector = PeopleSearchPage(cast(BrowserManager, fixture_browser), max_pages=1)
+        collector = PeopleSearchPage(adapt_browser(fixture_browser), max_pages=1)
         try:
             people, coverage, _, source_url = await collector.collect(
                 PeopleSearchInput(
@@ -680,7 +674,7 @@ async def test_people_search_current_panel_fails_closed_when_submission_drops_fi
             page,
             submitted_url="https://www.linkedin.com/search/results/people/?keywords=engineer",
         )
-        collector = PeopleSearchPage(cast(BrowserManager, fixture_browser), max_pages=1)
+        collector = PeopleSearchPage(adapt_browser(fixture_browser), max_pages=1)
         try:
             with pytest.raises(ParserDriftError, match="did not retain every requested location"):
                 await collector.collect(
@@ -725,7 +719,7 @@ async def test_people_search_current_panel_fails_closed_when_submission_drops_to
             page,
             submitted_url="https://www.linkedin.com/search/results/people/?keywords=engineer",
         )
-        collector = PeopleSearchPage(cast(BrowserManager, fixture_browser), max_pages=1)
+        collector = PeopleSearchPage(adapt_browser(fixture_browser), max_pages=1)
         try:
             with pytest.raises(ParserDriftError, match=message):
                 await collector.collect(
@@ -747,7 +741,7 @@ async def test_person_profile_supports_current_heading_and_roleless_detail_layou
         page = await browser.new_page()
         fixture_browser = CurrentProfileFixtureBrowser(page)
         reader = PersonProfilePage(
-            cast(BrowserManager, fixture_browser),
+            adapt_browser(fixture_browser),
             max_detail_pages=10,
         )
         try:
@@ -832,7 +826,7 @@ async def test_person_profile_ignores_self_verification_and_guidance() -> None:
         page = await browser.new_page()
         fixture_browser = SelfProfileFixtureBrowser(page)
         reader = PersonProfilePage(
-            cast(BrowserManager, fixture_browser),
+            adapt_browser(fixture_browser),
             max_detail_pages=10,
         )
         try:
@@ -868,7 +862,7 @@ async def test_person_profile_reads_current_roleless_detail_collection_cards() -
         page = await browser.new_page()
         fixture_browser = CurrentRolelessDetailFixtureBrowser(page)
         reader = PersonProfilePage(
-            cast(BrowserManager, fixture_browser),
+            adapt_browser(fixture_browser),
             max_detail_pages=10,
         )
         try:
@@ -906,7 +900,7 @@ async def test_person_profile_visits_and_returns_only_selected_detail_sections()
         page = await browser.new_page()
         fixture_browser = PeopleFixtureBrowser(page)
         reader = PersonProfilePage(
-            cast(BrowserManager, fixture_browser),
+            adapt_browser(fixture_browser),
             max_detail_pages=10,
         )
         try:
@@ -953,7 +947,7 @@ async def test_person_profile_reports_unavailable_and_truncated_selected_section
         page = await browser.new_page()
         fixture_browser = PeopleFixtureBrowser(page)
         reader = PersonProfilePage(
-            cast(BrowserManager, fixture_browser),
+            adapt_browser(fixture_browser),
             max_detail_pages=2,
         )
         try:
@@ -991,7 +985,7 @@ async def test_person_profile_overview_selection_never_visits_detail_pages() -> 
         page = await browser.new_page()
         fixture_browser = PeopleFixtureBrowser(page)
         reader = PersonProfilePage(
-            cast(BrowserManager, fixture_browser),
+            adapt_browser(fixture_browser),
             max_detail_pages=10,
         )
         try:
@@ -1027,12 +1021,11 @@ async def test_person_profile_fails_closed_without_visible_name() -> None:
         try:
             with pytest.raises(ParserDriftError, match="visible heading"):
                 await PersonProfilePage(
-                    cast(
-                        BrowserManager,
+                    adapt_browser(
                         StaticProfileBrowser(
                             page,
                             "<html><body><main>Profile without a name</main></body></html>",
-                        ),
+                        )
                     ),
                     max_detail_pages=0,
                 ).read(

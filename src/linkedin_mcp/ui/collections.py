@@ -5,21 +5,14 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Protocol, cast
+from typing import cast
 
-from playwright.async_api import Locator, Page
+from linkedin_mcp.ui.locator import LinkedInLocator as Locator
+from linkedin_mcp.ui.page import LinkedInPage as Page
 
 CollectionSignature = tuple[str, ...]
 SignatureReader = Callable[[], Awaitable[CollectionSignature]]
 EndReader = Callable[[], Awaitable[bool]]
-
-
-class _EventDispatcher(Protocol):
-    def dispatch_event(
-        self,
-        event_type: str,
-        event_init: dict[str, object],
-    ) -> Awaitable[None]: ...
 
 
 class CollectionSettleOutcome(StrEnum):
@@ -39,8 +32,7 @@ class CollectionSettleResult:
 async def dispatch_bubbling_wheel(locator: Locator, *, delta_y: int) -> None:
     """Dispatch one bounded locator-scoped wheel fallback with explicit typing."""
 
-    dispatcher = cast(_EventDispatcher, locator)
-    await dispatcher.dispatch_event(
+    await locator.dispatch_event(
         "wheel",
         {"bubbles": True, "cancelable": True, "deltaY": delta_y},
     )

@@ -492,12 +492,30 @@ async def test_run_host_owns_and_closes_its_listener(
     class FakeBrowser:
         def __init__(self, _: Settings) -> None:
             events.append("browser-created")
+            self.setup_state = object()
 
-        def start_session_bootstrap(self) -> None:
+        async def start(self) -> object:
             events.append("browser-started")
+            return context
+
+        def profile_present(self) -> bool:
+            return True
 
         async def close(self) -> None:
             events.append("browser-closed")
+
+    class FakePlaywright:
+        def __init__(
+            self,
+            observed_context: object,
+            _: Settings,
+            **__: object,
+        ) -> None:
+            assert observed_context is context
+            events.append("playwright-created")
+
+        async def close(self) -> None:
+            events.append("playwright-closed")
 
     class FakeScheduler:
         def __init__(self, *_: object, **__: object) -> None:
@@ -526,6 +544,7 @@ async def test_run_host_owns_and_closes_its_listener(
     def fake_listener(_: str, __: int) -> Any:
         return FakeListener()
 
+    context = object()
     mcp = object()
 
     def fake_mcp(_: Settings) -> object:
@@ -549,6 +568,7 @@ async def test_run_host_owns_and_closes_its_listener(
 
     monkeypatch.setattr(host, "AccountProcessLock", FakeLock)
     monkeypatch.setattr(host, "BrowserManager", FakeBrowser)
+    monkeypatch.setattr(host, "LinkedInPlaywright", FakePlaywright)
     monkeypatch.setattr(host, "Scheduler", FakeScheduler)
     monkeypatch.setattr(host, "CursorStore", FakeCursorStore)
     monkeypatch.setattr(host, "create_mcp_server", fake_mcp)
@@ -560,24 +580,26 @@ async def test_run_host_owns_and_closes_its_listener(
         runtime_lock_path=tmp_path / "runtime.lock",
         http_port=8123,
     )
-    await host.run_host(settings)
+    await host.HostManager(settings).run_http()
 
     assert events == [
         "lock-created",
+        "lock-acquired",
         "browser-created",
+        "browser-started",
+        "playwright-created",
         "scheduler-created",
         "cursor-created",
         "mcp-created",
         "tools-attached",
-        "lock-acquired",
         "scheduler-started",
-        "browser-started",
         "published:http://127.0.0.1:8123/mcp",
         "served",
         "listener-closed",
         "scheduler-quiesced",
         "scheduler-closed",
         "cursor-closed",
+        "playwright-closed",
         "browser-closed",
         "lock-released",
     ]
@@ -608,9 +630,11 @@ def test_runtime_spawn_listener_and_owner_validation_helpers(
         assert kwargs["creationflags"]
         assert "start_new_session" not in kwargs
     else:
-        assert args == [host.sys.executable, "-m", "linkedin_mcp.host"]
+        assert args == [host.sys.executable, "-m", "linkedin_mcp"]
         assert kwargs["start_new_session"] is True
         assert "creationflags" not in kwargs
+        environment = cast(dict[str, str], kwargs["env"])
+        assert environment["LINKEDIN_MCP_INTERNAL_HOST"] == "1"
     assert (tmp_path / "runtime.log").is_file()
 
     with pytest.raises(ConfigurationError, match="invalid endpoint"):
@@ -673,8 +697,9 @@ def test_windows_runtime_uses_a_local_cim_broker_outside_client_jobs(
 
     environment = cast(dict[str, str], kwargs["env"])
     assert environment["LINKEDIN_MCP_INTERNAL_BROKER_COMMAND"] == subprocess.list2cmdline(
-        [host.sys.executable, "-m", "linkedin_mcp.host"]
+        [host.sys.executable, "-m", "linkedin_mcp"]
     )
+    assert environment["LINKEDIN_MCP_INTERNAL_HOST"] == "1"
     assert environment["LINKEDIN_MCP_INTERNAL_BROKER_CWD"] == str(Path.cwd())
     assert environment["LINKEDIN_MCP_INTERNAL_BROKERED_RUNTIME"] == "1"
     assert kwargs["stdin"] is subprocess.DEVNULL

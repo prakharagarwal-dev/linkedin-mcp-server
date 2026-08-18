@@ -5,8 +5,7 @@ import asyncio
 import json
 
 from linkedin_mcp.config import Settings
-from linkedin_mcp.host.lock import run_owned_operation
-from linkedin_mcp.tools._shared.browser import logout_interactively
+from linkedin_mcp.host.manager import HostManager
 
 
 def configure(command: argparse.ArgumentParser) -> None:
@@ -14,11 +13,7 @@ def configure(command: argparse.ArgumentParser) -> None:
 
 
 async def execute(settings: Settings) -> None:
-    logged_out = await run_owned_operation(
-        settings,
-        command="logout",
-        operation=lambda: logout_interactively(settings),
-    )
+    logged_out = await HostManager(settings).logout()
     print(
         json.dumps(
             {

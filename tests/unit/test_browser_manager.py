@@ -2,14 +2,20 @@ from __future__ import annotations
 
 import os
 import time
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, cast
 
 import pytest
+from playwright.async_api import async_playwright
 
-import linkedin_mcp.browser.runtime as runtime_module
-import linkedin_mcp.tools._shared.browser as manager_module
-from linkedin_mcp.browser import BrowserRuntimeBootstrap
+import linkedin_mcp.browser.login as login_module
+import linkedin_mcp.browser.logout as logout_module
+import linkedin_mcp.browser.manager as manager_module
+from linkedin_mcp.browser import BrowserManager, BrowserSetupState
+from linkedin_mcp.browser.login import login_interactively
+from linkedin_mcp.browser.logout import logout_interactively
 from linkedin_mcp.browser.profile import BrowserProfileManager, BrowserProfileStatus
 from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import (
@@ -21,18 +27,13 @@ from linkedin_mcp.errors import (
     ParserDriftError,
     RestrictionDetectedError,
 )
-from linkedin_mcp.tools._shared.browser import (
-    BrowserManager,
-    login_interactively,
-    logout_interactively,
-)
+from linkedin_mcp.ui import LinkedInPlaywright
 
 
 def _live_settings(tmp_path: Path, *, profile_name: str = "profile") -> Settings:
     return Settings(
         browser_profile_path=tmp_path / profile_name,
         browser_auto_install=False,
-        auto_login_on_start=False,
         minimum_navigation_interval_seconds=0,
         browser_timeout_seconds=5,
     )
@@ -40,7 +41,28 @@ def _live_settings(tmp_path: Path, *, profile_name: str = "profile") -> Settings
 
 def _mark_profile_initialized(settings: Settings) -> None:
     settings.browser_profile_path.mkdir(parents=True, exist_ok=True)
+    if os.name != "nt":
+        settings.browser_profile_path.chmod(0o700)
     (settings.browser_profile_path / "Preferences").write_text("{}", encoding="utf-8")
+
+
+@asynccontextmanager
+async def _live_facade(settings: Settings) -> AsyncGenerator[LinkedInPlaywright]:
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        context = await browser.new_context()
+        facade = LinkedInPlaywright(
+            context,
+            settings,
+            browser_setup_state=BrowserSetupState.DISABLED,
+            profile_present=True,
+        )
+        try:
+            yield facade
+        finally:
+            await facade.close()
+            await context.close()
+            await browser.close()
 
 
 class FakeBrowserProfileManager:
@@ -52,8 +74,9 @@ class FakeBrowserProfileManager:
         initialized = path.is_dir() and any(path.iterdir())
         return BrowserProfileStatus(path=path, exists=path.is_dir(), initialized=initialized)
 
-    async def ensure_created(self) -> None:
-        _mark_profile_initialized(self.settings)
+    def require_initialized(self) -> None:
+        if not self.inspect().initialized:
+            raise ConfigurationError("The browser profile is not initialized.")
 
 
 class FakeRuntimePage:
@@ -392,48 +415,35 @@ def _fake_li_at(*, persistent: bool) -> dict[str, object]:
 
 
 @pytest.mark.asyncio
-async def test_automatic_first_run_login_validates_and_reuses_one_persistent_context(
+async def test_start_synchronously_validates_and_reuses_the_saved_profile(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    settings = _live_settings(tmp_path, profile_name="automatic").model_copy(
-        update={"auto_login_on_start": True}
-    )
+    settings = _live_settings(tmp_path, profile_name="saved-session")
+    _mark_profile_initialized(settings)
     context = FakeRuntimeContext()
     playwright = FakeRuntimePlaywright(context)
-    login_calls = 0
-
-    async def fake_login(
-        login_settings: Settings,
-        _: BrowserRuntimeBootstrap,
-    ) -> None:
-        nonlocal login_calls
-        login_calls += 1
-        assert login_settings.browser_profile_path.is_dir()
 
     def fake_async_playwright() -> FakeRuntimeStarter:
         return FakeRuntimeStarter(playwright)
 
-    async def safe_page(_: object, __: tuple[str, ...]) -> None:
-        return
+    validated: list[object] = []
 
-    monkeypatch.setattr(runtime_module, "async_playwright", cast(Any, fake_async_playwright))
-    monkeypatch.setattr(manager_module, "assert_safe_linkedin_page", safe_page)
+    async def validate(context_to_validate: object, _: Settings) -> None:
+        validated.append(context_to_validate)
+
+    monkeypatch.setattr(manager_module, "async_playwright", cast(Any, fake_async_playwright))
+    monkeypatch.setattr(manager_module, "validate_saved_session", validate)
 
     manager = BrowserManager(
         settings,
         browser_profile=cast(BrowserProfileManager, FakeBrowserProfileManager(settings)),
-        login_runner=fake_login,
     )
-    manager.start_session_bootstrap()
+    started_context = await manager.start()
 
-    async with manager.page() as capability_page:
-        assert capability_page is context.pages[1]
-
-    assert login_calls == 1
-    assert manager.authentication_state.value == "authenticated"
+    assert started_context is context
+    assert validated == [context]
     assert manager.profile_present() is True
-    assert context.pages[0].visited_url == "https://www.linkedin.com/feed/"
     assert playwright.chromium.headless is True
     assert playwright.chromium.user_data_dir == str(settings.browser_profile_path)
     assert manager.started is True
@@ -443,109 +453,157 @@ async def test_automatic_first_run_login_validates_and_reuses_one_persistent_con
     assert playwright.stopped is True
 
 
+@pytest.mark.asyncio
+async def test_start_requires_an_explicitly_created_profile(tmp_path: Path) -> None:
+    manager = BrowserManager(_live_settings(tmp_path, profile_name="missing"))
+
+    with pytest.raises(ConfigurationError, match="profile create"):
+        await manager.start()
+    assert manager.started is False
+    assert manager.profile_present() is False
+    await manager.close()
+
+
+@pytest.mark.asyncio
+async def test_start_awaits_visible_login_then_reopens_and_revalidates(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = _live_settings(tmp_path, profile_name="expired-session")
+    _mark_profile_initialized(settings)
+    expired_context = FakeRuntimeContext()
+    authenticated_context = FakeRuntimeContext()
+    expired_playwright = FakeRuntimePlaywright(expired_context)
+    authenticated_playwright = FakeRuntimePlaywright(authenticated_context)
+    playwrights = iter((expired_playwright, authenticated_playwright))
+
+    def fake_async_playwright() -> FakeRuntimeStarter:
+        return FakeRuntimeStarter(next(playwrights))
+
+    validations = 0
+
+    async def validate(_: object, __: Settings) -> None:
+        nonlocal validations
+        validations += 1
+        if validations == 1:
+            raise AuthenticationRequiredError("The saved LinkedIn session expired.")
+
+    login_calls: list[Settings] = []
+
+    async def login(settings_to_login: Settings, _: object) -> None:
+        login_calls.append(settings_to_login)
+
+    monkeypatch.setattr(manager_module, "async_playwright", cast(Any, fake_async_playwright))
+    monkeypatch.setattr(manager_module, "validate_saved_session", validate)
+    monkeypatch.setattr(manager_module, "login_interactively", login)
+    manager = BrowserManager(settings)
+
+    context = await manager.start()
+
+    assert context is authenticated_context
+    assert validations == 2
+    assert login_calls == [settings]
+    assert expired_context.closed is True
+    assert expired_playwright.stopped is True
+    assert manager.started is True
+    await manager.close()
+    assert authenticated_context.closed is True
+    assert authenticated_playwright.stopped is True
+
+
 @pytest.mark.timeout(20)
-async def test_browser_manager_starts_navigates_pauses_and_persists_profile(
+async def test_linkedin_playwright_navigates_and_pauses_on_a_checkpoint(
     tmp_path: Path,
 ) -> None:
     settings = _live_settings(tmp_path)
-    manager = BrowserManager(settings)
+    async with _live_facade(settings) as playwright:
+        assert playwright.profile_present() is True
+        assert playwright.started is True
+        assert playwright.paused is False
 
-    assert manager.profile_present() is False
-    assert manager.started is False
-    assert manager.paused is False
+        async with playwright.page() as page:
+            await page.raw_page.route(
+                "**/*",
+                lambda route: route.fulfill(
+                    status=200,
+                    content_type="text/html",
+                    body="<html><body><main>Visible jobs</main></body></html>",
+                ),
+            )
+            await page.goto("https://www.linkedin.com/jobs/search/?keywords=python")
 
-    async with manager.page() as page:
-        await page.route(
-            "**/*",
-            lambda route: route.fulfill(
-                status=200,
-                content_type="text/html",
-                body="<html><body><main>Visible jobs</main></body></html>",
-            ),
-        )
-        await manager.navigate(page, "https://www.linkedin.com/jobs/search/?keywords=python")
-        assert manager.started is True
+            with pytest.raises(RestrictionDetectedError, match="security checkpoint"):
+                await page.goto("https://www.linkedin.com/checkpoint/challenge/")
 
-        with pytest.raises(RestrictionDetectedError, match="security checkpoint"):
-            await manager.navigate(page, "https://www.linkedin.com/checkpoint/challenge/")
-
-    assert manager.paused is True
-    assert manager.pause_reason is not None
-    manager.resume()
-    await manager.close()
-
-    assert manager.started is False
-    assert manager.profile_present() is True
-    if os.name != "nt":
-        assert settings.browser_profile_path.stat().st_mode & 0o077 == 0
+        assert playwright.paused is True
+        assert playwright.pause_reason is not None
 
 
 @pytest.mark.timeout(20)
-async def test_browser_manager_paces_and_validates_visible_control_navigation(
+async def test_linkedin_playwright_validates_visible_control_navigation(
     tmp_path: Path,
 ) -> None:
     settings = _live_settings(tmp_path, profile_name="visible-control")
-    manager = BrowserManager(settings)
-
-    async with manager.page() as page:
-        await page.route(
-            "**/*",
-            lambda route: route.fulfill(
-                status=200,
-                content_type="text/html",
-                body="""
-                    <html>
-                      <body>
-                        <main>Visible people</main>
-                        <script>
-                          setTimeout(
-                            () => history.replaceState(
-                              null,
-                              "",
-                              "/search/results/people/?keywords=python&geoUrn=%5B%22102713980%22%5D"
-                            ),
-                            1200
-                          );
-                        </script>
-                      </body>
-                    </html>
-                """,
-            ),
-        )
-        await page.set_content(
-            """
-            <a href="https://www.linkedin.com/search/results/people/?keywords=python">
-              Show results
-            </a>
-            """
-        )
-        target = await manager.navigate_via_visible_control(
-            page,
-            page.get_by_role("link", name="Show results"),
-        )
-        await page.set_content('<a href="https://example.com/search/">Unsafe results</a>')
-        with pytest.raises(InvalidTargetError, match="allowed exact host"):
-            await manager.navigate_via_visible_control(
-                page,
-                page.get_by_role("link", name="Unsafe results"),
+    async with _live_facade(settings) as playwright:
+        async with playwright.page() as page:
+            await page.raw_page.route(
+                "**/*",
+                lambda route: route.fulfill(
+                    status=200,
+                    content_type="text/html",
+                    body="""
+                        <html>
+                          <body>
+                            <main>Visible people</main>
+                            <script>
+                              setTimeout(
+                                () => history.replaceState(
+                                  null,
+                                  "",
+                                  "/search/results/people/?keywords=python&geoUrn=%5B%22102713980%22%5D"
+                                ),
+                                1200
+                              );
+                            </script>
+                          </body>
+                        </html>
+                    """,
+                ),
             )
+            await page.raw_page.set_content(
+                """
+                <a href="https://www.linkedin.com/search/results/people/?keywords=python">
+                  Show results
+                </a>
+                """
+            )
+            target = await page.get_by_role(
+                "link",
+                name="Show results",
+            ).click_and_wait_for_navigation()
+            await page.raw_page.set_content(
+                '<a href="https://example.com/search/">Unsafe results</a>'
+            )
+            with pytest.raises(InvalidTargetError, match="allowed exact host"):
+                await page.get_by_role(
+                    "link",
+                    name="Unsafe results",
+                ).click_and_wait_for_navigation()
 
-    assert target == (
-        "https://www.linkedin.com/search/results/people/"
-        "?keywords=python&geoUrn=%5B%22102713980%22%5D"
-    )
-    assert manager.paused is False
-    await manager.close()
+        assert target == (
+            "https://www.linkedin.com/search/results/people/"
+            "?keywords=python&geoUrn=%5B%22102713980%22%5D"
+        )
+        assert playwright.paused is False
 
 
 @pytest.mark.timeout(20)
-async def test_browser_manager_pauses_on_expired_login_and_restriction_text(
+async def test_linkedin_playwright_pauses_on_expired_login_and_restriction_text(
     tmp_path: Path,
 ) -> None:
     settings = _live_settings(tmp_path, profile_name="access-errors")
-    manager = BrowserManager(settings)
-    async with manager.page() as page:
-        await page.route(
+    async with _live_facade(settings) as playwright, playwright.page() as page:
+        await page.raw_page.route(
             "**/*",
             lambda route: route.fulfill(
                 status=200,
@@ -554,12 +612,12 @@ async def test_browser_manager_pauses_on_expired_login_and_restriction_text(
             ),
         )
         with pytest.raises(AuthenticationRequiredError, match="expired"):
-            await manager.navigate(page, "https://www.linkedin.com/login")
-        assert manager.paused is True
+            await page.goto("https://www.linkedin.com/login")
+        assert playwright.paused is True
 
-        manager.resume()
-        await page.unroute("**/*")
-        await page.route(
+        playwright._mark_authenticated()  # pyright: ignore[reportPrivateUsage]
+        await page.raw_page.unroute("**/*")
+        await page.raw_page.route(
             "**/*",
             lambda route: route.fulfill(
                 status=200,
@@ -568,40 +626,40 @@ async def test_browser_manager_pauses_on_expired_login_and_restriction_text(
             ),
         )
         with pytest.raises(RestrictionDetectedError, match="restriction-shaped"):
-            await manager.navigate(page, "https://www.linkedin.com/jobs/search/")
-        assert manager.paused is True
-
-    await manager.close()
+            await page.goto("https://www.linkedin.com/jobs/search/")
+        assert playwright.paused is True
 
 
 @pytest.mark.timeout(20)
-async def test_browser_manager_reuses_one_context_with_a_fresh_page_per_operation(
+async def test_linkedin_playwright_reuses_one_context_with_a_fresh_page_per_task(
     tmp_path: Path,
 ) -> None:
-    manager = BrowserManager(_live_settings(tmp_path, profile_name="fresh-pages"))
+    settings = _live_settings(tmp_path, profile_name="fresh-pages")
+    async with _live_facade(settings) as playwright:
+        async with playwright.page() as first_page:
+            assert playwright.started is True
+            first_page_reference = first_page
+            popup_reference = await first_page.raw_page.context.new_page()
 
-    async with manager.page() as first_page:
-        assert manager.started is True
-        first_page_reference = first_page
-        popup_reference = await first_page.context.new_page()
+        assert first_page_reference.is_closed() is True
+        assert popup_reference.is_closed() is True
+        assert playwright.started is True
 
-    assert first_page_reference.is_closed() is True
-    assert popup_reference.is_closed() is True
-    assert manager.started is True
-
-    async with manager.page() as second_page:
-        assert second_page is not first_page_reference
-
-    await manager.close()
+        async with playwright.page() as second_page:
+            assert second_page is not first_page_reference
 
 
 @pytest.mark.asyncio
-async def test_browser_manager_fails_closed_when_paused(tmp_path: Path) -> None:
-    paused = BrowserManager(_live_settings(tmp_path, profile_name="paused"))
-    paused.pause("operator review")
-    with pytest.raises(AccessPausedError, match="operator review"):
-        async with paused.page():
-            pass
+async def test_linkedin_playwright_fails_closed_when_paused(tmp_path: Path) -> None:
+    settings = _live_settings(tmp_path, profile_name="paused")
+    async with _live_facade(settings) as playwright:
+        playwright._record_access_error(  # pyright: ignore[reportPrivateUsage]
+            RestrictionDetectedError("operator review"),
+            "https://www.linkedin.com/jobs/",
+        )
+        with pytest.raises(AccessPausedError, match="operator review"):
+            async with playwright.page():
+                pass
 
 
 @pytest.mark.asyncio
@@ -636,8 +694,8 @@ async def test_interactive_login_uses_and_preserves_the_local_profile(
     async def no_sleep(_: float) -> None:
         return
 
-    monkeypatch.setattr(manager_module, "async_playwright", cast(Any, fake_async_playwright))
-    monkeypatch.setattr(manager_module.asyncio, "sleep", no_sleep)
+    monkeypatch.setattr(login_module, "async_playwright", cast(Any, fake_async_playwright))
+    monkeypatch.setattr(login_module.asyncio, "sleep", no_sleep)
 
     await login_interactively(settings)
 
@@ -676,8 +734,8 @@ async def test_interactive_login_rejects_a_transient_session_cookie(
     async def no_sleep(_: float) -> None:
         return
 
-    monkeypatch.setattr(manager_module, "async_playwright", cast(Any, fake_async_playwright))
-    monkeypatch.setattr(manager_module.asyncio, "sleep", no_sleep)
+    monkeypatch.setattr(login_module, "async_playwright", cast(Any, fake_async_playwright))
+    monkeypatch.setattr(login_module.asyncio, "sleep", no_sleep)
 
     with pytest.raises(AuthenticationRequiredError, match="not saved persistently"):
         await login_interactively(settings)
@@ -715,8 +773,8 @@ async def test_interactive_login_rejects_a_session_lost_during_clean_reopen(
     async def no_sleep(_: float) -> None:
         return
 
-    monkeypatch.setattr(manager_module, "async_playwright", cast(Any, fake_async_playwright))
-    monkeypatch.setattr(manager_module.asyncio, "sleep", no_sleep)
+    monkeypatch.setattr(login_module, "async_playwright", cast(Any, fake_async_playwright))
+    monkeypatch.setattr(login_module.asyncio, "sleep", no_sleep)
 
     with pytest.raises(AuthenticationRequiredError, match="clean browser restart"):
         await login_interactively(settings)
@@ -769,12 +827,12 @@ async def test_interactive_logout_uses_visible_controls_and_survives_clean_reope
         return
 
     monkeypatch.setattr(
-        manager_module,
+        logout_module,
         "async_playwright",
         cast(Any, lambda: FakeLogoutStarter(playwright)),
     )
-    monkeypatch.setattr(manager_module, "assert_safe_linkedin_page", safe_page)
-    monkeypatch.setattr(manager_module.asyncio, "sleep", no_sleep)
+    monkeypatch.setattr(logout_module, "assert_safe_linkedin_page", safe_page)
+    monkeypatch.setattr(logout_module.asyncio, "sleep", no_sleep)
 
     assert await logout_interactively(settings) is True
     assert account_menu.clicked is True
@@ -801,7 +859,7 @@ async def test_interactive_logout_is_idempotent_when_already_logged_out(
     )
     playwright = FakeLogoutPlaywright([context])
     monkeypatch.setattr(
-        manager_module,
+        logout_module,
         "async_playwright",
         cast(Any, lambda: FakeLogoutStarter(playwright)),
     )
@@ -827,11 +885,11 @@ async def test_interactive_logout_fails_closed_when_visible_account_menu_is_miss
         return
 
     monkeypatch.setattr(
-        manager_module,
+        logout_module,
         "async_playwright",
         cast(Any, lambda: FakeLogoutStarter(playwright)),
     )
-    monkeypatch.setattr(manager_module, "assert_safe_linkedin_page", safe_page)
+    monkeypatch.setattr(logout_module, "assert_safe_linkedin_page", safe_page)
 
     with pytest.raises(ParserDriftError, match="account menu"):
         await logout_interactively(settings)
@@ -871,12 +929,12 @@ async def test_interactive_logout_rejects_session_that_survives_clean_reopen(
         return
 
     monkeypatch.setattr(
-        manager_module,
+        logout_module,
         "async_playwright",
         cast(Any, lambda: FakeLogoutStarter(playwright)),
     )
-    monkeypatch.setattr(manager_module, "assert_safe_linkedin_page", safe_page)
-    monkeypatch.setattr(manager_module.asyncio, "sleep", no_sleep)
+    monkeypatch.setattr(logout_module, "assert_safe_linkedin_page", safe_page)
+    monkeypatch.setattr(logout_module.asyncio, "sleep", no_sleep)
 
     with pytest.raises(BrowserUnavailableError, match="clean browser restart"):
         await logout_interactively(settings)

@@ -6,7 +6,6 @@ import re
 from datetime import UTC, datetime
 
 from playwright.async_api import Error as PlaywrightError
-from playwright.async_api import Locator, Page
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import InvalidTargetError, LinkedInMCPError, ParserDriftError
@@ -18,9 +17,11 @@ from linkedin_mcp.tools._shared.actions import (
     ActionTarget,
     InvitationSendPayload,
 )
-from linkedin_mcp.tools._shared.urls import canonical_profile_url
 from linkedin_mcp.tools.invitations.action_surface import InvitationActionSurface
 from linkedin_mcp.tools.invitations.send.models.invitation_send_input import InvitationSendInput
+from linkedin_mcp.ui import LinkedInLocator as Locator
+from linkedin_mcp.ui import LinkedInPage as Page
+from linkedin_mcp.ui.urls import canonical_profile_url
 
 
 async def _visible_text(page: Page) -> str:
@@ -59,8 +60,8 @@ class SendInvitationPage(InvitationActionSurface):
         self,
         request: InvitationSendInput,
     ) -> ActionInspection:
-        async with self._browser.page() as page:
-            await self._browser.navigate(page, canonical_profile_url(request.profile_slug))
+        async with self._playwright.page() as page:
+            await page.goto(canonical_profile_url(request.profile_slug))
             main, name = await self._profile_identity(page)
             state, connect = await self._wait_for_connect_control(page, main, name)
             if state != "connect_available":
@@ -69,7 +70,7 @@ class SendInvitationPage(InvitationActionSurface):
                 )
             if connect is None:
                 raise ParserDriftError("The exact profile has no unique visible Connect control.")
-            await self._browser.click_visible_control(page, connect)
+            await connect.click()
             dialog = await _wait_for_unique_visible(
                 page,
                 page.get_by_role("dialog"),
@@ -120,7 +121,7 @@ class SendInvitationPage(InvitationActionSurface):
             raise InvalidTargetError(
                 "LinkedIn does not offer a personalized note for this invitation."
             )
-        await self._browser.click_visible_control(page, add_note)
+        await add_note.click()
         textbox = await _wait_for_unique_visible(
             page,
             page.get_by_role("dialog").get_by_role("textbox"),
@@ -163,8 +164,8 @@ class SendInvitationPage(InvitationActionSurface):
     async def perform_send(self, command: ActionCommand) -> ActionPageResult:
         if not isinstance(command.payload, InvitationSendPayload):
             raise InvalidTargetError("The invitation action payload is invalid.")
-        async with self._browser.page() as page:
-            await self._browser.navigate(page, canonical_profile_url(command.target.profile_slug))
+        async with self._playwright.page() as page:
+            await page.goto(canonical_profile_url(command.target.profile_slug))
             main, name = await self._profile_identity(page)
             if name.casefold() != command.target.display_name.casefold():
                 return await self._result(
@@ -191,7 +192,7 @@ class SendInvitationPage(InvitationActionSurface):
                     state,
                     "The requested profile no longer exposes a visible Connect action.",
                 )
-            await self._browser.click_visible_control(page, connect)
+            await connect.click()
             try:
                 dialog = await _wait_for_unique_visible(
                     page,
@@ -224,7 +225,7 @@ class SendInvitationPage(InvitationActionSurface):
                         "personalized_invitation_unavailable",
                         "LinkedIn does not offer a personalized note for this invitation.",
                     )
-                await self._browser.click_visible_control(page, add_note)
+                await add_note.click()
                 textbox = await _wait_for_unique_visible(
                     page,
                     page.get_by_role("dialog").get_by_role("textbox"),
@@ -300,7 +301,7 @@ class SendInvitationPage(InvitationActionSurface):
             )
             verification_captured_at = datetime.now(UTC)
             try:
-                await self._browser.click_visible_control(page, send)
+                await send.click()
             except LinkedInMCPError as error:
                 if error.pause_required:
                     raise
@@ -327,10 +328,7 @@ class SendInvitationPage(InvitationActionSurface):
                     captured_at=verification_captured_at,
                 )
             try:
-                await self._browser.navigate(
-                    page,
-                    canonical_profile_url(command.target.profile_slug),
-                )
+                await page.goto(canonical_profile_url(command.target.profile_slug))
                 main, fresh_name = await self._profile_identity(page)
                 state, _ = await self._wait_for_connect_control(page, main, fresh_name)
             except LinkedInMCPError as error:

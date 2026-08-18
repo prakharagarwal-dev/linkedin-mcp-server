@@ -10,12 +10,9 @@ from datetime import UTC, datetime
 from typing import Literal, cast
 from urllib.parse import parse_qs, unquote, urljoin, urlsplit
 
-from playwright.async_api import Locator, Page
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import BrowserUnavailableError, ParserDriftError
-from linkedin_mcp.tools._shared.browser import BrowserManager
-from linkedin_mcp.tools._shared.collections import wait_for_collection_change
 from linkedin_mcp.tools._shared.models import StopReason
 from linkedin_mcp.tools.invitations.list.models.invitation_available_action import (
     InvitationAvailableAction,
@@ -34,6 +31,10 @@ from linkedin_mcp.tools.invitations.list.models.invitation_list_coverage import 
 from linkedin_mcp.tools.invitations.list.models.invitation_list_input import InvitationListInput
 from linkedin_mcp.tools.invitations.list.models.invitation_summary import InvitationSummary
 from linkedin_mcp.tools.invitations.list.models.invitation_type import InvitationType
+from linkedin_mcp.ui import LinkedInLocator as Locator
+from linkedin_mcp.ui import LinkedInPage as Page
+from linkedin_mcp.ui import LinkedInPlaywright
+from linkedin_mcp.ui.collections import wait_for_collection_change
 
 InvitationProgressReporter = Callable[[int, int, str], Awaitable[None]]
 
@@ -1266,7 +1267,7 @@ async def _implicit_sent_empty_inventory(page: Page) -> _VisibleInventory:
 
 async def _select_visible_view(
     page: Page,
-    browser: BrowserManager,
+    playwright: LinkedInPlaywright,
     direction: InvitationDirection,
     invitation_filter: InvitationFilter,
 ) -> _VisibleInventory:
@@ -1293,14 +1294,14 @@ async def _select_visible_view(
             name=_BUCKET_PICKER_PATTERN,
             description="Focused/Other selector",
         )
-        await browser.click_visible_control(page, picker)
+        await picker.click()
         option = await _unique_visible_role_control(
             page,
             role="menuitem",
             name=_CONTROL_NAME_PATTERNS[invitation_filter],
             description=f"{invitation_filter.value} menu option",
         )
-        await browser.click_visible_control(page, option)
+        await option.click()
     elif invitation_filter in _CATEGORY_FILTERS:
         try:
             control = await _unique_visible_role_control(
@@ -1314,7 +1315,7 @@ async def _select_visible_view(
             # Returning through the visible Focused picker restores them.
             await _select_visible_view(
                 page,
-                browser,
+                playwright,
                 direction,
                 InvitationFilter.FOCUSED,
             )
@@ -1331,7 +1332,7 @@ async def _select_visible_view(
                     f"{invitation_filter.value} filter control."
                 ) from None
             control = category_controls[0]
-        await browser.click_visible_control(page, control)
+        await control.click()
     elif invitation_filter is InvitationFilter.PEOPLE:
         controls: list[Locator] = []
         for role in ("link", "radio", "button"):
@@ -1348,7 +1349,7 @@ async def _select_visible_view(
             raise ParserDriftError(
                 "LinkedIn Invitations has no unique current People filter control."
             )
-        await browser.click_visible_control(page, controls[0])
+        await controls[0].click()
     else:
         raise ValueError("The synthetic All filter cannot be selected directly.")
     inventory = await _wait_for_inventory(page, invitation_filter)
@@ -1384,13 +1385,13 @@ class InvitationListPage:
 
     def __init__(
         self,
-        browser: BrowserManager,
+        playwright: LinkedInPlaywright,
         *,
         max_scroll_rounds: int,
     ) -> None:
         if max_scroll_rounds < 1:
             raise ValueError("Invitation collection requires a positive scroll bound.")
-        self._browser = browser
+        self._playwright = playwright
         self._max_scroll_rounds = max_scroll_rounds
 
     async def collect(
@@ -1444,8 +1445,8 @@ class InvitationListPage:
         observed_view_memberships = 0
         completed_views = 0
         stop_reason = StopReason.VISIBLE_PAGE_COMPLETE
-        async with self._browser.page() as page:
-            await self._browser.navigate(page, navigation_url)
+        async with self._playwright.page() as page:
+            await page.goto(navigation_url)
             mains = page.locator("main")
             if await mains.count() != 1:
                 raise ParserDriftError("LinkedIn Invitations has no unique current main surface.")
@@ -1454,7 +1455,7 @@ class InvitationListPage:
             for invitation_filter in views:
                 inventories[invitation_filter] = await _select_visible_view(
                     page,
-                    self._browser,
+                    self._playwright,
                     request.direction,
                     invitation_filter,
                 )
@@ -1471,7 +1472,7 @@ class InvitationListPage:
             for view_index, invitation_filter in enumerate(views):
                 inventory = await _select_visible_view(
                     page,
-                    self._browser,
+                    self._playwright,
                     request.direction,
                     invitation_filter,
                 )
@@ -1526,7 +1527,7 @@ class InvitationListPage:
             for invitation_filter, expected in inventories.items():
                 current = await _select_visible_view(
                     page,
-                    self._browser,
+                    self._playwright,
                     request.direction,
                     invitation_filter,
                 )
@@ -1684,7 +1685,7 @@ class InvitationListPage:
             load_more = await _unique_load_more(page)
             baseline = observation.signature
             if load_more is not None:
-                await self._browser.click_visible_control(page, load_more)
+                await load_more.click()
             else:
                 mains = page.locator("main")
                 if await mains.count() != 1:

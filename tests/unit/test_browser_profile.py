@@ -8,7 +8,7 @@ from typing import Any, cast
 import pytest
 
 import linkedin_mcp.browser.profile as profile_module
-from linkedin_mcp.browser import BrowserProfileManager, BrowserRuntimeBootstrap
+from linkedin_mcp.browser import BrowserBootstrap, BrowserProfileManager
 from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import BrowserUnavailableError, ConfigurationError
 
@@ -87,7 +87,7 @@ def _manager(
     )
     manager = BrowserProfileManager(
         settings,
-        cast(BrowserRuntimeBootstrap, bootstrap),
+        cast(BrowserBootstrap, bootstrap),
     )
     return manager, bootstrap, chromium, playwright
 

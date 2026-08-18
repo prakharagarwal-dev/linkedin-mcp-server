@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import os
 import subprocess
 from collections.abc import Iterator
@@ -10,7 +9,7 @@ from typing import cast
 import pytest
 
 import linkedin_mcp.browser.bootstrap as bootstrap_module
-from linkedin_mcp.browser.bootstrap import BrowserRuntimeBootstrap, BrowserSetupState
+from linkedin_mcp.browser.bootstrap import BrowserBootstrap, BrowserSetupState
 from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import BrowserUnavailableError
 
@@ -57,7 +56,7 @@ def _playwright_registry_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
 
 
 def _expected_targets() -> tuple[tuple[str, str], ...]:
-    return BrowserRuntimeBootstrap._expected_targets()  # pyright: ignore[reportPrivateUsage]
+    return BrowserBootstrap._expected_targets()  # pyright: ignore[reportPrivateUsage]
 
 
 @pytest.mark.asyncio
@@ -67,7 +66,7 @@ async def test_browser_bootstrap_installs_into_shared_user_cache(
 ) -> None:
     monkeypatch.delenv("PLAYWRIGHT_BROWSERS_PATH", raising=False)
     monkeypatch.setattr(
-        BrowserRuntimeBootstrap,
+        BrowserBootstrap,
         "_expected_targets",
         staticmethod(lambda: _TARGETS),
     )
@@ -85,7 +84,7 @@ async def test_browser_bootstrap_installs_into_shared_user_cache(
         return subprocess.CompletedProcess(command, 0, "", "")
 
     monkeypatch.setattr(bootstrap_module.subprocess, "run", fake_run)
-    runtime = BrowserRuntimeBootstrap(_settings(tmp_path))
+    runtime = BrowserBootstrap(_settings(tmp_path))
 
     await runtime.ensure_ready()
 
@@ -102,7 +101,7 @@ async def test_browser_bootstrap_reuses_matching_install_without_subprocess(
 ) -> None:
     monkeypatch.delenv("PLAYWRIGHT_BROWSERS_PATH", raising=False)
     monkeypatch.setattr(
-        BrowserRuntimeBootstrap,
+        BrowserBootstrap,
         "_expected_targets",
         staticmethod(lambda: _TARGETS),
     )
@@ -116,7 +115,7 @@ async def test_browser_bootstrap_reuses_matching_install_without_subprocess(
         pytest.fail(f"matching install must be reused: {command!r}")
 
     monkeypatch.setattr(bootstrap_module.subprocess, "run", unexpected_run)
-    runtime = BrowserRuntimeBootstrap(settings)
+    runtime = BrowserBootstrap(settings)
 
     assert runtime.inspect_state() is BrowserSetupState.READY
     await runtime.ensure_ready()
@@ -130,77 +129,13 @@ async def test_browser_bootstrap_can_delegate_to_an_operator_managed_browser(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("PLAYWRIGHT_BROWSERS_PATH", raising=False)
-    runtime = BrowserRuntimeBootstrap(_settings(tmp_path, auto_install=False))
+    runtime = BrowserBootstrap(_settings(tmp_path, auto_install=False))
 
     await runtime.ensure_ready()
 
     assert runtime.state is BrowserSetupState.DISABLED
     assert runtime.ready is True
     assert "PLAYWRIGHT_BROWSERS_PATH" not in bootstrap_module.os.environ
-
-
-@pytest.mark.asyncio
-async def test_browser_bootstrap_skips_background_start_when_install_is_disabled(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.delenv("PLAYWRIGHT_BROWSERS_PATH", raising=False)
-    runtime = BrowserRuntimeBootstrap(_settings(tmp_path, auto_install=False))
-
-    assert runtime.inspect_state() is BrowserSetupState.DISABLED
-    runtime.start()
-    await runtime.close()
-
-
-@pytest.mark.asyncio
-async def test_browser_bootstrap_starts_only_one_pending_background_task(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    runtime = BrowserRuntimeBootstrap(_settings(tmp_path))
-    started = asyncio.Event()
-    never_complete = asyncio.Event()
-    calls = 0
-
-    async def pending_setup(*, force: bool = False) -> None:
-        del force
-        nonlocal calls
-        calls += 1
-        started.set()
-        await never_complete.wait()
-
-    monkeypatch.setattr(runtime, "ensure_ready", pending_setup)
-
-    runtime.start()
-    runtime.start()
-    await started.wait()
-    assert calls == 1
-
-    await runtime.close()
-
-
-@pytest.mark.asyncio
-async def test_browser_bootstrap_consumes_completed_background_task_before_restart(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    runtime = BrowserRuntimeBootstrap(_settings(tmp_path))
-    calls = 0
-
-    async def completed_setup(*, force: bool = False) -> None:
-        del force
-        nonlocal calls
-        calls += 1
-
-    monkeypatch.setattr(runtime, "ensure_ready", completed_setup)
-
-    runtime.start()
-    await asyncio.sleep(0)
-    runtime.start()
-    await asyncio.sleep(0)
-    await runtime.close()
-
-    assert calls == 2
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX mode preservation")
@@ -214,11 +149,11 @@ async def test_browser_bootstrap_reuses_operator_managed_read_only_cache(
     _set_mode(cache_path, 0o555)
     monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(cache_path))
     monkeypatch.setattr(
-        BrowserRuntimeBootstrap,
+        BrowserBootstrap,
         "_expected_targets",
         staticmethod(lambda: _TARGETS),
     )
-    runtime = BrowserRuntimeBootstrap(_settings(tmp_path))
+    runtime = BrowserBootstrap(_settings(tmp_path))
 
     try:
         await runtime.ensure_ready()
@@ -234,7 +169,7 @@ async def test_browser_bootstrap_projects_only_a_safe_install_failure(
 ) -> None:
     monkeypatch.delenv("PLAYWRIGHT_BROWSERS_PATH", raising=False)
     monkeypatch.setattr(
-        BrowserRuntimeBootstrap,
+        BrowserBootstrap,
         "_expected_targets",
         staticmethod(lambda: _TARGETS),
     )
@@ -246,17 +181,13 @@ async def test_browser_bootstrap_projects_only_a_safe_install_failure(
         return subprocess.CompletedProcess(command, 1, "", "COOKIE=must-not-leak")
 
     monkeypatch.setattr(bootstrap_module.subprocess, "run", fake_run)
-    runtime = BrowserRuntimeBootstrap(_settings(tmp_path))
+    runtime = BrowserBootstrap(_settings(tmp_path))
 
     with pytest.raises(BrowserUnavailableError) as raised:
         await runtime.ensure_ready()
 
     assert runtime.state is BrowserSetupState.FAILED
     assert "must-not-leak" not in str(raised.value)
-
-    with pytest.raises(BrowserUnavailableError) as repeated:
-        runtime._raise_if_failed()  # pyright: ignore[reportPrivateUsage]
-    assert repeated.value is raised.value
 
 
 def test_browser_bootstrap_reads_supported_targets_from_playwright_registry(
@@ -307,14 +238,12 @@ def test_browser_bootstrap_reports_no_install_when_registry_has_no_targets(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        BrowserRuntimeBootstrap,
+        BrowserBootstrap,
         "_expected_targets",
         staticmethod(lambda: ()),
     )
 
-    assert BrowserRuntimeBootstrap(_settings(tmp_path)).inspect_state() is (
-        BrowserSetupState.NOT_STARTED
-    )
+    assert BrowserBootstrap(_settings(tmp_path)).inspect_state() is (BrowserSetupState.NOT_STARTED)
 
 
 def test_browser_bootstrap_projects_operating_system_install_failure(
@@ -322,7 +251,7 @@ def test_browser_bootstrap_projects_operating_system_install_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        BrowserRuntimeBootstrap,
+        BrowserBootstrap,
         "_expected_targets",
         staticmethod(lambda: _TARGETS),
     )
@@ -331,7 +260,7 @@ def test_browser_bootstrap_projects_operating_system_install_failure(
         raise OSError("sensitive operating-system detail")
 
     monkeypatch.setattr(bootstrap_module.subprocess, "run", unavailable_run)
-    runtime = BrowserRuntimeBootstrap(_settings(tmp_path))
+    runtime = BrowserBootstrap(_settings(tmp_path))
 
     with pytest.raises(BrowserUnavailableError) as raised:
         runtime._install()  # pyright: ignore[reportPrivateUsage]

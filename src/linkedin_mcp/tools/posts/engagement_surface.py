@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from urllib.parse import urljoin
 
-from playwright.async_api import Locator, Page
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import ParserDriftError
@@ -15,15 +14,17 @@ from linkedin_mcp.tools._shared.actions import (
     ActionPageResult,
     ActionTarget,
 )
-from linkedin_mcp.tools._shared.browser import BrowserManager
-from linkedin_mcp.tools._shared.urls import (
-    canonical_post_url,
-    canonical_profile_url,
-    profile_slug_from_url,
-)
 from linkedin_mcp.tools.posts.surface import (
     post_author_from_region,
     region_for_post,
+)
+from linkedin_mcp.ui import LinkedInLocator as Locator
+from linkedin_mcp.ui import LinkedInPage as Page
+from linkedin_mcp.ui import LinkedInPlaywright
+from linkedin_mcp.ui.urls import (
+    canonical_post_url,
+    canonical_profile_url,
+    profile_slug_from_url,
 )
 
 _COMMENT_ATTACHMENT_SELECTOR = (
@@ -74,8 +75,8 @@ async def _visible_text(page: Page) -> str:
 class PostEngagementSurface:
     """Shared visible-surface mechanics for PostEngagementSurface."""
 
-    def __init__(self, browser: BrowserManager) -> None:
-        self._browser = browser
+    def __init__(self, playwright: LinkedInPlaywright) -> None:
+        self._playwright = playwright
 
     async def _resolve_target(
         self,

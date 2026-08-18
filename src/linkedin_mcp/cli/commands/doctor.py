@@ -5,8 +5,8 @@ import asyncio
 import json
 
 from linkedin_mcp.browser import (
+    BrowserBootstrap,
     BrowserProfileManager,
-    BrowserRuntimeBootstrap,
     BrowserSetupState,
 )
 from linkedin_mcp.config import Settings
@@ -18,13 +18,12 @@ def configure(command: argparse.ArgumentParser) -> None:
 
 
 async def execute(settings: Settings) -> int:
-    bootstrap = BrowserRuntimeBootstrap(settings)
+    bootstrap = BrowserBootstrap(settings)
     browser_state = bootstrap.inspect_state()
     profile = BrowserProfileManager(settings).inspect()
     runtime = inspect_account_runtime(settings.runtime_lock_path)
     report: dict[str, object] = {
         "automatic_browser_install": settings.browser_auto_install,
-        "automatic_login": settings.auto_login_on_start,
         "browser_setup": browser_state.value,
         "configuration": "valid",
         "operation_state": "process_local",

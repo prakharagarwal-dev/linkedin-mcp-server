@@ -8,18 +8,11 @@ from datetime import UTC, datetime
 from urllib.parse import urlencode, urljoin
 
 from playwright.async_api import Error as PlaywrightError
-from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.tools._shared.browser import BrowserManager
-from linkedin_mcp.tools._shared.collections import CollectionSettleOutcome
 from linkedin_mcp.tools._shared.models import EvidenceField, StopReason
-from linkedin_mcp.tools._shared.urls import (
-    canonical_job_url,
-    job_id_from_url,
-)
 from linkedin_mcp.tools.jobs.models.job_workplace_type import JobWorkplaceType
 from linkedin_mcp.tools.jobs.search.models.job_benefit import JobBenefit
 from linkedin_mcp.tools.jobs.search.models.job_commitment import JobCommitment
@@ -40,6 +33,14 @@ from linkedin_mcp.tools.jobs.surface import (
 )
 from linkedin_mcp.tools.jobs.surface import (
     lines as visible_text_lines,
+)
+from linkedin_mcp.ui import LinkedInLocator as Locator
+from linkedin_mcp.ui import LinkedInPage as Page
+from linkedin_mcp.ui import LinkedInPlaywright
+from linkedin_mcp.ui.collections import CollectionSettleOutcome
+from linkedin_mcp.ui.urls import (
+    canonical_job_url,
+    job_id_from_url,
 )
 
 _WORKPLACE_SUFFIX_PATTERN = re.compile(
@@ -515,10 +516,10 @@ async def _resolve_named_facets(
 
 
 class JobSearchPage:
-    def __init__(self, browser: BrowserManager, *, max_pages: int) -> None:
+    def __init__(self, playwright: LinkedInPlaywright, *, max_pages: int) -> None:
         if max_pages < 1:
             raise ValueError("Job search must allow at least one internal page.")
-        self._browser = browser
+        self._playwright = playwright
         self._max_pages = max_pages
 
     @staticmethod
@@ -558,20 +559,15 @@ class JobSearchPage:
         advertised_result_count: int | None = None
         advertised_result_count_is_lower_bound = False
         resolved_facets = _ResolvedJobSearchFacets()
-        async with self._browser.page() as page:
+        async with self._playwright.page() as page:
             if _has_named_facets(request.filters):
-                await self._browser.navigate(page, self.build_url(request))
+                await page.goto(self.build_url(request))
                 await _wait_for_job_search_state(page)
                 resolved_facets = await _resolve_named_facets(page, request.filters)
             first_url = self.build_url(request, resolved_facets=resolved_facets)
             for page_index in range(self._max_pages):
-                await self._browser.navigate(
-                    page,
-                    self.build_url(
-                        request,
-                        page_index,
-                        resolved_facets=resolved_facets,
-                    ),
+                await page.goto(
+                    self.build_url(request, page_index, resolved_facets=resolved_facets)
                 )
                 rendered_state = await _wait_for_job_search_state(page)
                 pages_visited += 1

@@ -76,7 +76,6 @@ through their own tool-permission interface.
 | `BROWSER_CACHE_PATH` | native Playwright cache | Managed Playwright browser binaries |
 | `BROWSER_AUTO_INSTALL` | `true` | Install the matching Chromium revision when needed |
 | `BROWSER_INSTALL_TIMEOUT_SECONDS` | `600` | Browser installation time bound |
-| `AUTO_LOGIN_ON_START` | `true` | Validate or recover login after MCP initialization |
 | `ALLOWED_HOSTS` | exact LinkedIn hosts | Navigation hostname allowlist |
 | `QUEUE_CAPACITY` | `100` | Maximum waiting process-local capability calls |
 | `MINIMUM_NAVIGATION_INTERVAL_SECONDS` | `2` | Minimum internal delay between navigations |
@@ -111,10 +110,18 @@ The browser profile is the server's only authentication persistence. It stores
 normal Chromium cookies and preferences and must be treated as sensitive. The
 server does not receive or store a LinkedIn password.
 
-Normal first use remains automatic: `serve` installs Chromium when needed,
-creates the dedicated profile when missing, opens LinkedIn for login, and then
-reuses that same profile on later starts. The MCP handshake remains responsive
-while setup and authentication run in the background.
+Before first use, run `profile create`; running `login` explicitly is
+recommended because it proves persistence through a clean reopen. `setup` may
+be run first to preinstall Chromium, otherwise `serve` installs it synchronously
+when automatic browser installation is enabled.
+
+At every start, the host opens the persistent context and validates the saved
+session. When authentication is missing or expired, it closes that context,
+opens the visible headed login flow, waits for the operator, reopens the
+configured headed or headless context, and validates it again. Only then does
+it start the task scheduler and publish the MCP endpoint. Authentication is
+therefore awaited startup work, never a background task racing with tools. A
+checkpoint or restriction fails startup for operator attention.
 
 The explicit lifecycle commands are:
 
@@ -145,7 +152,8 @@ backup still contains sensitive browser data and remains until you delete it.
 
 `profile status`, `status`, and `doctor` expose only non-secret local state and
 do not open LinkedIn. `status` identifies the shared runtime and reports its
-health, attached client count, queue depth, and current browser operation.
+health, queue depth, and current browser operation. The server does not keep an
+application-level registry of MCP clients or sessions.
 `stop` sends that exact owner a graceful termination request and waits for lock
 release; it never force-kills a process. During clean shutdown the runtime
 rejects new and queued calls, lets an active write reach a terminal result,
@@ -229,6 +237,6 @@ The image includes Chromium, runs as UID/GID `10001`, and stores the browser
 profile below `/data/linkedin-mcp`. Mount that directory only when you intend to
 persist it. A host file path is not automatically visible inside the container;
 mount any directory containing intended uploads into the container, preferably
-read-only, and pass the resulting container path to the tool. Automatic headed
-login is disabled in the image, so create and mount an authenticated profile
-from an environment that can display Chromium.
+read-only, and pass the resulting container path to the tool. Startup login is
+visible and headed, so create and mount an authenticated profile from an
+environment that can display Chromium when the container has no display.

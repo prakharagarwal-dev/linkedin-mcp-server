@@ -57,7 +57,6 @@ jobs:
       matrix:
         python-version: ["3.12", "3.13", "3.14"]
     env:
-      LINKEDIN_MCP_AUTO_LOGIN_ON_START: "false"
       UV_PYTHON: ${{ matrix.python-version }}
     steps:
       - name: Check out repository
@@ -95,7 +94,6 @@ jobs:
           - windows-latest
           - ubuntu-24.04-arm
     env:
-      LINKEDIN_MCP_AUTO_LOGIN_ON_START: "false"
       UV_PYTHON: "3.13"
     steps:
       - name: Check out repository

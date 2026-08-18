@@ -10,25 +10,25 @@ from datetime import UTC, datetime
 from typing import ClassVar, cast
 from urllib.parse import urljoin
 
-from playwright.async_api import Page
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.tools._shared.browser import BrowserManager
-from linkedin_mcp.tools._shared.collections import (
-    CollectionSettleOutcome,
-    CollectionSettleResult,
-    dispatch_bubbling_wheel,
-    wait_for_collection_interaction,
-)
 from linkedin_mcp.tools._shared.models import StopReason
-from linkedin_mcp.tools._shared.urls import canonical_profile_url, profile_slug_from_url
 from linkedin_mcp.tools.connections.list.models.connection_summary import ConnectionSummary
 from linkedin_mcp.tools.connections.list.models.connections_list_coverage import (
     ConnectionsListCoverage,
 )
 from linkedin_mcp.tools.connections.list.models.connections_list_input import ConnectionsListInput
 from linkedin_mcp.tools.connections.list.models.connections_sort_by import ConnectionsSortBy
+from linkedin_mcp.ui import LinkedInPage as Page
+from linkedin_mcp.ui import LinkedInPlaywright
+from linkedin_mcp.ui.collections import (
+    CollectionSettleOutcome,
+    CollectionSettleResult,
+    dispatch_bubbling_wheel,
+    wait_for_collection_interaction,
+)
+from linkedin_mcp.ui.urls import canonical_profile_url, profile_slug_from_url
 
 _CONNECTIONS_URL = "https://www.linkedin.com/mynetwork/invite-connect/connections/"
 
@@ -545,8 +545,8 @@ class ConnectionsListPage:
         ConnectionsSortBy.LAST_NAME: re.compile(r"^last name$", re.I),
     }
 
-    def __init__(self, browser: BrowserManager, *, max_scroll_rounds: int) -> None:
-        self._browser = browser
+    def __init__(self, playwright: LinkedInPlaywright, *, max_scroll_rounds: int) -> None:
+        self._playwright = playwright
         self._max_scroll_rounds = max_scroll_rounds
 
     async def collect(
@@ -563,8 +563,8 @@ class ConnectionsListPage:
         stop_reason = StopReason.SAFETY_BOUND
         rounds_visited = 0
         terminal_tracker = _MemberListTerminalTracker()
-        async with self._browser.page() as page:
-            await self._browser.navigate(page, _CONNECTIONS_URL)
+        async with self._playwright.page() as page:
+            await page.goto(_CONNECTIONS_URL)
             await page.locator("main").first.wait_for(state="visible")
             if request.sort_by is not ConnectionsSortBy.RECENTLY_ADDED:
                 await self._apply_sort(page, request.sort_by)
@@ -651,7 +651,7 @@ class ConnectionsListPage:
         await textbox.fill(query)
         await textbox.press("Enter")
         await page.wait_for_timeout(750)
-        await self._browser.assert_safe(page)
+        await page.assert_safe()
 
     async def _apply_sort(self, page: Page, sort_by: ConnectionsSortBy) -> None:
         main = page.locator("main")
@@ -667,7 +667,7 @@ class ConnectionsListPage:
         ]
         if len(visible_controls) != 1:
             raise ParserDriftError("LinkedIn Connections has no unique visible sort control.")
-        await self._browser.click_visible_control(page, visible_controls[0])
+        await visible_controls[0].click()
         option = page.get_by_role("option", name=self._SORT_LABELS[sort_by])
         if await option.count() == 0:
             option = page.get_by_role("menuitem", name=self._SORT_LABELS[sort_by])
@@ -678,7 +678,7 @@ class ConnectionsListPage:
         ]
         if len(visible_options) != 1:
             raise ParserDriftError("The requested visible Connections sort option is unavailable.")
-        await self._browser.click_visible_control(page, visible_options[0])
+        await visible_options[0].click()
 
     @staticmethod
     async def extract_visible_connections(page: Page) -> tuple[ConnectionSummary, ...]:

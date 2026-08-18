@@ -13,7 +13,6 @@ from pydantic import ValidationError
 
 import linkedin_mcp.tools.jobs.search.page as jobs_page_module
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.tools._shared.models import StopReason
 from linkedin_mcp.tools.jobs.get.evidence import source_from_job_detail
 from linkedin_mcp.tools.jobs.get.models.job_apply_method import JobApplyMethod
@@ -28,6 +27,8 @@ from linkedin_mcp.tools.jobs.search.models.job_search_filters import JobSearchFi
 from linkedin_mcp.tools.jobs.search.models.job_search_input import JobSearchInput
 from linkedin_mcp.tools.jobs.search.models.job_search_sort import JobSearchSort
 from linkedin_mcp.tools.jobs.search.page import JobSearchPage
+from linkedin_mcp.ui import LinkedInLocator, LinkedInPage
+from tests.support.playwright import adapt_browser
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 JOB_FIXTURES = FIXTURES / "jobs" / "latest"
@@ -199,7 +200,7 @@ async def test_current_job_search_cards_extract_exact_typed_fields_and_evidence(
             await page.set_content(
                 (FIXTURES / "jobs/latest/search.html").read_text(encoding="utf-8")
             )
-            jobs = await JobSearchPage.extract_visible_jobs(page)
+            jobs = await JobSearchPage.extract_visible_jobs(cast(LinkedInPage, page))
         finally:
             await browser.close()
 
@@ -257,7 +258,7 @@ async def test_current_job_card_supports_aria_title_company_link_and_plain_locat
                 </main>
                 """
             )
-            jobs = await JobSearchPage.extract_visible_jobs(page)
+            jobs = await JobSearchPage.extract_visible_jobs(cast(LinkedInPage, page))
         finally:
             await browser.close()
 
@@ -284,13 +285,13 @@ async def test_job_search_cards_fail_closed_on_identity_and_title_corruption() -
             )
             await page.set_content(f"<main><ul>{duplicate}{duplicate}</ul></main>")
             with pytest.raises(ParserDriftError, match="duplicate result-card identities"):
-                await JobSearchPage.extract_visible_jobs(page)
+                await JobSearchPage.extract_visible_jobs(cast(LinkedInPage, page))
 
             await page.set_content(
                 f"<main><ul>{_current_job_card('invalid-id', 'Invalid', 'Observed')}</ul></main>"
             )
             with pytest.raises(ParserDriftError, match="invalid result-card identity"):
-                await JobSearchPage.extract_visible_jobs(page)
+                await JobSearchPage.extract_visible_jobs(cast(LinkedInPage, page))
 
             await page.set_content(
                 """
@@ -311,8 +312,8 @@ async def test_job_search_cards_fail_closed_on_identity_and_title_corruption() -
                 card = page.locator('li[data-occludable-job-id="4100000012"]')
                 link = card.locator("a.job-card-list__title--link")
                 await JobSearchPage._extract_job_card(  # pyright: ignore[reportPrivateUsage]
-                    card,
-                    link,
+                    cast(LinkedInLocator, card),
+                    cast(LinkedInLocator, link),
                     "4100000012",
                 )
 
@@ -331,7 +332,7 @@ async def test_job_search_cards_fail_closed_on_identity_and_title_corruption() -
                 """
             )
             with pytest.raises(ParserDriftError, match="without visible title"):
-                await JobSearchPage.extract_visible_jobs(page)
+                await JobSearchPage.extract_visible_jobs(cast(LinkedInPage, page))
         finally:
             await browser.close()
 
@@ -345,7 +346,7 @@ async def test_job_search_collects_scoped_source_and_visible_terminal_coverage()
             page,
             (FIXTURES / "jobs/latest/search.html").read_text(encoding="utf-8"),
         )
-        collector = JobSearchPage(cast(BrowserManager, fixture_browser), max_pages=3)
+        collector = JobSearchPage(adapt_browser(fixture_browser), max_pages=3)
         try:
             jobs, coverage, captured_text, source_url = await collector.collect(
                 JobSearchInput(
@@ -375,12 +376,11 @@ async def test_job_search_hydrates_every_virtualized_shell_before_completion() -
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         collector = JobSearchPage(
-            cast(
-                BrowserManager,
+            adapt_browser(
                 FixtureBrowser(
                     page,
                     (FIXTURES / "jobs/latest/search-virtualized.html").read_text(encoding="utf-8"),
-                ),
+                )
             ),
             max_pages=1,
         )
@@ -409,12 +409,11 @@ async def test_zero_result_recommendations_are_never_returned_as_query_matches()
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         collector = JobSearchPage(
-            cast(
-                BrowserManager,
+            adapt_browser(
                 FixtureBrowser(
                     page,
                     (FIXTURES / "jobs/latest/search-empty.html").read_text(encoding="utf-8"),
-                ),
+                )
             ),
             max_pages=1,
         )
@@ -441,7 +440,7 @@ async def test_numeric_zero_result_is_terminal_before_filters_render() -> None:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         collector = JobSearchPage(
-            cast(BrowserManager, FixtureBrowser(page, "<main><p>0 results</p></main>")),
+            adapt_browser(FixtureBrowser(page, "<main><p>0 results</p></main>")),
             max_pages=1,
         )
         try:
@@ -470,7 +469,7 @@ async def test_job_search_fails_closed_when_current_shell_contract_never_settles
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         collector = JobSearchPage(
-            cast(BrowserManager, FixtureBrowser(page, "<main><p>Loading jobs</p></main>")),
+            adapt_browser(FixtureBrowser(page, "<main><p>Loading jobs</p></main>")),
             max_pages=1,
         )
         try:
@@ -510,7 +509,7 @@ async def test_job_search_uses_visible_next_control_for_exact_page_traversal() -
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         fixture_browser = PagedFixtureBrowser(page, first_page, second_page)
-        collector = JobSearchPage(cast(BrowserManager, fixture_browser), max_pages=3)
+        collector = JobSearchPage(adapt_browser(fixture_browser), max_pages=3)
         try:
             limited_jobs, limited_coverage, _, _ = await collector.collect(
                 JobSearchInput(
@@ -703,7 +702,7 @@ async def test_job_search_resolves_current_visible_facet_names_to_exact_ids() ->
             page,
             (FIXTURES / "jobs/latest/search-filters.html").read_text(encoding="utf-8"),
         )
-        collector = JobSearchPage(cast(BrowserManager, fixture_browser), max_pages=1)
+        collector = JobSearchPage(adapt_browser(fixture_browser), max_pages=1)
         request = JobSearchInput(
             context_id="context-1",
             request_id="request-named-filters",
@@ -745,7 +744,7 @@ async def test_job_search_name_resolution_fails_closed_when_choice_is_not_visibl
             page,
             (FIXTURES / "jobs/latest/search-filters.html").read_text(encoding="utf-8"),
         )
-        collector = JobSearchPage(cast(BrowserManager, fixture_browser), max_pages=1)
+        collector = JobSearchPage(adapt_browser(fixture_browser), max_pages=1)
         try:
             with pytest.raises(ParserDriftError, match="use location_ids instead"):
                 await collector.collect(
@@ -769,7 +768,7 @@ async def test_current_easy_apply_job_expands_jd_and_retains_hiring_team() -> No
             page,
             (FIXTURES / "jobs/latest/detail-easy-apply.html").read_text(encoding="utf-8"),
         )
-        reader = JobDetailPage(cast(BrowserManager, fixture_browser))
+        reader = JobDetailPage(adapt_browser(fixture_browser))
         try:
             job = await reader.read(
                 JobDetailInput(
@@ -815,7 +814,7 @@ async def test_current_external_apply_job_reports_company_site_method() -> None:
             page,
             (FIXTURES / "jobs/latest/detail-external-apply.html").read_text(encoding="utf-8"),
         )
-        reader = JobDetailPage(cast(BrowserManager, fixture_browser))
+        reader = JobDetailPage(adapt_browser(fixture_browser))
         try:
             job = await reader.read(
                 JobDetailInput(
@@ -845,7 +844,7 @@ async def test_current_anonymous_job_preserves_missing_company_identity() -> Non
             page,
             (FIXTURES / "jobs/latest/detail-anonymous.html").read_text(encoding="utf-8"),
         )
-        reader = JobDetailPage(cast(BrowserManager, fixture_browser))
+        reader = JobDetailPage(adapt_browser(fixture_browser))
         try:
             job = await reader.read(
                 JobDetailInput(
@@ -903,7 +902,7 @@ async def test_job_detail_uses_semantic_title_and_visible_location_fallback() ->
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
-        reader = JobDetailPage(cast(BrowserManager, FixtureBrowser(page, html)))
+        reader = JobDetailPage(adapt_browser(FixtureBrowser(page, html)))
         try:
             job = await reader.read(
                 JobDetailInput(
@@ -953,7 +952,7 @@ async def test_job_detail_uses_company_adjacent_title_without_document_identity(
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
-        reader = JobDetailPage(cast(BrowserManager, FixtureBrowser(page, html)))
+        reader = JobDetailPage(adapt_browser(FixtureBrowser(page, html)))
         try:
             job = await reader.read(
                 JobDetailInput(
@@ -981,7 +980,7 @@ async def test_current_closed_job_reports_unavailable_application_method() -> No
             page,
             (FIXTURES / "jobs/latest/detail-unavailable.html").read_text(encoding="utf-8"),
         )
-        reader = JobDetailPage(cast(BrowserManager, fixture_browser))
+        reader = JobDetailPage(adapt_browser(fixture_browser))
         try:
             job = await reader.read(
                 JobDetailInput(
@@ -1005,7 +1004,7 @@ async def test_job_detail_waits_for_current_description_to_render() -> None:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         fixture_browser = DelayedDetailBrowser(page, "")
-        reader = JobDetailPage(cast(BrowserManager, fixture_browser))
+        reader = JobDetailPage(adapt_browser(fixture_browser))
         try:
             result = await reader.read(
                 JobDetailInput(
@@ -1029,7 +1028,7 @@ async def test_current_job_parsers_fail_closed_on_missing_structural_contracts()
         try:
             await page.set_content("<html><body></body></html>")
             with pytest.raises(ParserDriftError, match="no visible text"):
-                await JobSearchPage.extract_visible_text(page)
+                await JobSearchPage.extract_visible_text(cast(LinkedInPage, page))
 
             await page.set_content(
                 """
@@ -1047,12 +1046,15 @@ async def test_current_job_parsers_fail_closed_on_missing_structural_contracts()
                 """
             )
             with pytest.raises(ParserDriftError, match="visible location field"):
-                await JobSearchPage.extract_visible_jobs(page)
+                await JobSearchPage.extract_visible_jobs(cast(LinkedInPage, page))
 
             await page.set_content(
                 "<main><a href='/company/acme/'>Acme</a><p>Old layout</p></main>"
             )
             with pytest.raises(ParserDriftError, match="primary job card"):
-                await JobDetailPage.extract_visible_job(page, "4100000001")
+                await JobDetailPage.extract_visible_job(
+                    cast(LinkedInPage, page),
+                    "4100000001",
+                )
         finally:
             await browser.close()

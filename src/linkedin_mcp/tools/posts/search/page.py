@@ -10,21 +10,11 @@ from typing import cast
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 from playwright.async_api import Error as PlaywrightError
-from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.tools._shared.browser import BrowserManager
-from linkedin_mcp.tools._shared.collections import (
-    CollectionSettleOutcome,
-    visible_locator_signature,
-    wait_for_collection_initial_state,
-)
 from linkedin_mcp.tools._shared.models import StopReason
-from linkedin_mcp.tools._shared.urls import (
-    canonical_post_url,
-)
 from linkedin_mcp.tools.posts.models.post_author import PostAuthor
 from linkedin_mcp.tools.posts.search.models.post_content_type import PostContentType
 from linkedin_mcp.tools.posts.search.models.post_search_content_type import PostSearchContentType
@@ -49,6 +39,17 @@ from linkedin_mcp.tools.posts.surface import (
     post_reference_for_region,
     prepare_visible_content,
     unique_lines,
+)
+from linkedin_mcp.ui import LinkedInLocator as Locator
+from linkedin_mcp.ui import LinkedInPage as Page
+from linkedin_mcp.ui import LinkedInPlaywright
+from linkedin_mcp.ui.collections import (
+    CollectionSettleOutcome,
+    visible_locator_signature,
+    wait_for_collection_initial_state,
+)
+from linkedin_mcp.ui.urls import (
+    canonical_post_url,
 )
 
 _CONTENT_SEARCH_URL = "https://www.linkedin.com/search/results/content/"
@@ -512,7 +513,7 @@ def _validate_resolved_post_facets(
 
 
 async def _resolve_post_facets(
-    browser: BrowserManager,
+    playwright: LinkedInPlaywright,
     page: Page,
     filters: PostSearchFilters,
 ) -> _ResolvedPostFacets:
@@ -555,7 +556,7 @@ async def _resolve_post_facets(
         raise ParserDriftError(
             "LinkedIn's visible Show results control was unavailable for Posts search."
         ) from error
-    submitted_url = await browser.navigate_via_visible_control(page, show_results.first)
+    submitted_url = await show_results.first.click_and_wait_for_navigation()
     resolved = _resolved_post_facets_from_url(submitted_url)
     _validate_resolved_post_facets(filters, resolved)
     return resolved
@@ -696,10 +697,10 @@ async def _visible_posts(
 
 
 class PostSearchPage:
-    def __init__(self, browser: BrowserManager, *, max_pages: int) -> None:
+    def __init__(self, playwright: LinkedInPlaywright, *, max_pages: int) -> None:
         if max_pages < 1:
             raise ValueError("Post search page bound must be positive.")
-        self._browser = browser
+        self._playwright = playwright
         self._max_pages = max_pages
 
     @staticmethod
@@ -721,11 +722,11 @@ class PostSearchPage:
         pages_visited = 0
         unsupported_result_count = 0
         stop_reason = StopReason.SAFETY_BOUND
-        async with self._browser.page() as page:
+        async with self._playwright.page() as page:
             if _requires_post_facet_resolution(request.filters):
-                await self._browser.navigate(page, _build_post_search_url(request, page_index=1))
+                await page.goto(_build_post_search_url(request, page_index=1))
                 resolved = await _resolve_post_facets(
-                    self._browser,
+                    self._playwright,
                     page,
                     request.filters,
                 )
@@ -735,7 +736,7 @@ class PostSearchPage:
                     page_index=page_index,
                     resolved=resolved,
                 )
-                await self._browser.navigate(page, target)
+                await page.goto(target)
                 rendered_state = await _wait_for_post_search_state(page)
                 await prepare_visible_content(page)
                 visible_batch = await _visible_posts(

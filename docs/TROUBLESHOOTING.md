@@ -11,7 +11,7 @@ uvx --from linkedin-mcp-local linkedin-mcp status
 `setup` ensures the matching Playwright Chromium revision is installed.
 `doctor` reports browser, profile, configuration, and runtime readiness without
 exposing cookies or credentials. `status` identifies the exact shared runtime
-and reports safe health, client, queue, and active-operation metadata.
+and reports safe health, queue, and active-operation metadata.
 
 ## The MCP server does not start
 
@@ -59,6 +59,12 @@ profile.
 Complete login, MFA, or checkpoints only in the opened LinkedIn browser. The
 server never needs the password. A successful login is verified through a
 clean browser restart before the command exits.
+
+`serve` may open this login flow automatically when startup validation finds a
+missing or expired session. The endpoint stays unpublished until login and the
+clean-reopen check finish. If the host is already running and a tool detects
+expiry, stop and restart the host (or run the explicit `login` command while it
+is stopped).
 
 If LinkedIn shows a checkpoint, restriction, or security review, resolve it
 manually. The server intentionally pauses and does not bypass those pages.

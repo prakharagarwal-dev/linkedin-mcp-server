@@ -3,9 +3,9 @@ from __future__ import annotations
 from typing import cast
 
 import pytest
-from playwright.async_api import Page
 
-from linkedin_mcp.tools._shared.collections import (
+from linkedin_mcp.ui import LinkedInPage
+from linkedin_mcp.ui.collections import (
     CollectionSettleOutcome,
     wait_for_collection_change,
     wait_for_collection_initial_state,
@@ -30,7 +30,7 @@ class _PollingPage:
 async def test_collection_settling_distinguishes_progress_from_timed_idleness() -> None:
     progressed_page = _PollingPage([("first",), ("first",), ("first", "second")])
     progressed = await wait_for_collection_change(
-        cast(Page, progressed_page),
+        cast(LinkedInPage, progressed_page),
         baseline=("first",),
         read_signature=progressed_page.signature,
         attempts=4,
@@ -41,7 +41,7 @@ async def test_collection_settling_distinguishes_progress_from_timed_idleness() 
 
     idle_page = _PollingPage([("first",)])
     idle = await wait_for_collection_change(
-        cast(Page, idle_page),
+        cast(LinkedInPage, idle_page),
         baseline=("first",),
         read_signature=idle_page.signature,
         attempts=3,
@@ -60,7 +60,7 @@ async def test_collection_settling_accepts_only_an_explicit_end_signal() -> None
         return page.polls >= 2
 
     result = await wait_for_collection_change(
-        cast(Page, page),
+        cast(LinkedInPage, page),
         baseline=("first",),
         read_signature=page.signature,
         read_explicit_end=explicit_end,
@@ -80,7 +80,7 @@ async def test_collection_progress_wins_when_tail_and_end_arrive_together() -> N
         return page.polls >= 1
 
     result = await wait_for_collection_change(
-        cast(Page, page),
+        cast(LinkedInPage, page),
         baseline=("first",),
         read_signature=page.signature,
         read_explicit_end=explicit_end,
@@ -107,7 +107,7 @@ async def test_collection_interaction_retries_idle_delivery_within_one_poll_budg
         return ("first",)
 
     result = await wait_for_collection_interaction(
-        cast(Page, page),
+        cast(LinkedInPage, page),
         baseline=("first",),
         interact=interact,
         read_signature=signature,
@@ -135,7 +135,7 @@ async def test_collection_interaction_does_not_retry_after_explicit_end() -> Non
         return page.polls >= 2
 
     result = await wait_for_collection_interaction(
-        cast(Page, page),
+        cast(LinkedInPage, page),
         baseline=("first",),
         interact=interact,
         read_signature=page.signature,
@@ -154,7 +154,7 @@ async def test_collection_interaction_does_not_retry_after_explicit_end() -> Non
 async def test_initial_collection_state_observes_ready_and_explicit_empty_without_polling() -> None:
     ready_page = _PollingPage([("first",)])
     ready = await wait_for_collection_initial_state(
-        cast(Page, ready_page),
+        cast(LinkedInPage, ready_page),
         read_signature=ready_page.signature,
         attempts=2,
         delay_ms=1,
@@ -164,7 +164,7 @@ async def test_initial_collection_state_observes_ready_and_explicit_empty_withou
 
     empty_page = _PollingPage([()])
     empty = await wait_for_collection_initial_state(
-        cast(Page, empty_page),
+        cast(LinkedInPage, empty_page),
         read_signature=empty_page.signature,
         read_explicit_end=lambda: _true(),
         attempts=2,
@@ -183,21 +183,21 @@ async def test_collection_settling_rejects_unbounded_configuration() -> None:
     page = _PollingPage([()])
     with pytest.raises(ValueError, match="at least one"):
         await wait_for_collection_change(
-            cast(Page, page),
+            cast(LinkedInPage, page),
             baseline=(),
             read_signature=page.signature,
             attempts=0,
         )
     with pytest.raises(ValueError, match="positive poll"):
         await wait_for_collection_change(
-            cast(Page, page),
+            cast(LinkedInPage, page),
             baseline=(),
             read_signature=page.signature,
             delay_ms=0,
         )
     with pytest.raises(ValueError, match="at least one interaction"):
         await wait_for_collection_interaction(
-            cast(Page, page),
+            cast(LinkedInPage, page),
             baseline=(),
             interact=_noop,
             read_signature=page.signature,
