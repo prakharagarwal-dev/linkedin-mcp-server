@@ -26,9 +26,6 @@ async def test_serve_http_owns_uvicorn_and_cancels_its_stop_waiter(
 ) -> None:
     events: list[str] = []
 
-    class FakeContainer:
-        settings = Settings(http_port=8123)
-
     class FakeMcp:
         @staticmethod
         def streamable_http_app() -> object:
@@ -48,10 +45,6 @@ async def test_serve_http_owns_uvicorn_and_cancels_its_stop_waiter(
             assert len(sockets) == 1
             events.append("served")
 
-    def fake_mcp(_: Any, *, manage_container_lifecycle: bool) -> FakeMcp:
-        assert manage_container_lifecycle is False
-        return FakeMcp()
-
     def fake_config(*_: object, **__: object) -> object:
         events.append("configured")
         return object()
@@ -62,12 +55,12 @@ async def test_serve_http_owns_uvicorn_and_cancels_its_stop_waiter(
         finally:
             events.append("stop-waiter-closed")
 
-    monkeypatch.setattr(transport_server, "create_mcp_server", fake_mcp)
     monkeypatch.setattr(transport_server.uvicorn, "Config", fake_config)
     monkeypatch.setattr(transport_server.uvicorn, "Server", FakeServer)
 
     await transport_server.serve_http(
-        cast(Any, FakeContainer()),
+        cast(Any, FakeMcp()),
+        Settings(http_port=8123),
         cast(Any, FakeListener()),
         wait_for_stop,
     )

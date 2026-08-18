@@ -8,6 +8,12 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Remove the central `AppContainer`. The host now owns process lifecycle
+  directly, transport accepts an already configured FastMCP server, and each
+  tool receives only its scheduler, concrete page, and optional cursor store at
+  registration. Move task execution to `infra/queue/` and generic continuation
+  state to `infra/cursor/store.py` without infrastructure importing tool
+  contracts.
 - Rename the narrowly scoped `execution` package to `queue`; its existing
   `Task` → FIFO `Scheduler` → single `Worker` behavior is unchanged.
 - Keep MCP protocol wiring in `transport`, and move shared-process lifecycle,

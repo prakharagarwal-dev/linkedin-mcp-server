@@ -16,7 +16,7 @@ from linkedin_mcp.errors import (
     InvalidTargetError,
     ParserDriftError,
 )
-from linkedin_mcp.pagination import PaginationManager
+from linkedin_mcp.infra.cursor import CursorStore
 from linkedin_mcp.tools._shared.actions import (
     ActionCommand,
     ActionInspection,
@@ -1324,7 +1324,7 @@ class _ToolHarness:
         conversation_page: FakeConversation,
     ) -> None:
         self._settings = settings
-        self._pagination = PaginationManager(
+        self._cursor_store = CursorStore(
             ttl_seconds=settings.pagination_cursor_ttl_seconds,
             max_active_cursors=settings.pagination_max_active_cursors,
             max_seen_items_per_cursor=settings.pagination_max_seen_items_per_cursor,
@@ -1355,7 +1355,7 @@ class _ToolHarness:
         return await job_search.execute(
             request,
             page=self._job_search,
-            pagination=self._pagination,
+            cursor_store=self._cursor_store,
             account_id=self._settings.account_id,
         )
 
@@ -1366,7 +1366,7 @@ class _ToolHarness:
         return await people_search.execute(
             request,
             page=self._people_search,
-            pagination=self._pagination,
+            cursor_store=self._cursor_store,
             account_id=self._settings.account_id,
         )
 
@@ -1377,7 +1377,7 @@ class _ToolHarness:
         return await connections_search.execute(
             request,
             page=self._connections_search,
-            pagination=self._pagination,
+            cursor_store=self._cursor_store,
             account_id=self._settings.account_id,
         )
 
@@ -1388,7 +1388,7 @@ class _ToolHarness:
         return await company_search.execute(
             request,
             page=self._company_search,
-            pagination=self._pagination,
+            cursor_store=self._cursor_store,
             account_id=self._settings.account_id,
         )
 
@@ -1399,7 +1399,7 @@ class _ToolHarness:
         return await post_search.execute(
             request,
             page=self._post_search,
-            pagination=self._pagination,
+            cursor_store=self._cursor_store,
             account_id=self._settings.account_id,
         )
 
@@ -1413,7 +1413,7 @@ class _ToolHarness:
         return await post_comments_list.execute(
             request,
             page=self._post_comments,
-            pagination=self._pagination,
+            cursor_store=self._cursor_store,
             account_id=self._settings.account_id,
         )
 
@@ -1421,7 +1421,7 @@ class _ToolHarness:
         return await invitations_list.execute(
             request,
             page=self._invitation_list,
-            pagination=self._pagination,
+            cursor_store=self._cursor_store,
             account_id=self._settings.account_id,
         )
 
@@ -1429,7 +1429,7 @@ class _ToolHarness:
         return await connections_list.execute(
             request,
             page=self._connections_list,
-            pagination=self._pagination,
+            cursor_store=self._cursor_store,
             account_id=self._settings.account_id,
         )
 
@@ -1440,7 +1440,7 @@ class _ToolHarness:
         return await messaging_search.execute(
             request,
             page=self._conversation_search,
-            pagination=self._pagination,
+            cursor_store=self._cursor_store,
             account_id=self._settings.account_id,
         )
 

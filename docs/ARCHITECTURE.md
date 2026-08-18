@@ -62,7 +62,7 @@ does not cache or deduplicate a call.
 
 Collection tools keep their output and cursor assembly in a leaf-local
 `pagination.py`. Opaque cursors are process-local, expiring, single-use, and
-bound to the client, account, tool, and semantic filters. The cursor stores
+bound to the account, tool, and semantic filters. The cursor store retains
 only the stable identities already returned. A failed collection does not
 consume its input cursor; a successful one does.
 
@@ -116,13 +116,13 @@ profile through the CLI.
 
 ```text
 linkedin_mcp/
-├── queue/                   Task, Scheduler, Worker
 ├── browser/                 Playwright setup, profile, low-level runtime
 ├── transport/               FastMCP HTTP server and stdio bridge
 ├── host/                    shared-process lifecycle and account lock
+├── infra/
+│   ├── queue/               Task, Scheduler, Worker
+│   └── cursor/store.py      bounded process-local cursor state
 ├── cli/                     CLI assembly and commands
-├── container.py             process-wide dependency composition
-├── pagination.py            bounded process-local cursor state
 ├── assets.py                safe local attachment resolution
 └── tools/
     ├── action.py            shared single-attempt write helper
@@ -138,6 +138,11 @@ linkedin_mcp/
     ├── connections/{list,search}/
     └── messaging/{search,send}/ and messaging/conversation/get/
 ```
+
+`host/manager.py` constructs the one browser, scheduler, and cursor store,
+starts only the components with an active lifecycle, and closes them in reverse
+order. It passes concrete dependencies once during tool registration. There is
+no dependency container, service locator, or module-global runtime singleton.
 
 Every public MCP name maps directly to a tool leaf after removing the
 `linkedin.` prefix. A browser-backed leaf contains:

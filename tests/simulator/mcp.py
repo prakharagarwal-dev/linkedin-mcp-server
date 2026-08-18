@@ -10,8 +10,7 @@ import anyio
 from mcp import ClientSession
 from mcp.shared.message import SessionMessage
 
-from linkedin_mcp.transport.server import create_mcp_server
-from tests.simulator.harness import create_simulator_container
+from tests.simulator.harness import create_simulator_server
 from tests.simulator.state import SimulatorState
 
 
@@ -20,8 +19,8 @@ async def simulator_session(
     root: Path,
     state: SimulatorState,
 ) -> AsyncGenerator[ClientSession]:
-    container = create_simulator_container(root, state)
-    mcp = create_mcp_server(container)
+    mcp, scheduler, browser, cursor_store = create_simulator_server(root, state)
+    await scheduler.start()
     server_to_client_send, server_to_client_receive = anyio.create_memory_object_stream[
         SessionMessage
     ](50)
@@ -37,9 +36,14 @@ async def simulator_session(
             raise_exceptions=True,
         )
 
-    async with anyio.create_task_group() as task_group:
-        task_group.start_soon(run_server)
-        async with ClientSession(server_to_client_receive, client_to_server_send) as session:
-            await session.initialize()
-            yield session
-        task_group.cancel_scope.cancel()
+    try:
+        async with anyio.create_task_group() as task_group:
+            task_group.start_soon(run_server)
+            async with ClientSession(server_to_client_receive, client_to_server_send) as session:
+                await session.initialize()
+                yield session
+            task_group.cancel_scope.cancel()
+    finally:
+        await scheduler.close()
+        await cursor_store.close()
+        await browser.close()

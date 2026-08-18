@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
+
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.pagination import (
-    PaginationManager,
+from linkedin_mcp.infra.cursor import (
+    CursorStore,
+    cursor_binding,
     select_page,
 )
 from linkedin_mcp.tools._shared.models import (
     CapabilityName,
+    PaginationMetadata,
     StopReason,
 )
 from linkedin_mcp.tools.connections.search.evidence import source_from_people_search
@@ -26,17 +30,23 @@ async def execute(
     request: ConnectionsSearchInput,
     *,
     page: ConnectionsSearchPage,
-    pagination: PaginationManager,
+    cursor_store: CursorStore,
     account_id: str,
 ) -> ConnectionsSearchOutput:
-    state = await pagination.start(
+    arguments = request.model_dump(
+        mode="json",
+        exclude={"context_id", "request_id", "cursor", "page_size"},
+    )
+    operation = CapabilityName.CONNECTIONS_SEARCH.value
+    state = await cursor_store.start(
         account_id=account_id,
-        capability_name=CapabilityName.CONNECTIONS_SEARCH,
-        request=request,
+        operation=operation,
+        binding=cursor_binding(operation, arguments),
+        cursor=request.cursor,
     )
     people, coverage, captured_text, source_url = await page.collect(
         request,
-        result_limit=pagination.traversal_limit(state, request.page_size),
+        result_limit=cursor_store.traversal_limit(state, request.page_size),
     )
     if any(person.connection_degree is not PersonConnectionDegree.FIRST for person in people):
         raise ParserDriftError(
@@ -46,7 +56,7 @@ async def execute(
         people,
         key=lambda person: person.profile_slug,
         seen_keys=state.seen_keys,
-        page_size=pagination.page_capacity(state, request.page_size),
+        page_size=cursor_store.page_capacity(state, request.page_size),
     )
     provider_has_more = selected.has_lookahead or coverage.stop_reason in {
         StopReason.RESULT_LIMIT,
@@ -65,12 +75,13 @@ async def execute(
         people=selected.items,
         coverage=page_coverage,
     )
-    metadata = await pagination.finish(
+    cursor_page = await cursor_store.finish(
         state,
         page_size=request.page_size,
         returned_keys=selected.keys,
         provider_has_more=provider_has_more,
     )
+    metadata = PaginationMetadata.model_validate(asdict(cursor_page))
     return ConnectionsSearchOutput(
         context_id=request.context_id,
         request_id=request.request_id,

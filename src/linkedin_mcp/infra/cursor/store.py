@@ -1,4 +1,4 @@
-"""Bounded process-local cursor state for live LinkedIn collection scans."""
+"""Bounded process-local cursor storage for collection scans."""
 
 from __future__ import annotations
 
@@ -12,16 +12,14 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from linkedin_mcp.errors import InvalidCursorError
-from linkedin_mcp.tools._shared.models import CapabilityName, PaginatedInput, PaginationMetadata
-from linkedin_mcp.tools.invitations.list.models.invitation_list_input import InvitationListInput
 
 Clock = Callable[[], datetime]
 
 
 @dataclass(slots=True)
-class _CursorState:
+class _StoredCursor:
     account_id: str
-    capability_name: CapabilityName
+    operation: str
     binding: str
     scan_id: str
     seen_keys: tuple[str, ...]
@@ -29,11 +27,11 @@ class _CursorState:
 
 
 @dataclass(frozen=True, slots=True)
-class PaginationState:
+class CursorState:
     """Cursor state needed by one serialized collection task."""
 
     account_id: str
-    capability_name: CapabilityName
+    operation: str
     binding: str
     scan_id: str
     seen_keys: frozenset[str]
@@ -51,23 +49,11 @@ class PageSlice[ItemT]:
     has_lookahead: bool
 
 
-def request_binding(
-    capability_name: CapabilityName,
-    request: PaginatedInput,
-) -> str:
-    """Bind a cursor to every semantic argument except call and page state."""
+def cursor_binding(operation: str, arguments: object) -> str:
+    """Create a stable binding from an operation and JSON-compatible arguments."""
 
-    value = request.model_dump(
-        mode="json",
-        exclude={"context_id", "request_id", "cursor", "page_size"},
-    )
-    if isinstance(request, InvitationListInput):
-        value["invitation_filter"] = request.resolved_filter.value
     payload = json.dumps(
-        {
-            "capability": capability_name.value,
-            "input": value,
-        },
+        {"operation": operation, "arguments": arguments},
         sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=False,
@@ -102,7 +88,21 @@ def select_page[ItemT](
     )
 
 
-class PaginationManager:
+@dataclass(frozen=True, slots=True)
+class CursorPage:
+    """Cursor state returned after one page has been committed."""
+
+    scan_id: str
+    page_size: int
+    returned_count: int
+    cumulative_count: int
+    has_more: bool
+    next_cursor: str | None
+    cursor_expires_at: datetime | None
+    truncated: bool
+
+
+class CursorStore:
     """Issue single-use cursors backed only by bounded in-process memory."""
 
     def __init__(
@@ -117,57 +117,57 @@ class PaginationManager:
         self._max_active_cursors = max_active_cursors
         self._max_seen_items = max_seen_items_per_cursor
         self._clock = clock or (lambda: datetime.now(UTC))
-        self._states: dict[str, _CursorState] = {}
+        self._states: dict[str, _StoredCursor] = {}
         self._lock = asyncio.Lock()
 
     async def start(
         self,
         *,
         account_id: str,
-        capability_name: CapabilityName,
-        request: PaginatedInput,
-    ) -> PaginationState:
-        binding = request_binding(capability_name, request)
+        operation: str,
+        binding: str,
+        cursor: str | None,
+    ) -> CursorState:
         async with self._lock:
             now = self._clock()
             self._prune_expired(now)
-            if request.cursor is None:
-                return PaginationState(
+            if cursor is None:
+                return CursorState(
                     account_id=account_id,
-                    capability_name=capability_name,
+                    operation=operation,
                     binding=binding,
                     scan_id=str(uuid.uuid4()),
                     seen_keys=frozenset(),
                     prior_cursor=None,
                 )
 
-            state = self._states.get(request.cursor)
+            state = self._states.get(cursor)
             if state is None:
                 raise InvalidCursorError(
                     "The pagination cursor is invalid, expired, consumed, or belongs to another "
                     "server process."
                 )
             if state.expires_at <= now:
-                self._states.pop(request.cursor, None)
+                self._states.pop(cursor, None)
                 raise InvalidCursorError("The pagination cursor has expired.")
             if (
                 state.account_id != account_id
-                or state.capability_name is not capability_name
+                or state.operation != operation
                 or state.binding != binding
             ):
                 raise InvalidCursorError(
                     "The pagination cursor does not match this account, capability, or filter set."
                 )
-            return PaginationState(
+            return CursorState(
                 account_id=account_id,
-                capability_name=capability_name,
+                operation=operation,
                 binding=binding,
                 scan_id=state.scan_id,
                 seen_keys=frozenset(state.seen_keys),
-                prior_cursor=request.cursor,
+                prior_cursor=cursor,
             )
 
-    def traversal_limit(self, state: PaginationState, page_size: int) -> int:
+    def traversal_limit(self, state: CursorState, page_size: int) -> int:
         """Request a prefix containing prior identities plus one unseen lookahead."""
 
         return min(
@@ -175,7 +175,7 @@ class PaginationManager:
             state.cumulative_count + page_size + 1,
         )
 
-    def page_capacity(self, state: PaginationState, page_size: int) -> int:
+    def page_capacity(self, state: CursorState, page_size: int) -> int:
         """Keep a returned page inside the configured per-scan identity bound."""
 
         return max(
@@ -185,13 +185,13 @@ class PaginationManager:
 
     async def finish(
         self,
-        state: PaginationState,
+        state: CursorState,
         *,
         page_size: int,
         returned_keys: tuple[str, ...],
         provider_has_more: bool,
         force_truncated: bool = False,
-    ) -> PaginationMetadata:
+    ) -> CursorPage:
         if len(set(returned_keys)) != len(returned_keys):
             raise ValueError("A pagination page cannot contain duplicate stable identities.")
         if any(item_key in state.seen_keys for item_key in returned_keys):
@@ -202,7 +202,7 @@ class PaginationManager:
                 current = self._states.get(state.prior_cursor)
                 if current is None or (
                     current.account_id != state.account_id
-                    or current.capability_name is not state.capability_name
+                    or current.operation != state.operation
                     or current.binding != state.binding
                     or current.scan_id != state.scan_id
                     or frozenset(current.seen_keys) != state.seen_keys
@@ -221,15 +221,15 @@ class PaginationManager:
                 self._make_room()
                 next_cursor = self._new_token()
                 expires_at = self._clock() + self._ttl
-                self._states[next_cursor] = _CursorState(
+                self._states[next_cursor] = _StoredCursor(
                     account_id=state.account_id,
-                    capability_name=state.capability_name,
+                    operation=state.operation,
                     binding=state.binding,
                     scan_id=state.scan_id,
                     seen_keys=combined,
                     expires_at=expires_at,
                 )
-            return PaginationMetadata(
+            return CursorPage(
                 scan_id=state.scan_id,
                 page_size=page_size,
                 returned_count=len(returned_keys),

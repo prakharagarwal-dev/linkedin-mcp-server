@@ -6,7 +6,7 @@ from contextvars import ContextVar
 import pytest
 
 from linkedin_mcp.errors import BrowserUnavailableError
-from linkedin_mcp.queue import Scheduler, Task, Worker
+from linkedin_mcp.infra.queue import Scheduler, Task, Worker
 
 
 @pytest.mark.asyncio

@@ -6,8 +6,8 @@ import asyncio
 from typing import Final, cast
 
 from linkedin_mcp.errors import BrowserUnavailableError
-from linkedin_mcp.queue.task import Task
-from linkedin_mcp.queue.worker import Worker
+from linkedin_mcp.infra.queue.task import Task
+from linkedin_mcp.infra.queue.worker import Worker
 
 _CLOSED: Final = object()
 

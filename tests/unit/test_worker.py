@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from linkedin_mcp.queue import Scheduler, Task, Worker
+from linkedin_mcp.infra.queue import Scheduler, Task, Worker
 
 
 @pytest.mark.asyncio

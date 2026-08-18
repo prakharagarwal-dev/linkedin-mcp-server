@@ -6,13 +6,16 @@ from collections.abc import (
     Awaitable,
     Callable,
 )
+from dataclasses import asdict
 
-from linkedin_mcp.pagination import (
-    PaginationManager,
+from linkedin_mcp.infra.cursor import (
+    CursorStore,
+    cursor_binding,
     select_page,
 )
 from linkedin_mcp.tools._shared.models import (
     CapabilityName,
+    PaginationMetadata,
     StopReason,
 )
 from linkedin_mcp.tools.invitations.list.evidence import source_from_invitation_list
@@ -27,25 +30,32 @@ async def execute(
     request: InvitationListInput,
     *,
     page: InvitationListPage,
-    pagination: PaginationManager,
+    cursor_store: CursorStore,
     account_id: str,
     progress: ProgressReporter | None = None,
 ) -> InvitationListOutput:
-    state = await pagination.start(
+    arguments = request.model_dump(
+        mode="json",
+        exclude={"context_id", "request_id", "cursor", "page_size"},
+    )
+    arguments["invitation_filter"] = request.resolved_filter.value
+    operation = CapabilityName.INVITATIONS_LIST.value
+    state = await cursor_store.start(
         account_id=account_id,
-        capability_name=CapabilityName.INVITATIONS_LIST,
-        request=request,
+        operation=operation,
+        binding=cursor_binding(operation, arguments),
+        cursor=request.cursor,
     )
     invitations, coverage, captured_text, source_url = await page.collect(
         request,
-        result_limit=pagination.traversal_limit(state, request.page_size),
+        result_limit=cursor_store.traversal_limit(state, request.page_size),
         progress=progress,
     )
     selected = select_page(
         invitations,
         key=lambda invitation: invitation.invitation_ref,
         seen_keys=state.seen_keys,
-        page_size=pagination.page_capacity(state, request.page_size),
+        page_size=cursor_store.page_capacity(state, request.page_size),
     )
     provider_has_more = selected.has_lookahead or coverage.stop_reason in {
         StopReason.RESULT_LIMIT,
@@ -71,12 +81,13 @@ async def execute(
         invitations=selected.items,
         coverage=page_coverage,
     )
-    metadata = await pagination.finish(
+    cursor_page = await cursor_store.finish(
         state,
         page_size=request.page_size,
         returned_keys=selected.keys,
         provider_has_more=provider_has_more,
     )
+    metadata = PaginationMetadata.model_validate(asdict(cursor_page))
     return InvitationListOutput(
         context_id=request.context_id,
         request_id=request.request_id,

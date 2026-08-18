@@ -7,14 +7,13 @@ and puts LinkedIn behavior inside the tool that owns it.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
-│ AppContainer                                                     │
+│ host/manager.py: run_host                                        │
 │                                                                  │
-│ owns: Settings, Scheduler, Worker, BrowserManager,                │
-│       PaginationManager, AccountProcessLock, concrete tool pages │
-│                                                                  │
-│ start()   quiesce()   close()                                    │
+│ constructs: BrowserManager, Scheduler, CursorStore               │
+│ lifecycle: AccountProcessLock, Scheduler, BrowserManager         │
+│ wiring: create FastMCP, attach tools, serve transport            │
 └──────────────┬───────────────────────────────────────────────────┘
-               │ supplied to every registered tool
+               │ supplies each tool only its concrete dependencies
                ▼
 ┌────────────────────┐       creates       ┌──────────────────────┐
 │ FastMCP tool       │ ──────────────────> │ Task[Result]         │
@@ -52,7 +51,11 @@ Responsibilities are intentionally narrow:
 - `Scheduler` owns queue admission and FIFO ordering. It does not dispatch by
   capability name.
 - `Worker` runs the task it receives. It has no tool methods.
-- `AppContainer` wires long-lived dependencies. It contains no business flow.
+- `CursorStore` holds bounded, expiring, single-use continuation state for all
+  collection tools in the process. It knows only strings, bindings, and stable
+  item identities; it imports no tool contracts.
+- `run_host` owns startup and shutdown but stores no aggregate dependency
+  object. Tool registration captures explicit component references.
 
 Read tasks are interruptible. Write tasks set `interruptible=False`, so a
 caller cancellation cannot stop an action after its final LinkedIn control may
@@ -82,11 +85,11 @@ tool.py
                     │
                     ▼
 pagination.py
-   ├── starts cursor state
+   ├── starts state in infra/cursor/store.py
    ├── calls page.collect(...)
    ├── selects unseen results
    ├── calls evidence builder
-   ├── finishes cursor state
+   ├── commits state in infra/cursor/store.py
    └── returns JobSearchOutput
                     │
                     ▼
@@ -168,22 +171,21 @@ visible terminal state cannot be proven. The server never retries it.
 ## Dependency direction
 
 ```text
-host/ ──> transport/server.py ──> tools/*/tool.py
-                                      │
-                                      ├──> queue/Task, Scheduler, Worker
-                                      └──> tool-owned models, page, evidence, optional pagination
-                                      │
-                                      ▼
-                            shared LinkedIn UI helpers
-                                      │
-                                      ▼
-                               browser runtime
-                                      │
-                                      ▼
-                                  Playwright
+host/ ───────> transport/server.py
+  │
+  ├─────────> infra/queue
+  ├─────────> infra/cursor
+  ├─────────> browser runtime ──> Playwright
+  └─────────> tools/ (explicit registration dependencies)
+                    │
+                    ├──> infra/queue: Task, Scheduler
+                    ├──> infra/cursor: CursorStore (collections only)
+                    ├──> tool-owned models, page, evidence, optional pagination
+                    └──> shared LinkedIn UI helpers ──> browser runtime
 
 transport/stdio.py ──> shared host endpoint
 ```
 
-Lower layers never import MCP tool definitions. Page objects never retain a
-Playwright `Page`; they obtain an operation-scoped page from the browser layer.
+Infrastructure and transport never import MCP tool definitions. Page objects
+never retain a Playwright `Page`; they obtain an operation-scoped page from the
+browser layer.

@@ -8,8 +8,7 @@ from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from linkedin_mcp.container import AppContainer
-from linkedin_mcp.queue import Task
+from linkedin_mcp.infra.queue import Scheduler, Task
 from linkedin_mcp.tools._shared.actions import ActionOutput, ActionType, MessageSendPayload
 from linkedin_mcp.tools._shared.identifiers import PROFILE_SLUG_PATTERN
 from linkedin_mcp.tools._shared.tool import (
@@ -42,7 +41,8 @@ async def execute(request: MessageSendInput, page: MessageSendPage) -> ActionOut
 
 def register(
     mcp: FastMCP[None],
-    container: AppContainer,
+    scheduler: Scheduler,
+    page: MessageSendPage,
     annotations: ToolAnnotations,
 ) -> None:
     @mcp.tool(
@@ -105,10 +105,10 @@ def register(
         )
         task = Task(
             name="linkedin.messaging.send",
-            execute=lambda: execute(request, container.message_send),
+            execute=lambda: execute(request, page),
             interruptible=False,
         )
-        await container.scheduler.schedule(task)
+        await scheduler.schedule(task)
         result = await tool_result(task.result())
         await ctx.report_progress(100, 100, "Message action reached a terminal outcome")
         return result

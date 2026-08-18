@@ -5,13 +5,15 @@ from __future__ import annotations
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
-from linkedin_mcp.container import AppContainer
+from linkedin_mcp.config import Settings
+from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.tools.session.status.models.session_status_output import SessionStatusOutput
 
 
 def register(
     mcp: FastMCP[None],
-    container: AppContainer,
+    settings: Settings,
+    browser: BrowserManager,
     annotations: ToolAnnotations,
 ) -> None:
     @mcp.tool(
@@ -22,16 +24,16 @@ def register(
     )
     async def _session_status() -> SessionStatusOutput:
         return SessionStatusOutput(
-            account_id=container.settings.account_id,
-            profile_present=container.browser.profile_present(),
-            browser_setup_state=container.browser.browser_setup_state,
-            browser_started=container.browser.started,
-            authentication_state=container.browser.authentication_state,
-            automatic_login_enabled=container.settings.auto_login_on_start,
-            login_browser_open=container.browser.login_browser_open,
-            paused=container.browser.paused,
-            pause_reason=container.browser.pause_reason,
-            status_message=container.browser.authentication_status_message,
+            account_id=settings.account_id,
+            profile_present=browser.profile_present(),
+            browser_setup_state=browser.browser_setup_state,
+            browser_started=browser.started,
+            authentication_state=browser.authentication_state,
+            automatic_login_enabled=settings.auto_login_on_start,
+            login_browser_open=browser.login_browser_open,
+            paused=browser.paused,
+            pause_reason=browser.pause_reason,
+            status_message=browser.authentication_status_message,
         )
 
     del _session_status
