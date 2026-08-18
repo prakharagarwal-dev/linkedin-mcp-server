@@ -13,7 +13,7 @@ from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
-from linkedin_mcp.app.assets import LocalAssetStore
+from linkedin_mcp.assets import LocalAssetStore
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
 from linkedin_mcp.tools._shared.actions import (
     ActionCommand,

@@ -13,8 +13,8 @@ from types import ModuleType
 import pytest
 
 import linkedin_mcp.runtime.ownership as process_lock_module
-from linkedin_mcp.app.container import create_production_container
 from linkedin_mcp.config import Settings
+from linkedin_mcp.container import create_production_container
 from linkedin_mcp.errors import ConfigurationError
 from linkedin_mcp.runtime import (
     AccountProcessLock,

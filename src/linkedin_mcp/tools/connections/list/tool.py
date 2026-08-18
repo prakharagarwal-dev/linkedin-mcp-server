@@ -7,7 +7,8 @@ from typing import Any
 from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 
-from linkedin_mcp.app.container import AppContainer
+from linkedin_mcp.container import AppContainer
+from linkedin_mcp.execution import Task
 from linkedin_mcp.tools._shared.tool import (
     CursorArgument,
     IdentifierArgument,
@@ -17,6 +18,7 @@ from linkedin_mcp.tools._shared.tool import (
 from linkedin_mcp.tools.connections.list.models.connections_list_input import ConnectionsListInput
 from linkedin_mcp.tools.connections.list.models.connections_list_output import ConnectionsListOutput
 from linkedin_mcp.tools.connections.list.models.connections_sort_by import ConnectionsSortBy
+from linkedin_mcp.tools.connections.list.pagination import execute
 
 
 def register(
@@ -42,17 +44,24 @@ def register(
         cursor: CursorArgument | None = None,
     ) -> ConnectionsListOutput:
         await ctx.report_progress(0, 100, "Queued LinkedIn connections read")
-        result = await tool_result(
-            container.worker.list_connections(
-                ConnectionsListInput(
-                    context_id=context_id,
-                    request_id=request_id,
-                    sort_by=sort_by,
-                    page_size=page_size,
-                    cursor=cursor,
-                )
-            )
+        request = ConnectionsListInput(
+            context_id=context_id,
+            request_id=request_id,
+            sort_by=sort_by,
+            page_size=page_size,
+            cursor=cursor,
         )
+        task = Task(
+            name="linkedin.connections.list",
+            execute=lambda: execute(
+                request,
+                page=container.connections_list,
+                pagination=container.pagination,
+                account_id=container.settings.account_id,
+            ),
+        )
+        await container.scheduler.schedule(task)
+        result = await tool_result(task.result())
         await ctx.report_progress(100, 100, "LinkedIn connections read complete")
         return result
 

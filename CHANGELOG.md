@@ -8,6 +8,11 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Replace the capability executor, operation mixins, provider protocols, and
+  per-client fair scheduler with a small `Task` → FIFO `Scheduler` → `Worker`
+  pipeline. Each tool now owns its execution and optional pagination flow next
+  to its page, evidence, and models; cursor state no longer uses queue-time
+  leases.
 - Remove the duplicate capability registry and custom
   `linkedin.capabilities.list` tool. FastMCP's standard MCP `tools/list`
   response is now the single source of truth for tool discovery, schemas, and
@@ -54,7 +59,7 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   available through read-only post discussions, but setting reactions on
   comments is no longer exposed.
 - Consolidate accumulated action lifecycle tests into current atomic protocol,
-  worker, executor, simulator, and workflow coverage while retaining the latest
+  worker, tool-execution, simulator, and workflow coverage while retaining the latest
   semantic page fixtures and safety cases.
 - Remove deprecated pagination, title-keyword, and image-tag aliases, unused
   dependencies and helpers, stale publishing-status documentation, and legacy

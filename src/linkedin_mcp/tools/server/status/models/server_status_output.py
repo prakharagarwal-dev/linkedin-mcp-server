@@ -6,7 +6,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field
 
-from linkedin_mcp.tools._shared.models import CapabilityName, StrictModel
+from linkedin_mcp.tools._shared.models import StrictModel
 
 
 class ServerStatusOutput(StrictModel):
@@ -17,7 +17,6 @@ class ServerStatusOutput(StrictModel):
     runtime_model: Literal["shared_local"] = "shared_local"
     connected_clients: Annotated[int, Field(ge=0)] = 0
     queue_depth: Annotated[int, Field(ge=0)] = 0
-    queued_clients: Annotated[int, Field(ge=0)] = 0
     active_browser_operation: bool = False
-    active_capability: CapabilityName | None = None
+    active_task: str | None = None
     accepting_calls: bool = True

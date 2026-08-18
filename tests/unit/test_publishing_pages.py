@@ -11,7 +11,7 @@ from playwright.async_api import Locator, Page, Route, async_playwright
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl, ValidationError
 
-from linkedin_mcp.app.assets import LocalAssetStore
+from linkedin_mcp.assets import LocalAssetStore
 from linkedin_mcp.errors import InvalidTargetError
 from linkedin_mcp.tools._shared.actions import (
     ActionCommand,

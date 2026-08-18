@@ -9,7 +9,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 from linkedin_mcp import __version__
-from linkedin_mcp.app.container import AppContainer
+from linkedin_mcp.container import AppContainer
 from linkedin_mcp.mcp.context import bind_client_execution
 from linkedin_mcp.tools import attach_tools
 

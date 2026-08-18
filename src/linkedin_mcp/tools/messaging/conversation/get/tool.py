@@ -8,18 +8,34 @@ from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from linkedin_mcp.app.container import AppContainer
+from linkedin_mcp.container import AppContainer
+from linkedin_mcp.execution import Task
 from linkedin_mcp.tools._shared.identifiers import PROFILE_SLUG_PATTERN
 from linkedin_mcp.tools._shared.tool import (
     IdentifierArgument,
     tool_result,
 )
+from linkedin_mcp.tools.messaging.conversation.get.evidence import source_from_conversation
 from linkedin_mcp.tools.messaging.conversation.get.models.conversation_get_input import (
     ConversationGetInput,
 )
 from linkedin_mcp.tools.messaging.conversation.get.models.conversation_get_output import (
     ConversationGetOutput,
 )
+from linkedin_mcp.tools.messaging.conversation.get.page import ConversationGetPage
+
+
+async def execute(
+    request: ConversationGetInput,
+    page: ConversationGetPage,
+) -> ConversationGetOutput:
+    observation = await page.read(request)
+    return ConversationGetOutput(
+        context_id=request.context_id,
+        request_id=request.request_id,
+        conversation=observation,
+        sources=(source_from_conversation(observation),),
+    )
 
 
 def register(
@@ -67,18 +83,20 @@ def register(
         max_messages: Annotated[int, Field(ge=1, le=100)] = 50,
     ) -> ConversationGetOutput:
         await ctx.report_progress(0, 100, "Opening visible LinkedIn conversation")
-        result = await tool_result(
-            container.worker.get_conversation(
-                ConversationGetInput(
-                    context_id=context_id,
-                    request_id=request_id,
-                    profile_slug=profile_slug,
-                    conversation_id=conversation_id,
-                    conversation_ref=conversation_ref,
-                    max_messages=max_messages,
-                )
-            )
+        request = ConversationGetInput(
+            context_id=context_id,
+            request_id=request_id,
+            profile_slug=profile_slug,
+            conversation_id=conversation_id,
+            conversation_ref=conversation_ref,
+            max_messages=max_messages,
         )
+        task = Task(
+            name="linkedin.messaging.conversation.get",
+            execute=lambda: execute(request, container.conversation_read),
+        )
+        await container.scheduler.schedule(task)
+        result = await tool_result(task.result())
         await ctx.report_progress(100, 100, "LinkedIn conversation read complete")
         return result
 

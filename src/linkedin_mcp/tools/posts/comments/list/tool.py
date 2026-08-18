@@ -8,7 +8,8 @@ from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from linkedin_mcp.app.container import AppContainer
+from linkedin_mcp.container import AppContainer
+from linkedin_mcp.execution import Task
 from linkedin_mcp.tools._shared.tool import (
     CursorArgument,
     IdentifierArgument,
@@ -22,6 +23,7 @@ from linkedin_mcp.tools.posts.comments.list.models.post_comments_list_input impo
 from linkedin_mcp.tools.posts.comments.list.models.post_comments_list_output import (
     PostCommentsListOutput,
 )
+from linkedin_mcp.tools.posts.comments.list.pagination import execute
 
 
 def register(
@@ -53,19 +55,26 @@ def register(
         max_replies_per_comment: Annotated[int, Field(ge=0, le=100)] = 25,
     ) -> PostCommentsListOutput:
         await ctx.report_progress(0, 100, "Opening visible LinkedIn post discussion")
-        result = await tool_result(
-            container.worker.list_post_comments(
-                PostCommentsListInput(
-                    context_id=context_id,
-                    request_id=request_id,
-                    post_ref=post_ref,
-                    sort_by=sort_by,
-                    page_size=page_size,
-                    cursor=cursor,
-                    max_replies_per_comment=max_replies_per_comment,
-                )
-            )
+        request = PostCommentsListInput(
+            context_id=context_id,
+            request_id=request_id,
+            post_ref=post_ref,
+            sort_by=sort_by,
+            page_size=page_size,
+            cursor=cursor,
+            max_replies_per_comment=max_replies_per_comment,
         )
+        task = Task(
+            name="linkedin.posts.comments.list",
+            execute=lambda: execute(
+                request,
+                page=container.post_comments,
+                pagination=container.pagination,
+                account_id=container.settings.account_id,
+            ),
+        )
+        await container.scheduler.schedule(task)
+        result = await tool_result(task.result())
         await ctx.report_progress(100, 100, "LinkedIn post discussion complete")
         return result
 

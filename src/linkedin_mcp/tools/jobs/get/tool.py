@@ -8,13 +8,26 @@ from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from linkedin_mcp.app.container import AppContainer
+from linkedin_mcp.container import AppContainer
+from linkedin_mcp.execution import Task
 from linkedin_mcp.tools._shared.tool import (
     IdentifierArgument,
     tool_result,
 )
+from linkedin_mcp.tools.jobs.get.evidence import source_from_job_detail
 from linkedin_mcp.tools.jobs.get.models.job_detail_input import JobDetailInput
 from linkedin_mcp.tools.jobs.get.models.job_detail_output import JobDetailOutput
+from linkedin_mcp.tools.jobs.get.page import JobDetailPage
+
+
+async def execute(request: JobDetailInput, page: JobDetailPage) -> JobDetailOutput:
+    job = await page.read(request)
+    return JobDetailOutput(
+        context_id=request.context_id,
+        request_id=request.request_id,
+        job=job,
+        sources=(source_from_job_detail(job),),
+    )
 
 
 def register(
@@ -39,15 +52,17 @@ def register(
         ctx: Context[Any, Any, Any],
     ) -> JobDetailOutput:
         await ctx.report_progress(0, 100, "Validating LinkedIn job target")
-        result = await tool_result(
-            container.worker.get_job(
-                JobDetailInput(
-                    context_id=context_id,
-                    request_id=request_id,
-                    job_id=job_id,
-                )
-            )
+        request = JobDetailInput(
+            context_id=context_id,
+            request_id=request_id,
+            job_id=job_id,
         )
+        task = Task(
+            name="linkedin.jobs.get",
+            execute=lambda: execute(request, container.job_detail),
+        )
+        await container.scheduler.schedule(task)
+        result = await tool_result(task.result())
         await ctx.report_progress(100, 100, "LinkedIn job detail complete")
         return result
 

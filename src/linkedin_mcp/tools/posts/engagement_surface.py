@@ -9,7 +9,7 @@ from urllib.parse import urljoin
 from playwright.async_api import Locator, Page
 from pydantic import HttpUrl
 
-from linkedin_mcp.app.assets import LocalAssetStore
+from linkedin_mcp.assets import LocalAssetStore
 from linkedin_mcp.errors import ParserDriftError
 from linkedin_mcp.tools._shared.actions import (
     ActionOutcome,

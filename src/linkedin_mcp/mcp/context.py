@@ -8,20 +8,15 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from linkedin_mcp.app.pagination import PaginationLease
 
 LOCAL_CLIENT_ID = "direct-local-client"
 
 
 @dataclass(frozen=True, slots=True)
 class ClientExecutionContext:
-    """Server-owned identity and any resource reserved for one atomic call."""
+    """Server-owned identity for one MCP call."""
 
     client_id: str
-    pagination_lease: PaginationLease | None = None
 
 
 _CURRENT_CONTEXT: ContextVar[ClientExecutionContext | None] = ContextVar(
@@ -41,17 +36,10 @@ def current_client_id() -> str:
 @contextmanager
 def bind_client_execution(
     client_id: str,
-    *,
-    pagination_lease: PaginationLease | None = None,
 ) -> Generator[None, None, None]:
-    """Bind server-owned call state for the duration of one async execution path."""
+    """Bind the MCP client identity for the duration of one async execution path."""
 
-    token = _CURRENT_CONTEXT.set(
-        ClientExecutionContext(
-            client_id=client_id,
-            pagination_lease=pagination_lease,
-        )
-    )
+    token = _CURRENT_CONTEXT.set(ClientExecutionContext(client_id=client_id))
     try:
         yield
     finally:

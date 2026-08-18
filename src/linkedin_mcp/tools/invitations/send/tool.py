@@ -8,14 +8,33 @@ from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from linkedin_mcp.app.container import AppContainer
-from linkedin_mcp.tools._shared.actions import ActionOutput
+from linkedin_mcp.container import AppContainer
+from linkedin_mcp.execution import Task
+from linkedin_mcp.tools._shared.actions import (
+    ActionOutput,
+    ActionType,
+    InvitationSendPayload,
+)
 from linkedin_mcp.tools._shared.identifiers import PROFILE_SLUG_PATTERN
 from linkedin_mcp.tools._shared.tool import (
     IdentifierArgument,
     tool_result,
 )
+from linkedin_mcp.tools.action import execute_action
 from linkedin_mcp.tools.invitations.send.models.invitation_send_input import InvitationSendInput
+from linkedin_mcp.tools.invitations.send.page import SendInvitationPage
+
+
+async def execute(request: InvitationSendInput, page: SendInvitationPage) -> ActionOutput:
+    return await execute_action(
+        task_name="linkedin.invitations.send",
+        context_id=request.context_id,
+        request_id=request.request_id,
+        action_type=ActionType.INVITATION_SEND,
+        payload=InvitationSendPayload(note=request.note),
+        inspect=lambda: page.inspect_send(request),
+        perform=page.perform_send,
+    )
 
 
 def register(
@@ -48,16 +67,19 @@ def register(
         note: Annotated[str, Field(min_length=1, max_length=200)] | None = None,
     ) -> ActionOutput:
         await ctx.report_progress(0, 100, "Sending LinkedIn connection invitation")
-        result = await tool_result(
-            container.worker.send_invitation(
-                InvitationSendInput(
-                    context_id=context_id,
-                    request_id=request_id,
-                    profile_slug=profile_slug,
-                    note=note,
-                )
-            )
+        request = InvitationSendInput(
+            context_id=context_id,
+            request_id=request_id,
+            profile_slug=profile_slug,
+            note=note,
         )
+        task = Task(
+            name="linkedin.invitations.send",
+            execute=lambda: execute(request, container.invitation_send),
+            interruptible=False,
+        )
+        await container.scheduler.schedule(task)
+        result = await tool_result(task.result())
         await ctx.report_progress(100, 100, "Invitation action reached a terminal outcome")
         return result
 

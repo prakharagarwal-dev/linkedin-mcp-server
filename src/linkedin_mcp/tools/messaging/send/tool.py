@@ -8,16 +8,36 @@ from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from linkedin_mcp.app.container import AppContainer
-from linkedin_mcp.tools._shared.actions import ActionOutput
+from linkedin_mcp.container import AppContainer
+from linkedin_mcp.execution import Task
+from linkedin_mcp.tools._shared.actions import ActionOutput, ActionType, MessageSendPayload
 from linkedin_mcp.tools._shared.identifiers import PROFILE_SLUG_PATTERN
 from linkedin_mcp.tools._shared.tool import (
     IdentifierArgument,
     tool_result,
 )
+from linkedin_mcp.tools.action import execute_action
 from linkedin_mcp.tools.messaging.send.models.message_file_input import MessageFileInput
 from linkedin_mcp.tools.messaging.send.models.message_gif_input import MessageGifInput
 from linkedin_mcp.tools.messaging.send.models.message_send_input import MessageSendInput
+from linkedin_mcp.tools.messaging.send.page import MessageSendPage
+
+
+async def execute(request: MessageSendInput, page: MessageSendPage) -> ActionOutput:
+    return await execute_action(
+        task_name="linkedin.messaging.send",
+        context_id=request.context_id,
+        request_id=request.request_id,
+        action_type=ActionType.MESSAGE_SEND,
+        payload=MessageSendPayload(
+            message=request.message,
+            attachment_refs=tuple(attachment.asset_ref for attachment in request.attachments),
+            gif=request.gif,
+            reply_to_message_ref=request.reply_to_message_ref,
+        ),
+        inspect=lambda: page.inspect_message(request),
+        perform=page.perform_message,
+    )
 
 
 def register(
@@ -72,21 +92,24 @@ def register(
         ) = None,
     ) -> ActionOutput:
         await ctx.report_progress(0, 100, "Sending LinkedIn message")
-        result = await tool_result(
-            container.worker.send_message(
-                MessageSendInput(
-                    context_id=context_id,
-                    request_id=request_id,
-                    profile_slug=profile_slug,
-                    conversation_id=conversation_id,
-                    conversation_ref=conversation_ref,
-                    message=message,
-                    attachments=attachments,
-                    gif=gif,
-                    reply_to_message_ref=reply_to_message_ref,
-                )
-            )
+        request = MessageSendInput(
+            context_id=context_id,
+            request_id=request_id,
+            profile_slug=profile_slug,
+            conversation_id=conversation_id,
+            conversation_ref=conversation_ref,
+            message=message,
+            attachments=attachments,
+            gif=gif,
+            reply_to_message_ref=reply_to_message_ref,
         )
+        task = Task(
+            name="linkedin.messaging.send",
+            execute=lambda: execute(request, container.message_send),
+            interruptible=False,
+        )
+        await container.scheduler.schedule(task)
+        result = await tool_result(task.result())
         await ctx.report_progress(100, 100, "Message action reached a terminal outcome")
         return result
 

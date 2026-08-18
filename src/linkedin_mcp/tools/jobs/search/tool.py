@@ -8,7 +8,8 @@ from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from linkedin_mcp.app.container import AppContainer
+from linkedin_mcp.container import AppContainer
+from linkedin_mcp.execution import Task
 from linkedin_mcp.tools._shared.tool import (
     CursorArgument,
     IdentifierArgument,
@@ -18,6 +19,7 @@ from linkedin_mcp.tools._shared.tool import (
 from linkedin_mcp.tools.jobs.search.models.job_search_filters import JobSearchFilters
 from linkedin_mcp.tools.jobs.search.models.job_search_input import JobSearchInput
 from linkedin_mcp.tools.jobs.search.models.job_search_output import JobSearchOutput
+from linkedin_mcp.tools.jobs.search.pagination import execute
 
 
 def register(
@@ -79,20 +81,27 @@ def register(
         cursor: CursorArgument | None = None,
     ) -> JobSearchOutput:
         await ctx.report_progress(0, 100, "Queued LinkedIn job search")
-        result = await tool_result(
-            container.worker.search_jobs(
-                JobSearchInput(
-                    context_id=context_id,
-                    request_id=request_id,
-                    query=query,
-                    location=location,
-                    freshness_hours=freshness_hours,
-                    filters=filters or JobSearchFilters(),
-                    page_size=page_size,
-                    cursor=cursor,
-                )
-            )
+        request = JobSearchInput(
+            context_id=context_id,
+            request_id=request_id,
+            query=query,
+            location=location,
+            freshness_hours=freshness_hours,
+            filters=filters or JobSearchFilters(),
+            page_size=page_size,
+            cursor=cursor,
         )
+        task = Task(
+            name="linkedin.jobs.search",
+            execute=lambda: execute(
+                request,
+                page=container.job_search,
+                pagination=container.pagination,
+                account_id=container.settings.account_id,
+            ),
+        )
+        await container.scheduler.schedule(task)
+        result = await tool_result(task.result())
         await ctx.report_progress(100, 100, "LinkedIn job search complete")
         return result
 

@@ -87,7 +87,7 @@ def test_build_configuration_packages_only_the_standalone_server() -> None:
 
 def test_source_layout_keeps_infrastructure_and_linkedin_features_separate() -> None:
     package = ROOT / "src" / "linkedin_mcp"
-    retired_layers = ("application", "auth", "automation", "domain", "linkedin", "policy")
+    retired_layers = ("app", "application", "auth", "automation", "domain", "linkedin", "policy")
     for layer in retired_layers:
         assert not tuple((package / layer).glob("*.py"))
 
@@ -122,8 +122,9 @@ def test_source_layout_keeps_infrastructure_and_linkedin_features_separate() -> 
         capability = tools / relative_path
         required_files = {"__init__.py", "tool.py"}
         if tool_name not in status_tools:
-            required_files.update({"evidence.py", "operation.py", "page.py"})
+            required_files.update({"evidence.py", "page.py"})
         assert required_files <= {path.name for path in capability.glob("*.py")}
+        assert not (capability / "operation.py").exists()
         model_package = capability / "models"
         assert (model_package / "__init__.py").is_file()
         assert not (capability / "models.py").exists()
@@ -138,6 +139,17 @@ def test_source_layout_keeps_infrastructure_and_linkedin_features_separate() -> 
     server_source = (package / "mcp" / "server.py").read_text(encoding="utf-8")
     assert "attach_tools(mcp, container)" in server_source
     assert "@mcp.tool" not in server_source
+
+    execution = package / "execution"
+    assert {path.name for path in execution.glob("*.py")} == {
+        "__init__.py",
+        "scheduler.py",
+        "task.py",
+        "worker.py",
+    }
+    assert (package / "container.py").is_file()
+    assert (package / "pagination.py").is_file()
+    assert (package / "assets.py").is_file()
 
     domain_modules = {
         "jobs": {"__init__.py", "surface.py"},
@@ -382,7 +394,8 @@ def test_wheel_excludes_tests_profiles_secrets_and_other_repositories(tmp_path: 
         lowered = tuple(name.casefold() for name in names)
         assert "linkedin_mcp/mcp/server.py" in names
         assert "linkedin_mcp/tools/jobs/search/tool.py" in names
-        assert "linkedin_mcp/tools/jobs/search/operation.py" in names
+        assert "linkedin_mcp/tools/jobs/search/pagination.py" in names
+        assert "linkedin_mcp/execution/task.py" in names
         assert any(name.endswith(".dist-info/entry_points.txt") for name in names)
         assert not any(name.startswith("tests/") for name in names)
         assert not any("simulator" in name for name in lowered)

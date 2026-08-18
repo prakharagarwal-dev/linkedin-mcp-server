@@ -8,13 +8,26 @@ from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from linkedin_mcp.app.container import AppContainer
+from linkedin_mcp.container import AppContainer
+from linkedin_mcp.execution import Task
 from linkedin_mcp.tools._shared.tool import (
     IdentifierArgument,
     tool_result,
 )
+from linkedin_mcp.tools.companies.get.evidence import sources_from_company_profile
 from linkedin_mcp.tools.companies.get.models.company_get_input import CompanyGetInput
 from linkedin_mcp.tools.companies.get.models.company_get_output import CompanyGetOutput
+from linkedin_mcp.tools.companies.get.page import CompanyProfilePage
+
+
+async def execute(request: CompanyGetInput, page: CompanyProfilePage) -> CompanyGetOutput:
+    company, captures = await page.read(request)
+    return CompanyGetOutput(
+        context_id=request.context_id,
+        request_id=request.request_id,
+        company=company,
+        sources=sources_from_company_profile(company, captures),
+    )
 
 
 def register(
@@ -48,15 +61,17 @@ def register(
         ctx: Context[Any, Any, Any],
     ) -> CompanyGetOutput:
         await ctx.report_progress(0, 100, "Validating LinkedIn company target")
-        result = await tool_result(
-            container.worker.get_company(
-                CompanyGetInput(
-                    context_id=context_id,
-                    request_id=request_id,
-                    company_slug=company_slug,
-                )
-            )
+        request = CompanyGetInput(
+            context_id=context_id,
+            request_id=request_id,
+            company_slug=company_slug,
         )
+        task = Task(
+            name="linkedin.companies.get",
+            execute=lambda: execute(request, container.company_profile),
+        )
+        await container.scheduler.schedule(task)
+        result = await tool_result(task.result())
         await ctx.report_progress(100, 100, "LinkedIn company profile complete")
         return result
 

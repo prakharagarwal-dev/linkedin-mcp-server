@@ -204,7 +204,7 @@ A collection change may be called complete only when all of these are true:
 - terminal reconciliation passes or truncation is reported honestly;
 - raw candidate normalization occurs before private bounds;
 - offline fixtures include the observed failure shape;
-- page-object, executor, MCP, cursor, simulator, and complete-suite checks pass;
+- page-object, tool-execution, MCP, cursor, simulator, and complete-suite checks pass;
 - a low-volume repeated production-MCP invocation passes when live acceptance is in scope;
 - the capability matrix, changelog, and relevant durable documentation are updated;
   and

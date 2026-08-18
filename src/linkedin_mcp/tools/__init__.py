@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
 
-    from linkedin_mcp.app.container import AppContainer
+    from linkedin_mcp.container import AppContainer
 
 
 def attach_tools(mcp: FastMCP[None], container: AppContainer) -> None:

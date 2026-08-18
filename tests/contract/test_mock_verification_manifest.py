@@ -3,8 +3,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from linkedin_mcp.app.container import create_production_container
 from linkedin_mcp.config import Settings
+from linkedin_mcp.container import create_production_container
 from linkedin_mcp.errors import ErrorCode
 from linkedin_mcp.mcp.server import create_mcp_server
 from linkedin_mcp.tools._shared.models import CapabilityName, StrictModel

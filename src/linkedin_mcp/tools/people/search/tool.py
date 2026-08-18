@@ -8,7 +8,8 @@ from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from linkedin_mcp.app.container import AppContainer
+from linkedin_mcp.container import AppContainer
+from linkedin_mcp.execution import Task
 from linkedin_mcp.tools._shared.tool import (
     CursorArgument,
     IdentifierArgument,
@@ -18,6 +19,7 @@ from linkedin_mcp.tools._shared.tool import (
 from linkedin_mcp.tools.people.search.models.people_search_filters import PeopleSearchFilters
 from linkedin_mcp.tools.people.search.models.people_search_input import PeopleSearchInput
 from linkedin_mcp.tools.people.search.models.people_search_output import PeopleSearchOutput
+from linkedin_mcp.tools.people.search.pagination import execute
 
 
 def register(
@@ -58,18 +60,25 @@ def register(
         cursor: CursorArgument | None = None,
     ) -> PeopleSearchOutput:
         await ctx.report_progress(0, 100, "Queued LinkedIn People search")
-        result = await tool_result(
-            container.worker.search_people(
-                PeopleSearchInput(
-                    context_id=context_id,
-                    request_id=request_id,
-                    query=query,
-                    filters=filters or PeopleSearchFilters(),
-                    page_size=page_size,
-                    cursor=cursor,
-                )
-            )
+        request = PeopleSearchInput(
+            context_id=context_id,
+            request_id=request_id,
+            query=query,
+            filters=filters or PeopleSearchFilters(),
+            page_size=page_size,
+            cursor=cursor,
         )
+        task = Task(
+            name="linkedin.people.search",
+            execute=lambda: execute(
+                request,
+                page=container.people_search,
+                pagination=container.pagination,
+                account_id=container.settings.account_id,
+            ),
+        )
+        await container.scheduler.schedule(task)
+        result = await tool_result(task.result())
         await ctx.report_progress(100, 100, "LinkedIn People search complete")
         return result
 

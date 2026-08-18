@@ -369,14 +369,14 @@ Send <message> on LinkedIn to <profile URL>.
       [Typed MCP boundary]
                |
                v
-       [Fair queue + pacing]
+        [Task + FIFO queue]
                |
       one operation at a time
                v
-[Capability executor] ---> [Process-local cursors]
+[Scheduler -> Worker] ---> [Process-local cursors]
                |
                v
-      [Capability page objects]
+ [Tool-owned execution + page object]
                |
                v
 [Browser manager: fresh page per call] <--> [Persistent auth profile]
@@ -389,8 +389,8 @@ Send <message> on LinkedIn to <profile URL>.
 Everything runs locally. There is no hosted backend, telemetry, database,
 external queue, LangGraph runtime, or credential service. Browser cookies live
 only in the local Playwright profile. The first client starts one shared local
-runtime; later clients attach to it, and fair scheduling gives each client a
-turn between complete tool calls. Calls execute freshly; only queue, pacing, and
+runtime; later clients attach to it. A bounded FIFO queue feeds one worker, so
+browser calls run one at a time. Calls execute freshly; only queue, pacing, and
 cursor coordination live in runtime memory.
 Read the full [architecture](docs/ARCHITECTURE.md) and [privacy policy](PRIVACY.md).
 

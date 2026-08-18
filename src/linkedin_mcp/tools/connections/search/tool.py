@@ -8,7 +8,8 @@ from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from linkedin_mcp.app.container import AppContainer
+from linkedin_mcp.container import AppContainer
+from linkedin_mcp.execution import Task
 from linkedin_mcp.tools._shared.tool import (
     CursorArgument,
     IdentifierArgument,
@@ -24,6 +25,7 @@ from linkedin_mcp.tools.connections.search.models.connections_search_input impor
 from linkedin_mcp.tools.connections.search.models.connections_search_output import (
     ConnectionsSearchOutput,
 )
+from linkedin_mcp.tools.connections.search.pagination import execute
 
 
 def register(
@@ -65,18 +67,25 @@ def register(
         cursor: CursorArgument | None = None,
     ) -> ConnectionsSearchOutput:
         await ctx.report_progress(0, 100, "Queued LinkedIn connection search")
-        result = await tool_result(
-            container.worker.search_connections(
-                ConnectionsSearchInput(
-                    context_id=context_id,
-                    request_id=request_id,
-                    query=query,
-                    filters=filters or ConnectionsSearchFilters(),
-                    page_size=page_size,
-                    cursor=cursor,
-                )
-            )
+        request = ConnectionsSearchInput(
+            context_id=context_id,
+            request_id=request_id,
+            query=query,
+            filters=filters or ConnectionsSearchFilters(),
+            page_size=page_size,
+            cursor=cursor,
         )
+        task = Task(
+            name="linkedin.connections.search",
+            execute=lambda: execute(
+                request,
+                page=container.connections_search,
+                pagination=container.pagination,
+                account_id=container.settings.account_id,
+            ),
+        )
+        await container.scheduler.schedule(task)
+        result = await tool_result(task.result())
         await ctx.report_progress(100, 100, "LinkedIn connection search complete")
         return result
 

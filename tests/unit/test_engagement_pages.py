@@ -10,7 +10,7 @@ from playwright.async_api import Locator, Page, Route, async_playwright
 from pydantic import ValidationError
 
 import linkedin_mcp.tools.posts.comment.page as engagement_page
-from linkedin_mcp.app.assets import LocalAssetStore
+from linkedin_mcp.assets import LocalAssetStore
 from linkedin_mcp.tools._shared.actions import (
     ActionCommand,
     ActionOutcome,

@@ -8,16 +8,42 @@ from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from linkedin_mcp.app.container import AppContainer
-from linkedin_mcp.tools._shared.actions import ActionOutput
+from linkedin_mcp.container import AppContainer
+from linkedin_mcp.execution import Task
+from linkedin_mcp.tools._shared.actions import (
+    ActionInspection,
+    ActionOutput,
+    ActionType,
+    InvitationIgnorePayload,
+)
 from linkedin_mcp.tools._shared.identifiers import PROFILE_SLUG_PATTERN
 from linkedin_mcp.tools._shared.tool import (
     IdentifierArgument,
     tool_result,
 )
+from linkedin_mcp.tools.action import execute_action
 from linkedin_mcp.tools.invitations.ignore.models.invitation_ignore_input import (
     InvitationIgnoreInput,
 )
+from linkedin_mcp.tools.invitations.ignore.page import IgnoreInvitationPage
+
+
+async def execute(request: InvitationIgnoreInput, page: IgnoreInvitationPage) -> ActionOutput:
+    def payload(inspection: ActionInspection) -> InvitationIgnorePayload:
+        invitation_ref = inspection.target.invitation_ref
+        if invitation_ref is None:
+            raise RuntimeError("Invitation inspection did not return an invitation reference.")
+        return InvitationIgnorePayload(invitation_ref=invitation_ref)
+
+    return await execute_action(
+        task_name="linkedin.invitations.ignore",
+        context_id=request.context_id,
+        request_id=request.request_id,
+        action_type=ActionType.INVITATION_IGNORE,
+        payload_factory=payload,
+        inspect=lambda: page.inspect_ignore(request),
+        perform=page.perform_ignore,
+    )
 
 
 def register(
@@ -49,15 +75,18 @@ def register(
         ctx: Context[Any, Any, Any],
     ) -> ActionOutput:
         await ctx.report_progress(0, 100, "Ignoring LinkedIn connection invitation")
-        result = await tool_result(
-            container.worker.ignore_invitation(
-                InvitationIgnoreInput(
-                    context_id=context_id,
-                    request_id=request_id,
-                    profile_slug=profile_slug,
-                )
-            )
+        request = InvitationIgnoreInput(
+            context_id=context_id,
+            request_id=request_id,
+            profile_slug=profile_slug,
         )
+        task = Task(
+            name="linkedin.invitations.ignore",
+            execute=lambda: execute(request, container.invitation_ignore),
+            interruptible=False,
+        )
+        await container.scheduler.schedule(task)
+        result = await tool_result(task.result())
         await ctx.report_progress(100, 100, "Ignore action reached a terminal outcome")
         return result
 

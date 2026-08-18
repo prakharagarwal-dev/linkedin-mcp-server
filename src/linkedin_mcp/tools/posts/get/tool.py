@@ -8,13 +8,26 @@ from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from linkedin_mcp.app.container import AppContainer
+from linkedin_mcp.container import AppContainer
+from linkedin_mcp.execution import Task
 from linkedin_mcp.tools._shared.tool import (
     IdentifierArgument,
     tool_result,
 )
+from linkedin_mcp.tools.posts.get.evidence import source_from_post
 from linkedin_mcp.tools.posts.get.models.post_get_input import PostGetInput
 from linkedin_mcp.tools.posts.get.models.post_get_output import PostGetOutput
+from linkedin_mcp.tools.posts.get.page import PostDetailPage
+
+
+async def execute(request: PostGetInput, page: PostDetailPage) -> PostGetOutput:
+    post = await page.read(request)
+    return PostGetOutput(
+        context_id=request.context_id,
+        request_id=request.request_id,
+        post=post,
+        sources=(source_from_post(post),),
+    )
 
 
 def register(
@@ -48,15 +61,17 @@ def register(
         ctx: Context[Any, Any, Any],
     ) -> PostGetOutput:
         await ctx.report_progress(0, 100, "Validating LinkedIn post target")
-        result = await tool_result(
-            container.worker.get_post(
-                PostGetInput(
-                    context_id=context_id,
-                    request_id=request_id,
-                    post_ref=post_ref,
-                )
-            )
+        request = PostGetInput(
+            context_id=context_id,
+            request_id=request_id,
+            post_ref=post_ref,
         )
+        task = Task(
+            name="linkedin.posts.get",
+            execute=lambda: execute(request, container.post_detail),
+        )
+        await container.scheduler.schedule(task)
+        result = await tool_result(task.result())
         await ctx.report_progress(100, 100, "LinkedIn post detail complete")
         return result
 

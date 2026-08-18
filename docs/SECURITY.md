@@ -152,11 +152,9 @@ The project does not implement:
 
 ## In-process queue and state
 
-One bounded fair scheduler backed by `asyncio.Queue` supplies backpressure and
-one worker serializes capability execution. Each MCP session has a FIFO lane;
-the worker round-robins lanes between atomic calls. It never interrupts one
-browser call to serve another. Queue entries and pacing history are not
-durable.
+One bounded FIFO scheduler backed by `asyncio.Queue` supplies backpressure and
+one worker serializes tool execution. It never interrupts one browser call to
+serve another. Queue entries and pacing history are not durable.
 
 Every MCP tool invocation gets its own queue item and executes freshly. The
 server does not cache completed reads, coalesce duplicate submissions, record
@@ -169,8 +167,8 @@ terminal calls, or retain captured evidence. Consequently:
 
 Collection cursors are also process-local authentication-adjacent state. They
 contain no cookies, URLs, or captured content, only random tokens plus a client,
-account, capability, semantic binding, and stable identities. They are
-reserved before queue waiting, single-use, expiring, and bounded. They never
+account, capability, semantic binding, and stable identities. They are read
+and consumed inside the serialized task, single-use, expiring, and bounded. They never
 authorize a capability or broaden its configured account.
 
 Therefore, a write interrupted by a hard process exit must never be blindly
@@ -244,7 +242,7 @@ stdio is the recommended local transport.
 Streamable HTTP is restricted to `127.0.0.1`, `::1`, or `localhost`. This
 release has no HTTP authentication and must not be exposed on a LAN or public
 interface. Stdio bridges and direct HTTP clients share the same account,
-browser context, pacing, and fair queue. Cursors remain isolated by their
+browser context, pacing, and FIFO queue. Cursors remain isolated by their
 server-assigned MCP-session identities.
 
 ## Reporting a vulnerability

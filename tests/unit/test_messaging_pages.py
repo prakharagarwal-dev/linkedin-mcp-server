@@ -11,7 +11,7 @@ from playwright.async_api import Locator, Page, Route, async_playwright
 from pydantic import HttpUrl, ValidationError
 
 import linkedin_mcp.tools.messaging.search.page as messaging_pages
-from linkedin_mcp.app.assets import LocalAssetStore
+from linkedin_mcp.assets import LocalAssetStore
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
 from linkedin_mcp.tools._shared.actions import (
     ActionCommand,

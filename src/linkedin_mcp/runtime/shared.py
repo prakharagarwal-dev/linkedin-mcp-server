@@ -20,8 +20,8 @@ from starlette.responses import Response
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from linkedin_mcp import __version__
-from linkedin_mcp.app.container import create_production_container
 from linkedin_mcp.config import Settings, runtime_configuration_fingerprint
+from linkedin_mcp.container import create_production_container
 from linkedin_mcp.errors import ConfigurationError
 from linkedin_mcp.mcp.server import create_mcp_server
 from linkedin_mcp.runtime.ownership import (

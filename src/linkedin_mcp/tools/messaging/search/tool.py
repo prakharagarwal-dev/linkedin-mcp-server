@@ -8,7 +8,8 @@ from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from linkedin_mcp.app.container import AppContainer
+from linkedin_mcp.container import AppContainer
+from linkedin_mcp.execution import Task
 from linkedin_mcp.tools._shared.tool import (
     CursorArgument,
     IdentifierArgument,
@@ -23,6 +24,7 @@ from linkedin_mcp.tools.messaging.search.models.conversation_search_input import
 from linkedin_mcp.tools.messaging.search.models.conversation_search_output import (
     ConversationSearchOutput,
 )
+from linkedin_mcp.tools.messaging.search.pagination import execute
 
 
 def register(
@@ -52,19 +54,26 @@ def register(
         cursor: CursorArgument | None = None,
     ) -> ConversationSearchOutput:
         await ctx.report_progress(0, 100, "Queued LinkedIn inbox read")
-        result = await tool_result(
-            container.worker.search_messages(
-                ConversationSearchInput(
-                    context_id=context_id,
-                    request_id=request_id,
-                    query=query,
-                    category=category,
-                    filter=filter,
-                    page_size=page_size,
-                    cursor=cursor,
-                )
-            )
+        request = ConversationSearchInput(
+            context_id=context_id,
+            request_id=request_id,
+            query=query,
+            category=category,
+            filter=filter,
+            page_size=page_size,
+            cursor=cursor,
         )
+        task = Task(
+            name="linkedin.messaging.search",
+            execute=lambda: execute(
+                request,
+                page=container.conversation_search,
+                pagination=container.pagination,
+                account_id=container.settings.account_id,
+            ),
+        )
+        await container.scheduler.schedule(task)
+        result = await tool_result(task.result())
         await ctx.report_progress(100, 100, "LinkedIn inbox read complete")
         return result
 

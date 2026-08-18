@@ -28,12 +28,12 @@ class _CursorState:
     scan_id: str
     seen_keys: tuple[str, ...]
     expires_at: datetime
-    reserved_by: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
-class PaginationLease:
-    lease_id: str
+class PaginationState:
+    """Cursor state needed by one serialized collection task."""
+
     account_id: str
     client_id: str
     capability_name: CapabilityName
@@ -121,25 +121,22 @@ class PaginationManager:
         self._max_seen_items = max_seen_items_per_cursor
         self._clock = clock or (lambda: datetime.now(UTC))
         self._states: dict[str, _CursorState] = {}
-        self._leases: dict[str, str | None] = {}
         self._lock = asyncio.Lock()
 
-    async def acquire(
+    async def start(
         self,
         *,
         account_id: str,
         client_id: str = DEFAULT_CLIENT_ID,
         capability_name: CapabilityName,
         request: PaginatedInput,
-    ) -> PaginationLease:
+    ) -> PaginationState:
         binding = request_binding(capability_name, request)
-        lease_id = str(uuid.uuid4())
         async with self._lock:
             now = self._clock()
             self._prune_expired(now)
             if request.cursor is None:
-                lease = PaginationLease(
-                    lease_id=lease_id,
+                return PaginationState(
                     account_id=account_id,
                     client_id=client_id,
                     capability_name=capability_name,
@@ -148,8 +145,6 @@ class PaginationManager:
                     seen_keys=frozenset(),
                     prior_cursor=None,
                 )
-                self._leases[lease_id] = None
-                return lease
 
             state = self._states.get(request.cursor)
             if state is None:
@@ -170,11 +165,7 @@ class PaginationManager:
                     "The pagination cursor does not match this client, account, capability, "
                     "or filter set."
                 )
-            if state.reserved_by is not None:
-                raise InvalidCursorError("The pagination cursor is already in use.")
-            state.reserved_by = lease_id
-            lease = PaginationLease(
-                lease_id=lease_id,
+            return PaginationState(
                 account_id=account_id,
                 client_id=client_id,
                 capability_name=capability_name,
@@ -183,28 +174,26 @@ class PaginationManager:
                 seen_keys=frozenset(state.seen_keys),
                 prior_cursor=request.cursor,
             )
-            self._leases[lease_id] = request.cursor
-            return lease
 
-    def traversal_limit(self, lease: PaginationLease, page_size: int) -> int:
+    def traversal_limit(self, state: PaginationState, page_size: int) -> int:
         """Request a prefix containing prior identities plus one unseen lookahead."""
 
         return min(
             self._max_seen_items + 1,
-            lease.cumulative_count + page_size + 1,
+            state.cumulative_count + page_size + 1,
         )
 
-    def page_capacity(self, lease: PaginationLease, page_size: int) -> int:
+    def page_capacity(self, state: PaginationState, page_size: int) -> int:
         """Keep a returned page inside the configured per-scan identity bound."""
 
         return max(
             0,
-            min(page_size, self._max_seen_items - lease.cumulative_count),
+            min(page_size, self._max_seen_items - state.cumulative_count),
         )
 
-    async def advance(
+    async def finish(
         self,
-        lease: PaginationLease,
+        state: PaginationState,
         *,
         page_size: int,
         returned_keys: tuple[str, ...],
@@ -213,18 +202,24 @@ class PaginationManager:
     ) -> PaginationMetadata:
         if len(set(returned_keys)) != len(returned_keys):
             raise ValueError("A pagination page cannot contain duplicate stable identities.")
-        if any(item_key in lease.seen_keys for item_key in returned_keys):
+        if any(item_key in state.seen_keys for item_key in returned_keys):
             raise ValueError("A pagination page cannot repeat an earlier stable identity.")
 
         async with self._lock:
-            self._require_lease(lease)
-            if lease.prior_cursor is not None:
-                state = self._states.get(lease.prior_cursor)
-                if state is None or state.reserved_by != lease.lease_id:
-                    raise InvalidCursorError("The pagination cursor lease is no longer valid.")
-                self._states.pop(lease.prior_cursor, None)
+            if state.prior_cursor is not None:
+                current = self._states.get(state.prior_cursor)
+                if current is None or (
+                    current.account_id != state.account_id
+                    or current.client_id != state.client_id
+                    or current.capability_name is not state.capability_name
+                    or current.binding != state.binding
+                    or current.scan_id != state.scan_id
+                    or frozenset(current.seen_keys) != state.seen_keys
+                ):
+                    raise InvalidCursorError("The pagination cursor is no longer valid.")
+                self._states.pop(state.prior_cursor, None)
 
-            combined = (*sorted(lease.seen_keys), *returned_keys)
+            combined = (*sorted(state.seen_keys), *returned_keys)
             capacity_reached = provider_has_more and len(combined) >= self._max_seen_items
             stalled = provider_has_more and not returned_keys
             truncated = force_truncated or capacity_reached or stalled
@@ -236,17 +231,16 @@ class PaginationManager:
                 next_cursor = self._new_token()
                 expires_at = self._clock() + self._ttl
                 self._states[next_cursor] = _CursorState(
-                    account_id=lease.account_id,
-                    client_id=lease.client_id,
-                    capability_name=lease.capability_name,
-                    binding=lease.binding,
-                    scan_id=lease.scan_id,
+                    account_id=state.account_id,
+                    client_id=state.client_id,
+                    capability_name=state.capability_name,
+                    binding=state.binding,
+                    scan_id=state.scan_id,
                     seen_keys=combined,
                     expires_at=expires_at,
                 )
-            self._leases.pop(lease.lease_id, None)
             return PaginationMetadata(
-                scan_id=lease.scan_id,
+                scan_id=state.scan_id,
                 page_size=page_size,
                 returned_count=len(returned_keys),
                 cumulative_count=len(combined),
@@ -256,39 +250,19 @@ class PaginationManager:
                 truncated=truncated,
             )
 
-    async def abort(self, lease: PaginationLease) -> None:
-        async with self._lock:
-            prior_cursor = self._leases.pop(lease.lease_id, None)
-            if prior_cursor is None:
-                return
-            state = self._states.get(prior_cursor)
-            if state is not None and state.reserved_by == lease.lease_id:
-                state.reserved_by = None
-
     async def close(self) -> None:
         async with self._lock:
             self._states.clear()
-            self._leases.clear()
-
-    def _require_lease(self, lease: PaginationLease) -> None:
-        if lease.lease_id not in self._leases:
-            raise InvalidCursorError("The pagination cursor lease is no longer valid.")
 
     def _prune_expired(self, now: datetime) -> None:
         for token, state in tuple(self._states.items()):
-            if state.expires_at <= now and state.reserved_by is None:
+            if state.expires_at <= now:
                 self._states.pop(token, None)
 
     def _make_room(self) -> None:
         if len(self._states) < self._max_active_cursors:
             return
-        candidates = [
-            (state.expires_at, token)
-            for token, state in self._states.items()
-            if state.reserved_by is None
-        ]
-        if not candidates:
-            raise InvalidCursorError("The local pagination cursor capacity is temporarily full.")
+        candidates = [(state.expires_at, token) for token, state in self._states.items()]
         _, oldest_token = min(candidates)
         self._states.pop(oldest_token, None)
 

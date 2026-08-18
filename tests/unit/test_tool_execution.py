@@ -1,13 +1,14 @@
+"""Behavioral tests for tool-owned execution functions."""
+
 from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from pydantic import HttpUrl
 
-from linkedin_mcp.app.executor import CapabilityExecutor
 from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import (
     InternalServerError,
@@ -15,10 +16,12 @@ from linkedin_mcp.errors import (
     InvalidTargetError,
     ParserDriftError,
 )
+from linkedin_mcp.pagination import PaginationManager
 from linkedin_mcp.tools._shared.actions import (
     ActionCommand,
     ActionInspection,
     ActionOutcome,
+    ActionOutput,
     ActionPageResult,
     ActionTarget,
     ReactionSetPayload,
@@ -29,7 +32,9 @@ from linkedin_mcp.tools._shared.models import (
     StopReason,
 )
 from linkedin_mcp.tools._shared.tool import safe_capability_error
+from linkedin_mcp.tools.companies.get import tool as company_get_tool
 from linkedin_mcp.tools.companies.get.models.company_get_input import CompanyGetInput
+from linkedin_mcp.tools.companies.get.models.company_get_output import CompanyGetOutput
 from linkedin_mcp.tools.companies.get.models.company_profile_coverage import CompanyProfileCoverage
 from linkedin_mcp.tools.companies.get.models.company_profile_evidence import CompanyProfileEvidence
 from linkedin_mcp.tools.companies.get.models.company_profile_observation import (
@@ -38,26 +43,45 @@ from linkedin_mcp.tools.companies.get.models.company_profile_observation import 
 from linkedin_mcp.tools.companies.get.models.company_profile_page_capture import (
     CompanyProfilePageCapture,
 )
+from linkedin_mcp.tools.companies.get.page import CompanyProfilePage
+from linkedin_mcp.tools.companies.search import pagination as company_search
 from linkedin_mcp.tools.companies.search.models.company_search_coverage import CompanySearchCoverage
 from linkedin_mcp.tools.companies.search.models.company_search_input import CompanySearchInput
+from linkedin_mcp.tools.companies.search.models.company_search_output import CompanySearchOutput
 from linkedin_mcp.tools.companies.search.models.company_summary import CompanySummary
+from linkedin_mcp.tools.companies.search.page import CompanySearchPage
+from linkedin_mcp.tools.connections.list import pagination as connections_list
 from linkedin_mcp.tools.connections.list.models.connection_summary import ConnectionSummary
 from linkedin_mcp.tools.connections.list.models.connections_list_coverage import (
     ConnectionsListCoverage,
 )
 from linkedin_mcp.tools.connections.list.models.connections_list_input import ConnectionsListInput
+from linkedin_mcp.tools.connections.list.models.connections_list_output import (
+    ConnectionsListOutput,
+)
+from linkedin_mcp.tools.connections.list.page import ConnectionsListPage
+from linkedin_mcp.tools.connections.search import pagination as connections_search
 from linkedin_mcp.tools.connections.search.models.connections_search_filters import (
     ConnectionsSearchFilters,
 )
 from linkedin_mcp.tools.connections.search.models.connections_search_input import (
     ConnectionsSearchInput,
 )
+from linkedin_mcp.tools.connections.search.models.connections_search_output import (
+    ConnectionsSearchOutput,
+)
+from linkedin_mcp.tools.connections.search.page import ConnectionsSearchPage
+from linkedin_mcp.tools.invitations.accept import tool as invitation_accept_tool
 from linkedin_mcp.tools.invitations.accept.models.invitation_accept_input import (
     InvitationAcceptInput,
 )
+from linkedin_mcp.tools.invitations.accept.page import AcceptInvitationPage
+from linkedin_mcp.tools.invitations.ignore import tool as invitation_ignore_tool
 from linkedin_mcp.tools.invitations.ignore.models.invitation_ignore_input import (
     InvitationIgnoreInput,
 )
+from linkedin_mcp.tools.invitations.ignore.page import IgnoreInvitationPage
+from linkedin_mcp.tools.invitations.list import pagination as invitations_list
 from linkedin_mcp.tools.invitations.list.models.invitation_available_action import (
     InvitationAvailableAction,
 )
@@ -73,19 +97,33 @@ from linkedin_mcp.tools.invitations.list.models.invitation_list_coverage import 
     InvitationListCoverage,
 )
 from linkedin_mcp.tools.invitations.list.models.invitation_list_input import InvitationListInput
+from linkedin_mcp.tools.invitations.list.models.invitation_list_output import InvitationListOutput
 from linkedin_mcp.tools.invitations.list.models.invitation_summary import InvitationSummary
 from linkedin_mcp.tools.invitations.list.models.invitation_type import InvitationType
+from linkedin_mcp.tools.invitations.list.page import InvitationListPage
+from linkedin_mcp.tools.invitations.send import tool as invitation_send_tool
 from linkedin_mcp.tools.invitations.send.models.invitation_send_input import InvitationSendInput
+from linkedin_mcp.tools.invitations.send.page import SendInvitationPage
+from linkedin_mcp.tools.jobs.get import tool as job_get_tool
 from linkedin_mcp.tools.jobs.get.models.job_detail_input import JobDetailInput
 from linkedin_mcp.tools.jobs.get.models.job_detail_observation import JobDetailObservation
+from linkedin_mcp.tools.jobs.get.models.job_detail_output import JobDetailOutput
+from linkedin_mcp.tools.jobs.get.page import JobDetailPage
+from linkedin_mcp.tools.jobs.search import pagination as job_search
 from linkedin_mcp.tools.jobs.search.models.job_search_coverage import JobSearchCoverage
 from linkedin_mcp.tools.jobs.search.models.job_search_input import JobSearchInput
+from linkedin_mcp.tools.jobs.search.models.job_search_output import JobSearchOutput
 from linkedin_mcp.tools.jobs.search.models.job_summary import JobSummary
+from linkedin_mcp.tools.jobs.search.page import JobSearchPage
+from linkedin_mcp.tools.messaging.conversation.get import tool as conversation_get_tool
 from linkedin_mcp.tools.messaging.conversation.get.models.conversation_coverage import (
     ConversationCoverage,
 )
 from linkedin_mcp.tools.messaging.conversation.get.models.conversation_get_input import (
     ConversationGetInput,
+)
+from linkedin_mcp.tools.messaging.conversation.get.models.conversation_get_output import (
+    ConversationGetOutput,
 )
 from linkedin_mcp.tools.messaging.conversation.get.models.conversation_observation import (
     ConversationObservation,
@@ -94,6 +132,8 @@ from linkedin_mcp.tools.messaging.conversation.get.models.message_direction impo
 from linkedin_mcp.tools.messaging.conversation.get.models.message_observation import (
     MessageObservation,
 )
+from linkedin_mcp.tools.messaging.conversation.get.page import ConversationGetPage
+from linkedin_mcp.tools.messaging.search import pagination as messaging_search
 from linkedin_mcp.tools.messaging.search.models.conversation_filter import ConversationFilter
 from linkedin_mcp.tools.messaging.search.models.conversation_search_coverage import (
     ConversationSearchCoverage,
@@ -101,9 +141,17 @@ from linkedin_mcp.tools.messaging.search.models.conversation_search_coverage imp
 from linkedin_mcp.tools.messaging.search.models.conversation_search_input import (
     ConversationSearchInput,
 )
+from linkedin_mcp.tools.messaging.search.models.conversation_search_output import (
+    ConversationSearchOutput,
+)
 from linkedin_mcp.tools.messaging.search.models.conversation_summary import ConversationSummary
+from linkedin_mcp.tools.messaging.search.page import ConversationSearchPage
+from linkedin_mcp.tools.messaging.send import tool as message_send_tool
 from linkedin_mcp.tools.messaging.send.models.message_send_input import MessageSendInput
+from linkedin_mcp.tools.messaging.send.page import MessageSendPage
+from linkedin_mcp.tools.people.get import tool as people_get_tool
 from linkedin_mcp.tools.people.get.models.people_get_input import PeopleGetInput
+from linkedin_mcp.tools.people.get.models.people_get_output import PeopleGetOutput
 from linkedin_mcp.tools.people.get.models.person_profile_coverage import PersonProfileCoverage
 from linkedin_mcp.tools.people.get.models.person_profile_evidence import PersonProfileEvidence
 from linkedin_mcp.tools.people.get.models.person_profile_observation import PersonProfileObservation
@@ -113,14 +161,21 @@ from linkedin_mcp.tools.people.get.models.person_profile_page_capture import (
 from linkedin_mcp.tools.people.get.models.person_profile_section_selector import (
     PersonProfileSectionSelector,
 )
+from linkedin_mcp.tools.people.get.page import PersonProfilePage
 from linkedin_mcp.tools.people.models.person_connection_degree import PersonConnectionDegree
+from linkedin_mcp.tools.people.search import pagination as people_search
 from linkedin_mcp.tools.people.search.models.people_search_connection_degree import (
     PeopleSearchConnectionDegree,
 )
 from linkedin_mcp.tools.people.search.models.people_search_coverage import PeopleSearchCoverage
 from linkedin_mcp.tools.people.search.models.people_search_input import PeopleSearchInput
+from linkedin_mcp.tools.people.search.models.people_search_output import PeopleSearchOutput
 from linkedin_mcp.tools.people.search.models.person_summary import PersonSummary
+from linkedin_mcp.tools.people.search.page import PeopleSearchPage
+from linkedin_mcp.tools.posts.comment import tool as post_comment_tool
 from linkedin_mcp.tools.posts.comment.models.post_comment_input import PostCommentInput
+from linkedin_mcp.tools.posts.comment.page import PostCommentPage
+from linkedin_mcp.tools.posts.comments.list import pagination as post_comments_list
 from linkedin_mcp.tools.posts.comments.list.models.comment_observation import CommentObservation
 from linkedin_mcp.tools.posts.comments.list.models.comment_sort import CommentSort
 from linkedin_mcp.tools.posts.comments.list.models.comment_thread import CommentThread
@@ -130,18 +185,32 @@ from linkedin_mcp.tools.posts.comments.list.models.post_comments_coverage import
 from linkedin_mcp.tools.posts.comments.list.models.post_comments_list_input import (
     PostCommentsListInput,
 )
+from linkedin_mcp.tools.posts.comments.list.models.post_comments_list_output import (
+    PostCommentsListOutput,
+)
+from linkedin_mcp.tools.posts.comments.list.page import PostCommentsPage
+from linkedin_mcp.tools.posts.create import tool as post_create_tool
 from linkedin_mcp.tools.posts.create.models.post_create_input import PostCreateInput
 from linkedin_mcp.tools.posts.create.models.text_post_content import TextPostContent
+from linkedin_mcp.tools.posts.create.page import PostPublishingPage
+from linkedin_mcp.tools.posts.get import tool as post_get_tool
 from linkedin_mcp.tools.posts.get.models.post_author_type import PostAuthorType
 from linkedin_mcp.tools.posts.get.models.post_detail_coverage import PostDetailCoverage
 from linkedin_mcp.tools.posts.get.models.post_evidence import PostEvidence
 from linkedin_mcp.tools.posts.get.models.post_get_input import PostGetInput
+from linkedin_mcp.tools.posts.get.models.post_get_output import PostGetOutput
 from linkedin_mcp.tools.posts.get.models.post_observation import PostObservation
+from linkedin_mcp.tools.posts.get.page import PostDetailPage
 from linkedin_mcp.tools.posts.models.post_author import PostAuthor
+from linkedin_mcp.tools.posts.react import tool as post_react_tool
 from linkedin_mcp.tools.posts.react.models.post_reaction_input import PostReactionInput
+from linkedin_mcp.tools.posts.react.page import PostReactionPage
+from linkedin_mcp.tools.posts.search import pagination as post_search
 from linkedin_mcp.tools.posts.search.models.post_search_coverage import PostSearchCoverage
 from linkedin_mcp.tools.posts.search.models.post_search_input import PostSearchInput
+from linkedin_mcp.tools.posts.search.models.post_search_output import PostSearchOutput
 from linkedin_mcp.tools.posts.search.models.post_summary import PostSummary
+from linkedin_mcp.tools.posts.search.page import PostSearchPage
 
 
 class FakeJobSearch:
@@ -1230,7 +1299,177 @@ def _settings() -> Settings:
     return Settings(minimum_navigation_interval_seconds=0)
 
 
-def _executor(
+class _ToolHarness:
+    """Call tool-owned execution functions without MCP transport or queue wiring."""
+
+    def __init__(
+        self,
+        *,
+        settings: Settings,
+        job_search_page: FakeJobSearch,
+        job_detail_page: FakeJobDetail,
+        people_search_page: FakePeopleSearch,
+        person_profile_page: FakePersonProfile,
+        company_search_page: FakeCompanySearch,
+        company_profile_page: FakeCompanyProfile,
+        post_search_page: FakePostSearch,
+        post_detail_page: FakePostDetail,
+        post_comments_page: FakePostComments,
+        post_publishing_page: FakePostPublishing,
+        post_engagement_page: FakePostEngagement,
+        invitation_list_page: FakeInvitationList,
+        connections_list_page: FakeConnectionsList,
+        invitation_actions_page: FakeInvitationActions,
+        conversation_search_page: FakeConversationSearch,
+        conversation_page: FakeConversation,
+    ) -> None:
+        self._settings = settings
+        self._pagination = PaginationManager(
+            ttl_seconds=settings.pagination_cursor_ttl_seconds,
+            max_active_cursors=settings.pagination_max_active_cursors,
+            max_seen_items_per_cursor=settings.pagination_max_seen_items_per_cursor,
+        )
+        self._job_search = cast(JobSearchPage, job_search_page)
+        self._job_detail = cast(JobDetailPage, job_detail_page)
+        self._people_search = cast(PeopleSearchPage, people_search_page)
+        self._connections_search = cast(ConnectionsSearchPage, people_search_page)
+        self._person_profile = cast(PersonProfilePage, person_profile_page)
+        self._company_search = cast(CompanySearchPage, company_search_page)
+        self._company_profile = cast(CompanyProfilePage, company_profile_page)
+        self._post_search = cast(PostSearchPage, post_search_page)
+        self._post_detail = cast(PostDetailPage, post_detail_page)
+        self._post_comments = cast(PostCommentsPage, post_comments_page)
+        self._post_publishing = cast(PostPublishingPage, post_publishing_page)
+        self._post_comment = cast(PostCommentPage, post_engagement_page)
+        self._post_reaction = cast(PostReactionPage, post_engagement_page)
+        self._invitation_list = cast(InvitationListPage, invitation_list_page)
+        self._connections_list = cast(ConnectionsListPage, connections_list_page)
+        self._invitation_send = cast(SendInvitationPage, invitation_actions_page)
+        self._invitation_accept = cast(AcceptInvitationPage, invitation_actions_page)
+        self._invitation_ignore = cast(IgnoreInvitationPage, invitation_actions_page)
+        self._conversation_search = cast(ConversationSearchPage, conversation_search_page)
+        self._conversation_read = cast(ConversationGetPage, conversation_page)
+        self._message_send = cast(MessageSendPage, conversation_page)
+
+    async def search_jobs(self, request: JobSearchInput) -> JobSearchOutput:
+        return await job_search.execute(
+            request,
+            page=self._job_search,
+            pagination=self._pagination,
+            account_id=self._settings.account_id,
+        )
+
+    async def get_job(self, request: JobDetailInput) -> JobDetailOutput:
+        return await job_get_tool.execute(request, self._job_detail)
+
+    async def search_people(self, request: PeopleSearchInput) -> PeopleSearchOutput:
+        return await people_search.execute(
+            request,
+            page=self._people_search,
+            pagination=self._pagination,
+            account_id=self._settings.account_id,
+        )
+
+    async def search_connections(
+        self,
+        request: ConnectionsSearchInput,
+    ) -> ConnectionsSearchOutput:
+        return await connections_search.execute(
+            request,
+            page=self._connections_search,
+            pagination=self._pagination,
+            account_id=self._settings.account_id,
+        )
+
+    async def get_person(self, request: PeopleGetInput) -> PeopleGetOutput:
+        return await people_get_tool.execute(request, self._person_profile)
+
+    async def search_companies(self, request: CompanySearchInput) -> CompanySearchOutput:
+        return await company_search.execute(
+            request,
+            page=self._company_search,
+            pagination=self._pagination,
+            account_id=self._settings.account_id,
+        )
+
+    async def get_company(self, request: CompanyGetInput) -> CompanyGetOutput:
+        return await company_get_tool.execute(request, self._company_profile)
+
+    async def search_posts(self, request: PostSearchInput) -> PostSearchOutput:
+        return await post_search.execute(
+            request,
+            page=self._post_search,
+            pagination=self._pagination,
+            account_id=self._settings.account_id,
+        )
+
+    async def get_post(self, request: PostGetInput) -> PostGetOutput:
+        return await post_get_tool.execute(request, self._post_detail)
+
+    async def list_post_comments(
+        self,
+        request: PostCommentsListInput,
+    ) -> PostCommentsListOutput:
+        return await post_comments_list.execute(
+            request,
+            page=self._post_comments,
+            pagination=self._pagination,
+            account_id=self._settings.account_id,
+        )
+
+    async def list_invitations(self, request: InvitationListInput) -> InvitationListOutput:
+        return await invitations_list.execute(
+            request,
+            page=self._invitation_list,
+            pagination=self._pagination,
+            account_id=self._settings.account_id,
+        )
+
+    async def list_connections(self, request: ConnectionsListInput) -> ConnectionsListOutput:
+        return await connections_list.execute(
+            request,
+            page=self._connections_list,
+            pagination=self._pagination,
+            account_id=self._settings.account_id,
+        )
+
+    async def search_messages(
+        self,
+        request: ConversationSearchInput,
+    ) -> ConversationSearchOutput:
+        return await messaging_search.execute(
+            request,
+            page=self._conversation_search,
+            pagination=self._pagination,
+            account_id=self._settings.account_id,
+        )
+
+    async def get_conversation(self, request: ConversationGetInput) -> ConversationGetOutput:
+        return await conversation_get_tool.execute(request, self._conversation_read)
+
+    async def create_post(self, request: PostCreateInput) -> ActionOutput:
+        return await post_create_tool.execute(request, self._post_publishing)
+
+    async def comment_on_post(self, request: PostCommentInput) -> ActionOutput:
+        return await post_comment_tool.execute(request, self._post_comment)
+
+    async def react_to_post(self, request: PostReactionInput) -> ActionOutput:
+        return await post_react_tool.execute(request, self._post_reaction)
+
+    async def send_invitation(self, request: InvitationSendInput) -> ActionOutput:
+        return await invitation_send_tool.execute(request, self._invitation_send)
+
+    async def accept_invitation(self, request: InvitationAcceptInput) -> ActionOutput:
+        return await invitation_accept_tool.execute(request, self._invitation_accept)
+
+    async def ignore_invitation(self, request: InvitationIgnoreInput) -> ActionOutput:
+        return await invitation_ignore_tool.execute(request, self._invitation_ignore)
+
+    async def send_message(self, request: MessageSendInput) -> ActionOutput:
+        return await message_send_tool.execute(request, self._message_send)
+
+
+def _tools(
     search: FakeJobSearch,
     detail: FakeJobDetail,
     people_search: FakePeopleSearch | None = None,
@@ -1247,34 +1486,29 @@ def _executor(
     invitation_actions: FakeInvitationActions | None = None,
     conversation_search: FakeConversationSearch | None = None,
     conversation: FakeConversation | None = None,
-) -> CapabilityExecutor:
+) -> _ToolHarness:
     selected_people_search = people_search or FakePeopleSearch()
     selected_post_engagement = post_engagement or FakePostEngagement()
     selected_invitation_actions = invitation_actions or FakeInvitationActions()
     selected_conversation = conversation or FakeConversation()
-    return CapabilityExecutor(
+    return _ToolHarness(
         settings=_settings(),
-        job_search=search,
-        job_detail=detail,
-        people_search=selected_people_search,
-        connections_search=selected_people_search,
-        person_profile=person_profile or FakePersonProfile(),
-        company_search=company_search or FakeCompanySearch(),
-        company_profile=company_profile or FakeCompanyProfile(),
-        post_search=post_search or FakePostSearch(),
-        post_detail=post_detail or FakePostDetail(),
-        post_comments=post_comments or FakePostComments(),
-        post_publishing=post_publishing or FakePostPublishing(),
-        post_comment=selected_post_engagement,
-        post_reaction=selected_post_engagement,
-        invitation_list=invitation_list or FakeInvitationList(),
-        connections_list=connections_list or FakeConnectionsList(),
-        invitation_send=selected_invitation_actions,
-        invitation_accept=selected_invitation_actions,
-        invitation_ignore=selected_invitation_actions,
-        conversation_search=conversation_search or FakeConversationSearch(),
-        conversation_read=selected_conversation,
-        message_send=selected_conversation,
+        job_search_page=search,
+        job_detail_page=detail,
+        people_search_page=selected_people_search,
+        person_profile_page=person_profile or FakePersonProfile(),
+        company_search_page=company_search or FakeCompanySearch(),
+        company_profile_page=company_profile or FakeCompanyProfile(),
+        post_search_page=post_search or FakePostSearch(),
+        post_detail_page=post_detail or FakePostDetail(),
+        post_comments_page=post_comments or FakePostComments(),
+        post_publishing_page=post_publishing or FakePostPublishing(),
+        post_engagement_page=selected_post_engagement,
+        invitation_list_page=invitation_list or FakeInvitationList(),
+        connections_list_page=connections_list or FakeConnectionsList(),
+        invitation_actions_page=selected_invitation_actions,
+        conversation_search_page=conversation_search or FakeConversationSearch(),
+        conversation_page=selected_conversation,
     )
 
 
@@ -1421,7 +1655,7 @@ _READ_FAILURE_CASES: tuple[tuple[str, str, str, object], ...] = (
 
 
 @pytest.mark.parametrize(
-    ("provider_attribute", "provider_method", "executor_method", "capability_request"),
+    ("provider_attribute", "provider_method", "tool_method", "capability_request"),
     _READ_FAILURE_CASES,
 )
 @pytest.mark.parametrize("cancelled", [False, True], ids=["safe-error", "cancelled"])
@@ -1429,13 +1663,13 @@ _READ_FAILURE_CASES: tuple[tuple[str, str, str, object], ...] = (
 async def test_read_failures_are_not_cached_and_each_invocation_executes(
     provider_attribute: str,
     provider_method: str,
-    executor_method: str,
+    tool_method: str,
     capability_request: object,
     cancelled: bool,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    executor = _executor(FakeJobSearch(), FakeJobDetail())
-    provider = getattr(executor, provider_attribute)
+    tools = _tools(FakeJobSearch(), FakeJobDetail())
+    provider = getattr(tools, provider_attribute)
     attempts = 0
 
     async def fail(_request: object, **_kwargs: object) -> Any:
@@ -1446,7 +1680,7 @@ async def test_read_failures_are_not_cached_and_each_invocation_executes(
         raise InvalidTargetError("The visible LinkedIn target changed.")
 
     monkeypatch.setattr(provider, provider_method, fail)
-    invoke = getattr(executor, executor_method)
+    invoke = getattr(tools, tool_method)
 
     expected_error = asyncio.CancelledError if cancelled else InvalidTargetError
     for _ in range(2):
@@ -1458,7 +1692,7 @@ async def test_read_failures_are_not_cached_and_each_invocation_executes(
 @pytest.mark.asyncio
 async def test_repeated_job_search_executes_provider_each_time() -> None:
     search = FakeJobSearch()
-    executor = _executor(search, FakeJobDetail())
+    tools = _tools(search, FakeJobDetail())
     request = JobSearchInput(
         context_id="context-1",
         request_id="request-1",
@@ -1466,8 +1700,8 @@ async def test_repeated_job_search_executes_provider_each_time() -> None:
         page_size=10,
     )
 
-    first = await executor.search_jobs(request)
-    second = await executor.search_jobs(request)
+    first = await tools.search_jobs(request)
+    second = await tools.search_jobs(request)
 
     assert second.jobs == first.jobs
     assert search.calls == 2
@@ -1476,7 +1710,7 @@ async def test_repeated_job_search_executes_provider_each_time() -> None:
 @pytest.mark.asyncio
 async def test_job_search_cursor_walks_live_prefix_without_duplicates() -> None:
     search = PaginatedFakeJobSearch()
-    executor = _executor(search, FakeJobDetail())
+    tools = _tools(search, FakeJobDetail())
     first_request = JobSearchInput(
         context_id="pagination-context",
         request_id="jobs-page-1",
@@ -1484,7 +1718,7 @@ async def test_job_search_cursor_walks_live_prefix_without_duplicates() -> None:
         page_size=2,
     )
 
-    first = await executor.search_jobs(first_request)
+    first = await tools.search_jobs(first_request)
     assert tuple(job.job_id for job in first.jobs) == ("4100000001", "4100000002")
     assert first.pagination.returned_count == 2
     assert first.pagination.cumulative_count == 2
@@ -1497,14 +1731,14 @@ async def test_job_search_cursor_walks_live_prefix_without_duplicates() -> None:
             "cursor": first.pagination.next_cursor,
         }
     )
-    second = await executor.search_jobs(second_request)
+    second = await tools.search_jobs(second_request)
     assert tuple(job.job_id for job in second.jobs) == ("4100000003", "4100000004")
     assert second.pagination.scan_id == first.pagination.scan_id
     assert second.pagination.cumulative_count == 4
     assert second.pagination.next_cursor is not None
 
     with pytest.raises(InvalidCursorError, match="consumed"):
-        await executor.search_jobs(
+        await tools.search_jobs(
             first_request.model_copy(
                 update={
                     "request_id": "jobs-page-1-cursor-replay",
@@ -1519,7 +1753,7 @@ async def test_job_search_cursor_walks_live_prefix_without_duplicates() -> None:
             "cursor": second.pagination.next_cursor,
         }
     )
-    third = await executor.search_jobs(third_request)
+    third = await tools.search_jobs(third_request)
     assert tuple(job.job_id for job in third.jobs) == ("4100000005",)
     assert third.pagination.scan_id == first.pagination.scan_id
     assert third.pagination.cumulative_count == 5
@@ -1527,14 +1761,14 @@ async def test_job_search_cursor_walks_live_prefix_without_duplicates() -> None:
     assert third.pagination.next_cursor is None
 
     with pytest.raises(InvalidCursorError, match="consumed"):
-        await executor.search_jobs(second_request)
+        await tools.search_jobs(second_request)
     assert search.result_limits == [3, 5, 7]
 
 
 @pytest.mark.asyncio
 async def test_invitation_cursor_walks_live_prefix_without_duplicates() -> None:
     invitations = PaginatedFakeInvitationList()
-    executor = _executor(
+    tools = _tools(
         FakeJobSearch(),
         FakeJobDetail(),
         invitation_list=invitations,
@@ -1546,7 +1780,7 @@ async def test_invitation_cursor_walks_live_prefix_without_duplicates() -> None:
         page_size=2,
     )
 
-    first = await executor.list_invitations(first_request)
+    first = await tools.list_invitations(first_request)
     assert [item.primary_entity.slug for item in first.invitations] == [
         "invitation-member-1",
         "invitation-member-2",
@@ -1560,7 +1794,7 @@ async def test_invitation_cursor_walks_live_prefix_without_duplicates() -> None:
     assert first.pagination.next_cursor is not None
 
     with pytest.raises(InvalidCursorError, match="account, capability, or filter set"):
-        await executor.list_invitations(
+        await tools.list_invitations(
             first_request.model_copy(
                 update={
                     "request_id": "invitation-filter-mismatch",
@@ -1570,7 +1804,7 @@ async def test_invitation_cursor_walks_live_prefix_without_duplicates() -> None:
             )
         )
     with pytest.raises(InvalidCursorError, match="account, capability, or filter set"):
-        await executor.list_invitations(
+        await tools.list_invitations(
             first_request.model_copy(
                 update={
                     "request_id": "invitation-direction-mismatch",
@@ -1588,14 +1822,14 @@ async def test_invitation_cursor_walks_live_prefix_without_duplicates() -> None:
             "page_size": 1,
         }
     )
-    second = await executor.list_invitations(second_request)
+    second = await tools.list_invitations(second_request)
     assert [item.primary_entity.slug for item in second.invitations] == ["invitation-member-3"]
     assert second.pagination.scan_id == first.pagination.scan_id
     assert second.pagination.cumulative_count == 3
     assert second.pagination.next_cursor is not None
 
     with pytest.raises(InvalidCursorError, match="consumed"):
-        await executor.list_invitations(
+        await tools.list_invitations(
             first_request.model_copy(
                 update={
                     "request_id": "invitation-consumed-cursor",
@@ -1611,7 +1845,7 @@ async def test_invitation_cursor_walks_live_prefix_without_duplicates() -> None:
             "page_size": 2,
         }
     )
-    third = await executor.list_invitations(third_request)
+    third = await tools.list_invitations(third_request)
     assert [item.primary_entity.slug for item in third.invitations] == [
         "invitation-member-4",
         "invitation-member-5",
@@ -1624,21 +1858,21 @@ async def test_invitation_cursor_walks_live_prefix_without_duplicates() -> None:
     assert third.coverage.result_count == 2
 
     with pytest.raises(InvalidCursorError, match="consumed"):
-        await executor.list_invitations(second_request)
+        await tools.list_invitations(second_request)
     assert invitations.calls == 3
     assert invitations.result_limits == [3, 4, 6]
 
 
 @pytest.mark.asyncio
-async def test_unadvertised_empty_invitation_view_survives_executor_evidence() -> None:
+async def test_unadvertised_empty_invitation_view_survives_tools_evidence() -> None:
     invitations = ImplicitEmptyInvitationList()
-    executor = _executor(
+    tools = _tools(
         FakeJobSearch(),
         FakeJobDetail(),
         invitation_list=invitations,
     )
 
-    output = await executor.list_invitations(
+    output = await tools.list_invitations(
         InvitationListInput(
             context_id="empty-sent-invitations",
             request_id="empty-sent-invitations-1",
@@ -1659,9 +1893,9 @@ async def test_unadvertised_empty_invitation_view_survives_executor_evidence() -
 @pytest.mark.asyncio
 async def test_job_detail_accepts_any_valid_job_id_without_prior_search() -> None:
     detail = FakeJobDetail()
-    executor = _executor(FakeJobSearch(), detail)
+    tools = _tools(FakeJobSearch(), detail)
 
-    output = await executor.get_job(
+    output = await tools.get_job(
         JobDetailInput(
             context_id="context-1",
             request_id="direct-detail",
@@ -1677,7 +1911,7 @@ async def test_job_detail_accepts_any_valid_job_id_without_prior_search() -> Non
 @pytest.mark.asyncio
 async def test_repeated_people_search_executes_provider_each_time() -> None:
     people_search = FakePeopleSearch()
-    executor = _executor(
+    tools = _tools(
         FakeJobSearch(),
         FakeJobDetail(),
         people_search=people_search,
@@ -1689,8 +1923,8 @@ async def test_repeated_people_search_executes_provider_each_time() -> None:
         page_size=10,
     )
 
-    first = await executor.search_people(request)
-    second = await executor.search_people(request)
+    first = await tools.search_people(request)
+    second = await tools.search_people(request)
 
     assert second.people == first.people
     assert first.people[0].profile_slug == "jane-doe"
@@ -1700,7 +1934,7 @@ async def test_repeated_people_search_executes_provider_each_time() -> None:
 @pytest.mark.asyncio
 async def test_repeated_connections_search_executes_provider_each_time() -> None:
     people_search = FakePeopleSearch()
-    executor = _executor(
+    tools = _tools(
         FakeJobSearch(),
         FakeJobDetail(),
         people_search=people_search,
@@ -1714,8 +1948,8 @@ async def test_repeated_connections_search_executes_provider_each_time() -> None
         page_size=10,
     )
 
-    first = await executor.search_connections(request)
-    second = await executor.search_connections(request)
+    first = await tools.search_connections(request)
+    second = await tools.search_connections(request)
 
     assert second.people == first.people
     assert first.people[0].profile_slug == "jane-doe"
@@ -1725,14 +1959,14 @@ async def test_repeated_connections_search_executes_provider_each_time() -> None
 
 @pytest.mark.asyncio
 async def test_connections_search_rejects_non_first_degree_results() -> None:
-    executor = _executor(
+    tools = _tools(
         FakeJobSearch(),
         FakeJobDetail(),
         people_search=FakeNonConnectionPeopleSearch(),
     )
 
     with pytest.raises(ParserDriftError, match="not visibly first-degree"):
-        await executor.search_connections(
+        await tools.search_connections(
             ConnectionsSearchInput(
                 context_id="connections-context",
                 request_id="connections-search-degree-drift",
@@ -1744,13 +1978,13 @@ async def test_connections_search_rejects_non_first_degree_results() -> None:
 @pytest.mark.asyncio
 async def test_person_profile_returns_metadata_for_every_captured_page() -> None:
     person_profile = FakePersonProfile()
-    executor = _executor(
+    tools = _tools(
         FakeJobSearch(),
         FakeJobDetail(),
         person_profile=person_profile,
     )
 
-    output = await executor.get_person(
+    output = await tools.get_person(
         PeopleGetInput(
             context_id="context-1",
             request_id="person-direct-1",
@@ -1771,7 +2005,7 @@ async def test_person_profile_returns_metadata_for_every_captured_page() -> None
 @pytest.mark.asyncio
 async def test_same_request_id_can_execute_with_different_profile_sections() -> None:
     person_profile = FakePersonProfile()
-    executor = _executor(
+    tools = _tools(
         FakeJobSearch(),
         FakeJobDetail(),
         person_profile=person_profile,
@@ -1783,8 +2017,8 @@ async def test_same_request_id_can_execute_with_different_profile_sections() -> 
         sections=(PersonProfileSectionSelector.OVERVIEW,),
     )
 
-    await executor.get_person(overview_request)
-    await executor.get_person(
+    await tools.get_person(overview_request)
+    await tools.get_person(
         overview_request.model_copy(update={"sections": (PersonProfileSectionSelector.SKILLS,)})
     )
     assert person_profile.calls == 2
@@ -1794,7 +2028,7 @@ async def test_same_request_id_can_execute_with_different_profile_sections() -> 
 async def test_company_reads_execute_fresh_and_return_source_metadata() -> None:
     company_search = FakeCompanySearch()
     company_profile = FakeCompanyProfile()
-    executor = _executor(
+    tools = _tools(
         FakeJobSearch(),
         FakeJobDetail(),
         company_search=company_search,
@@ -1806,15 +2040,15 @@ async def test_company_reads_execute_fresh_and_return_source_metadata() -> None:
         query="cloud",
     )
 
-    search = await executor.search_companies(search_request)
-    second_search = await executor.search_companies(search_request)
+    search = await tools.search_companies(search_request)
+    second_search = await tools.search_companies(search_request)
     profile_request = CompanyGetInput(
         context_id="company-context",
         request_id="company-get-1",
         company_slug="acme-cloud",
     )
-    profile = await executor.get_company(profile_request)
-    second_profile = await executor.get_company(profile_request)
+    profile = await tools.get_company(profile_request)
+    second_profile = await tools.get_company(profile_request)
 
     assert search.companies[0].company_slug == "acme-cloud"
     assert second_search.companies == search.companies
@@ -1824,7 +2058,7 @@ async def test_company_reads_execute_fresh_and_return_source_metadata() -> None:
     assert second_profile.company.company_slug == profile.company.company_slug
     assert company_profile.calls == 2
 
-    changed = await executor.get_company(
+    changed = await tools.get_company(
         profile_request.model_copy(update={"company_slug": "example-labs"})
     )
     assert changed.company.company_slug == "example-labs"
@@ -1836,7 +2070,7 @@ async def test_post_discussion_reads_execute_fresh_with_exact_evidence() -> None
     post_search = FakePostSearch()
     post_detail = FakePostDetail()
     post_comments = FakePostComments()
-    executor = _executor(
+    tools = _tools(
         FakeJobSearch(),
         FakeJobDetail(),
         post_search=post_search,
@@ -1860,13 +2094,13 @@ async def test_post_discussion_reads_execute_fresh_with_exact_evidence() -> None
         post_ref=post_ref,
         sort_by=CommentSort.MOST_RECENT,
     )
-    post_search_output = await executor.search_posts(search_request)
-    post_detail_output = await executor.get_post(detail_request)
-    comments_output = await executor.list_post_comments(comments_request)
+    post_search_output = await tools.search_posts(search_request)
+    post_detail_output = await tools.get_post(detail_request)
+    comments_output = await tools.list_post_comments(comments_request)
 
-    await executor.search_posts(search_request)
-    await executor.get_post(detail_request)
-    await executor.list_post_comments(comments_request)
+    await tools.search_posts(search_request)
+    await tools.get_post(detail_request)
+    await tools.list_post_comments(comments_request)
     assert post_search_output.posts[0].post_ref == post_ref
     assert post_search_output.coverage.unsupported_result_count == 1
     assert post_detail_output.post.evidence[1].quote in post_detail_output.post.visible_text
@@ -1888,7 +2122,7 @@ async def test_post_discussion_reads_execute_fresh_with_exact_evidence() -> None
 @pytest.mark.asyncio
 async def test_connection_and_messaging_reads_execute_fresh() -> None:
     invitations = FakeInvitationList()
-    executor = _executor(
+    tools = _tools(
         FakeJobSearch(),
         FakeJobDetail(),
         invitation_list=invitations,
@@ -1899,28 +2133,28 @@ async def test_connection_and_messaging_reads_execute_fresh() -> None:
         request_id="invitations-1",
         direction=InvitationDirection.RECEIVED,
     )
-    first = await executor.list_invitations(invitation_request)
-    second_invitations = await executor.list_invitations(invitation_request)
+    first = await tools.list_invitations(invitation_request)
+    second_invitations = await tools.list_invitations(invitation_request)
     connections_request = ConnectionsListInput(
         context_id="connections-context",
         request_id="connections-1",
     )
-    connections = await executor.list_connections(connections_request)
-    second_connections = await executor.list_connections(connections_request)
+    connections = await tools.list_connections(connections_request)
+    second_connections = await tools.list_connections(connections_request)
     inbox_request = ConversationSearchInput(
         context_id="messaging-context",
         request_id="inbox-1",
         filter=ConversationFilter.UNREAD,
     )
-    inbox = await executor.search_messages(inbox_request)
-    second_inbox = await executor.search_messages(inbox_request)
+    inbox = await tools.search_messages(inbox_request)
+    second_inbox = await tools.search_messages(inbox_request)
     conversation_request = ConversationGetInput(
         context_id="messaging-context",
         request_id="conversation-1",
         conversation_id="thread-123",
     )
-    conversation = await executor.get_conversation(conversation_request)
-    second_conversation = await executor.get_conversation(conversation_request)
+    conversation = await tools.get_conversation(conversation_request)
+    second_conversation = await tools.get_conversation(conversation_request)
 
     assert first.invitations[0].note == "Hi, let us connect."
     assert second_invitations.invitations[0].note == first.invitations[0].note
@@ -1950,7 +2184,7 @@ async def test_all_seven_actions_run_directly_with_typed_evidence() -> None:
     publishing = FakePostPublishing()
     engagement = FakePostEngagement()
     messaging = FakeConversation()
-    executor = _executor(
+    tools = _tools(
         FakeJobSearch(),
         FakeJobDetail(),
         invitation_actions=actions,
@@ -1961,14 +2195,14 @@ async def test_all_seven_actions_run_directly_with_typed_evidence() -> None:
     post_ref = "activity:7312345678901234567"
 
     outputs = (
-        await executor.create_post(
+        await tools.create_post(
             PostCreateInput(
                 context_id="actions",
                 request_id="post",
                 content=TextPostContent(text="An atomic post."),
             )
         ),
-        await executor.comment_on_post(
+        await tools.comment_on_post(
             PostCommentInput(
                 context_id="actions",
                 request_id="comment",
@@ -1976,7 +2210,7 @@ async def test_all_seven_actions_run_directly_with_typed_evidence() -> None:
                 text="Thanks",
             )
         ),
-        await executor.react_to_post(
+        await tools.react_to_post(
             PostReactionInput(
                 context_id="actions",
                 request_id="reaction",
@@ -1984,7 +2218,7 @@ async def test_all_seven_actions_run_directly_with_typed_evidence() -> None:
                 desired_reaction=ReactionState.LIKE,
             )
         ),
-        await executor.send_invitation(
+        await tools.send_invitation(
             InvitationSendInput(
                 context_id="actions",
                 request_id="invite",
@@ -1992,21 +2226,21 @@ async def test_all_seven_actions_run_directly_with_typed_evidence() -> None:
                 note="Hello",
             )
         ),
-        await executor.accept_invitation(
+        await tools.accept_invitation(
             InvitationAcceptInput(
                 context_id="actions",
                 request_id="accept",
                 profile_slug="jane-doe",
             )
         ),
-        await executor.ignore_invitation(
+        await tools.ignore_invitation(
             InvitationIgnoreInput(
                 context_id="actions",
                 request_id="ignore",
                 profile_slug="jane-doe",
             )
         ),
-        await executor.send_message(
+        await tools.send_message(
             MessageSendInput(
                 context_id="actions",
                 request_id="message",
@@ -2035,7 +2269,7 @@ async def test_all_seven_actions_run_directly_with_typed_evidence() -> None:
 @pytest.mark.asyncio
 async def test_repeated_write_request_executes_a_new_action() -> None:
     actions = FakeInvitationActions()
-    executor = _executor(
+    tools = _tools(
         FakeJobSearch(),
         FakeJobDetail(),
         invitation_actions=actions,
@@ -2046,8 +2280,8 @@ async def test_repeated_write_request_executes_a_new_action() -> None:
         profile_slug="jane-doe",
     )
 
-    first = await executor.send_invitation(request)
-    second = await executor.send_invitation(request)
+    first = await tools.send_invitation(request)
+    second = await tools.send_invitation(request)
 
     assert actions.invite_actions == 2
     assert first.sources != second.sources
@@ -2056,14 +2290,14 @@ async def test_repeated_write_request_executes_a_new_action() -> None:
 
 @pytest.mark.asyncio
 async def test_incoming_invitation_action_requires_exact_visible_reference() -> None:
-    executor = _executor(
+    tools = _tools(
         FakeJobSearch(),
         FakeJobDetail(),
         invitation_actions=MissingReferenceActions(),
     )
 
     with pytest.raises(RuntimeError, match="invitation reference"):
-        await executor.accept_invitation(
+        await tools.accept_invitation(
             InvitationAcceptInput(
                 context_id="missing-reference",
                 request_id="accept",
@@ -2077,7 +2311,7 @@ async def test_incoming_invitation_action_requires_exact_visible_reference() -> 
 async def test_interrupted_action_is_uncertain_but_cancellation_propagates(
     cancelled: bool,
 ) -> None:
-    executor = _executor(
+    tools = _tools(
         FakeJobSearch(),
         FakeJobDetail(),
         invitation_actions=InterruptedInvitationActions(cancelled=cancelled),
@@ -2090,9 +2324,9 @@ async def test_interrupted_action_is_uncertain_but_cancellation_propagates(
 
     if cancelled:
         with pytest.raises(asyncio.CancelledError):
-            await executor.send_invitation(request)
+            await tools.send_invitation(request)
     else:
-        output = await executor.send_invitation(request)
+        output = await tools.send_invitation(request)
         assert output.result.outcome is ActionOutcome.UNCERTAIN
         assert output.result.performed is None
         assert output.result.final_state == "unknown_after_interruption"
@@ -2101,14 +2335,14 @@ async def test_interrupted_action_is_uncertain_but_cancellation_propagates(
 
 @pytest.mark.asyncio
 async def test_known_precondition_error_is_not_misreported_as_uncertain() -> None:
-    executor = _executor(
+    tools = _tools(
         FakeJobSearch(),
         FakeJobDetail(),
         invitation_actions=RejectedInvitationActions(),
     )
 
     with pytest.raises(InvalidTargetError, match="no longer available"):
-        await executor.send_invitation(
+        await tools.send_invitation(
             InvitationSendInput(
                 context_id="rejected-action",
                 request_id="invite",

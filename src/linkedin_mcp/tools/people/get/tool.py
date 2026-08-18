@@ -8,17 +8,30 @@ from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from linkedin_mcp.app.container import AppContainer
+from linkedin_mcp.container import AppContainer
+from linkedin_mcp.execution import Task
 from linkedin_mcp.tools._shared.identifiers import PROFILE_SLUG_PATTERN
 from linkedin_mcp.tools._shared.tool import (
     IdentifierArgument,
     tool_result,
 )
+from linkedin_mcp.tools.people.get.evidence import sources_from_person_profile
 from linkedin_mcp.tools.people.get.models.people_get_input import PeopleGetInput
 from linkedin_mcp.tools.people.get.models.people_get_output import PeopleGetOutput
 from linkedin_mcp.tools.people.get.models.person_profile_section_selector import (
     PersonProfileSectionSelector,
 )
+from linkedin_mcp.tools.people.get.page import PersonProfilePage
+
+
+async def execute(request: PeopleGetInput, page: PersonProfilePage) -> PeopleGetOutput:
+    person, captures = await page.read(request)
+    return PeopleGetOutput(
+        context_id=request.context_id,
+        request_id=request.request_id,
+        person=person,
+        sources=sources_from_person_profile(person, captures),
+    )
 
 
 def register(
@@ -63,16 +76,18 @@ def register(
         ] = (PersonProfileSectionSelector.ALL,),
     ) -> PeopleGetOutput:
         await ctx.report_progress(0, 100, "Validating LinkedIn member target")
-        result = await tool_result(
-            container.worker.get_person(
-                PeopleGetInput(
-                    context_id=context_id,
-                    request_id=request_id,
-                    profile_slug=profile_slug,
-                    sections=sections,
-                )
-            )
+        request = PeopleGetInput(
+            context_id=context_id,
+            request_id=request_id,
+            profile_slug=profile_slug,
+            sections=sections,
         )
+        task = Task(
+            name="linkedin.people.get",
+            execute=lambda: execute(request, container.person_profile),
+        )
+        await container.scheduler.schedule(task)
+        result = await tool_result(task.result())
         await ctx.report_progress(100, 100, "LinkedIn member profile complete")
         return result
 

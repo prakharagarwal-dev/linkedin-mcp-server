@@ -7,7 +7,8 @@ from typing import Any
 from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 
-from linkedin_mcp.app.container import AppContainer
+from linkedin_mcp.container import AppContainer
+from linkedin_mcp.execution import Task
 from linkedin_mcp.tools._shared.tool import (
     CursorArgument,
     IdentifierArgument,
@@ -18,6 +19,7 @@ from linkedin_mcp.tools.invitations.list.models.invitation_direction import Invi
 from linkedin_mcp.tools.invitations.list.models.invitation_filter import InvitationFilter
 from linkedin_mcp.tools.invitations.list.models.invitation_list_input import InvitationListInput
 from linkedin_mcp.tools.invitations.list.models.invitation_list_output import InvitationListOutput
+from linkedin_mcp.tools.invitations.list.pagination import execute
 
 
 def register(
@@ -53,19 +55,26 @@ def register(
             ratio = 1.0 if total == 0 else min(1.0, current / total)
             await ctx.report_progress(5 + round(90 * ratio), 100, message)
 
-        result = await tool_result(
-            container.worker.list_invitations(
-                InvitationListInput(
-                    context_id=context_id,
-                    request_id=request_id,
-                    direction=direction,
-                    invitation_filter=invitation_filter,
-                    page_size=page_size,
-                    cursor=cursor,
-                ),
-                progress=report_progress,
-            )
+        request = InvitationListInput(
+            context_id=context_id,
+            request_id=request_id,
+            direction=direction,
+            invitation_filter=invitation_filter,
+            page_size=page_size,
+            cursor=cursor,
         )
+        task = Task(
+            name="linkedin.invitations.list",
+            execute=lambda: execute(
+                request,
+                page=container.invitation_list,
+                pagination=container.pagination,
+                account_id=container.settings.account_id,
+                progress=report_progress,
+            ),
+        )
+        await container.scheduler.schedule(task)
+        result = await tool_result(task.result())
         await ctx.report_progress(100, 100, "LinkedIn invitation read complete")
         return result
 
