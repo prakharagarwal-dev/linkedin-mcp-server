@@ -32,7 +32,6 @@ from linkedin_mcp.tools.posts.get.page import PostDetailPage
 from linkedin_mcp.tools.posts.react.page import PostReactionPage
 from linkedin_mcp.tools.posts.search.page import PostSearchPage
 from linkedin_mcp.transport import AccountProcessLock
-from linkedin_mcp.transport.context import ClientSessionRegistry
 
 
 @dataclass(slots=True)
@@ -66,7 +65,6 @@ class AppContainer:
     conversation_search: ConversationSearchPage
     conversation_read: ConversationGetPage
     message_send: MessageSendPage
-    clients: ClientSessionRegistry = field(default_factory=ClientSessionRegistry)
     _started: bool = field(default=False, init=False)
 
     async def start(self) -> None:

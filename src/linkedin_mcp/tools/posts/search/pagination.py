@@ -14,7 +14,6 @@ from linkedin_mcp.tools.posts.search.evidence import source_from_post_search
 from linkedin_mcp.tools.posts.search.models.post_search_input import PostSearchInput
 from linkedin_mcp.tools.posts.search.models.post_search_output import PostSearchOutput
 from linkedin_mcp.tools.posts.search.page import PostSearchPage
-from linkedin_mcp.transport.context import current_client_id
 
 
 async def execute(
@@ -26,7 +25,6 @@ async def execute(
 ) -> PostSearchOutput:
     state = await pagination.start(
         account_id=account_id,
-        client_id=current_client_id(),
         capability_name=CapabilityName.POSTS_SEARCH,
         request=request,
     )

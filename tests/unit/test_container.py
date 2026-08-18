@@ -12,7 +12,7 @@ from types import ModuleType
 
 import pytest
 
-import linkedin_mcp.transport.ownership as process_lock_module
+import linkedin_mcp.transport.lock as process_lock_module
 from linkedin_mcp.config import Settings
 from linkedin_mcp.container import create_production_container
 from linkedin_mcp.errors import ConfigurationError

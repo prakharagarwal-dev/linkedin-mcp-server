@@ -20,7 +20,6 @@ from linkedin_mcp.tools.connections.search.models.connections_search_output impo
 )
 from linkedin_mcp.tools.connections.search.page import ConnectionsSearchPage
 from linkedin_mcp.tools.people.models.person_connection_degree import PersonConnectionDegree
-from linkedin_mcp.transport.context import current_client_id
 
 
 async def execute(
@@ -32,7 +31,6 @@ async def execute(
 ) -> ConnectionsSearchOutput:
     state = await pagination.start(
         account_id=account_id,
-        client_id=current_client_id(),
         capability_name=CapabilityName.CONNECTIONS_SEARCH,
         request=request,
     )

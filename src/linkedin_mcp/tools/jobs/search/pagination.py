@@ -14,7 +14,6 @@ from linkedin_mcp.tools.jobs.search.evidence import source_from_job_search
 from linkedin_mcp.tools.jobs.search.models.job_search_input import JobSearchInput
 from linkedin_mcp.tools.jobs.search.models.job_search_output import JobSearchOutput
 from linkedin_mcp.tools.jobs.search.page import JobSearchPage
-from linkedin_mcp.transport.context import current_client_id
 
 
 async def execute(
@@ -26,7 +25,6 @@ async def execute(
 ) -> JobSearchOutput:
     state = await pagination.start(
         account_id=account_id,
-        client_id=current_client_id(),
         capability_name=CapabilityName.JOBS_SEARCH,
         request=request,
     )

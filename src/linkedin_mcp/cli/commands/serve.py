@@ -7,10 +7,10 @@ import sys
 from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import LinkedInMCPError
 from linkedin_mcp.transport import inspect_account_runtime
-from linkedin_mcp.transport.shared import (
-    ensure_shared_runtime,
-    run_shared_runtime,
-    wait_for_shared_runtime,
+from linkedin_mcp.transport.host import (
+    ensure_host,
+    run_host,
+    wait_for_host,
 )
 from linkedin_mcp.transport.stdio import run_stdio_proxy
 
@@ -26,23 +26,23 @@ def configure(command: argparse.ArgumentParser) -> None:
 
 async def execute(settings: Settings) -> None:
     if settings.transport == "stdio":
-        endpoint = await ensure_shared_runtime(settings)
+        endpoint = await ensure_host(settings)
         await run_stdio_proxy(endpoint)
         return
 
     status = inspect_account_runtime(settings.runtime_lock_path)
     if status.running:
-        endpoint = await wait_for_shared_runtime(settings)
+        endpoint = await wait_for_host(settings)
         print(f"LinkedIn MCP shared runtime already available at {endpoint}", file=sys.stderr)
         return
 
     try:
-        await run_shared_runtime(settings)
+        await run_host(settings)
     except LinkedInMCPError:
         status = inspect_account_runtime(settings.runtime_lock_path)
         if not status.running:
             raise
-        endpoint = await wait_for_shared_runtime(settings)
+        endpoint = await wait_for_host(settings)
         print(f"LinkedIn MCP shared runtime already available at {endpoint}", file=sys.stderr)
 
 

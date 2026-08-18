@@ -1,6 +1,6 @@
 """MCP transports and shared-host lifecycle."""
 
-from .ownership import (
+from .lock import (
     AccountProcessLock,
     AccountRuntimeOwner,
     AccountRuntimeStatus,

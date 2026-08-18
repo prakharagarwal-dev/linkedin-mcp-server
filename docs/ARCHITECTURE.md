@@ -94,8 +94,7 @@ The server has no result or evidence repository. Process-local state is limited
 to:
 
 - queued and active tasks;
-- pagination cursors;
-- MCP session identities; and
+- pagination cursors; and
 - navigation pacing.
 
 Restarting clears that state. The Chromium profile is the only persistent
@@ -119,7 +118,7 @@ profile through the CLI.
 linkedin_mcp/
 ├── execution/               Task, Scheduler, Worker
 ├── browser/                 Playwright setup, profile, low-level runtime
-├── transport/               FastMCP, client context, transports, shared host
+├── transport/               FastMCP, stdio bridge, shared host and lock
 ├── cli/                     CLI assembly and commands
 ├── container.py             process-wide dependency composition
 ├── pagination.py            bounded process-local cursor state

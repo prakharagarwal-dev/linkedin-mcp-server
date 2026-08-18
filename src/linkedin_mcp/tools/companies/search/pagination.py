@@ -14,7 +14,6 @@ from linkedin_mcp.tools.companies.search.evidence import source_from_company_sea
 from linkedin_mcp.tools.companies.search.models.company_search_input import CompanySearchInput
 from linkedin_mcp.tools.companies.search.models.company_search_output import CompanySearchOutput
 from linkedin_mcp.tools.companies.search.page import CompanySearchPage
-from linkedin_mcp.transport.context import current_client_id
 
 
 async def execute(
@@ -26,7 +25,6 @@ async def execute(
 ) -> CompanySearchOutput:
     state = await pagination.start(
         account_id=account_id,
-        client_id=current_client_id(),
         capability_name=CapabilityName.COMPANIES_SEARCH,
         request=request,
     )

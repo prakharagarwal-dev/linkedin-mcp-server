@@ -20,7 +20,7 @@ import linkedin_mcp.cli.commands.setup as setup_command
 import linkedin_mcp.cli.commands.status as status_command
 import linkedin_mcp.cli.commands.stop as stop_command
 import linkedin_mcp.cli.main as cli
-import linkedin_mcp.transport.owned_operation as owned_operation
+import linkedin_mcp.transport.lock as owned_operation
 from linkedin_mcp.browser import BrowserProfileResetResult, BrowserProfileStatus
 from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import ConfigurationError
@@ -271,7 +271,7 @@ async def test_logout_and_owned_operation_complete_without_a_signal(
         return True
 
     monkeypatch.setattr(
-        "linkedin_mcp.transport.owned_operation._wait_for_stop_signal",
+        "linkedin_mcp.transport.lock._wait_for_stop_signal",
         no_signal,
     )
     monkeypatch.setattr(logout_command, "logout_interactively", logged_out)
@@ -415,14 +415,13 @@ async def test_runtime_status_and_stop_report_exact_owner(
 
     async def fake_runtime_status(_: str) -> dict[str, object]:
         return {
-            "connected_clients": 2,
             "queue_depth": 3,
             "active_browser_operation": True,
             "active_task": "linkedin.jobs.search",
             "accepting_calls": True,
         }
 
-    monkeypatch.setattr(status_command, "read_shared_runtime_status", fake_runtime_status)
+    monkeypatch.setattr(status_command, "read_host_status", fake_runtime_status)
 
     await status_command.execute(settings)
     status = json.loads(capsys.readouterr().out)
@@ -435,7 +434,6 @@ async def test_runtime_status_and_stop_report_exact_owner(
         "active_browser_operation": True,
         "active_task": "linkedin.jobs.search",
         "command": "shared-runtime",
-        "connected_clients": 2,
         "endpoint": "http://127.0.0.1:8000/mcp",
         "healthy": True,
         "lock_path": str(settings.runtime_lock_path),
@@ -537,7 +535,7 @@ async def test_owned_cli_operation_cleans_up_before_releasing_lock_on_stop_signa
         return signal.SIGTERM
 
     monkeypatch.setattr(
-        "linkedin_mcp.transport.owned_operation._wait_for_stop_signal",
+        "linkedin_mcp.transport.lock._wait_for_stop_signal",
         signal_after_start,
     )
 
@@ -565,7 +563,7 @@ async def test_stdio_serve_attaches_proxy_to_shared_runtime(
     async def fake_proxy(endpoint: str) -> None:
         events.append(("proxy-running", endpoint))
 
-    monkeypatch.setattr(serve_command, "ensure_shared_runtime", fake_ensure)
+    monkeypatch.setattr(serve_command, "ensure_host", fake_ensure)
     monkeypatch.setattr(serve_command, "run_stdio_proxy", fake_proxy)
 
     await serve_command.execute(Settings(transport="stdio"))
@@ -590,7 +588,7 @@ async def test_streamable_http_starts_shared_runtime_when_no_owner_exists(
         events.append("runtime-running")
 
     monkeypatch.setattr(serve_command, "inspect_account_runtime", fake_inspect)
-    monkeypatch.setattr(serve_command, "run_shared_runtime", fake_runtime)
+    monkeypatch.setattr(serve_command, "run_host", fake_runtime)
 
     await serve_command.execute(
         Settings(
@@ -621,7 +619,7 @@ async def test_streamable_http_reuses_an_owner_and_recovers_an_election_race(
         return endpoint
 
     monkeypatch.setattr(serve_command, "inspect_account_runtime", running)
-    monkeypatch.setattr(serve_command, "wait_for_shared_runtime", wait)
+    monkeypatch.setattr(serve_command, "wait_for_host", wait)
     await serve_command.execute(settings)
     assert endpoint in capsys.readouterr().err
 
@@ -639,6 +637,6 @@ async def test_streamable_http_reuses_an_owner_and_recovers_an_election_race(
         raise ConfigurationError("another owner won")
 
     monkeypatch.setattr(serve_command, "inspect_account_runtime", racing)
-    monkeypatch.setattr(serve_command, "run_shared_runtime", lose_election)
+    monkeypatch.setattr(serve_command, "run_host", lose_election)
     await serve_command.execute(settings)
     assert endpoint in capsys.readouterr().err

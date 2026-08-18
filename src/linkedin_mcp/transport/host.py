@@ -1,4 +1,4 @@
-"""Discovery, election, and lifecycle for the shared local MCP runtime."""
+"""Discovery, startup, and lifecycle for the shared local MCP host."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from linkedin_mcp import __version__
 from linkedin_mcp.config import Settings, runtime_configuration_fingerprint
 from linkedin_mcp.container import create_production_container
 from linkedin_mcp.errors import ConfigurationError
-from linkedin_mcp.transport.ownership import (
+from linkedin_mcp.transport.lock import (
     AccountProcessLock,
     AccountRuntimeStatus,
     inspect_account_runtime,
@@ -60,11 +60,11 @@ _WINDOWS_BROKER_SCRIPT = "; ".join(
 )
 
 
-class _RuntimeStarter(Protocol):
+class _HostStarter(Protocol):
     def poll(self) -> int | None: ...
 
 
-class _BrokeredRuntimeStarter:
+class _BrokeredHostStarter:
     """Report only broker failures while the elected runtime publishes its own PID."""
 
     def __init__(self, broker: subprocess.Popen[bytes]) -> None:
@@ -92,33 +92,33 @@ class _LoopbackMCPApp:
         await self._app(scope, receive, send)
 
 
-def shared_runtime_endpoint(settings: Settings) -> str:
+def host_endpoint(settings: Settings) -> str:
     host = _normalized_loopback_host(settings.http_host)
     rendered_host = f"[{host}]" if ":" in host else host
     return f"http://{rendered_host}:{settings.http_port}/mcp"
 
 
-async def ensure_shared_runtime(settings: Settings) -> str:
+async def ensure_host(settings: Settings) -> str:
     """Return a healthy endpoint, starting one elected background owner if needed."""
 
     status = inspect_account_runtime(settings.runtime_lock_path)
     if status.running and status.owner is None:
-        return await wait_for_shared_runtime(settings)
+        return await wait_for_host(settings)
     _validate_running_owner(status, settings)
     endpoint = await _healthy_endpoint(status)
     if endpoint is not None:
         return endpoint
     if status.running:
-        return await wait_for_shared_runtime(settings)
+        return await wait_for_host(settings)
 
-    starter = _spawn_shared_runtime(settings)
-    return await wait_for_shared_runtime(settings, starter=starter)
+    starter = _spawn_host(settings)
+    return await wait_for_host(settings, starter=starter)
 
 
-async def wait_for_shared_runtime(
+async def wait_for_host(
     settings: Settings,
     *,
-    starter: _RuntimeStarter | None = None,
+    starter: _HostStarter | None = None,
 ) -> str:
     deadline = time.monotonic() + settings.runtime_start_timeout_seconds
     last_owner_command: str | None = None
@@ -142,7 +142,7 @@ async def wait_for_shared_runtime(
         if starter is not None and starter.poll() is not None and not status.running:
             raise ConfigurationError(
                 "The shared LinkedIn MCP runtime failed during startup. See "
-                f"{_runtime_log_path(settings)} for the safe local diagnostic log."
+                f"{_host_log_path(settings)} for the safe local diagnostic log."
             )
         await asyncio.sleep(0.1)
     suffix = f" The current owner command is {last_owner_command!r}." if last_owner_command else ""
@@ -152,9 +152,9 @@ async def wait_for_shared_runtime(
     )
 
 
-async def runtime_is_healthy(endpoint: str, *, timeout_seconds: float = 2.0) -> bool:
+async def host_is_healthy(endpoint: str, *, timeout_seconds: float = 2.0) -> bool:
     try:
-        validated = validate_shared_runtime_endpoint(endpoint)
+        validated = validate_host_endpoint(endpoint)
         async with asyncio.timeout(timeout_seconds):
             async with streamable_http_client(validated) as (read_stream, write_stream, _):
                 async with ClientSession(
@@ -172,7 +172,7 @@ async def runtime_is_healthy(endpoint: str, *, timeout_seconds: float = 2.0) -> 
         return False
 
 
-async def read_shared_runtime_status(
+async def read_host_status(
     endpoint: str,
     *,
     timeout_seconds: float = 2.0,
@@ -180,7 +180,7 @@ async def read_shared_runtime_status(
     """Read the runtime's safe local status without entering the browser queue."""
 
     try:
-        validated = validate_shared_runtime_endpoint(endpoint)
+        validated = validate_host_endpoint(endpoint)
         async with asyncio.timeout(timeout_seconds):
             async with streamable_http_client(validated) as (read_stream, write_stream, _):
                 async with ClientSession(
@@ -200,10 +200,10 @@ async def read_shared_runtime_status(
         return None
 
 
-async def run_shared_runtime(settings: Settings) -> None:
+async def run_host(settings: Settings) -> None:
     """Own the profile lock and serve stateful MCP sessions on loopback."""
 
-    endpoint = shared_runtime_endpoint(settings)
+    endpoint = host_endpoint(settings)
     host = _normalized_loopback_host(settings.http_host)
     container = create_production_container(settings)
     container.process_lock = AccountProcessLock(
@@ -237,7 +237,7 @@ async def run_shared_runtime(settings: Settings) -> None:
         await container.close()
 
 
-def validate_shared_runtime_endpoint(endpoint: str) -> str:
+def validate_host_endpoint(endpoint: str) -> str:
     try:
         parsed = urlsplit(endpoint)
         port = parsed.port
@@ -261,12 +261,12 @@ async def _healthy_endpoint(status: AccountRuntimeStatus) -> str | None:
     owner = status.owner
     if not status.running or owner is None or owner.endpoint is None:
         return None
-    endpoint = validate_shared_runtime_endpoint(owner.endpoint)
-    return endpoint if await runtime_is_healthy(endpoint) else None
+    endpoint = validate_host_endpoint(owner.endpoint)
+    return endpoint if await host_is_healthy(endpoint) else None
 
 
-def _spawn_shared_runtime(settings: Settings) -> _RuntimeStarter:
-    log_path = _runtime_log_path(settings)
+def _spawn_host(settings: Settings) -> _HostStarter:
+    log_path = _host_log_path(settings)
     log_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     with suppress(OSError):
         log_path.parent.chmod(0o700)
@@ -275,7 +275,7 @@ def _spawn_shared_runtime(settings: Settings) -> _RuntimeStarter:
         if os.name != "nt":
             os.fchmod(log.fileno(), 0o600)
         if os.name == "nt":
-            process: _RuntimeStarter = _spawn_windows_shared_runtime(log)
+            process: _HostStarter = _spawn_windows_host(log)
         else:
             process = subprocess.Popen(
                 [sys.executable, "-m", _RUNTIME_MODULE],
@@ -290,7 +290,7 @@ def _spawn_shared_runtime(settings: Settings) -> _RuntimeStarter:
     return process
 
 
-def _spawn_windows_shared_runtime(log: BinaryIO) -> _BrokeredRuntimeStarter:
+def _spawn_windows_host(log: BinaryIO) -> _BrokeredHostStarter:
     """Ask local Windows CIM to create the runtime outside the caller's Job Object."""
 
     environment = os.environ.copy()
@@ -328,17 +328,17 @@ def _spawn_windows_shared_runtime(log: BinaryIO) -> _BrokeredRuntimeStarter:
         raise ConfigurationError(
             "The shared LinkedIn MCP runtime could not start through local Windows CIM."
         ) from error
-    return _BrokeredRuntimeStarter(broker)
+    return _BrokeredHostStarter(broker)
 
 
-def brokered_runtime_output_required() -> bool:
+def brokered_host_output_required() -> bool:
     return os.environ.get(_WINDOWS_BROKERED_RUNTIME_ENV) == "1"
 
 
-def redirect_brokered_runtime_output(settings: Settings) -> TextIO:
+def redirect_brokered_host_output(settings: Settings) -> TextIO:
     """Give the detached Windows runtime safe Python output streams for diagnostics."""
 
-    log_path = _runtime_log_path(settings)
+    log_path = _host_log_path(settings)
     log_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     log = log_path.open("a", encoding="utf-8", buffering=1)
     sys.stdout = log
@@ -346,7 +346,7 @@ def redirect_brokered_runtime_output(settings: Settings) -> TextIO:
     return log
 
 
-def _runtime_log_path(settings: Settings) -> Path:
+def _host_log_path(settings: Settings) -> Path:
     return settings.runtime_lock_path.with_name("runtime.log")
 
 

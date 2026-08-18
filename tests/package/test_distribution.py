@@ -210,23 +210,20 @@ def test_source_layout_keeps_infrastructure_and_linkedin_features_separate() -> 
         assert not (cli / retired_cli_module).exists()
 
     transport = package / "transport"
-    for transport_module in (
+    assert {path.name for path in transport.glob("*.py")} == {
+        "__init__.py",
         "__main__.py",
-        "context.py",
-        "owned_operation.py",
-        "ownership.py",
-        "runner.py",
+        "host.py",
+        "lock.py",
         "server.py",
-        "shared.py",
         "stdio.py",
-    ):
-        assert (transport / transport_module).is_file()
+    }
     assert not (package / "mcp").exists()
     assert not (package / "runtime").exists()
 
     main_source = (cli / "main.py").read_text(encoding="utf-8")
     assert "BrowserProfileManager" not in main_source
-    assert "run_shared_runtime" not in main_source
+    assert "run_host" not in main_source
     assert "_runtime" not in main_source
 
 
