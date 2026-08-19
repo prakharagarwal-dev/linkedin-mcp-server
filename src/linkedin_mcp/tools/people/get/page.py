@@ -7,10 +7,14 @@ from datetime import UTC, datetime
 from typing import cast
 from urllib.parse import urljoin, urlsplit
 
+from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
+from linkedin_mcp.browser import BrowserManager
+from linkedin_mcp.browser.urls import canonical_profile_url, profile_slug_from_url
 from linkedin_mcp.errors import ParserDriftError
+from linkedin_mcp.infra.playwright import Paced
 from linkedin_mcp.tools.people.get.models import (
     PROFILE_SLUG_SEGMENT_PATTERN,
     PeopleGetInput,
@@ -35,10 +39,6 @@ from linkedin_mcp.tools.people.surface import (
     first_text,
     unique_lines,
 )
-from linkedin_mcp.ui import LinkedInLocator as Locator
-from linkedin_mcp.ui import LinkedInPage as Page
-from linkedin_mcp.ui import LinkedInPlaywright
-from linkedin_mcp.ui.urls import canonical_profile_url, profile_slug_from_url
 
 _DATE_RANGE_PATTERN = re.compile(
     r"\b(?:19|20)\d{2}\b|\bPresent\b|\b(?:\d+\s+)?(?:mos?|yrs?)\b",
@@ -693,7 +693,7 @@ def _parse_education(
     return tuple(values)
 
 
-async def _expand_and_scroll(page: Page) -> None:
+async def _expand_and_scroll(paced: Paced, page: Page) -> None:
     main = page.locator("main")
     source_path = urlsplit(page.url).path.rstrip("/")
     for scroll_index in range(8):
@@ -704,8 +704,8 @@ async def _expand_and_scroll(page: Page) -> None:
                 "LinkedIn member profile became unavailable during bounded scrolling "
                 f"at step {scroll_index + 1}."
             ) from error
-        await main.evaluate("element => { element.scrollTop = element.scrollHeight; }")
-        await page.keyboard.press("End")
+        await paced.evaluate(main, "element => { element.scrollTop = element.scrollHeight; }")
+        await paced.keyboard_press(page.keyboard, "End")
         await page.wait_for_timeout(200)
         if urlsplit(page.url).path.rstrip("/") != source_path:
             raise ParserDriftError("LinkedIn member profile navigated away during scrolling.")
@@ -719,15 +719,15 @@ async def _expand_and_scroll(page: Page) -> None:
             if not await button.is_visible():
                 continue
             source_url = page.url
-            await button.click(timeout=1_000)
+            await paced.click(button, timeout=1_000)
             if page.url != source_url:
                 raise ParserDriftError(
                     "A profile content-expansion control unexpectedly navigated away."
                 )
         except PlaywrightTimeoutError:
             continue
-    await main.evaluate("element => { element.scrollTop = 0; }")
-    await page.keyboard.press("Home")
+    await paced.evaluate(main, "element => { element.scrollTop = 0; }")
+    await paced.keyboard_press(page.keyboard, "Home")
 
 
 async def _visible_page_text(page: Page) -> str:
@@ -912,10 +912,11 @@ def _merge_sections(
 
 
 class PersonProfilePage:
-    def __init__(self, playwright: LinkedInPlaywright, *, max_detail_pages: int) -> None:
+    def __init__(self, browser: BrowserManager, *, max_detail_pages: int) -> None:
         if max_detail_pages < 0:
             raise ValueError("Profile detail-page bound cannot be negative.")
-        self._playwright = playwright
+        self._browser = browser
+        self._paced = browser.paced
         self._max_detail_pages = max_detail_pages
 
     async def read(
@@ -934,8 +935,8 @@ class PersonProfilePage:
                 if section is not PersonProfileSectionSelector.OVERVIEW
             }
         )
-        async with self._playwright.page() as page:
-            await page.goto(canonical_profile_url(request.profile_slug))
+        async with self._browser.page() as page:
+            await self._paced.goto(page, canonical_profile_url(request.profile_slug))
             try:
                 await (
                     page.locator("main")
@@ -950,7 +951,7 @@ class PersonProfilePage:
             main = page.locator("main")
             await _top_card(main)
             await page.wait_for_timeout(2_000)
-            await _expand_and_scroll(page)
+            await _expand_and_scroll(self._paced, page)
             main = page.locator("main")
             top, name, top_text = await _top_card(main)
             (
@@ -1008,8 +1009,8 @@ class PersonProfilePage:
             )
 
             for detail_url, _detail_key in visited_detail_pairs:
-                await page.goto(detail_url)
-                await _expand_and_scroll(page)
+                await self._paced.goto(page, detail_url)
+                await _expand_and_scroll(self._paced, page)
                 detail_text = await _visible_page_text(page)
                 page_sections = await _extract_sections(
                     page.locator("main"),

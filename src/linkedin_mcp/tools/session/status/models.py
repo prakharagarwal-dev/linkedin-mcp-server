@@ -6,8 +6,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, StringConstraints
 
-from linkedin_mcp.browser.bootstrap import BrowserSetupState
-from linkedin_mcp.ui import AuthenticationState
+from linkedin_mcp.browser import AuthenticationState, BrowserSetupState
 
 
 class StrictModel(BaseModel):

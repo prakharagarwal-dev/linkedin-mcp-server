@@ -1,4 +1,4 @@
-"""Detection for authentication loss, restrictions, and unexpected navigation."""
+"""Browser-owned detection for authentication loss and LinkedIn restrictions."""
 
 from __future__ import annotations
 
@@ -6,8 +6,8 @@ from urllib.parse import urlsplit
 
 from playwright.async_api import Page
 
+from linkedin_mcp.browser.urls import validate_linkedin_url
 from linkedin_mcp.errors import AuthenticationRequiredError, RestrictionDetectedError
-from linkedin_mcp.ui.urls import validate_linkedin_url
 
 _RESTRICTION_PATHS = ("/checkpoint/", "/authwall")
 _LOGIN_PATHS = ("/login", "/uas/login")
@@ -20,7 +20,7 @@ _RESTRICTION_PHRASES = (
 )
 
 
-async def assert_safe_linkedin_page(page: Page, allowed_hosts: tuple[str, ...]) -> None:
+async def assert_linkedin_access(page: Page, allowed_hosts: tuple[str, ...]) -> None:
     validated = validate_linkedin_url(page.url, allowed_hosts)
     path = urlsplit(validated).path.lower()
     if any(marker in path for marker in _RESTRICTION_PATHS):

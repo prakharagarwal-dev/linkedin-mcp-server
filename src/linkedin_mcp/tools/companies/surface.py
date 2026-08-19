@@ -5,11 +5,11 @@ from __future__ import annotations
 import re
 from urllib.parse import urlsplit
 
+from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.ui import LinkedInLocator as Locator
-from linkedin_mcp.ui import LinkedInPage as Page
+from linkedin_mcp.infra.playwright import Paced
 
 VISIBLE_COUNT = r"\d[\d,.]*[KMB]?\+?"
 
@@ -60,7 +60,7 @@ async def first_visible_text(locator: Locator) -> str | None:
     return None
 
 
-async def expand_and_scroll(page: Page) -> None:
+async def expand_and_scroll(paced: Paced, page: Page) -> None:
     main = page.locator("main")
     try:
         await main.wait_for(state="visible", timeout=10_000)
@@ -68,8 +68,8 @@ async def expand_and_scroll(page: Page) -> None:
         raise ParserDriftError("LinkedIn Company surface has no visible main region.") from error
     source_path = urlsplit(page.url).path.rstrip("/")
     for _ in range(8):
-        await main.evaluate("element => { element.scrollTop = element.scrollHeight; }")
-        await page.keyboard.press("End")
+        await paced.evaluate(main, "element => { element.scrollTop = element.scrollHeight; }")
+        await paced.keyboard_press(page.keyboard, "End")
         await page.wait_for_timeout(200)
         if urlsplit(page.url).path.rstrip("/") != source_path:
             raise ParserDriftError("LinkedIn Company surface navigated away while scrolling.")
@@ -82,12 +82,12 @@ async def expand_and_scroll(page: Page) -> None:
         try:
             if await button.is_visible():
                 source_url = page.url
-                await button.click(timeout=1_000)
+                await paced.click(button, timeout=1_000)
                 if page.url != source_url:
                     raise ParserDriftError(
                         "A Company content-expansion control unexpectedly navigated away."
                     )
         except PlaywrightTimeoutError:
             continue
-    await main.evaluate("element => { element.scrollTop = 0; }")
-    await page.keyboard.press("Home")
+    await paced.evaluate(main, "element => { element.scrollTop = 0; }")
+    await paced.keyboard_press(page.keyboard, "Home")

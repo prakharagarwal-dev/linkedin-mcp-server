@@ -12,10 +12,24 @@ from typing import Literal, cast
 from urllib.parse import urljoin
 
 from playwright.async_api import Error as PlaywrightError
+from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
+from linkedin_mcp.browser.urls import (
+    canonical_conversation_url,
+    canonical_profile_url,
+    conversation_id_from_url,
+    profile_slug_from_url,
+)
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
+from linkedin_mcp.infra.playwright import Paced
+from linkedin_mcp.infra.playwright.collections import (
+    CollectionSettleOutcome,
+    CollectionSettleResult,
+    dispatch_bubbling_wheel,
+    wait_for_collection_interaction,
+)
 from linkedin_mcp.tools.messaging.conversation_surface import (
     ConversationSurface,
     MessageAttachmentKind,
@@ -31,20 +45,6 @@ from linkedin_mcp.tools.messaging.send.models import (
     MessageGifInput,
     MessageSendInput,
     MessageSendPayload,
-)
-from linkedin_mcp.ui import LinkedInLocator as Locator
-from linkedin_mcp.ui import LinkedInPage as Page
-from linkedin_mcp.ui.collections import (
-    CollectionSettleOutcome,
-    CollectionSettleResult,
-    dispatch_bubbling_wheel,
-    wait_for_collection_interaction,
-)
-from linkedin_mcp.ui.urls import (
-    canonical_conversation_url,
-    canonical_profile_url,
-    conversation_id_from_url,
-    profile_slug_from_url,
 )
 
 _SCROLL_PROGRESS_POLL_ATTEMPTS = 8
@@ -312,6 +312,7 @@ def _history_has_explicit_start(visible_text: str) -> bool:
 
 
 async def _settle_history_scroll(
+    paced: Paced,
     page: Page,
     root: Locator,
 ) -> CollectionSettleResult:
@@ -330,14 +331,16 @@ async def _settle_history_scroll(
     async def scroll() -> None:
         nonlocal delivery_attempt
         delivery_attempt += 1
-        await scroller.hover(
+        await paced.hover(
+            scroller,
             position={
                 "x": box["width"] / 2,
                 "y": min(20, box["height"] / 2),
-            }
+            },
         )
-        await page.mouse.wheel(0, -1_800)
-        await scroller.evaluate(
+        await paced.wheel(page.mouse, 0, -1_800)
+        await paced.evaluate(
+            scroller,
             """
             element => {
               const boundary = Math.max(0, element.scrollHeight - element.clientHeight);
@@ -345,10 +348,10 @@ async def _settle_history_scroll(
                 ? -boundary
                 : 0;
             }
-            """
+            """,
         )
         if delivery_attempt > 1:
-            await dispatch_bubbling_wheel(scroller, delta_y=-1_800)
+            await dispatch_bubbling_wheel(paced, scroller, delta_y=-1_800)
 
     async def explicit_start() -> bool:
         return _history_has_explicit_start(await _visible_text(root))
@@ -505,7 +508,7 @@ class MessageSendPage(ConversationSurface):
         self,
         request: MessageSendInput,
     ) -> ActionInspection:
-        async with self._playwright.page() as page:
+        async with self._browser.page() as page:
             page, root, profile_slug, name, is_group = await self._open(
                 page,
                 profile_slug=request.profile_slug,
@@ -572,7 +575,7 @@ class MessageSendPage(ConversationSurface):
 
     async def perform_message(self, command: ActionCommand) -> ActionPageResult:
         payload = command.payload
-        async with self._playwright.page() as page:
+        async with self._browser.page() as page:
             page, root, profile_slug, name, is_group = await self._open(
                 page,
                 profile_slug=(
@@ -628,7 +631,7 @@ class MessageSendPage(ConversationSurface):
                         payload.reply_to_message_ref,
                         participant_name=name,
                     )
-                    await reply.click()
+                    await self._paced.click(reply)
                 except (InvalidTargetError, ParserDriftError) as error:
                     return await self._result(
                         page,
@@ -665,7 +668,7 @@ class MessageSendPage(ConversationSurface):
                 reply_target=reply_target,
             )
             if payload.message is not None:
-                await composer.fill(payload.message)
+                await self._paced.fill(composer, payload.message)
             try:
                 await self._upload_attachments(root, payload)
             except InvalidTargetError as error:
@@ -703,7 +706,7 @@ class MessageSendPage(ConversationSurface):
                     "The conversation has no unique visible Send control.",
                 )
             try:
-                await send.click()
+                await self._paced.click(send)
             except Exception:
                 return await self._result(
                     page,
@@ -800,7 +803,7 @@ class MessageSendPage(ConversationSurface):
         )
         result = await self._gif_result(page, root, payload.gif)
         try:
-            await result.click()
+            await self._paced.click(result)
         except Exception:
             return await self._result(
                 page,
@@ -890,8 +893,8 @@ class MessageSendPage(ConversationSurface):
                 )
             if matches:
                 item, message = matches[0]
-                await item.scroll_into_view_if_needed()
-                await item.hover()
+                await self._paced.scroll_into_view_if_needed(item)
+                await self._paced.hover(item)
                 controls = item.get_by_role(
                     "button",
                     name=re.compile(r"^reply to this message$", re.I),
@@ -927,7 +930,7 @@ class MessageSendPage(ConversationSurface):
                 )
             if round_index + 1 >= self._max_history_rounds:
                 break
-            settled = await _settle_history_scroll(page, root)
+            settled = await _settle_history_scroll(self._paced, page, root)
             if settled.outcome is CollectionSettleOutcome.EXPLICIT_END:
                 break
             if settled.outcome is CollectionSettleOutcome.PROGRESSED:
@@ -949,7 +952,7 @@ class MessageSendPage(ConversationSurface):
     ) -> None:
         for asset_ref in payload.attachment_refs:
             upload = await self._attachment_input(root, asset_ref)
-            await upload.set_input_files(asset_ref)
+            await self._paced.set_input_files(upload, asset_ref)
 
     @staticmethod
     async def _attachment_input(root: Locator, asset_ref: str) -> Locator:
@@ -1006,7 +1009,7 @@ class MessageSendPage(ConversationSurface):
         )
         if await opener.count() != 1:
             raise InvalidTargetError("The conversation has no unique visible GIF picker control.")
-        await opener.click()
+        await self._paced.click(opener)
         search = page.get_by_role(
             "textbox",
             name=re.compile(r"(?:search|find).*(?:gifs?|klipy)", re.I),
@@ -1015,10 +1018,9 @@ class MessageSendPage(ConversationSurface):
             search = page.get_by_placeholder(re.compile(r"(?:search|find).*(?:gifs?|klipy)", re.I))
         if await search.count() != 1:
             raise ParserDriftError("LinkedIn's GIF picker has no unique visible search field.")
-        await search.fill(gif.search_query)
+        await self._paced.fill(search, gif.search_query)
         for _ in range(24):
             await page.wait_for_timeout(250)
-            await page.assert_safe()
             result = await self._visible_gif_result(page, gif.result_title)
             if result is not None:
                 return result

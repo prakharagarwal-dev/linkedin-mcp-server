@@ -5,9 +5,20 @@ from __future__ import annotations
 import re
 from datetime import UTC, datetime
 
+from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
+from linkedin_mcp.browser import BrowserManager
+from linkedin_mcp.browser.urls import (
+    canonical_post_url,
+    post_reference_from_comment_ref,
+)
 from linkedin_mcp.errors import ParserDriftError
+from linkedin_mcp.infra.playwright import Paced
+from linkedin_mcp.infra.playwright.collections import (
+    visible_locator_signature,
+    wait_for_collection_change,
+)
 from linkedin_mcp.tools.posts.comments.list.models import (
     CommentObservation,
     CommentSort,
@@ -25,17 +36,6 @@ from linkedin_mcp.tools.posts.surface import (
     internal_comment_from_region,
     prepare_visible_content,
 )
-from linkedin_mcp.ui import LinkedInLocator as Locator
-from linkedin_mcp.ui import LinkedInPage as Page
-from linkedin_mcp.ui import LinkedInPlaywright
-from linkedin_mcp.ui.collections import (
-    visible_locator_signature,
-    wait_for_collection_change,
-)
-from linkedin_mcp.ui.urls import (
-    canonical_post_url,
-    post_reference_from_comment_ref,
-)
 
 _COLLECTION_POLL_ATTEMPTS = 8
 
@@ -48,14 +48,14 @@ async def _visible_comment_signature(page: Page) -> tuple[str, ...]:
     )
 
 
-async def _expand_visible_content(page: Page) -> None:
+async def _expand_visible_content(paced: Paced, page: Page) -> None:
     """Preserve bounded best-effort expansion for the discussion collection."""
 
     await prepare_visible_content(page)
     main = page.locator("main")
-    await page.keyboard.press("End")
+    await paced.keyboard_press(page.keyboard, "End")
     await page.wait_for_timeout(500)
-    await page.keyboard.press("Home")
+    await paced.keyboard_press(page.keyboard, "Home")
     buttons = main.locator('[data-testid="expandable-text-button"]').or_(
         main.get_by_role(
             "button",
@@ -76,7 +76,7 @@ async def _expand_visible_content(page: Page) -> None:
             if re.search(r"\b(?:comments?|repl(?:y|ies))\b", button_name, re.IGNORECASE):
                 continue
             source_url = page.url
-            await button.click(timeout=1_000)
+            await paced.click(button, timeout=1_000)
             if page.url != source_url:
                 raise ParserDriftError("A LinkedIn content expansion unexpectedly navigated away.")
         except PlaywrightTimeoutError:
@@ -135,10 +135,11 @@ async def _visible_comment_regions(page: Page) -> tuple[Locator, ...]:
 
 
 class PostCommentsPage:
-    def __init__(self, playwright: LinkedInPlaywright, *, max_expansion_rounds: int) -> None:
+    def __init__(self, browser: BrowserManager, *, max_expansion_rounds: int) -> None:
         if max_expansion_rounds < 0:
             raise ValueError("Comment expansion bound cannot be negative.")
-        self._playwright = playwright
+        self._browser = browser
+        self._paced = browser.paced
         self._max_expansion_rounds = max_expansion_rounds
 
     async def collect(
@@ -157,10 +158,11 @@ class PostCommentsPage:
             raise ValueError("Post-comment result limit must be positive.")
         target = canonical_post_url(request.post_ref)
         expansion_rounds = 0
-        async with self._playwright.page() as page:
-            await page.goto(target)
-            await _expand_visible_content(page)
+        async with self._browser.page() as page:
+            await self._paced.goto(page, target)
+            await _expand_visible_content(self._paced, page)
             post_region, displayed_post_ref = await detail_region_for_post(
+                self._paced,
                 page,
                 request.post_ref,
             )
@@ -180,7 +182,7 @@ class PostCommentsPage:
                         "LinkedIn discussion has no unique visible Comment control."
                     )
                 if visible_controls:
-                    await visible_controls[0].click()
+                    await self._paced.click(visible_controls[0])
                     for _ in range(20):
                         visible_regions = await _visible_comment_regions(page)
                         if visible_regions:
@@ -196,7 +198,7 @@ class PostCommentsPage:
             if await sort_buttons.count():
                 current = sort_buttons.first
                 if desired_sort.casefold() not in ((await current.inner_text()).strip().casefold()):
-                    await current.click()
+                    await self._paced.click(current)
                     option = page.get_by_role(
                         "option",
                         name=re.compile(rf"^{re.escape(desired_sort)}$", re.IGNORECASE),
@@ -215,7 +217,7 @@ class PostCommentsPage:
                         raise ParserDriftError(
                             "LinkedIn comment sorting has no unique requested visible option."
                         )
-                    await visible_options[0].click()
+                    await self._paced.click(visible_options[0])
                     if visible_regions:
                         # LinkedIn briefly removes the discussion while applying a
                         # new sort. Do not mistake that transient empty DOM for an
@@ -249,7 +251,7 @@ class PostCommentsPage:
                     break
                 baseline = await _visible_comment_signature(page)
                 for control in visible_controls:
-                    await control.click()
+                    await self._paced.click(control)
                 expansion_rounds += 1
                 await wait_for_collection_change(
                     page,

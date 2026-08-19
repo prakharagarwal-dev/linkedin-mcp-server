@@ -183,26 +183,23 @@ def test_source_layout_keeps_infrastructure_and_linkedin_features_separate() -> 
     browser = package / "browser"
     assert {path.name for path in browser.glob("*.py")} == {
         "__init__.py",
+        "access.py",
         "bootstrap.py",
         "login.py",
         "logout.py",
         "manager.py",
         "profile.py",
+        "urls.py",
     }
     browser_sources = "\n".join(path.read_text(encoding="utf-8") for path in browser.glob("*.py"))
     assert "linkedin_mcp.linkedin" not in browser_sources
 
-    ui = package / "ui"
-    assert {path.name for path in ui.glob("*.py")} == {
+    assert not (package / "ui").exists()
+    playwright_infra = infra_package / "playwright"
+    assert {path.name for path in playwright_infra.glob("*.py")} == {
         "__init__.py",
-        "authentication_state.py",
         "collections.py",
-        "locator.py",
-        "pacing.py",
-        "page.py",
-        "playwright.py",
-        "safety.py",
-        "urls.py",
+        "pacer.py",
     }
     for retired_shared_helper in (
         "authentication.py",

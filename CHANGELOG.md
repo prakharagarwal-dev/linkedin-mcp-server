@@ -17,10 +17,11 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   visible login when required, revalidates the reopened profile, and only then
   starts its single queue worker and publishes the transport. Remove
   `AUTO_LOGIN_ON_START`, `BrowserRuntime`, and the browser operation lock.
-- Add a tool-facing `LinkedInPlaywright` layer that wraps official Playwright
-  pages and locators with navigation pacing, exact-host validation, safety
-  checks, and task-page cleanup. Move browser login/logout and context ownership
-  into `browser/`, and remove obsolete UI helpers from `tools/_shared`.
+- Replace the `LinkedInPlaywright` page/locator facade with raw official
+  Playwright objects plus a host-provided `Paced` action wrapper. Move task-page
+  ownership, popup cleanup, authentication/access state, URL validation, and
+  login/logout into `browser/`; keep only pacing and collection settling in
+  `infra/playwright/`; and remove the top-level `ui/` package.
 - Make `HostManager` the process composition root for stdio attachment,
   Streamable HTTP serving, queue/tools/cursor wiring, browser/login lifecycle,
   and reverse-order shutdown. The root `linkedin_mcp.__main__` now also launches

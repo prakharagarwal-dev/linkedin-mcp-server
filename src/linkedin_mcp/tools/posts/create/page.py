@@ -8,9 +8,17 @@ from datetime import UTC, datetime, timedelta
 from urllib.parse import urljoin, urlsplit
 
 from playwright.async_api import Error as PlaywrightError
+from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
+from linkedin_mcp.browser import BrowserManager
+from linkedin_mcp.browser.urls import (
+    canonical_post_url,
+    canonical_profile_url,
+    post_reference_from_value,
+    profile_slug_from_url,
+)
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
 from linkedin_mcp.tools.posts.create.models import (
     ActionCommand,
@@ -44,15 +52,6 @@ from linkedin_mcp.tools.posts.create.models import (
     TextPostContent,
     VideoCaptionMode,
     VideoPostContent,
-)
-from linkedin_mcp.ui import LinkedInLocator as Locator
-from linkedin_mcp.ui import LinkedInPage as Page
-from linkedin_mcp.ui import LinkedInPlaywright
-from linkedin_mcp.ui.urls import (
-    canonical_post_url,
-    canonical_profile_url,
-    post_reference_from_value,
-    profile_slug_from_url,
 )
 
 _HOME_URL = "https://www.linkedin.com/feed/"
@@ -156,16 +155,17 @@ async def _unique_visible_or_hidden(locator: Locator, description: str) -> Locat
 class PostPublishingPage:
     """Narrow personal-member composer adapter; it never publishes as a Page."""
 
-    def __init__(self, playwright: LinkedInPlaywright) -> None:
-        self._playwright = playwright
+    def __init__(self, browser: BrowserManager) -> None:
+        self._browser = browser
+        self._paced = browser.paced
 
     async def inspect_post(
         self,
         request: PostCreateInput,
     ) -> ActionInspection:
         self._validate_schedule(request.scheduled_at)
-        async with self._playwright.page() as page:
-            await page.goto(_HOME_URL)
+        async with self._browser.page() as page:
+            await self._paced.goto(page, _HOME_URL)
             dialog, slug, name = await self._open_composer(page)
             await self._assert_mode_available(page, dialog, request.content)
             await self._assert_settings_available(dialog, request)
@@ -192,9 +192,9 @@ class PostPublishingPage:
     async def perform_post(self, command: ActionCommand) -> ActionPageResult:
         payload = command.payload
         self._validate_schedule(payload.scheduled_at)
-        async with self._playwright.page() as page:
+        async with self._browser.page() as page:
             try:
-                await page.goto(_HOME_URL)
+                await self._paced.goto(page, _HOME_URL)
                 dialog, slug, name = await self._open_composer(page)
                 expected_slug = command.target.actor_profile_slug or command.target.profile_slug
                 expected_name = command.target.actor_display_name or command.target.display_name
@@ -240,7 +240,7 @@ class PostPublishingPage:
                     ),
                 )
             try:
-                await (final_control).click()
+                await self._paced.click(final_control)
             except Exception:
                 confirmation = await self._visible_publish_confirmation(page)
                 if confirmation is not None:
@@ -384,7 +384,7 @@ class PostPublishingPage:
             if identity[0] in nearby_slugs
         ]
         visible_target = await start.get_attribute("href")
-        await (start).click()
+        await self._paced.click(start)
         try:
             dialog = await self._composer_dialog(page)
         except ParserDriftError:
@@ -398,7 +398,7 @@ class PostPublishingPage:
                 or parsed.fragment
             ):
                 raise
-            await page.goto(target)
+            await self._paced.goto(page, target)
             dialog = await self._composer_dialog(page)
         identities = await self._visible_member_identities(dialog)
         if len(identities) == 1:
@@ -524,7 +524,7 @@ class PostPublishingPage:
                 dialog.get_by_role("button", name=re.compile(r"^more$", re.I)),
                 "More publishing-options control",
             )
-            await (more).click()
+            await self._paced.click(more)
         await _unique_visible(
             page.get_by_role("button", name=names[mode]),
             f"{mode.value} publishing option",
@@ -577,7 +577,7 @@ class PostPublishingPage:
             post_control,
             "Post control",
         )
-        await (settings_control).click()
+        await self._paced.click(settings_control)
         settings_candidates = page.get_by_role(
             "dialog",
             name=re.compile(r"^post settings$", re.I),
@@ -606,7 +606,7 @@ class PostPublishingPage:
             "requested audience option",
         )
         if request.audience is PostAudience.GROUP:
-            await (requested_audience).click()
+            await self._paced.click(requested_audience)
             assert request.group_target is not None
             await self._select_exact_group_target(
                 page,
@@ -622,7 +622,7 @@ class PostPublishingPage:
         if visible_current_controls:
             if len(visible_current_controls) != 1:
                 raise ParserDriftError("The visible post composer has no unique Comment control.")
-            await (visible_current_controls[0]).click()
+            await self._paced.click(visible_current_controls[0])
             comment_dialog_candidates = page.get_by_role(
                 "dialog",
                 name=re.compile(r"^comment control$", re.I),
@@ -701,7 +701,7 @@ class PostPublishingPage:
                     ),
                     "Remove link preview control",
                 )
-                await (remove).click()
+                await self._paced.click(remove)
         if payload.collaborators:
             dialog = await self._composer_dialog(page)
             await self._configure_collaborators(page, dialog, payload)
@@ -716,13 +716,13 @@ class PostPublishingPage:
             dialog.get_by_role("button", name=re.compile(r"^add media$", re.I)),
             "Add media control",
         )
-        await (control).click()
+        await self._paced.click(control)
         editor = await self._media_editor(page)
         upload = await _unique_visible(
             editor.locator('input[type="file"]'),
             "media file input",
         )
-        await upload.set_input_files([image.asset_ref for image in content.images])
+        await self._paced.set_input_files(upload, [image.asset_ref for image in content.images])
         selection_controls = editor.get_by_role(
             "button",
             name=re.compile(r"^select .+", re.I),
@@ -739,7 +739,7 @@ class PostPublishingPage:
                 "LinkedIn's media editor did not expose one selectable photo per upload."
             )
         for index, image in enumerate(content.images):
-            await (visible_selections[index]).click()
+            await self._paced.click(visible_selections[index])
             if image.edit is not None:
                 await self._edit_image(page, editor, image.edit)
                 editor = await self._media_editor(page)
@@ -753,7 +753,7 @@ class PostPublishingPage:
             editor.get_by_role("button", name=re.compile(r"^next$", re.I)),
             "media editor Next control",
         )
-        await (next_control).click()
+        await self._paced.click(next_control)
 
     @staticmethod
     async def _media_editor(page: Page) -> Locator:
@@ -774,7 +774,7 @@ class PostPublishingPage:
             editor.get_by_role("button", name=re.compile(r"^edit$", re.I)),
             "image Edit control",
         )
-        await (open_control).click()
+        await self._paced.click(open_control)
         image_editor = await _unique_visible(
             page.get_by_role("dialog").filter(
                 has=page.get_by_role("tab", name=re.compile(r"^crop$", re.I))
@@ -792,21 +792,21 @@ class PostPublishingPage:
             "image aspect-ratio option",
         )
         if not await aspect.is_checked():
-            await (aspect).click()
+            await self._paced.click(aspect)
         rotation_name = (
             re.compile(r"^rotate clockwise$", re.I)
             if edit.clockwise_quarter_turns > 0
             else re.compile(r"^rotate (?:anti|counter)clockwise$", re.I)
         )
         for _ in range(abs(edit.clockwise_quarter_turns)):
-            await (
+            await self._paced.click(
                 await _unique_visible(
                     image_editor.get_by_role("button", name=rotation_name),
                     "image rotation control",
                 )
-            ).click()
+            )
         if edit.flip_horizontal:
-            await (
+            await self._paced.click(
                 await _unique_visible(
                     image_editor.get_by_role(
                         "button",
@@ -814,9 +814,9 @@ class PostPublishingPage:
                     ),
                     "horizontal image-flip control",
                 )
-            ).click()
+            )
         if edit.flip_vertical:
-            await (
+            await self._paced.click(
                 await _unique_visible(
                     image_editor.get_by_role(
                         "button",
@@ -824,7 +824,7 @@ class PostPublishingPage:
                     ),
                     "vertical image-flip control",
                 )
-            ).click()
+            )
         await self._set_slider(image_editor, "zoom", edit.zoom)
         await self._set_slider(
             image_editor,
@@ -832,12 +832,12 @@ class PostPublishingPage:
             edit.straighten_degrees,
         )
         if edit.image_filter is not PostImageFilter.ORIGINAL:
-            await (
+            await self._paced.click(
                 await _unique_visible(
                     image_editor.get_by_role("tab", name=re.compile(r"^filter$", re.I)),
                     "Filter tab",
                 )
-            ).click()
+            )
             filter_control = await _unique_visible(
                 image_editor.get_by_role(
                     "radio",
@@ -856,7 +856,7 @@ class PostPublishingPage:
                 ),
                 "image filter option",
             )
-            await (filter_control).click()
+            await self._paced.click(filter_control)
         adjustments = {
             "brightness": edit.brightness,
             "contrast": edit.contrast,
@@ -864,12 +864,12 @@ class PostPublishingPage:
             "vignette": edit.vignette,
         }
         if any(adjustments.values()):
-            await (
+            await self._paced.click(
                 await _unique_visible(
                     image_editor.get_by_role("tab", name=re.compile(r"^adjust$", re.I)),
                     "Adjust tab",
                 )
-            ).click()
+            )
             for name, value in adjustments.items():
                 await self._set_slider(image_editor, name, value)
         apply_control = await _unique_visible(
@@ -879,10 +879,9 @@ class PostPublishingPage:
             ),
             "image edit Apply control",
         )
-        await (apply_control).click()
+        await self._paced.click(apply_control)
 
-    @staticmethod
-    async def _set_slider(root: Locator, label: str, value: int | float) -> None:
+    async def _set_slider(self, root: Locator, label: str, value: int | float) -> None:
         sliders = root.get_by_role("slider", name=re.compile(label, re.I)).or_(
             root.locator(
                 f'input[type="range"][aria-labelledby*="{label}" i], '
@@ -897,7 +896,7 @@ class PostPublishingPage:
             raise InvalidTargetError(
                 f"The requested {label} value is outside LinkedIn's visible control range."
             )
-        await slider.fill(str(value))
+        await self._paced.fill(slider, str(value))
 
     async def _add_image_alt_text(
         self,
@@ -912,7 +911,7 @@ class PostPublishingPage:
             ),
             "Alternative text control",
         )
-        await (control).click()
+        await self._paced.click(control)
         alt_dialog = await _unique_visible(
             page.get_by_role("dialog").filter(
                 has=page.get_by_placeholder(re.compile(r"how would you describe this image", re.I))
@@ -928,13 +927,13 @@ class PostPublishingPage:
             raise ParserDriftError(
                 "LinkedIn's current alternative-text field no longer has the verified limit."
             )
-        await field.fill(alt_text)
-        await (
+        await self._paced.fill(field, alt_text)
+        await self._paced.click(
             await _unique_visible(
                 alt_dialog.get_by_role("button", name=re.compile(r"^add$", re.I)),
                 "alternative-text Add control",
             )
-        ).click()
+        )
 
     async def _tag_image(
         self,
@@ -942,12 +941,12 @@ class PostPublishingPage:
         editor: Locator,
         image: PostImageInput,
     ) -> None:
-        await (
+        await self._paced.click(
             await _unique_visible(
                 editor.get_by_role("button", name=re.compile(r"^tag$", re.I)),
                 "image Tag control",
             )
-        ).click()
+        )
         tag_dialog = await _unique_visible(
             page.get_by_role("dialog").filter(
                 has=page.get_by_placeholder(re.compile(r"type a name or names", re.I))
@@ -959,15 +958,15 @@ class PostPublishingPage:
             "image-tag search field",
         )
         for identity in image.tags:
-            await search.fill(identity.display_name)
+            await self._paced.fill(search, identity.display_name)
             target = self._image_tag_result(tag_dialog, identity)
-            await (await _unique_visible(target, "exact image-tag result")).click()
-        await (
+            await self._paced.click(await _unique_visible(target, "exact image-tag result"))
+        await self._paced.click(
             await _unique_visible(
                 tag_dialog.get_by_role("button", name=re.compile(r"^add$", re.I)),
                 "image-tag Add control",
             )
-        ).click()
+        )
 
     @staticmethod
     def _image_tag_result(root: Locator, identity: PostImageTagInput) -> Locator:
@@ -986,10 +985,10 @@ class PostPublishingPage:
             dialog.get_by_role("button", name=re.compile(r"^add media$", re.I)),
             "Add media control",
         )
-        await (control).click()
+        await self._paced.click(control)
         editor = await self._media_editor(page)
         upload = await _unique_visible(editor.locator('input[type="file"]'), "media file input")
-        await upload.set_input_files(content.video_asset_ref)
+        await self._paced.set_input_files(upload, content.video_asset_ref)
         play = editor.get_by_role("button", name=re.compile(r"^play$", re.I))
         with suppress(PlaywrightTimeoutError):
             await play.first.wait_for(state="visible", timeout=15_000)
@@ -999,7 +998,7 @@ class PostPublishingPage:
                 editor.get_by_role("button", name=re.compile(r"^video thumbnail$", re.I)),
                 "video thumbnail control",
             )
-            await (thumbnail).click()
+            await self._paced.click(thumbnail)
             thumbnail_dialog = await _unique_visible(
                 page.get_by_role("dialog").filter(
                     has=page.locator('input[type="file"][aria-label="Add video thumbnail"]')
@@ -1010,8 +1009,8 @@ class PostPublishingPage:
                 thumbnail_dialog.locator('input[type="file"][aria-label="Add video thumbnail"]'),
                 "video thumbnail file input",
             )
-            await input_control.set_input_files(content.thumbnail_asset_ref)
-            await (
+            await self._paced.set_input_files(input_control, content.thumbnail_asset_ref)
+            await self._paced.click(
                 await _unique_visible(
                     thumbnail_dialog.get_by_role(
                         "button",
@@ -1019,13 +1018,13 @@ class PostPublishingPage:
                     ),
                     "video-thumbnail Add control",
                 )
-            ).click()
+            )
             editor = await self._media_editor(page)
         captions = await _unique_visible(
             editor.get_by_role("button", name=re.compile(r"^captions$", re.I)),
             "video captions control",
         )
-        await (captions).click()
+        await self._paced.click(captions)
         caption_dialog = await _unique_visible(
             page.get_by_role("dialog").filter(
                 has=page.get_by_role(
@@ -1044,7 +1043,7 @@ class PostPublishingPage:
         )
         should_auto = content.caption_mode is VideoCaptionMode.AUTO
         if await auto.is_checked() != should_auto:
-            await (auto).click()
+            await self._paced.click(auto)
         review = await _unique_visible(
             caption_dialog.get_by_role(
                 "checkbox",
@@ -1054,26 +1053,26 @@ class PostPublishingPage:
         )
         should_review = should_auto and content.review_auto_captions
         if await review.is_checked() != should_review:
-            await (review).click()
+            await self._paced.click(review)
         if content.caption_mode is VideoCaptionMode.FILE:
             upload_caption = await _unique_visible(
                 caption_dialog.locator('input[type="file"][accept*=".srt"]'),
                 "caption file input",
             )
             assert content.caption_asset_ref is not None
-            await upload_caption.set_input_files(content.caption_asset_ref)
-        await (
+            await self._paced.set_input_files(upload_caption, content.caption_asset_ref)
+        await self._paced.click(
             await _unique_visible(
                 caption_dialog.get_by_role("button", name=re.compile(r"^apply$", re.I)),
                 "captions Apply control",
             )
-        ).click()
+        )
         editor = await self._media_editor(page)
         next_control = await _unique_visible(
             editor.get_by_role("button", name=re.compile(r"^next$", re.I)),
             "video editor Next control",
         )
-        await (next_control).click()
+        await self._paced.click(next_control)
 
     async def _compose_document(
         self,
@@ -1085,12 +1084,12 @@ class PostPublishingPage:
             dialog.get_by_role("button", name=re.compile(r"^more$", re.I)),
             "More publishing-options control",
         )
-        await (more).click()
+        await self._paced.click(more)
         add = await _unique_visible(
             page.get_by_role("button", name=re.compile(r"^(?:add a )?document$", re.I)),
             "Document publishing option",
         )
-        await (add).click()
+        await self._paced.click(add)
         editor = await _unique_visible(
             page.get_by_role("dialog").filter(
                 has=page.get_by_text(
@@ -1101,19 +1100,19 @@ class PostPublishingPage:
             "Share a document dialog",
         )
         upload = await _unique_visible(editor.locator('input[type="file"]'), "document file input")
-        await upload.set_input_files(content.document_asset_ref)
+        await self._paced.set_input_files(upload, content.document_asset_ref)
         title = await _unique_visible(
             editor.get_by_placeholder(
                 re.compile(r"add a descriptive title to your document", re.I)
             ),
             "document title field",
         )
-        await title.fill(content.document_title)
+        await self._paced.fill(title, content.document_title)
         done = await _unique_visible(
             editor.get_by_role("button", name=re.compile(r"^done$", re.I)),
             "document Done control",
         )
-        await (done).click()
+        await self._paced.click(done)
 
     async def _compose_poll(
         self,
@@ -1125,12 +1124,12 @@ class PostPublishingPage:
             dialog.get_by_role("button", name=re.compile(r"^more$", re.I)),
             "More publishing-options control",
         )
-        await (more).click()
+        await self._paced.click(more)
         add = await _unique_visible(
             page.get_by_role("button", name=re.compile(r"^(?:create a )?poll$", re.I)),
             "Poll publishing option",
         )
-        await (add).click()
+        await self._paced.click(add)
         editor = await _unique_visible(
             page.get_by_role("dialog", name=re.compile(r"create a poll", re.I)),
             "poll editor",
@@ -1139,7 +1138,7 @@ class PostPublishingPage:
             editor.locator("textarea[maxlength='140']"),
             "poll question field",
         )
-        await question.fill(content.question)
+        await self._paced.fill(question, content.question)
         for index, option in enumerate(content.options, start=1):
             fields = editor.locator("input[maxlength='30']")
             if await fields.count() < index:
@@ -1147,23 +1146,23 @@ class PostPublishingPage:
                     editor.get_by_role("button", name=re.compile(r"^add option$", re.I)),
                     "Add poll option control",
                 )
-                await (add_option).click()
+                await self._paced.click(add_option)
             field = fields.nth(index - 1)
             if not await field.is_visible():
                 raise ParserDriftError(
                     f"LinkedIn's poll editor has no visible option {index} field."
                 )
-            await field.fill(option)
+            await self._paced.fill(field, option)
         duration = await _unique_visible(
             editor.get_by_role("combobox", name=re.compile(r"poll duration", re.I)),
             "poll duration control",
         )
-        await duration.select_option(label=_POLL_LABELS[content.duration])
+        await self._paced.select_option(duration, label=_POLL_LABELS[content.duration])
         done = await _unique_visible(
             editor.get_by_role("button", name=re.compile(r"^done$", re.I)),
             "poll Done control",
         )
-        await (done).click()
+        await self._paced.click(done)
 
     async def _compose_celebration(
         self,
@@ -1178,7 +1177,7 @@ class PostPublishingPage:
             ),
             "Celebrate an occasion control",
         )
-        await (open_control).click()
+        await self._paced.click(open_control)
         chooser = await _unique_visible(
             page.get_by_role("dialog").filter(
                 has=page.get_by_text(
@@ -1191,7 +1190,7 @@ class PostPublishingPage:
             ),
             "celebration chooser",
         )
-        await (
+        await self._paced.click(
             await _unique_visible(
                 chooser.get_by_role(
                     "button",
@@ -1202,7 +1201,7 @@ class PostPublishingPage:
                 ),
                 "exact celebration type",
             )
-        ).click()
+        )
         editor = await _unique_visible(
             page.get_by_role("dialog").filter(
                 has=page.get_by_role(
@@ -1217,7 +1216,7 @@ class PostPublishingPage:
                 editor.locator('input[type="file"][accept*="image"]'),
                 "celebration custom-image input",
             )
-            await upload.set_input_files(content.image_asset_ref)
+            await self._paced.set_input_files(upload, content.image_asset_ref)
             if content.image_alt_text is not None:
                 await self._add_image_alt_text(page, editor, content.image_alt_text)
                 editor = await _unique_visible(
@@ -1231,7 +1230,7 @@ class PostPublishingPage:
                 )
         else:
             assert content.template_index is not None
-            await (
+            await self._paced.click(
                 await _unique_visible(
                     editor.get_by_role(
                         "button",
@@ -1242,13 +1241,13 @@ class PostPublishingPage:
                     ),
                     "exact celebration template",
                 )
-            ).click()
-        await (
+            )
+        await self._paced.click(
             await _unique_visible(
                 editor.get_by_role("button", name=re.compile(r"^next$", re.I)),
                 "celebration Next control",
             )
-        ).click()
+        )
 
     async def _compose_event(
         self,
@@ -1256,7 +1255,7 @@ class PostPublishingPage:
         dialog: Locator,
         content: EventPostContent,
     ) -> None:
-        await (
+        await self._paced.click(
             await _unique_visible(
                 dialog.get_by_role(
                     "button",
@@ -1264,7 +1263,7 @@ class PostPublishingPage:
                 ),
                 "Create an event control",
             )
-        ).click()
+        )
         editor = await _unique_visible(
             page.get_by_role("dialog").filter(
                 has=page.get_by_role(
@@ -1279,7 +1278,7 @@ class PostPublishingPage:
                 editor.locator('input[type="file"][accept*="image"]'),
                 "event cover-image input",
             )
-            await cover.set_input_files(content.cover_asset_ref)
+            await self._paced.set_input_files(cover, content.cover_asset_ref)
             if content.cover_alt_text is not None:
                 await self._set_optional_alt_text(
                     page,
@@ -1298,7 +1297,7 @@ class PostPublishingPage:
             "event type option",
         )
         if not await event_type.is_checked():
-            await (event_type).click()
+            await self._paced.click(event_type)
         if content.event_type is EventType.ONLINE:
             assert content.event_format is not None
             format_label = (
@@ -1314,7 +1313,7 @@ class PostPublishingPage:
                 "event format option",
             )
             if not await event_format.is_checked():
-                await (event_format).click()
+                await self._paced.click(event_format)
         name = await _unique_visible(
             editor.get_by_role("textbox", name=re.compile(r"event name", re.I)),
             "event name field",
@@ -1323,14 +1322,14 @@ class PostPublishingPage:
             raise ParserDriftError(
                 "LinkedIn's current event-name field no longer has the verified limit."
             )
-        await name.fill(content.event_name)
+        await self._paced.fill(name, content.event_name)
         await self._set_event_timezone(page, editor, content.timezone_label)
         await self._fill_event_times(editor, content)
         description = await _unique_visible(
             editor.locator("textarea[maxlength='5000']"),
             "event description field",
         )
-        await description.fill(content.description)
+        await self._paced.fill(description, content.description)
         if content.event_type is EventType.ONLINE:
             if content.external_url is not None:
                 await self._fill_exact_url_field(editor, str(content.external_url))
@@ -1342,7 +1341,7 @@ class PostPublishingPage:
                 ),
                 "event location field",
             )
-            await location.fill(content.venue_location)
+            await self._paced.fill(location, content.venue_location)
             if content.venue_details is not None:
                 details = await _unique_visible(
                     editor.get_by_placeholder(
@@ -1350,7 +1349,7 @@ class PostPublishingPage:
                     ),
                     "event venue-details field",
                 )
-                await details.fill(content.venue_details)
+                await self._paced.fill(details, content.venue_details)
             if content.external_url is not None:
                 await self._fill_exact_url_field(editor, str(content.external_url))
         if content.speakers:
@@ -1362,16 +1361,16 @@ class PostPublishingPage:
                 "event speaker field",
             )
             for speaker in content.speakers:
-                await speaker_field.fill(speaker.display_name)
-                await (
+                await self._paced.fill(speaker_field, speaker.display_name)
+                await self._paced.click(
                     await _unique_visible(
                         page.get_by_role("listbox").locator(
                             f'a[href*="/in/{speaker.profile_slug}/"]'
                         ),
                         "exact first-degree event speaker",
                     )
-                ).click()
-        await (
+                )
+        await self._paced.click(
             await _unique_visible(
                 editor.get_by_role(
                     "button",
@@ -1379,7 +1378,7 @@ class PostPublishingPage:
                 ),
                 "event Done control",
             )
-        ).click()
+        )
 
     async def _set_optional_alt_text(
         self,
@@ -1396,19 +1395,21 @@ class PostPublishingPage:
             raise ParserDriftError(
                 f"LinkedIn's current {description} editor exposes no alternative-text control."
             )
-        await (await _unique_visible(control, f"{description} alternative-text control")).click()
+        await self._paced.click(
+            await _unique_visible(control, f"{description} alternative-text control")
+        )
         field = await _unique_visible(
             page.get_by_placeholder(
                 re.compile(r"how would you describe this image", re.I),
             ),
             f"{description} alternative-text field",
         )
-        await field.fill(alt_text)
+        await self._paced.fill(field, alt_text)
         parent_dialog = await _unique_visible(
             page.get_by_role("dialog").filter(has=field),
             f"{description} alternative-text dialog",
         )
-        await (
+        await self._paced.click(
             await _unique_visible(
                 parent_dialog.get_by_role(
                     "button",
@@ -1416,7 +1417,7 @@ class PostPublishingPage:
                 ),
                 f"{description} alternative-text Save control",
             )
-        ).click()
+        )
 
     async def _set_event_timezone(
         self,
@@ -1436,7 +1437,7 @@ class PostPublishingPage:
             ),
             "event timezone control",
         )
-        await (timezone).click()
+        await self._paced.click(timezone)
         option = page.get_by_role(
             "option",
             name=re.compile(rf"^{re.escape(timezone_label)}$", re.I),
@@ -1446,10 +1447,9 @@ class PostPublishingPage:
                 name=re.compile(rf"^{re.escape(timezone_label)}$", re.I),
             )
         )
-        await (await _unique_visible(option, "exact event timezone option")).click()
+        await self._paced.click(await _unique_visible(option, "exact event timezone option"))
 
-    @staticmethod
-    async def _fill_event_times(editor: Locator, content: EventPostContent) -> None:
+    async def _fill_event_times(self, editor: Locator, content: EventPostContent) -> None:
         dates = editor.get_by_role("textbox", name=re.compile(r"date", re.I))
         times = editor.get_by_role("textbox", name=re.compile(r"time", re.I))
         visible_dates = [
@@ -1464,8 +1464,8 @@ class PostPublishingPage:
         ]
         if not visible_dates or not visible_times:
             raise ParserDriftError("LinkedIn's event editor has no unique start date and time.")
-        await visible_dates[0].fill(content.start_at.strftime("%Y-%m-%d"))
-        await visible_times[0].fill(content.start_at.strftime("%H:%M"))
+        await self._paced.fill(visible_dates[0], content.start_at.strftime("%Y-%m-%d"))
+        await self._paced.fill(visible_times[0], content.start_at.strftime("%H:%M"))
         if content.end_at is None:
             return
         end_toggle = await _unique_visible(
@@ -1476,7 +1476,7 @@ class PostPublishingPage:
             "event end-date option",
         )
         if not await end_toggle.is_checked():
-            await end_toggle.click()
+            await self._paced.click(end_toggle)
         visible_dates = [
             dates.nth(index)
             for index in range(await dates.count())
@@ -1491,11 +1491,10 @@ class PostPublishingPage:
             raise ParserDriftError(
                 "LinkedIn's event editor has no unique end date and time fields."
             )
-        await visible_dates[1].fill(content.end_at.strftime("%Y-%m-%d"))
-        await visible_times[1].fill(content.end_at.strftime("%H:%M"))
+        await self._paced.fill(visible_dates[1], content.end_at.strftime("%Y-%m-%d"))
+        await self._paced.fill(visible_times[1], content.end_at.strftime("%H:%M"))
 
-    @staticmethod
-    async def _fill_exact_url_field(editor: Locator, value: str) -> None:
+    async def _fill_exact_url_field(self, editor: Locator, value: str) -> None:
         fields = editor.locator('input[maxlength="1024"][type="url"], input[maxlength="1024"]')
         visible = [
             fields.nth(index)
@@ -1504,7 +1503,7 @@ class PostPublishingPage:
         ]
         if len(visible) != 1:
             raise ParserDriftError("LinkedIn's event editor has no unique event URL field.")
-        await visible[0].fill(value)
+        await self._paced.fill(visible[0], value)
 
     async def _compose_hiring(
         self,
@@ -1547,7 +1546,7 @@ class PostPublishingPage:
             )
         selected = False
         for company in visible_companies:
-            await (company).click()
+            await self._paced.click(company)
             exact_job = page.locator(f'[data-job-id="{content.job_id}"]')
             with suppress(PlaywrightTimeoutError):
                 await exact_job.first.wait_for(state="visible", timeout=2_000)
@@ -1569,7 +1568,7 @@ class PostPublishingPage:
             raise InvalidTargetError(
                 "The visible job title no longer matches the requested existing job."
             )
-        await (job_region).click()
+        await self._paced.click(job_region)
         await self._click_done_or_next(page, "hiring")
 
     async def _compose_expert_request(
@@ -1596,7 +1595,7 @@ class PostPublishingPage:
             ),
             "expert-request editor",
         )
-        await (
+        await self._paced.click(
             await _unique_visible(
                 editor.get_by_role(
                     "button",
@@ -1607,7 +1606,7 @@ class PostPublishingPage:
                 ),
                 "exact expert category",
             )
-        ).click()
+        )
         location = await _unique_visible(
             editor.get_by_role(
                 "combobox",
@@ -1615,8 +1614,8 @@ class PostPublishingPage:
             ),
             "expert-request location field",
         )
-        await location.fill(content.location_label)
-        await (
+        await self._paced.fill(location, content.location_label)
+        await self._paced.click(
             await _unique_visible(
                 page.get_by_role(
                     "option",
@@ -1624,7 +1623,7 @@ class PostPublishingPage:
                 ),
                 "exact expert-request location",
             )
-        ).click()
+        )
         description = await _unique_visible(
             editor.locator("textarea[maxlength='750']"),
             "expert-request description field",
@@ -1635,7 +1634,7 @@ class PostPublishingPage:
                 "LinkedIn's expert-request description limit no longer matches the contract."
             )
         assert content.text is not None
-        await description.fill(content.text)
+        await self._paced.fill(description, content.text)
         await self._click_done_or_next(page, "expert-request")
 
     async def _open_more_option(
@@ -1649,13 +1648,13 @@ class PostPublishingPage:
             dialog.get_by_role("button", name=re.compile(r"^more$", re.I)),
             "More publishing-options control",
         )
-        await (more).click()
-        await (
+        await self._paced.click(more)
+        await self._paced.click(
             await _unique_visible(
                 page.get_by_role("button", name=name),
                 f"{description} option",
             )
-        ).click()
+        )
 
     async def _click_done_or_next(self, page: Page, description: str) -> None:
         visible_dialogs = page.get_by_role("dialog")
@@ -1670,7 +1669,7 @@ class PostPublishingPage:
             "button",
             name=re.compile(r"^(?:done|next)$", re.I),
         )
-        await (await _unique_visible(controls, f"{description} Done control")).click()
+        await self._paced.click(await _unique_visible(controls, f"{description} Done control"))
 
     @staticmethod
     async def _composer_textbox(dialog: Locator) -> Locator:
@@ -1696,23 +1695,23 @@ class PostPublishingPage:
         mentions: tuple[PostMentionInput, ...],
     ) -> None:
         if not mentions:
-            await textbox.fill(text)
+            await self._paced.fill(textbox, text)
             return
-        await textbox.fill("")
+        await self._paced.fill(textbox, "")
         position = 0
         for mention in sorted(mentions, key=lambda item: text.index(item.token)):
             start = text.index(mention.token)
-            await textbox.press_sequentially(text[position:start])
-            await textbox.press_sequentially(mention.token)
+            await self._paced.press_sequentially(textbox, text[position:start])
+            await self._paced.press_sequentially(textbox, mention.token)
             selector = (
                 f'a[href*="/in/{mention.profile_slug}/"]'
                 if mention.profile_slug is not None
                 else f'a[href*="/company/{mention.company_slug}/"]'
             )
             suggestion = page.locator("[role='listbox'], [role='menu']").locator(selector)
-            await (await _unique_visible(suggestion, "exact @mention suggestion")).click()
+            await self._paced.click(await _unique_visible(suggestion, "exact @mention suggestion"))
             position = start + len(mention.token)
-        await textbox.press_sequentially(text[position:])
+        await self._paced.press_sequentially(textbox, text[position:])
 
     async def _configure_collaborators(
         self,
@@ -1726,12 +1725,12 @@ class PostPublishingPage:
         )
         with suppress(PlaywrightTimeoutError):
             await control.first.wait_for(state="visible", timeout=2_000)
-        await (
+        await self._paced.click(
             await _unique_visible(
                 control,
                 "Add collaborators control for this rollout-eligible account",
             )
-        ).click()
+        )
         collaborator_dialog = await _unique_visible(
             page.get_by_role("dialog").filter(
                 has=page.get_by_role(
@@ -1749,7 +1748,7 @@ class PostPublishingPage:
             "collaborator search field",
         )
         for collaborator in payload.collaborators:
-            await search.fill(collaborator.display_name)
+            await self._paced.fill(search, collaborator.display_name)
             if collaborator.profile_slug is not None:
                 result = collaborator_dialog.locator(f'a[href*="/in/{collaborator.profile_slug}/"]')
             else:
@@ -1757,8 +1756,8 @@ class PostPublishingPage:
                 result = collaborator_dialog.locator(
                     f'a[href*="/company/{collaborator.company_slug}/"]'
                 )
-            await (await _unique_visible(result, "exact collaborator identity")).click()
-        await (
+            await self._paced.click(await _unique_visible(result, "exact collaborator identity"))
+        await self._paced.click(
             await _unique_visible(
                 collaborator_dialog.get_by_role(
                     "button",
@@ -1766,7 +1765,7 @@ class PostPublishingPage:
                 ),
                 "collaborator Add control",
             )
-        ).click()
+        )
 
     async def _configure_settings(
         self,
@@ -1792,7 +1791,7 @@ class PostPublishingPage:
             controls,
             "Post settings control",
         )
-        await (control).click()
+        await self._paced.click(control)
         settings_candidates = page.get_by_role(
             "dialog",
             name=re.compile(r"^post settings$", re.I),
@@ -1818,7 +1817,7 @@ class PostPublishingPage:
             "requested audience option",
         )
         if not await audience.is_checked():
-            await (audience).click()
+            await self._paced.click(audience)
         if payload.audience is PostAudience.GROUP:
             assert payload.group_target is not None
             await self._select_exact_group_target(
@@ -1833,7 +1832,7 @@ class PostPublishingPage:
         if visible_current_controls:
             if len(visible_current_controls) != 1:
                 raise ParserDriftError("The visible post composer has no unique Comment control.")
-            await (visible_current_controls[0]).click()
+            await self._paced.click(visible_current_controls[0])
             comment_dialog_candidates = page.get_by_role(
                 "dialog",
                 name=re.compile(r"^comment control$", re.I),
@@ -1855,7 +1854,7 @@ class PostPublishingPage:
                 "requested comment-control option",
             )
             if not await comments.is_checked():
-                await (comments).click()
+                await self._paced.click(comments)
                 if not await comments.is_checked():
                     raise ParserDriftError(
                         "LinkedIn did not retain the exact requested comment-control state."
@@ -1871,7 +1870,7 @@ class PostPublishingPage:
                     raise ParserDriftError(
                         "LinkedIn did not enable the changed Comment control Save action."
                     )
-                await (save).click()
+                await self._paced.click(save)
             else:
                 back = await _unique_visible(
                     comment_dialog.get_by_role(
@@ -1880,7 +1879,7 @@ class PostPublishingPage:
                     ),
                     "unchanged Comment control Back control",
                 )
-                await (back).click()
+                await self._paced.click(back)
             with suppress(PlaywrightTimeoutError):
                 await settings_candidates.first.wait_for(state="visible", timeout=3_000)
             settings = await _unique_visible(
@@ -1896,7 +1895,7 @@ class PostPublishingPage:
                 "requested comment-control option",
             )
             if not await comments.is_checked():
-                await (comments).click()
+                await self._paced.click(comments)
         brand = await self._brand_partnership_control(settings)
         if await brand.is_checked() != payload.brand_partnership:
             target = brand
@@ -1905,7 +1904,7 @@ class PostPublishingPage:
                 or not await brand.is_visible()
             ):
                 target = brand.locator("xpath=..")
-            await (target).click()
+            await self._paced.click(target)
             if await brand.is_checked() != payload.brand_partnership:
                 raise ParserDriftError(
                     "LinkedIn did not retain the exact requested brand-partnership state."
@@ -1915,13 +1914,13 @@ class PostPublishingPage:
             "Post settings Done control",
         )
         if await done.is_enabled():
-            await (done).click()
+            await self._paced.click(done)
         else:
             back = await _unique_visible(
                 settings.get_by_role("button", name=re.compile(r"^back$", re.I)),
                 "unchanged Post settings Back control",
             )
-            await (back).click()
+            await self._paced.click(back)
 
     @staticmethod
     async def _brand_partnership_control(settings: Locator) -> Locator:
@@ -1966,13 +1965,13 @@ class PostPublishingPage:
             raise InvalidTargetError(
                 "The exact visible group name no longer matches the requested target."
             )
-        await (region).click()
+        await self._paced.click(region)
         done = picker.get_by_role(
             "button",
             name=re.compile(r"^(?:done|save)$", re.I),
         )
         if await done.count():
-            await (await _unique_visible(done, "group picker Done control")).click()
+            await self._paced.click(await _unique_visible(done, "group picker Done control"))
 
     @staticmethod
     async def _group_picker(page: Page) -> Locator:
@@ -1993,7 +1992,7 @@ class PostPublishingPage:
             dialog.get_by_role("button", name=re.compile(r"^schedule post$", re.I)),
             "Schedule post control",
         )
-        await (schedule).click()
+        await self._paced.click(schedule)
         schedule_dialog = await _unique_visible(
             page.get_by_role("dialog", name=re.compile(r"schedule post", re.I)),
             "Schedule post dialog",
@@ -2007,13 +2006,13 @@ class PostPublishingPage:
             schedule_dialog.get_by_role("textbox", name=re.compile(r"^time$", re.I)),
             "schedule time field",
         )
-        await date.fill(local.strftime("%Y-%m-%d"))
-        await time.fill(local.strftime("%H:%M"))
+        await self._paced.fill(date, local.strftime("%Y-%m-%d"))
+        await self._paced.fill(time, local.strftime("%H:%M"))
         next_control = await _unique_visible(
             schedule_dialog.get_by_role("button", name=re.compile(r"^next$", re.I)),
             "schedule Next control",
         )
-        await (next_control).click()
+        await self._paced.click(next_control)
 
     @staticmethod
     def _verification_marker(payload: PostCreatePayload) -> str:

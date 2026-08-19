@@ -5,13 +5,12 @@ from __future__ import annotations
 import re
 from urllib.parse import parse_qs, urljoin, urlsplit
 
+from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
+from linkedin_mcp.browser import BrowserManager
+from linkedin_mcp.browser.urls import profile_slug_from_url
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.ui import LinkedInLocator as Locator
-from linkedin_mcp.ui import LinkedInPage as Page
-from linkedin_mcp.ui import LinkedInPlaywright
-from linkedin_mcp.ui.urls import profile_slug_from_url
 
 _PROFILE_ACTION_SETTLE_ATTEMPTS = 24
 
@@ -49,8 +48,9 @@ async def _optional_unique_visible(
 class InvitationActionSurface:
     """Shared visible-surface mechanics for InvitationActionSurface."""
 
-    def __init__(self, playwright: LinkedInPlaywright) -> None:
-        self._playwright = playwright
+    def __init__(self, browser: BrowserManager) -> None:
+        self._browser = browser
+        self._paced = browser.paced
 
     async def _connect_control(
         self,
@@ -135,14 +135,14 @@ class InvitationActionSurface:
             return "connect_available", exact_invite_links[0]
         more = main.get_by_role("button", name=re.compile(r"^more(?: actions)?$", re.I))
         if await more.count() == 1:
-            await more.click()
+            await self._paced.click(more)
             menu_connect = page.get_by_role(
                 "menuitem",
                 name=re.compile(r"^connect(?: with .+)?$", re.I),
             )
             if await menu_connect.count() == 1:
                 return "connect_available", menu_connect
-            await page.keyboard.press("Escape")
+            await self._paced.keyboard_press(page.keyboard, "Escape")
         return "connect_unavailable", None
 
     async def _wait_for_connect_control(

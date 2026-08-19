@@ -5,17 +5,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from urllib.parse import urljoin
 
+from playwright.async_api import Locator, Page
 from pydantic import HttpUrl
 
+from linkedin_mcp.browser import BrowserManager
+from linkedin_mcp.browser.urls import profile_slug_from_url
 from linkedin_mcp.errors import ParserDriftError
 from linkedin_mcp.tools.posts.surface import (
     post_author_from_region,
     region_for_post,
 )
-from linkedin_mcp.ui import LinkedInLocator as Locator
-from linkedin_mcp.ui import LinkedInPage as Page
-from linkedin_mcp.ui import LinkedInPlaywright
-from linkedin_mcp.ui.urls import profile_slug_from_url
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,15 +29,16 @@ class VisiblePostTarget:
 class PostEngagementSurface:
     """Shared visible-surface mechanics for PostEngagementSurface."""
 
-    def __init__(self, playwright: LinkedInPlaywright) -> None:
-        self._playwright = playwright
+    def __init__(self, browser: BrowserManager) -> None:
+        self._browser = browser
+        self._paced = browser.paced
 
     async def _resolve_target(
         self,
         page: Page,
         post_ref: str,
     ) -> VisiblePostTarget:
-        post_region = await region_for_post(page, post_ref)
+        post_region = await region_for_post(self._paced, page, post_ref)
         author = await post_author_from_region(post_region)
         actor_slug, actor_name = await self._active_actor(page)
         return VisiblePostTarget(

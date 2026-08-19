@@ -5,8 +5,13 @@ from __future__ import annotations
 import re
 from datetime import UTC, datetime
 
+from playwright.async_api import Locator, Page
 from pydantic import HttpUrl
 
+from linkedin_mcp.browser.urls import (
+    canonical_post_url,
+    canonical_profile_url,
+)
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
 from linkedin_mcp.tools.posts.comment.models import (
     ActionCommand,
@@ -32,12 +37,6 @@ from linkedin_mcp.tools.posts.surface import (
     comment_from_region,
     comment_regions,
     discussion_post_reference,
-)
-from linkedin_mcp.ui import LinkedInLocator as Locator
-from linkedin_mcp.ui import LinkedInPage as Page
-from linkedin_mcp.ui.urls import (
-    canonical_post_url,
-    canonical_profile_url,
 )
 
 _COMMENT_ATTACHMENT_SELECTOR = (
@@ -162,8 +161,8 @@ class PostCommentPage(PostEngagementSurface):
         request: PostCommentInput,
     ) -> ActionInspection:
         target_url = canonical_post_url(request.post_ref)
-        async with self._playwright.page() as page:
-            await page.goto(target_url)
+        async with self._browser.page() as page:
+            await self._paced.goto(page, target_url)
             target = await self._resolve_target(page, request.post_ref)
             composer = await self._open_comment_composer(page, target.region)
             await self._assert_comment_options(page, composer, request)
@@ -178,8 +177,8 @@ class PostCommentPage(PostEngagementSurface):
     async def perform_comment(self, command: ActionCommand) -> ActionPageResult:
         payload = command.payload
         target_url = canonical_post_url(payload.post_ref)
-        async with self._playwright.page() as page:
-            await page.goto(target_url)
+        async with self._browser.page() as page:
+            await self._paced.goto(page, target_url)
             target = await self._resolve_target(page, payload.post_ref)
             if not self._matches_inspected_target(command.target, target):
                 return await self._result(
@@ -231,7 +230,7 @@ class PostCommentPage(PostEngagementSurface):
                 "Comment submission control",
             )
             try:
-                await final.click()
+                await self._paced.click(final)
             except Exception:
                 return await self._result(
                     page,
@@ -291,7 +290,7 @@ class PostCommentPage(PostEngagementSurface):
                 ),
                 "Comment opener",
             )
-            await action.click()
+            await self._paced.click(action)
             for _ in range(20):
                 composer = region.get_by_role("textbox", name=scoped_label)
                 visible = [
@@ -329,7 +328,7 @@ class PostCommentPage(PostEngagementSurface):
                 ),
                 "comment Open GIF picker control",
             )
-            await gif.click()
+            await self._paced.click(gif)
             await self._resolve_gif(page, request.attachment, choose=False)
 
     async def _add_comment_attachment(
@@ -349,9 +348,9 @@ class PostCommentPage(PostEngagementSurface):
             )
             try:
                 async with page.expect_file_chooser(timeout=3_000) as chooser_info:
-                    await photo.click()
+                    await self._paced.click(photo)
                 chooser = await chooser_info.value
-                await chooser.set_files(payload.attachment.asset_ref)
+                await self._paced.set_files(chooser, payload.attachment.asset_ref)
             except Exception as error:
                 raise ParserDriftError(
                     "The client-selected path could not be uploaded through the current "
@@ -365,7 +364,7 @@ class PostCommentPage(PostEngagementSurface):
                 ),
                 "comment Open GIF picker control",
             )
-            await gif.click()
+            await self._paced.click(gif)
             await self._resolve_gif(page, payload.attachment, choose=True)
 
     async def _resolve_gif(
@@ -391,7 +390,7 @@ class PostCommentPage(PostEngagementSurface):
         )
         if await picker.count() != 1 or not await picker.is_visible():
             raise ParserDriftError("LinkedIn has no unique visible GIF picker.")
-        await search.fill(attachment.search_query)
+        await self._paced.fill(search, attachment.search_query)
         image = await _unique_visible(
             picker.get_by_alt_text(
                 re.compile(
@@ -405,7 +404,7 @@ class PostCommentPage(PostEngagementSurface):
         if await result.count() != 1 or not await result.is_visible():
             raise ParserDriftError("The exact visible GIF result is not an operable button.")
         if choose:
-            await result.click()
+            await self._paced.click(result)
         return result
 
     @staticmethod
@@ -432,23 +431,25 @@ class PostCommentPage(PostEngagementSurface):
         mentions: tuple[PostMentionInput, ...],
     ) -> None:
         if not mentions:
-            await textbox.fill(text)
+            await self._paced.fill(textbox, text)
             return
-        await textbox.fill("")
+        await self._paced.fill(textbox, "")
         position = 0
         for mention in sorted(mentions, key=lambda item: text.index(item.token)):
             start = text.index(mention.token)
-            await textbox.press_sequentially(text[position:start])
-            await textbox.press_sequentially(mention.token)
+            await self._paced.press_sequentially(textbox, text[position:start])
+            await self._paced.press_sequentially(textbox, mention.token)
             selector = (
                 f'a[href*="/in/{mention.profile_slug}/"]'
                 if mention.profile_slug is not None
                 else f'a[href*="/company/{mention.company_slug}/"]'
             )
             suggestion = page.locator("[role='listbox'], [role='menu']").locator(selector)
-            await (await _unique_visible(suggestion, "exact comment @mention suggestion")).click()
+            await self._paced.click(
+                await _unique_visible(suggestion, "exact comment @mention suggestion")
+            )
             position = start + len(mention.token)
-        await textbox.press_sequentially(text[position:])
+        await self._paced.press_sequentially(textbox, text[position:])
 
     @staticmethod
     async def _matching_comment_refs(

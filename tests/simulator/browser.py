@@ -15,22 +15,22 @@ from playwright.async_api import (
     async_playwright,
 )
 
+from linkedin_mcp.browser import AuthenticationState
+from linkedin_mcp.browser.access import assert_linkedin_access
 from linkedin_mcp.browser.bootstrap import BrowserSetupState
+from linkedin_mcp.browser.urls import validate_linkedin_url
 from linkedin_mcp.errors import (
     AuthenticationRequiredError,
     BrowserUnavailableError,
     ParserDriftError,
     RestrictionDetectedError,
 )
-from linkedin_mcp.ui import AuthenticationState
-from linkedin_mcp.ui.safety import assert_safe_linkedin_page
-from linkedin_mcp.ui.urls import validate_linkedin_url
 from tests.simulator.scenario import SimulatorScenario
 from tests.simulator.state import SimulatorFault
 
 
 class SimulatorBrowser:
-    """Offline raw-page provider adapted to LinkedInPlaywright in tests."""
+    """Offline raw-page provider adapted to BrowserManager in tests."""
 
     def __init__(self, scenario: SimulatorScenario) -> None:
         self.scenario = scenario
@@ -107,7 +107,7 @@ class SimulatorBrowser:
         await self.assert_safe(page)
 
     async def assert_safe(self, page: Page) -> None:
-        await assert_safe_linkedin_page(page, ("www.linkedin.com", "linkedin.com"))
+        await assert_linkedin_access(page, ("www.linkedin.com", "linkedin.com"))
 
     async def close(self) -> None:
         context, self._context = self._context, None

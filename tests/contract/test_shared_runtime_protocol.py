@@ -48,13 +48,13 @@ async def test_two_stdio_clients_share_one_surviving_runtime(
         "LINKEDIN_MCP_HTTP_HOST": "127.0.0.1",
         "LINKEDIN_MCP_HTTP_PORT": str(unused_tcp_port),
         "LINKEDIN_MCP_LOG_LEVEL": "CRITICAL",
-        "LINKEDIN_MCP_MINIMUM_NAVIGATION_INTERVAL_SECONDS": "0",
+        "LINKEDIN_MCP_BROWSER_ACTION_DELAY_SECONDS": "0",
     }
     runtime_settings = Settings(
         browser_auto_install=False,
         browser_profile_path=profile_path,
         browser_cache_path=cache_path,
-        minimum_navigation_interval_seconds=0,
+        browser_action_delay_seconds=0,
         runtime_lock_path=lock_path,
         transport="streamable-http",
         http_host="127.0.0.1",

@@ -7,8 +7,9 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import cast
 
-from linkedin_mcp.ui.locator import LinkedInLocator as Locator
-from linkedin_mcp.ui.page import LinkedInPage as Page
+from playwright.async_api import Locator, Page
+
+from linkedin_mcp.infra.playwright.pacer import Paced
 
 CollectionSignature = tuple[str, ...]
 SignatureReader = Callable[[], Awaitable[CollectionSignature]]
@@ -29,10 +30,16 @@ class CollectionSettleResult:
     signature: CollectionSignature
 
 
-async def dispatch_bubbling_wheel(locator: Locator, *, delta_y: int) -> None:
+async def dispatch_bubbling_wheel(
+    paced: Paced,
+    locator: Locator,
+    *,
+    delta_y: int,
+) -> None:
     """Dispatch one bounded locator-scoped wheel fallback with explicit typing."""
 
-    await locator.dispatch_event(
+    await paced.dispatch_event(
+        locator,
         "wheel",
         {"bubbles": True, "cancelable": True, "deltaY": delta_y},
     )

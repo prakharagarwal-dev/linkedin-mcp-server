@@ -8,6 +8,7 @@ from typing import cast
 
 from mcp.server.fastmcp import FastMCP
 
+from linkedin_mcp.browser import BrowserManager
 from linkedin_mcp.config import Settings
 from linkedin_mcp.infra.cursor import CursorStore
 from linkedin_mcp.infra.queue import Scheduler, Worker
@@ -34,7 +35,6 @@ from linkedin_mcp.tools.posts.get.page import PostDetailPage
 from linkedin_mcp.tools.posts.react.page import PostReactionPage
 from linkedin_mcp.tools.posts.search.page import PostSearchPage
 from linkedin_mcp.transport.server import create_mcp_server
-from linkedin_mcp.ui import LinkedInPlaywright
 from tests.contract.test_mcp_protocol import (
     ProtocolJobDetail,
     ProtocolPeopleSearch,
@@ -42,21 +42,21 @@ from tests.contract.test_mcp_protocol import (
 )
 from tests.simulator.providers import StatefulProtocolJobSearch, StatefulProtocolNetwork
 from tests.simulator.state import SimulatorState
-from tests.support.playwright import empty_playwright
+from tests.support.playwright import empty_browser
 
 
 def create_simulator_server(
     root: Path,
     state: SimulatorState,
-) -> tuple[FastMCP[None], Scheduler, LinkedInPlaywright, CursorStore]:
+) -> tuple[FastMCP[None], Scheduler, BrowserManager, CursorStore]:
     suffix = uuid.uuid4().hex
     settings = Settings(
         browser_auto_install=False,
         browser_profile_path=root / f"profile-{suffix}",
-        minimum_navigation_interval_seconds=0,
+        browser_action_delay_seconds=0,
         runtime_lock_path=root / f"runtime-{suffix}.lock",
     )
-    playwright = empty_playwright(settings)
+    browser = empty_browser(settings)
     network = StatefulProtocolNetwork(state)
     people_search = ProtocolPeopleSearch()
     cursor_store = CursorStore(
@@ -70,7 +70,7 @@ def create_simulator_server(
     attach_tool_implementations(
         mcp,
         settings=settings,
-        playwright=playwright,
+        browser=browser,
         scheduler=scheduler,
         cursor_store=cursor_store,
         job_search=cast(JobSearchPage, StatefulProtocolJobSearch(state)),
@@ -95,4 +95,4 @@ def create_simulator_server(
         conversation_read=cast(ConversationGetPage, network),
         message_send=cast(MessageSendPage, network),
     )
-    return mcp, scheduler, playwright, cursor_store
+    return mcp, scheduler, browser, cursor_store

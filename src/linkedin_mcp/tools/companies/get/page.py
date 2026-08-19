@@ -6,8 +6,14 @@ import re
 from datetime import UTC, datetime
 from urllib.parse import parse_qs, urljoin, urlsplit
 
+from playwright.async_api import Locator, Page
 from pydantic import HttpUrl
 
+from linkedin_mcp.browser import BrowserManager
+from linkedin_mcp.browser.urls import (
+    canonical_company_url,
+    company_slug_from_url,
+)
 from linkedin_mcp.errors import ParserDriftError
 from linkedin_mcp.tools.companies.get.models import (
     CompanyGetInput,
@@ -26,13 +32,6 @@ from linkedin_mcp.tools.companies.surface import (
     expand_and_scroll,
     first_visible_text,
     unique_lines,
-)
-from linkedin_mcp.ui import LinkedInLocator as Locator
-from linkedin_mcp.ui import LinkedInPage as Page
-from linkedin_mcp.ui import LinkedInPlaywright
-from linkedin_mcp.ui.urls import (
-    canonical_company_url,
-    company_slug_from_url,
 )
 
 _EXPLICIT_ASSOCIATED_MEMBER_PATTERN = re.compile(
@@ -222,17 +221,18 @@ def _evidence_source_url(
 
 
 class CompanyProfilePage:
-    def __init__(self, playwright: LinkedInPlaywright) -> None:
-        self._playwright = playwright
+    def __init__(self, browser: BrowserManager) -> None:
+        self._browser = browser
+        self._paced = browser.paced
 
     async def read(
         self,
         request: CompanyGetInput,
     ) -> tuple[CompanyProfileObservation, tuple[CompanyProfilePageCapture, ...]]:
         captures: list[CompanyProfilePageCapture] = []
-        async with self._playwright.page() as page:
-            await page.goto(canonical_company_url(request.company_slug))
-            await expand_and_scroll(page)
+        async with self._browser.page() as page:
+            await self._paced.goto(page, canonical_company_url(request.company_slug))
+            await expand_and_scroll(self._paced, page)
             overview_main = page.locator("main")
             name = await _company_heading(overview_main, page)
             top = await _top_company_region(overview_main, name)
@@ -249,8 +249,8 @@ class CompanyProfilePage:
                 )
             )
             about_url = canonical_company_url(actual_slug, "about")
-            await page.goto(about_url)
-            await expand_and_scroll(page)
+            await self._paced.goto(page, about_url)
+            await expand_and_scroll(self._paced, page)
             about_main = page.locator("main")
             about_name = await _company_heading(about_main, page)
             about_slug = company_slug_from_url(page.url) or actual_slug

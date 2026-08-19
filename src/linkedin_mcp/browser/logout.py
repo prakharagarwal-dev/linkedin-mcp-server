@@ -10,6 +10,7 @@ import structlog
 from playwright.async_api import BrowserContext, Locator, Playwright, async_playwright
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
+from linkedin_mcp.browser.access import assert_linkedin_access
 from linkedin_mcp.browser.bootstrap import BrowserBootstrap
 from linkedin_mcp.browser.login import SESSION_VALIDATION_URL
 from linkedin_mcp.browser.profile import BrowserProfileManager
@@ -19,8 +20,7 @@ from linkedin_mcp.errors import (
     LinkedInMCPError,
     ParserDriftError,
 )
-from linkedin_mcp.ui.pacing import NavigationPacer
-from linkedin_mcp.ui.safety import assert_safe_linkedin_page
+from linkedin_mcp.infra.playwright import Paced
 
 logger = structlog.get_logger(__name__)
 
@@ -30,6 +30,7 @@ _LOGOUT_VERIFICATION_MESSAGE = "LinkedIn logout did not survive a clean browser 
 
 async def logout_interactively(
     settings: Settings,
+    paced: Paced,
     browser_bootstrap: BrowserBootstrap | None = None,
 ) -> bool:
     """Use LinkedIn's visible sign-out control and verify the persistent session ended."""
@@ -37,10 +38,6 @@ async def logout_interactively(
     bootstrap = browser_bootstrap or BrowserBootstrap(settings)
     BrowserProfileManager(settings, bootstrap).require_initialized()
     await bootstrap.ensure_ready()
-    pacer = NavigationPacer(
-        account_id=settings.account_id,
-        interval_seconds=settings.minimum_navigation_interval_seconds,
-    )
     playwright: Playwright | None = None
     context: BrowserContext | None = None
     try:
@@ -51,13 +48,12 @@ async def logout_interactively(
         )
         _set_timeouts(context, settings)
         page = context.pages[0] if context.pages else await context.new_page()
-        await pacer.wait()
-        await page.goto(SESSION_VALIDATION_URL, wait_until="domcontentloaded")
+        await paced.goto(page, SESSION_VALIDATION_URL, wait_until="domcontentloaded")
         cookies = await context.cookies("https://www.linkedin.com")
         has_session_cookie = any(cookie.get("name") == "li_at" for cookie in cookies)
         if not has_session_cookie and _is_logged_out_surface(page.url):
             return False
-        await assert_safe_linkedin_page(page, settings.allowed_hosts)
+        await assert_linkedin_access(page, settings.allowed_hosts)
 
         account_menu = await _unique_visible_control(
             page.get_by_role(
@@ -67,8 +63,7 @@ async def logout_interactively(
             missing_message="LinkedIn's visible account menu was unavailable for logout.",
             ambiguous_message="LinkedIn exposed multiple visible account menus for logout.",
         )
-        await pacer.wait()
-        await account_menu.click()
+        await paced.click(account_menu)
         sign_out = await _unique_visible_control(
             page.get_by_role(
                 "link",
@@ -77,8 +72,7 @@ async def logout_interactively(
             missing_message="LinkedIn's visible Sign Out control was unavailable.",
             ambiguous_message="LinkedIn exposed multiple visible Sign Out controls.",
         )
-        await pacer.wait()
-        await sign_out.click()
+        await paced.click(sign_out)
         for _ in range(40):
             cookies = await context.cookies("https://www.linkedin.com")
             if not any(cookie.get("name") == "li_at" for cookie in cookies):
@@ -96,8 +90,11 @@ async def logout_interactively(
         )
         _set_timeouts(context, settings)
         verification_page = await context.new_page()
-        await pacer.wait()
-        await verification_page.goto(SESSION_VALIDATION_URL, wait_until="domcontentloaded")
+        await paced.goto(
+            verification_page,
+            SESSION_VALIDATION_URL,
+            wait_until="domcontentloaded",
+        )
         cookies = await context.cookies("https://www.linkedin.com")
         if any(cookie.get("name") == "li_at" for cookie in cookies):
             raise BrowserUnavailableError(_LOGOUT_VERIFICATION_MESSAGE)
@@ -112,7 +109,6 @@ async def logout_interactively(
     except Exception as error:
         raise BrowserUnavailableError("The interactive LinkedIn logout browser failed.") from error
     finally:
-        pacer.close()
         if context is not None:
             await context.close()
         if playwright is not None:

@@ -10,10 +10,24 @@ from datetime import UTC, datetime
 from typing import ClassVar, Literal, cast
 from urllib.parse import urljoin
 
+from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
+from linkedin_mcp.browser import BrowserManager
+from linkedin_mcp.browser.urls import (
+    canonical_profile_url,
+    conversation_id_from_url,
+    profile_slug_from_url,
+)
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
+from linkedin_mcp.infra.playwright import Paced
+from linkedin_mcp.infra.playwright.collections import (
+    CollectionSettleOutcome,
+    CollectionSettleResult,
+    dispatch_bubbling_wheel,
+    wait_for_collection_interaction,
+)
 from linkedin_mcp.tools.messaging.search.models import (
     ConversationCategory,
     ConversationFilter,
@@ -21,20 +35,6 @@ from linkedin_mcp.tools.messaging.search.models import (
     ConversationSearchInput,
     ConversationSummary,
     StopReason,
-)
-from linkedin_mcp.ui import LinkedInLocator as Locator
-from linkedin_mcp.ui import LinkedInPage as Page
-from linkedin_mcp.ui import LinkedInPlaywright
-from linkedin_mcp.ui.collections import (
-    CollectionSettleOutcome,
-    CollectionSettleResult,
-    dispatch_bubbling_wheel,
-    wait_for_collection_interaction,
-)
-from linkedin_mcp.ui.urls import (
-    canonical_profile_url,
-    conversation_id_from_url,
-    profile_slug_from_url,
 )
 
 _MESSAGING_URL = "https://www.linkedin.com/messaging/"
@@ -159,7 +159,10 @@ def _conversation_search_has_explicit_end(visible_text: str) -> bool:
     return any(_CONVERSATION_LIST_END_PATTERN.fullmatch(line) for line in _lines(visible_text))
 
 
-async def _settle_conversation_scroll(page: Page) -> CollectionSettleResult:
+async def _settle_conversation_scroll(
+    paced: Paced,
+    page: Page,
+) -> CollectionSettleResult:
     baseline = await _visible_conversation_signature(page)
     cards = page.locator(_CONVERSATION_CARD_SELECTOR)
     last_visible: Locator | None = None
@@ -168,7 +171,7 @@ async def _settle_conversation_scroll(page: Page) -> CollectionSettleResult:
         if await candidate.is_visible():
             last_visible = candidate
     if last_visible is not None:
-        await last_visible.scroll_into_view_if_needed()
+        await paced.scroll_into_view_if_needed(last_visible)
     main = page.locator("main").first
     wheel_target = main
     containers = page.locator('main [class*="msg-conversations-container__conversations-list"]')
@@ -183,10 +186,10 @@ async def _settle_conversation_scroll(page: Page) -> CollectionSettleResult:
     async def scroll() -> None:
         nonlocal delivery_attempt
         delivery_attempt += 1
-        await wheel_target.hover()
-        await page.mouse.wheel(0, 1_500)
+        await paced.hover(wheel_target)
+        await paced.wheel(page.mouse, 0, 1_500)
         if delivery_attempt > 1:
-            await dispatch_bubbling_wheel(wheel_target, delta_y=1_500)
+            await dispatch_bubbling_wheel(paced, wheel_target, delta_y=1_500)
 
     async def explicit_end() -> bool:
         return _conversation_search_has_explicit_end(await _visible_text(page.locator("main")))
@@ -289,12 +292,13 @@ class ConversationSearchPage:
 
     def __init__(
         self,
-        playwright: LinkedInPlaywright,
+        browser: BrowserManager,
         *,
         max_scroll_rounds: int,
         reference_index: ConversationReferenceIndex | None = None,
     ) -> None:
-        self._playwright = playwright
+        self._browser = browser
+        self._paced = browser.paced
         self._max_scroll_rounds = max_scroll_rounds
         self._reference_index = reference_index or ConversationReferenceIndex()
 
@@ -316,8 +320,8 @@ class ConversationSearchPage:
         stop_reason = StopReason.SAFETY_BOUND
         rounds_visited = 0
         end_confirmations = 0
-        async with self._playwright.page() as page:
-            await page.goto(_MESSAGING_URL)
+        async with self._browser.page() as page:
+            await self._paced.goto(page, _MESSAGING_URL)
             await page.locator("main").first.wait_for(state="visible")
             await self._apply_category(page, request.resolved_category)
             if request.filter is not None:
@@ -351,7 +355,7 @@ class ConversationSearchPage:
                     break
                 if round_index + 1 >= self._max_scroll_rounds:
                     break
-                settled = await _settle_conversation_scroll(page)
+                settled = await _settle_conversation_scroll(self._paced, page)
                 if settled.outcome is CollectionSettleOutcome.EXPLICIT_END:
                     end_text = await _visible_text(page.locator("main"))
                     if not captures or captures[-1] != end_text:
@@ -402,10 +406,9 @@ class ConversationSearchPage:
             textbox = main.get_by_placeholder(re.compile(r"search messages", re.I))
         if await textbox.count() != 1:
             raise ParserDriftError("LinkedIn Messaging has no unique visible search box.")
-        await textbox.fill(query)
-        await textbox.press("Enter")
+        await self._paced.fill(textbox, query)
+        await self._paced.press(textbox, "Enter")
         await page.wait_for_timeout(750)
-        await page.assert_safe()
 
     async def _apply_category(
         self,
@@ -432,7 +435,7 @@ class ConversationSearchPage:
             ).strip()
             if label.fullmatch(current_name):
                 return
-            await opener.click()
+            await self._paced.click(opener)
             option = await self._unique_named_control(
                 page,
                 label,
@@ -442,9 +445,8 @@ class ConversationSearchPage:
             raise ParserDriftError(
                 f"LinkedIn Messaging has no unique visible {category.value} category."
             )
-        await option.click()
+        await self._paced.click(option)
         await page.wait_for_timeout(500)
-        await page.assert_safe()
 
     async def _apply_filter(
         self,
@@ -462,9 +464,8 @@ class ConversationSearchPage:
             or await option.get_attribute("aria-checked") == "true"
         ):
             return
-        await option.click()
+        await self._paced.click(option)
         await page.wait_for_timeout(500)
-        await page.assert_safe()
         if (
             await option.get_attribute("aria-pressed") != "true"
             and await option.get_attribute("aria-checked") != "true"
@@ -484,7 +485,7 @@ class ConversationSearchPage:
                 "The process-local conversation reference is unavailable; search messages "
                 "again before opening it."
             )
-        await page.goto(_MESSAGING_URL)
+        await self._paced.goto(page, _MESSAGING_URL)
         await page.locator("main").first.wait_for(state="visible")
         await self._apply_category(page, lookup.category)
         if lookup.filter is not None:
@@ -529,7 +530,7 @@ class ConversationSearchPage:
                     '[class*="msg-conversations-container__convo-item-link"]'
                 )
                 control = clickable.first if await clickable.count() == 1 else card
-                await control.click()
+                await self._paced.click(control)
                 try:
                     await page.wait_for_url(
                         lambda value: conversation_id_from_url(str(value)) is not None,
@@ -539,7 +540,6 @@ class ConversationSearchPage:
                     raise ParserDriftError(
                         "The exact visible search result did not open a supported thread URL."
                     ) from error
-                await page.assert_safe()
                 return exact[0], card
             if len(exact) > 1 or len(matching_cards) > 1:
                 raise InvalidTargetError(
@@ -547,7 +547,7 @@ class ConversationSearchPage:
                 )
             if round_index + 1 >= self._max_scroll_rounds:
                 break
-            settled = await _settle_conversation_scroll(page)
+            settled = await _settle_conversation_scroll(self._paced, page)
             if settled.outcome is CollectionSettleOutcome.EXPLICIT_END:
                 break
             if settled.outcome is CollectionSettleOutcome.PROGRESSED:

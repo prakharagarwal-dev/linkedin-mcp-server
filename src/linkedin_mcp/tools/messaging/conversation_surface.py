@@ -6,22 +6,21 @@ import hashlib
 import re
 from enum import StrEnum
 from typing import Annotated, cast
-from urllib.parse import parse_qs, urljoin, urlsplit
+from urllib.parse import parse_qs, urljoin, urlsplit, urlunsplit
 
+from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
-from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
-from linkedin_mcp.tools.messaging.search.page import ConversationSearchPage
-from linkedin_mcp.ui import LinkedInLocator as Locator
-from linkedin_mcp.ui import LinkedInPage as Page
-from linkedin_mcp.ui import LinkedInPlaywright
-from linkedin_mcp.ui.urls import (
+from linkedin_mcp.browser import BrowserManager
+from linkedin_mcp.browser.urls import (
     canonical_conversation_url,
     canonical_profile_url,
     conversation_id_from_url,
     profile_slug_from_url,
 )
+from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
+from linkedin_mcp.tools.messaging.search.page import ConversationSearchPage
 
 _COMPOSER_SELECTOR = '[contenteditable]:not([contenteditable="false"]), textarea'
 
@@ -279,14 +278,15 @@ class ConversationSurface:
 
     def __init__(
         self,
-        playwright: LinkedInPlaywright,
+        browser: BrowserManager,
         *,
         conversation_search: ConversationSearchPage | None = None,
         max_history_rounds: int = 100,
     ) -> None:
         if max_history_rounds < 1:
             raise ValueError("Conversation history traversal must be bounded.")
-        self._playwright = playwright
+        self._browser = browser
+        self._paced = browser.paced
         self._conversation_search = conversation_search
         self._max_history_rounds = max_history_rounds
 
@@ -302,9 +302,9 @@ class ConversationSurface:
         selected_profile_slug = profile_slug
         selected_is_group = False
         if conversation_id:
-            await page.goto(canonical_conversation_url(conversation_id))
+            await self._paced.goto(page, canonical_conversation_url(conversation_id))
         elif profile_slug:
-            await page.goto(canonical_profile_url(profile_slug))
+            await self._paced.goto(page, canonical_profile_url(profile_slug))
             main = page.locator("main")
             introduction, expected_name = await self._profile_introduction(main)
             top_text = "\n".join(_lines(await _visible_text(introduction))[:30])
@@ -449,9 +449,25 @@ class ConversationSurface:
         )
         href = await selected.get_attribute("href")
         if href and "/messaging/" in href.casefold():
-            await page.goto(urljoin(page.url, href))
+            parsed_target = urlsplit(urljoin(page.url, href))
+            if not parsed_target.path.startswith("/messaging/"):
+                raise ParserDriftError(
+                    "The exact profile Message link has no supported conversation target."
+                )
+            await self._paced.goto(
+                page,
+                urlunsplit(
+                    (
+                        "https",
+                        "www.linkedin.com",
+                        parsed_target.path,
+                        parsed_target.query,
+                        "",
+                    )
+                ),
+            )
         else:
-            await selected.click()
+            await self._paced.click(selected)
         for _ in range(40):
             surfaces: list[tuple[Page, Locator]] = []
             overlays = await self._profile_message_overlays(
@@ -730,7 +746,7 @@ class ConversationSurface:
                 visible_dialogs += 1
         return (
             f"surface={surface}, visible_composers={visible_composers}, "
-            f"visible_dialogs={visible_dialogs}, pages={page.context_page_count}, "
+            f"visible_dialogs={visible_dialogs}, pages={len(page.context.pages)}, "
             f"selected_control={control_diagnostic}"
         )
 

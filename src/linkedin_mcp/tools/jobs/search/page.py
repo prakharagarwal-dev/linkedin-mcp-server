@@ -8,10 +8,18 @@ from datetime import UTC, datetime
 from urllib.parse import urlencode, urljoin
 
 from playwright.async_api import Error as PlaywrightError
+from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
+from linkedin_mcp.browser import BrowserManager
+from linkedin_mcp.browser.urls import (
+    canonical_job_url,
+    job_id_from_url,
+)
 from linkedin_mcp.errors import ParserDriftError
+from linkedin_mcp.infra.playwright import Paced
+from linkedin_mcp.infra.playwright.collections import CollectionSettleOutcome
 from linkedin_mcp.tools.jobs.search.models import (
     EvidenceField,
     JobBenefit,
@@ -36,14 +44,6 @@ from linkedin_mcp.tools.jobs.surface import (
 )
 from linkedin_mcp.tools.jobs.surface import (
     lines as visible_text_lines,
-)
-from linkedin_mcp.ui import LinkedInLocator as Locator
-from linkedin_mcp.ui import LinkedInPage as Page
-from linkedin_mcp.ui import LinkedInPlaywright
-from linkedin_mcp.ui.collections import CollectionSettleOutcome
-from linkedin_mcp.ui.urls import (
-    canonical_job_url,
-    job_id_from_url,
 )
 
 _WORKPLACE_SUFFIX_PATTERN = re.compile(
@@ -361,6 +361,7 @@ def _typeahead_option_label(option_text: str, option_kind: str) -> str:
 
 
 async def _resolve_typeahead_name(
+    paced: Paced,
     page: Page,
     dialog: Locator,
     requested_name: str,
@@ -369,10 +370,10 @@ async def _resolve_typeahead_name(
     add_button = dialog.get_by_role("button", name=facet.add_button_name, exact=True)
     try:
         await add_button.first.wait_for(state="visible", timeout=5_000)
-        await add_button.first.click()
+        await paced.click(add_button.first)
         combobox = dialog.get_by_role("combobox", name=facet.add_button_name, exact=True)
         await combobox.wait_for(state="visible", timeout=5_000)
-        await combobox.fill(requested_name)
+        await paced.fill(combobox, requested_name)
     except PlaywrightTimeoutError as error:
         raise ParserDriftError(
             f"LinkedIn's visible {facet.add_button_name.lower()} control was unavailable."
@@ -403,7 +404,7 @@ async def _resolve_typeahead_name(
             f"matches for {requested_name!r}; use {facet.id_field_name} instead."
         )
 
-    await options.nth(matching_indices[0]).click()
+    await paced.click(options.nth(matching_indices[0]))
     for _ in range(25):
         values = await _visible_facet_values(dialog, facet.input_name)
         resolved = _resolved_visible_value(
@@ -447,6 +448,7 @@ async def _resolve_visible_names(
 
 
 async def _resolve_typeahead_names(
+    paced: Paced,
     page: Page,
     dialog: Locator,
     requested_names: tuple[str, ...],
@@ -461,12 +463,19 @@ async def _resolve_typeahead_names(
             id_field_name=facet.id_field_name,
         )
         if value is None:
-            value = await _resolve_typeahead_name(page, dialog, requested_name, facet)
+            value = await _resolve_typeahead_name(
+                paced,
+                page,
+                dialog,
+                requested_name,
+                facet,
+            )
         resolved.append(value)
     return tuple(resolved)
 
 
 async def _resolve_named_facets(
+    paced: Paced,
     page: Page,
     filters: JobSearchFilters,
 ) -> _ResolvedJobSearchFacets:
@@ -476,7 +485,7 @@ async def _resolve_named_facets(
     )
     try:
         await all_filters.first.wait_for(state="visible", timeout=20_000)
-        await all_filters.first.click()
+        await paced.click(all_filters.first)
         dialog = page.get_by_role("dialog").first
         await dialog.wait_for(state="visible", timeout=10_000)
     except PlaywrightTimeoutError as error:
@@ -492,18 +501,21 @@ async def _resolve_named_facets(
             id_field_name="location_ids",
         ),
         company_ids=await _resolve_typeahead_names(
+            paced,
             page,
             dialog,
             filters.company_names,
             _COMPANY_FACET,
         ),
         industry_ids=await _resolve_typeahead_names(
+            paced,
             page,
             dialog,
             filters.industry_names,
             _INDUSTRY_FACET,
         ),
         job_function_ids=await _resolve_typeahead_names(
+            paced,
             page,
             dialog,
             filters.job_function_names,
@@ -519,10 +531,11 @@ async def _resolve_named_facets(
 
 
 class JobSearchPage:
-    def __init__(self, playwright: LinkedInPlaywright, *, max_pages: int) -> None:
+    def __init__(self, browser: BrowserManager, *, max_pages: int) -> None:
         if max_pages < 1:
             raise ValueError("Job search must allow at least one internal page.")
-        self._playwright = playwright
+        self._browser = browser
+        self._paced = browser.paced
         self._max_pages = max_pages
 
     @staticmethod
@@ -562,15 +575,19 @@ class JobSearchPage:
         advertised_result_count: int | None = None
         advertised_result_count_is_lower_bound = False
         resolved_facets = _ResolvedJobSearchFacets()
-        async with self._playwright.page() as page:
+        async with self._browser.page() as page:
             if _has_named_facets(request.filters):
-                await page.goto(self.build_url(request))
+                await self._paced.goto(page, self.build_url(request))
                 await _wait_for_job_search_state(page)
-                resolved_facets = await _resolve_named_facets(page, request.filters)
+                resolved_facets = await _resolve_named_facets(
+                    self._paced,
+                    page,
+                    request.filters,
+                )
             first_url = self.build_url(request, resolved_facets=resolved_facets)
             for page_index in range(self._max_pages):
-                await page.goto(
-                    self.build_url(request, page_index, resolved_facets=resolved_facets)
+                await self._paced.goto(
+                    page, self.build_url(request, page_index, resolved_facets=resolved_facets)
                 )
                 rendered_state = await _wait_for_job_search_state(page)
                 pages_visited += 1
@@ -583,7 +600,7 @@ class JobSearchPage:
                     )
                     break
 
-                page_jobs = await self.extract_visible_jobs(page)
+                page_jobs = await self.extract_visible_jobs(self._paced, page)
                 if not page_jobs:
                     raise ParserDriftError(
                         "LinkedIn Jobs rendered result shells but no complete current job cards."
@@ -654,7 +671,10 @@ class JobSearchPage:
         raise ParserDriftError("LinkedIn job search returned no visible text.")
 
     @staticmethod
-    async def extract_visible_jobs(page: Page) -> tuple[JobSummary, ...]:
+    async def extract_visible_jobs(
+        paced: Paced,
+        page: Page,
+    ) -> tuple[JobSummary, ...]:
         shells = page.locator("main li[data-occludable-job-id]")
         raw_ids = await shells.evaluate_all(
             "elements => elements.map(element => "
@@ -672,7 +692,10 @@ class JobSearchPage:
             link = card.locator(f'a.job-card-list__title--link[href*="/jobs/view/{job_id}/"]')
             for _ in range(3):
                 try:
-                    await card.scroll_into_view_if_needed(timeout=_CARD_HYDRATION_TIMEOUT_MS)
+                    await paced.scroll_into_view_if_needed(
+                        card,
+                        timeout=_CARD_HYDRATION_TIMEOUT_MS,
+                    )
                     await link.wait_for(
                         state="attached",
                         timeout=_CARD_HYDRATION_TIMEOUT_MS,

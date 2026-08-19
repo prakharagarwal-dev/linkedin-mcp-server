@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from linkedin_mcp.errors import InvalidTargetError
-from linkedin_mcp.ui.urls import (
+from linkedin_mcp.browser.urls import (
     canonical_company_url,
     canonical_conversation_url,
     canonical_job_url,
@@ -18,6 +17,7 @@ from linkedin_mcp.ui.urls import (
     profile_slug_from_url,
     validate_linkedin_url,
 )
+from linkedin_mcp.errors import InvalidTargetError
 
 
 def test_job_ids_are_extracted_from_supported_urls() -> None:
