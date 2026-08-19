@@ -13,12 +13,14 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.tools._shared.models import StopReason
-from linkedin_mcp.tools.companies.search.models.company_search_coverage import CompanySearchCoverage
-from linkedin_mcp.tools.companies.search.models.company_search_filters import CompanySearchFilters
-from linkedin_mcp.tools.companies.search.models.company_search_input import CompanySearchInput
-from linkedin_mcp.tools.companies.search.models.company_size import CompanySize
-from linkedin_mcp.tools.companies.search.models.company_summary import CompanySummary
+from linkedin_mcp.tools.companies.search.models import (
+    CompanySearchCoverage,
+    CompanySearchFilters,
+    CompanySearchInput,
+    CompanySize,
+    CompanySummary,
+    StopReason,
+)
 from linkedin_mcp.tools.companies.surface import (
     ACTION_LINES,
     ASSOCIATED_MEMBER_PATTERN,

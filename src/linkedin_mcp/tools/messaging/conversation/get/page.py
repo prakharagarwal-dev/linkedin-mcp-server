@@ -10,20 +10,19 @@ from typing import cast
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.tools._shared.models import StopReason
-from linkedin_mcp.tools.messaging.conversation.get.models.conversation_coverage import (
+from linkedin_mcp.tools.messaging.conversation.get.models import (
     ConversationCoverage,
-)
-from linkedin_mcp.tools.messaging.conversation.get.models.conversation_get_input import (
     ConversationGetInput,
-)
-from linkedin_mcp.tools.messaging.conversation.get.models.conversation_observation import (
     ConversationObservation,
-)
-from linkedin_mcp.tools.messaging.conversation.get.models.message_observation import (
     MessageObservation,
+    StopReason,
 )
-from linkedin_mcp.tools.messaging.conversation_surface import ConversationSurface
+from linkedin_mcp.tools.messaging.conversation_surface import (
+    ConversationSurface,
+)
+from linkedin_mcp.tools.messaging.conversation_surface import (
+    MessageObservation as SurfaceMessageObservation,
+)
 from linkedin_mcp.ui import LinkedInLocator as Locator
 from linkedin_mcp.ui import LinkedInPage as Page
 from linkedin_mcp.ui.collections import (
@@ -368,7 +367,7 @@ class ConversationGetPage(ConversationSurface):
     ) -> ConversationObservation:
         conversation_id = conversation_id_from_url(page.url)
         target = conversation_id or profile_slug or participant_name.casefold()
-        snapshots: list[tuple[MessageObservation, ...]] = []
+        snapshots: list[tuple[SurfaceMessageObservation, ...]] = []
         captures: list[str] = []
         observed_refs: set[str] = set()
         stop_reason = StopReason.SAFETY_BOUND
@@ -424,7 +423,7 @@ class ConversationGetPage(ConversationSurface):
             else:
                 end_confirmations = 0
 
-        merged: list[MessageObservation] = []
+        merged: list[SurfaceMessageObservation] = []
         merged_refs: set[str] = set()
         for snapshot in reversed(snapshots):
             for message in snapshot:
@@ -432,7 +431,10 @@ class ConversationGetPage(ConversationSurface):
                     continue
                 merged_refs.add(message.message_ref)
                 merged.append(message)
-        retained = tuple(merged[-max_messages:])
+        retained = tuple(
+            MessageObservation.model_validate(message.model_dump(mode="python"))
+            for message in merged[-max_messages:]
+        )
         history_complete = stop_reason in {
             StopReason.NO_NEW_RESULTS,
             StopReason.VISIBLE_PAGE_COMPLETE,

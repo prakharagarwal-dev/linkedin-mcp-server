@@ -160,7 +160,6 @@ def attach_tool_implementations(
 ) -> None:
     """Attach explicitly supplied tool implementations without storing them."""
 
-    from linkedin_mcp.tools._shared.tool import tool_annotations
     from linkedin_mcp.tools.companies.get.tool import register as register_companies_get
     from linkedin_mcp.tools.companies.search.tool import register as register_companies_search
     from linkedin_mcp.tools.connections.list.tool import register as register_connections_list
@@ -187,48 +186,27 @@ def attach_tool_implementations(
     from linkedin_mcp.tools.server.status.tool import register as register_server_status
     from linkedin_mcp.tools.session.status.tool import register as register_session_status
 
-    annotations = tool_annotations()
     account_id = settings.account_id
-    register_server_status(mcp, settings, scheduler, annotations.local_read)
-    register_session_status(mcp, settings, playwright, annotations.local_read)
-    register_jobs_search(
-        mcp, scheduler, job_search, cursor_store, account_id, annotations.linkedin_read
-    )
-    register_jobs_get(mcp, scheduler, job_detail, annotations.linkedin_read)
-    register_people_search(
-        mcp, scheduler, people_search, cursor_store, account_id, annotations.linkedin_read
-    )
-    register_people_get(mcp, scheduler, person_profile, annotations.linkedin_read)
-    register_companies_search(
-        mcp, scheduler, company_search, cursor_store, account_id, annotations.linkedin_read
-    )
-    register_companies_get(mcp, scheduler, company_profile, annotations.linkedin_read)
-    register_posts_search(
-        mcp, scheduler, post_search, cursor_store, account_id, annotations.linkedin_read
-    )
-    register_posts_get(mcp, scheduler, post_detail, annotations.linkedin_read)
-    register_posts_comments_list(
-        mcp, scheduler, post_comments, cursor_store, account_id, annotations.linkedin_read
-    )
-    register_posts_create(mcp, scheduler, post_publishing, annotations.linkedin_write)
-    register_posts_comment(mcp, scheduler, post_comment, annotations.linkedin_write)
-    register_posts_react(mcp, scheduler, post_reaction, annotations.linkedin_write)
-    register_invitations_list(
-        mcp, scheduler, invitation_list, cursor_store, account_id, annotations.linkedin_read
-    )
-    register_connections_list(
-        mcp, scheduler, connections_list, cursor_store, account_id, annotations.linkedin_read
-    )
-    register_connections_search(
-        mcp, scheduler, connections_search, cursor_store, account_id, annotations.linkedin_read
-    )
-    register_invitations_send(mcp, scheduler, invitation_send, annotations.linkedin_write)
-    register_invitations_accept(mcp, scheduler, invitation_accept, annotations.linkedin_write)
-    register_invitations_ignore(mcp, scheduler, invitation_ignore, annotations.linkedin_write)
-    register_messaging_search(
-        mcp, scheduler, conversation_search, cursor_store, account_id, annotations.linkedin_read
-    )
-    register_messaging_conversation_get(
-        mcp, scheduler, conversation_read, annotations.messaging_read
-    )
-    register_messaging_send(mcp, scheduler, message_send, annotations.linkedin_write)
+    register_server_status(mcp, settings, scheduler)
+    register_session_status(mcp, settings, playwright)
+    register_jobs_search(mcp, scheduler, job_search, cursor_store, account_id)
+    register_jobs_get(mcp, scheduler, job_detail)
+    register_people_search(mcp, scheduler, people_search, cursor_store, account_id)
+    register_people_get(mcp, scheduler, person_profile)
+    register_companies_search(mcp, scheduler, company_search, cursor_store, account_id)
+    register_companies_get(mcp, scheduler, company_profile)
+    register_posts_search(mcp, scheduler, post_search, cursor_store, account_id)
+    register_posts_get(mcp, scheduler, post_detail)
+    register_posts_comments_list(mcp, scheduler, post_comments, cursor_store, account_id)
+    register_posts_create(mcp, scheduler, post_publishing)
+    register_posts_comment(mcp, scheduler, post_comment)
+    register_posts_react(mcp, scheduler, post_reaction)
+    register_invitations_list(mcp, scheduler, invitation_list, cursor_store, account_id)
+    register_connections_list(mcp, scheduler, connections_list, cursor_store, account_id)
+    register_connections_search(mcp, scheduler, connections_search, cursor_store, account_id)
+    register_invitations_send(mcp, scheduler, invitation_send)
+    register_invitations_accept(mcp, scheduler, invitation_accept)
+    register_invitations_ignore(mcp, scheduler, invitation_ignore)
+    register_messaging_search(mcp, scheduler, conversation_search, cursor_store, account_id)
+    register_messaging_conversation_get(mcp, scheduler, conversation_read)
+    register_messaging_send(mcp, scheduler, message_send)

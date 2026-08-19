@@ -12,19 +12,17 @@ from pydantic import ValidationError
 
 import linkedin_mcp.tools.invitations.list.page as invitation_pages
 from linkedin_mcp.errors import BrowserUnavailableError, ParserDriftError
-from linkedin_mcp.tools._shared.models import StopReason
-from linkedin_mcp.tools.invitations.list.models.invitation_available_action import (
+from linkedin_mcp.tools.invitations.list.models import (
     InvitationAvailableAction,
-)
-from linkedin_mcp.tools.invitations.list.models.invitation_direction import InvitationDirection
-from linkedin_mcp.tools.invitations.list.models.invitation_entity_type import InvitationEntityType
-from linkedin_mcp.tools.invitations.list.models.invitation_filter import InvitationFilter
-from linkedin_mcp.tools.invitations.list.models.invitation_list_coverage import (
+    InvitationDirection,
+    InvitationEntityType,
+    InvitationFilter,
     InvitationListCoverage,
+    InvitationListInput,
+    InvitationSummary,
+    InvitationType,
+    StopReason,
 )
-from linkedin_mcp.tools.invitations.list.models.invitation_list_input import InvitationListInput
-from linkedin_mcp.tools.invitations.list.models.invitation_summary import InvitationSummary
-from linkedin_mcp.tools.invitations.list.models.invitation_type import InvitationType
 from linkedin_mcp.tools.invitations.list.page import InvitationListPage
 from tests.support.playwright import adapt_browser
 

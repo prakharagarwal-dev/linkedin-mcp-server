@@ -2,21 +2,32 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable
 from typing import Annotated, Any
 
 from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from linkedin_mcp.errors import InternalServerError, LinkedInMCPError
 from linkedin_mcp.infra.queue import Scheduler, Task
-from linkedin_mcp.tools._shared.tool import (
-    IdentifierArgument,
-    tool_result,
-)
 from linkedin_mcp.tools.companies.get.evidence import sources_from_company_profile
-from linkedin_mcp.tools.companies.get.models.company_get_input import CompanyGetInput
-from linkedin_mcp.tools.companies.get.models.company_get_output import CompanyGetOutput
+from linkedin_mcp.tools.companies.get.models import CompanyGetInput, CompanyGetOutput
 from linkedin_mcp.tools.companies.get.page import CompanyProfilePage
+
+IdentifierArgument = Annotated[
+    str,
+    Field(min_length=1, max_length=200, pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]*$"),
+]
+
+
+async def tool_result[ResultT](awaitable: Awaitable[ResultT]) -> ResultT:
+    try:
+        return await awaitable
+    except Exception as error:
+        safe = error if isinstance(error, LinkedInMCPError) else InternalServerError()
+        raise ToolError(f"{safe.code.value}: {safe.safe_message}") from error
 
 
 async def execute(request: CompanyGetInput, page: CompanyProfilePage) -> CompanyGetOutput:
@@ -33,7 +44,6 @@ def register(
     mcp: FastMCP[None],
     scheduler: Scheduler,
     page: CompanyProfilePage,
-    annotations: ToolAnnotations,
 ) -> None:
     @mcp.tool(
         name="linkedin.companies.get",
@@ -44,7 +54,12 @@ def register(
             "industry, company-size range, associated-member and follower counts, headquarters, "
             "organization type, founding year, specialties, and exact field evidence."
         ),
-        annotations=annotations,
+        annotations=ToolAnnotations(
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=True,
+        ),
     )
     async def _get_company(
         context_id: IdentifierArgument,

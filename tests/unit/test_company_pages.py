@@ -12,17 +12,19 @@ from playwright.async_api import Locator, Page, async_playwright
 from pydantic import ValidationError
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.tools._shared.models import StopReason
 from linkedin_mcp.tools.companies.get.evidence import sources_from_company_profile
-from linkedin_mcp.tools.companies.get.models.company_get_input import CompanyGetInput
-from linkedin_mcp.tools.companies.get.models.company_profile_evidence import CompanyProfileEvidence
-from linkedin_mcp.tools.companies.get.models.company_profile_observation import (
+from linkedin_mcp.tools.companies.get.models import (
+    CompanyGetInput,
+    CompanyProfileEvidence,
     CompanyProfileObservation,
 )
 from linkedin_mcp.tools.companies.get.page import CompanyProfilePage
-from linkedin_mcp.tools.companies.search.models.company_search_filters import CompanySearchFilters
-from linkedin_mcp.tools.companies.search.models.company_search_input import CompanySearchInput
-from linkedin_mcp.tools.companies.search.models.company_size import CompanySize
+from linkedin_mcp.tools.companies.search.models import (
+    CompanySearchFilters,
+    CompanySearchInput,
+    CompanySize,
+    StopReason,
+)
 from linkedin_mcp.tools.companies.search.page import CompanySearchPage
 from linkedin_mcp.ui import LinkedInPlaywright
 from tests.support.playwright import adapt_browser

@@ -12,24 +12,22 @@ from playwright.async_api import Locator, Page, async_playwright
 from pydantic import ValidationError
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.tools._shared.models import StopReason
-from linkedin_mcp.tools.connections.search.models.connections_search_filters import (
+from linkedin_mcp.tools.connections.search.models import (
     ConnectionsSearchFilters,
-)
-from linkedin_mcp.tools.connections.search.models.connections_search_input import (
     ConnectionsSearchInput,
 )
-from linkedin_mcp.tools.people.get.models.people_get_input import PeopleGetInput
-from linkedin_mcp.tools.people.get.models.person_profile_section_selector import (
+from linkedin_mcp.tools.people.get.models import (
+    PeopleGetInput,
     PersonProfileSectionSelector,
 )
 from linkedin_mcp.tools.people.get.page import PersonProfilePage
-from linkedin_mcp.tools.people.models.person_connection_degree import PersonConnectionDegree
-from linkedin_mcp.tools.people.search.models.people_search_connection_degree import (
+from linkedin_mcp.tools.people.search.models import (
     PeopleSearchConnectionDegree,
+    PeopleSearchFilters,
+    PeopleSearchInput,
+    PersonConnectionDegree,
+    StopReason,
 )
-from linkedin_mcp.tools.people.search.models.people_search_filters import PeopleSearchFilters
-from linkedin_mcp.tools.people.search.models.people_search_input import PeopleSearchInput
 from linkedin_mcp.tools.people.search.page import PeopleSearchPage
 from tests.support.playwright import adapt_browser
 
@@ -348,9 +346,10 @@ def test_connections_search_contract_forces_first_degree_and_hides_degree_input(
     )
 
     people_request = request.as_people_search_input()
-    query = parse_qs(urlsplit(PeopleSearchPage.build_url(people_request)).query)
+    provider_request = PeopleSearchInput.model_validate(people_request.model_dump(mode="python"))
+    query = parse_qs(urlsplit(PeopleSearchPage.build_url(provider_request)).query)
 
-    assert people_request.filters.connection_degrees == (PeopleSearchConnectionDegree.FIRST,)
+    assert provider_request.filters.connection_degrees == (PeopleSearchConnectionDegree.FIRST,)
     assert _decoded_values(query, "network") == ["F"]
     assert query["title"] == ["Staff Engineer"]
     assert _decoded_values(query, "currentCompany") == ["11130470"]

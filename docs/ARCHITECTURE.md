@@ -87,9 +87,10 @@ Each write tool performs one complete action in one call:
 
 Write tasks are non-interruptible after the worker starts them. If their MCP
 caller disconnects, the worker still lets the started action reach a terminal
-outcome. The server never retries a write automatically. The small shared
-`tools/action.py` helper builds the command, outcome, and evidence; it does not
-select or dispatch tools.
+outcome. The server never retries a write automatically. Each write leaf owns
+its input, command, inspection, outcome, evidence, and execution flow in its
+local `models.py`, `evidence.py`, and `tool.py`; there is no shared action
+executor.
 
 ## Runtime state
 
@@ -138,8 +139,6 @@ linkedin_mcp/
 │   └── cursor/store.py      bounded process-local cursor state
 ├── cli/                     CLI assembly and commands
 └── tools/
-    ├── action.py            shared single-attempt write helper
-    ├── _shared/             cross-tool contracts and MCP/action helpers
     ├── server/status/
     ├── session/status/
     ├── jobs/{search,get}/
@@ -166,14 +165,15 @@ Every public MCP name maps directly to a tool leaf after removing the
 tool.py          FastMCP registration, typed request, Task creation
 page.py          Playwright behavior for this tool
 evidence.py      evidence construction for this tool
-models/          one owned model per file
+models.py        all contracts owned by this tool
 pagination.py    collection/output assembly, only when the tool paginates
 ```
 
 Named domain modules such as `posts/surface.py` contain visible-UI mechanics
 that are genuinely shared by neighboring page objects. Reusable Playwright
-mechanics live in `ui/`; `tools/_shared/` contains only cross-domain contracts,
-source/action evidence helpers, and MCP annotations. There is no
+mechanics live in `ui/`. Tool contracts, evidence construction, annotations,
+safe MCP error projection, and single-attempt write execution stay in the leaf
+that exposes them. There is no `tools/_shared/`, `tools/action.py`,
 `operation.py`, capability registry, aggregate model facade, or central
 capability executor.
 

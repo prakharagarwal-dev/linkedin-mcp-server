@@ -9,20 +9,31 @@ from playwright.async_api import Locator, Page, Route, async_playwright
 from pydantic import ValidationError
 
 import linkedin_mcp.tools.posts.comment.page as engagement_page
-from linkedin_mcp.tools._shared.actions import (
-    ActionCommand,
-    ActionOutcome,
-    ActionType,
+from linkedin_mcp.tools.posts.comment.models import (
+    ActionCommand as CommentActionCommand,
+)
+from linkedin_mcp.tools.posts.comment.models import (
+    ActionType as CommentActionType,
+)
+from linkedin_mcp.tools.posts.comment.models import (
     CommentCreatePayload,
+    CommentGifAttachment,
+    CommentPhotoAttachment,
+    PostCommentInput,
     PostMentionInput,
+)
+from linkedin_mcp.tools.posts.comment.page import PostCommentPage
+from linkedin_mcp.tools.posts.react.models import (
+    ActionCommand as ReactionActionCommand,
+)
+from linkedin_mcp.tools.posts.react.models import (
+    ActionType as ReactionActionType,
+)
+from linkedin_mcp.tools.posts.react.models import (
+    PostReactionInput,
     ReactionSetPayload,
     ReactionState,
 )
-from linkedin_mcp.tools.posts.comment.models.comment_gif_attachment import CommentGifAttachment
-from linkedin_mcp.tools.posts.comment.models.comment_photo_attachment import CommentPhotoAttachment
-from linkedin_mcp.tools.posts.comment.models.post_comment_input import PostCommentInput
-from linkedin_mcp.tools.posts.comment.page import PostCommentPage
-from linkedin_mcp.tools.posts.react.models.post_reaction_input import PostReactionInput
 from linkedin_mcp.tools.posts.react.page import PostReactionPage
 from tests.support.playwright import adapt_browser
 
@@ -141,10 +152,10 @@ class EngagementFixtureBrowser:
 async def _comment_command(
     adapter: PostCommentPage,
     request: PostCommentInput,
-) -> ActionCommand:
+) -> CommentActionCommand:
     capture = await adapter.inspect_comment(request)
-    return ActionCommand(
-        action_type=ActionType.COMMENT_CREATE,
+    return CommentActionCommand(
+        action_type=CommentActionType.COMMENT_CREATE,
         target=capture.target,
         payload=CommentCreatePayload(
             post_ref=request.post_ref,
@@ -158,11 +169,11 @@ async def _comment_command(
 async def _reaction_command(
     adapter: PostReactionPage,
     request: PostReactionInput,
-) -> ActionCommand:
+) -> ReactionActionCommand:
     capture = await adapter.inspect_reaction(request)
     assert capture.existing_reaction is not None
-    return ActionCommand(
-        action_type=ActionType.REACTION_SET,
+    return ReactionActionCommand(
+        action_type=ReactionActionType.REACTION_SET,
         target=capture.target,
         payload=ReactionSetPayload(
             post_ref=request.post_ref,
@@ -200,7 +211,7 @@ async def test_top_level_comment_preserves_text_link_emoji_mention_and_target(
     assert command.target.content_author_name == "Jane Doe"
     assert command.target.post_ref == POST_REF
     assert command.target.post_ref == POST_REF
-    assert result.outcome is ActionOutcome.VERIFIED
+    assert result.outcome.value == "verified"
     assert result.performed is True
     assert result.final_state.startswith("comment_published:comment:ugc-post:7312345678901234566:")
     assert text in result.captured_text
@@ -239,7 +250,7 @@ async def test_comment_requires_stable_reference_despite_visible_delta_and_clear
         finally:
             await browser.close()
 
-    assert result.outcome is ActionOutcome.UNCERTAIN
+    assert result.outcome.value == "uncertain"
     assert result.performed is None
     assert result.final_state == "comment_outcome_unknown"
     assert "stable comment reference" in result.detail
@@ -275,7 +286,7 @@ async def test_comment_verifies_stable_reference_with_visible_expansion_affordan
         finally:
             await browser.close()
 
-    assert result.outcome is ActionOutcome.VERIFIED
+    assert result.outcome.value == "verified"
     assert result.performed is True
     assert result.final_state.startswith("comment_published:comment:")
 
@@ -306,7 +317,7 @@ async def test_comment_submit_ignores_visible_comment_count_control(tmp_path: Pa
         finally:
             await browser.close()
 
-    assert result.outcome is ActionOutcome.VERIFIED
+    assert result.outcome.value == "verified"
     assert result.performed is True
     assert result.final_state.startswith("comment_published:")
 
@@ -340,7 +351,7 @@ async def test_comment_waits_for_async_composer_after_count_control(tmp_path: Pa
         finally:
             await browser.close()
 
-    assert result.outcome is ActionOutcome.VERIFIED
+    assert result.outcome.value == "verified"
     assert result.performed is True
     assert result.final_state.startswith("comment_published:")
 
@@ -379,7 +390,7 @@ async def test_comment_waits_for_async_named_active_member_link(tmp_path: Path) 
         finally:
             await browser.close()
 
-    assert result.outcome is ActionOutcome.VERIFIED
+    assert result.outcome.value == "verified"
     assert result.performed is True
 
 
@@ -408,7 +419,7 @@ async def test_comment_verifies_native_ugc_discussion_alias_for_activity_url(
         finally:
             await browser.close()
 
-    assert result.outcome is ActionOutcome.VERIFIED
+    assert result.outcome.value == "verified"
     assert result.performed is True
     assert result.final_state.startswith("comment_published:comment:ugc-post:7999999999999999998:")
 
@@ -446,7 +457,7 @@ async def test_comment_accepts_single_rendered_post_alias_for_requested_activity
         finally:
             await browser.close()
 
-    assert result.outcome is ActionOutcome.VERIFIED
+    assert result.outcome.value == "verified"
     assert result.performed is True
 
 
@@ -475,7 +486,7 @@ async def test_reaction_accepts_single_rendered_post_alias_for_requested_activit
         finally:
             await browser.close()
 
-    assert result.outcome is ActionOutcome.VERIFIED
+    assert result.outcome.value == "verified"
     assert result.performed is True
 
 
@@ -515,7 +526,7 @@ async def test_comment_photo_and_gif_are_exact_and_verifiable(
 
     assert isinstance(command.payload, CommentCreatePayload)
     assert command.payload.attachment == attachment
-    assert result.outcome is ActionOutcome.VERIFIED
+    assert result.outcome.value == "verified"
     assert expected in result.captured_text
 
 
@@ -555,7 +566,7 @@ async def test_post_supports_every_visible_linkedin_reaction(
 
     assert isinstance(command.payload, ReactionSetPayload)
     assert command.payload.existing_reaction is ReactionState.NONE
-    assert result.outcome is ActionOutcome.VERIFIED
+    assert result.outcome.value == "verified"
     assert result.performed is True
     assert result.final_state == f"reaction_set:{desired.value}"
 
@@ -584,7 +595,7 @@ async def test_current_portaled_reaction_control_is_inspected_and_verified(
 
     assert isinstance(command.payload, ReactionSetPayload)
     assert command.payload.existing_reaction is ReactionState.NONE
-    assert result.outcome is ActionOutcome.VERIFIED
+    assert result.outcome.value == "verified"
     assert result.performed is True
     assert result.final_state == "reaction_set:funny"
 
@@ -634,7 +645,7 @@ async def test_react_label_and_pressed_state_are_inspected_and_verified(
 
     assert isinstance(command.payload, ReactionSetPayload)
     assert command.payload.existing_reaction is ReactionState.NONE
-    assert result.outcome is ActionOutcome.VERIFIED
+    assert result.outcome.value == "verified"
     assert result.performed is True
     assert result.final_state == "reaction_set:funny"
 
@@ -677,7 +688,7 @@ async def test_post_reaction_removal_noop_and_change(
 
     assert isinstance(command.payload, ReactionSetPayload)
     assert command.payload.existing_reaction is ReactionState.LIKE
-    assert result.outcome is ActionOutcome.VERIFIED
+    assert result.outcome.value == "verified"
     assert result.performed is performed
     assert result.final_state == final_state
 
@@ -714,7 +725,7 @@ async def test_reaction_refuses_state_drift_after_inspection(tmp_path: Path) -> 
         finally:
             await browser.close()
 
-    assert result.outcome is ActionOutcome.FAILED
+    assert result.outcome.value == "failed"
     assert result.performed is False
     assert result.final_state == "reaction_state_changed"
 
@@ -745,7 +756,7 @@ async def test_reaction_reports_missing_preclick_control_as_not_changed(
         finally:
             await browser.close()
 
-    assert result.outcome is ActionOutcome.FAILED
+    assert result.outcome.value == "failed"
     assert result.performed is False
     assert result.final_state == "reaction_not_changed"
 
@@ -774,7 +785,7 @@ async def test_comment_refuses_actor_or_content_target_drift(tmp_path: Path) -> 
         finally:
             await browser.close()
 
-    assert result.outcome is ActionOutcome.FAILED
+    assert result.outcome.value == "failed"
     assert result.performed is False
     assert result.final_state == "engagement_target_changed"
     assert "This must not be submitted." not in result.captured_text
@@ -799,7 +810,7 @@ async def test_interrupted_final_comment_click_is_uncertain(tmp_path: Path) -> N
         finally:
             await browser.close()
 
-    assert result.outcome is ActionOutcome.UNCERTAIN
+    assert result.outcome.value == "uncertain"
     assert result.performed is None
     assert result.final_state == "comment_outcome_unknown"
 
@@ -825,7 +836,7 @@ async def test_comment_upload_accepts_an_absolute_client_path(tmp_path: Path) ->
         finally:
             await browser.close()
 
-    assert result.outcome is ActionOutcome.VERIFIED
+    assert result.outcome.value == "verified"
 
 
 def test_engagement_contract_rejects_empty_inputs_and_allows_native_discussion_aliases() -> None:

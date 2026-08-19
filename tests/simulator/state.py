@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from linkedin_mcp.tools.messaging.conversation.get.models.message_direction import MessageDirection
-from linkedin_mcp.tools.posts.react.models.reaction_state import ReactionState
+from linkedin_mcp.tools.messaging.conversation.get.models import MessageDirection
+from linkedin_mcp.tools.posts.react.models import ReactionState
 
 
 def _empty_comments() -> list[SimulatorComment]:

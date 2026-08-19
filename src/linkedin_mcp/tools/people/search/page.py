@@ -13,14 +13,15 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.tools._shared.models import StopReason
-from linkedin_mcp.tools.people.search.models.people_search_connection_degree import (
+from linkedin_mcp.tools.people.search.models import (
     PeopleSearchConnectionDegree,
+    PeopleSearchCoverage,
+    PeopleSearchFilters,
+    PeopleSearchInput,
+    PersonConnectionDegree,
+    PersonSummary,
+    StopReason,
 )
-from linkedin_mcp.tools.people.search.models.people_search_coverage import PeopleSearchCoverage
-from linkedin_mcp.tools.people.search.models.people_search_filters import PeopleSearchFilters
-from linkedin_mcp.tools.people.search.models.people_search_input import PeopleSearchInput
-from linkedin_mcp.tools.people.search.models.person_summary import PersonSummary
 from linkedin_mcp.tools.people.surface import (
     ACTION_LINES,
     CONNECTION_COUNT_PATTERN,
@@ -1036,7 +1037,11 @@ class PeopleSearchPage:
                 name=name,
                 headline=headline,
                 location=location,
-                connection_degree=connection_degree(visible_text),
+                connection_degree=(
+                    PersonConnectionDegree(value)
+                    if (value := connection_degree(visible_text)) is not None
+                    else None
+                ),
                 mutual_connections_text=mutual_connections_text,
                 visible_text=visible_text,
             )

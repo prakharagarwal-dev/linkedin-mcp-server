@@ -8,22 +8,26 @@ from datetime import UTC, datetime
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
-from linkedin_mcp.tools._shared.actions import (
+from linkedin_mcp.tools.posts.comment.models import (
     ActionCommand,
     ActionInspection,
     ActionOutcome,
     ActionPageResult,
-    CommentCreatePayload,
-)
-from linkedin_mcp.tools.posts.comment.models.comment_gif_attachment import CommentGifAttachment
-from linkedin_mcp.tools.posts.comment.models.comment_photo_attachment import CommentPhotoAttachment
-from linkedin_mcp.tools.posts.comment.models.post_comment_input import PostCommentInput
-from linkedin_mcp.tools.posts.comments.list.models.comment_attachment_type import (
+    ActionTarget,
     CommentAttachmentType,
+    CommentCreatePayload,
+    CommentGifAttachment,
+    CommentPhotoAttachment,
+    PostCommentInput,
+    PostMentionInput,
 )
-from linkedin_mcp.tools.posts.comments.list.models.comment_observation import CommentObservation
-from linkedin_mcp.tools.posts.engagement_surface import PostEngagementSurface
-from linkedin_mcp.tools.posts.models.post_mention_input import PostMentionInput
+from linkedin_mcp.tools.posts.engagement_surface import (
+    PostEngagementSurface,
+    VisiblePostTarget,
+)
+from linkedin_mcp.tools.posts.surface import (
+    CommentObservation as SurfaceCommentObservation,
+)
 from linkedin_mcp.tools.posts.surface import (
     comment_from_region,
     comment_regions,
@@ -33,6 +37,7 @@ from linkedin_mcp.ui import LinkedInLocator as Locator
 from linkedin_mcp.ui import LinkedInPage as Page
 from linkedin_mcp.ui.urls import (
     canonical_post_url,
+    canonical_profile_url,
 )
 
 _COMMENT_ATTACHMENT_SELECTOR = (
@@ -98,6 +103,60 @@ def _visible_comment_text_matches(actual: str, expected: str) -> bool:
 
 
 class PostCommentPage(PostEngagementSurface):
+    @staticmethod
+    def _action_target(target: VisiblePostTarget, post_ref: str) -> ActionTarget:
+        actor_url = HttpUrl(canonical_profile_url(target.actor_slug))
+        return ActionTarget(
+            profile_slug=target.actor_slug,
+            profile_url=actor_url,
+            display_name=target.actor_name,
+            actor_profile_slug=target.actor_slug,
+            actor_profile_url=actor_url,
+            actor_display_name=target.actor_name,
+            post_ref=post_ref,
+            post_url=HttpUrl(canonical_post_url(post_ref)),
+            content_author_name=target.content_author_name,
+            content_author_url=target.content_author_url,
+        )
+
+    @staticmethod
+    def _matches_inspected_target(
+        requested: ActionTarget,
+        current: VisiblePostTarget,
+    ) -> bool:
+        return (
+            (requested.actor_profile_slug or requested.profile_slug) == current.actor_slug
+            and (requested.actor_display_name or requested.display_name).casefold()
+            == current.actor_name.casefold()
+            and requested.content_author_name is not None
+            and requested.content_author_name.casefold() == current.content_author_name.casefold()
+            and (
+                requested.content_author_url is None
+                or (
+                    current.content_author_url is not None
+                    and str(requested.content_author_url) == str(current.content_author_url)
+                )
+            )
+        )
+
+    @staticmethod
+    async def _result(
+        page: Page,
+        outcome: ActionOutcome,
+        performed: bool | None,
+        final_state: str,
+        detail: str,
+    ) -> ActionPageResult:
+        return ActionPageResult(
+            outcome=outcome,
+            performed=performed,
+            final_state=final_state,
+            detail=detail,
+            source_url=HttpUrl(page.url),
+            captured_text=await _visible_text(page),
+            captured_at=datetime.now(UTC),
+        )
+
     async def inspect_comment(
         self,
         request: PostCommentInput,
@@ -117,8 +176,6 @@ class PostCommentPage(PostEngagementSurface):
             )
 
     async def perform_comment(self, command: ActionCommand) -> ActionPageResult:
-        if not isinstance(command.payload, CommentCreatePayload):
-            raise InvalidTargetError("The comment action payload is invalid.")
         payload = command.payload
         target_url = canonical_post_url(payload.post_ref)
         async with self._playwright.page() as page:
@@ -457,7 +514,7 @@ class PostCommentPage(PostEngagementSurface):
 
     @staticmethod
     def _comment_matches_payload(
-        comment: CommentObservation,
+        comment: SurfaceCommentObservation,
         payload: CommentCreatePayload,
     ) -> bool:
         if payload.text is not None and (
@@ -468,12 +525,12 @@ class PostCommentPage(PostEngagementSurface):
             return not comment.attachments
         if isinstance(payload.attachment, CommentPhotoAttachment):
             return any(
-                attachment.attachment_type is CommentAttachmentType.PHOTO
+                attachment.attachment_type.value == CommentAttachmentType.PHOTO.value
                 for attachment in comment.attachments
             )
         expected = payload.attachment.visible_result_label.casefold()
         return any(
-            attachment.attachment_type is CommentAttachmentType.GIF
+            attachment.attachment_type.value == CommentAttachmentType.GIF.value
             and expected
             in {
                 value.casefold()

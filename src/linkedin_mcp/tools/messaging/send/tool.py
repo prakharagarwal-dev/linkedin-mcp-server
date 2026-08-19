@@ -2,40 +2,115 @@
 
 from __future__ import annotations
 
+import asyncio
+import uuid
+from collections.abc import Awaitable
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
+import structlog
 from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from linkedin_mcp.errors import InternalServerError, LinkedInMCPError
 from linkedin_mcp.infra.queue import Scheduler, Task
-from linkedin_mcp.tools._shared.actions import ActionOutput, ActionType, MessageSendPayload
-from linkedin_mcp.tools._shared.identifiers import PROFILE_SLUG_PATTERN
-from linkedin_mcp.tools._shared.tool import (
-    IdentifierArgument,
-    tool_result,
+from linkedin_mcp.tools.messaging.send.evidence import source_from_action_execution
+from linkedin_mcp.tools.messaging.send.models import (
+    PROFILE_SLUG_PATTERN,
+    ActionCommand,
+    ActionOutcome,
+    ActionOutput,
+    ActionResult,
+    ActionType,
+    MessageFileInput,
+    MessageGifInput,
+    MessageSendInput,
+    MessageSendPayload,
 )
-from linkedin_mcp.tools.action import execute_action
-from linkedin_mcp.tools.messaging.send.models.message_file_input import MessageFileInput
-from linkedin_mcp.tools.messaging.send.models.message_gif_input import MessageGifInput
-from linkedin_mcp.tools.messaging.send.models.message_send_input import MessageSendInput
 from linkedin_mcp.tools.messaging.send.page import MessageSendPage
 
+logger = structlog.get_logger(__name__)
 
-async def execute(request: MessageSendInput, page: MessageSendPage) -> ActionOutput:
-    return await execute_action(
-        task_name="linkedin.messaging.send",
+
+IdentifierArgument = Annotated[
+    str,
+    Field(min_length=1, max_length=200, pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]*$"),
+]
+
+
+async def tool_result[ResultT](awaitable: Awaitable[ResultT]) -> ResultT:
+    try:
+        return await awaitable
+    except Exception as error:
+        safe = error if isinstance(error, LinkedInMCPError) else InternalServerError()
+        raise ToolError(f"{safe.code.value}: {safe.safe_message}") from error
+
+
+async def execute(
+    request: MessageSendInput,
+    page: MessageSendPage,
+) -> ActionOutput:
+    execution_id = str(uuid.uuid4())
+    started_at = datetime.now(UTC)
+    inspection = await page.inspect_message(request)
+    payload = MessageSendPayload(
+        message=request.message,
+        attachment_refs=tuple(attachment.asset_ref for attachment in request.attachments),
+        gif=request.gif,
+        reply_to_message_ref=request.reply_to_message_ref,
+    )
+    command = ActionCommand(
+        action_type=ActionType.MESSAGE_SEND,
+        target=inspection.target,
+        payload=payload,
+    )
+    try:
+        page_result = await page.perform_message(command)
+    except asyncio.CancelledError:
+        raise
+    except LinkedInMCPError:
+        raise
+    except Exception as error:
+        logger.error(
+            "action_execution_interrupted",
+            task_name="linkedin.messaging.send",
+            error_type=type(error).__name__,
+        )
+        return ActionOutput(
+            context_id=request.context_id,
+            request_id=request.request_id,
+            result=ActionResult(
+                action_type=ActionType.MESSAGE_SEND,
+                outcome=ActionOutcome.UNCERTAIN,
+                performed=None,
+                final_state="unknown_after_interruption",
+                detail=(
+                    "Execution stopped without a verified visible outcome; "
+                    "operator review is required."
+                ),
+                started_at=started_at,
+                completed_at=datetime.now(UTC),
+            ),
+            sources=(),
+        )
+
+    result = ActionResult(
+        action_type=ActionType.MESSAGE_SEND,
+        outcome=page_result.outcome,
+        performed=page_result.performed,
+        final_state=page_result.final_state,
+        detail=page_result.detail,
+        started_at=started_at,
+        completed_at=datetime.now(UTC),
+    )
+    source = source_from_action_execution(page_result, execution_id=execution_id)
+    return ActionOutput(
         context_id=request.context_id,
         request_id=request.request_id,
-        action_type=ActionType.MESSAGE_SEND,
-        payload=MessageSendPayload(
-            message=request.message,
-            attachment_refs=tuple(attachment.asset_ref for attachment in request.attachments),
-            gif=request.gif,
-            reply_to_message_ref=request.reply_to_message_ref,
-        ),
-        inspect=lambda: page.inspect_message(request),
-        perform=page.perform_message,
+        result=result,
+        sources=(source,),
     )
 
 
@@ -43,7 +118,6 @@ def register(
     mcp: FastMCP[None],
     scheduler: Scheduler,
     page: MessageSendPage,
-    annotations: ToolAnnotations,
 ) -> None:
     @mcp.tool(
         name="linkedin.messaging.send",
@@ -57,7 +131,12 @@ def register(
             "and optionally an exact reply-to message_ref. Group chats, message requests, and "
             "paid InMail are excluded."
         ),
-        annotations=annotations,
+        annotations=ToolAnnotations(
+            readOnlyHint=False,
+            destructiveHint=True,
+            idempotentHint=False,
+            openWorldHint=True,
+        ),
     )
     async def _send_message(
         context_id: IdentifierArgument,

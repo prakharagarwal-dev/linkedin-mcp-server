@@ -16,24 +16,22 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
-from linkedin_mcp.tools._shared.actions import (
+from linkedin_mcp.tools.messaging.conversation_surface import (
+    ConversationSurface,
+    MessageAttachmentKind,
+    MessageAttachmentObservation,
+    MessageDirection,
+)
+from linkedin_mcp.tools.messaging.send.models import (
     ActionCommand,
     ActionInspection,
     ActionOutcome,
     ActionPageResult,
     ActionTarget,
+    MessageGifInput,
+    MessageSendInput,
     MessageSendPayload,
 )
-from linkedin_mcp.tools.messaging.conversation.get.models.message_attachment_kind import (
-    MessageAttachmentKind,
-)
-from linkedin_mcp.tools.messaging.conversation.get.models.message_attachment_observation import (
-    MessageAttachmentObservation,
-)
-from linkedin_mcp.tools.messaging.conversation.get.models.message_direction import MessageDirection
-from linkedin_mcp.tools.messaging.conversation_surface import ConversationSurface
-from linkedin_mcp.tools.messaging.send.models.message_gif_input import MessageGifInput
-from linkedin_mcp.tools.messaging.send.models.message_send_input import MessageSendInput
 from linkedin_mcp.ui import LinkedInLocator as Locator
 from linkedin_mcp.ui import LinkedInPage as Page
 from linkedin_mcp.ui.collections import (
@@ -573,8 +571,6 @@ class MessageSendPage(ConversationSurface):
             )
 
     async def perform_message(self, command: ActionCommand) -> ActionPageResult:
-        if not isinstance(command.payload, MessageSendPayload):
-            raise InvalidTargetError("The message action payload is invalid.")
         payload = command.payload
         async with self._playwright.page() as page:
             page, root, profile_slug, name, is_group = await self._open(

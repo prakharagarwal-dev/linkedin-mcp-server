@@ -137,7 +137,7 @@ tools/jobs/search/
 ├── pagination.py    execute(), cursor selection, output assembly
 ├── page.py          visible LinkedIn search and extraction
 ├── evidence.py      immutable source construction
-└── models/           input, output, filters, coverage, summaries
+└── models.py         input, output, filters, coverage, summaries
 ```
 
 ```text
@@ -163,8 +163,8 @@ page.py ──> LinkedInPlaywright ──> wrapped official Playwright controls
 ```
 
 A non-paginated read keeps its small `execute(...)` function directly in
-`tool.py`. A write tool also keeps its execution function in `tool.py` and uses
-the shared single-attempt action helper:
+`tool.py`. A write tool also keeps its complete single-attempt execution flow
+in `tool.py`:
 
 ```text
 tools/invitations/send/tool.py
@@ -173,12 +173,14 @@ tools/invitations/send/tool.py
    ├── creates non-interruptible Task
    └── execute(request, page)
            │
-           ├── tools/action.py: inspect -> command -> perform once -> evidence
+           ├── inspect -> local command -> perform once -> local evidence
            └── page.py: exact visible controls and postcondition
 ```
 
-There is no `Operation`, `CapabilityExecutor`, provider protocol hierarchy, or
-capability switch statement.
+Its request, action, result, and evidence contracts are all in the same leaf's
+`models.py`; it does not import a global tool contract. There is no
+`tools/_shared`, shared action executor, `Operation`, `CapabilityExecutor`,
+provider protocol hierarchy, or capability switch statement.
 
 ## Read sequence
 

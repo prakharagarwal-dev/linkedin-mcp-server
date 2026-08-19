@@ -4,23 +4,14 @@ from __future__ import annotations
 
 import hashlib
 import re
-from typing import cast
+from enum import StrEnum
+from typing import Annotated, cast
 from urllib.parse import parse_qs, urljoin, urlsplit
 
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
-from pydantic import HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
-from linkedin_mcp.tools.messaging.conversation.get.models.message_attachment_kind import (
-    MessageAttachmentKind,
-)
-from linkedin_mcp.tools.messaging.conversation.get.models.message_attachment_observation import (
-    MessageAttachmentObservation,
-)
-from linkedin_mcp.tools.messaging.conversation.get.models.message_direction import MessageDirection
-from linkedin_mcp.tools.messaging.conversation.get.models.message_observation import (
-    MessageObservation,
-)
 from linkedin_mcp.tools.messaging.search.page import ConversationSearchPage
 from linkedin_mcp.ui import LinkedInLocator as Locator
 from linkedin_mcp.ui import LinkedInPage as Page
@@ -33,6 +24,68 @@ from linkedin_mcp.ui.urls import (
 )
 
 _COMPOSER_SELECTOR = '[contenteditable]:not([contenteditable="false"]), textarea'
+
+
+class _SurfaceModel(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        str_strip_whitespace=True,
+        validate_default=True,
+    )
+
+
+class MessageAttachmentKind(StrEnum):
+    DOCUMENT = "document"
+    IMAGE = "image"
+    VIDEO = "video"
+    GIF = "gif"
+
+
+class MessageAttachmentObservation(_SurfaceModel):
+    kind: MessageAttachmentKind
+    name: Annotated[str, Field(min_length=1, max_length=500)] | None = None
+    accessible_label: Annotated[str, Field(min_length=1, max_length=1_000)] | None = None
+    resource_url: HttpUrl | None = None
+    visible_text: Annotated[str, Field(min_length=1)]
+
+    @model_validator(mode="after")
+    def require_visible_attachment_identity(self) -> MessageAttachmentObservation:
+        if self.name is None and self.accessible_label is None and self.resource_url is None:
+            raise ValueError("A message attachment requires visible identity evidence")
+        return self
+
+
+class MessageDirection(StrEnum):
+    INCOMING = "incoming"
+    OUTGOING = "outgoing"
+    SYSTEM = "system"
+
+
+class MessageObservation(_SurfaceModel):
+    message_ref: str
+    direction: MessageDirection
+    sender_name: Annotated[str, Field(min_length=1, max_length=500)] | None = None
+    sent_at_text: Annotated[str, Field(min_length=1, max_length=300)] | None = None
+    text: Annotated[str, Field(min_length=1, max_length=8_000)] | None = None
+    attachments: Annotated[
+        tuple[MessageAttachmentObservation, ...],
+        Field(max_length=20),
+    ] = ()
+    edited: bool = False
+    reply_to_sender_name: Annotated[str, Field(min_length=1, max_length=500)] | None = None
+    reply_to_text: Annotated[str, Field(min_length=1, max_length=8_000)] | None = None
+    reaction_summaries: Annotated[
+        tuple[Annotated[str, Field(min_length=1, max_length=500)], ...],
+        Field(max_length=20),
+    ] = ()
+    visible_text: Annotated[str, Field(min_length=1)]
+
+    @model_validator(mode="after")
+    def require_visible_message_content(self) -> MessageObservation:
+        if self.text is None and not self.attachments:
+            raise ValueError("A message observation requires text or a visible attachment")
+        return self
 
 
 def _lines(text: str) -> list[str]:

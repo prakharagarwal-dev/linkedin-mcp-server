@@ -9,14 +9,13 @@ from linkedin_mcp.infra.cursor import (
     cursor_binding,
     select_page,
 )
-from linkedin_mcp.tools._shared.models import (
-    CapabilityName,
+from linkedin_mcp.tools.companies.search.evidence import source_from_company_search
+from linkedin_mcp.tools.companies.search.models import (
+    CompanySearchInput,
+    CompanySearchOutput,
     PaginationMetadata,
     StopReason,
 )
-from linkedin_mcp.tools.companies.search.evidence import source_from_company_search
-from linkedin_mcp.tools.companies.search.models.company_search_input import CompanySearchInput
-from linkedin_mcp.tools.companies.search.models.company_search_output import CompanySearchOutput
 from linkedin_mcp.tools.companies.search.page import CompanySearchPage
 
 
@@ -31,7 +30,7 @@ async def execute(
         mode="json",
         exclude={"context_id", "request_id", "cursor", "page_size"},
     )
-    operation = CapabilityName.COMPANIES_SEARCH.value
+    operation = "linkedin.companies.search"
     state = await cursor_store.start(
         account_id=account_id,
         operation=operation,

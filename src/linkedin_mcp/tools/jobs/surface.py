@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 
-from linkedin_mcp.tools.jobs.models.job_workplace_type import JobWorkplaceType
 from linkedin_mcp.ui import LinkedInLocator as Locator
 
 LISTED_PATTERN = re.compile(
@@ -13,9 +12,9 @@ LISTED_PATTERN = re.compile(
 )
 
 WORKPLACE_VALUES = {
-    "remote": JobWorkplaceType.REMOTE,
-    "hybrid": JobWorkplaceType.HYBRID,
-    "on-site": JobWorkplaceType.ON_SITE,
+    "remote": "remote",
+    "hybrid": "hybrid",
+    "on-site": "on_site",
 }
 
 WORKPLACE_LABELS = {value: label for label, value in WORKPLACE_VALUES.items()}

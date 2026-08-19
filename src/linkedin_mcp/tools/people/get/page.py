@@ -11,25 +11,21 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.tools._shared.identifiers import PROFILE_SLUG_SEGMENT_PATTERN
-from linkedin_mcp.tools.people.get.models.people_get_input import PeopleGetInput
-from linkedin_mcp.tools.people.get.models.person_education import PersonEducation
-from linkedin_mcp.tools.people.get.models.person_experience import PersonExperience
-from linkedin_mcp.tools.people.get.models.person_profile_coverage import PersonProfileCoverage
-from linkedin_mcp.tools.people.get.models.person_profile_evidence import PersonProfileEvidence
-from linkedin_mcp.tools.people.get.models.person_profile_link import PersonProfileLink
-from linkedin_mcp.tools.people.get.models.person_profile_observation import PersonProfileObservation
-from linkedin_mcp.tools.people.get.models.person_profile_page_capture import (
+from linkedin_mcp.tools.people.get.models import (
+    PROFILE_SLUG_SEGMENT_PATTERN,
+    PeopleGetInput,
+    PersonConnectionDegree,
+    PersonEducation,
+    PersonExperience,
+    PersonProfileCoverage,
+    PersonProfileEvidence,
+    PersonProfileLink,
+    PersonProfileObservation,
     PersonProfilePageCapture,
-)
-from linkedin_mcp.tools.people.get.models.person_profile_section import PersonProfileSection
-from linkedin_mcp.tools.people.get.models.person_profile_section_entry import (
+    PersonProfileSection,
     PersonProfileSectionEntry,
-)
-from linkedin_mcp.tools.people.get.models.person_profile_section_selector import (
     PersonProfileSectionSelector,
 )
-from linkedin_mcp.tools.people.models.person_connection_degree import PersonConnectionDegree
 from linkedin_mcp.tools.people.surface import (
     ACTION_LINES,
     CONNECTION_COUNT_PATTERN,
@@ -897,7 +893,9 @@ async def _top_card_fields(
         pronouns,
         headline,
         location,
-        connection_degree(visible_text),
+        PersonConnectionDegree(value)
+        if (value := connection_degree(visible_text)) is not None
+        else None,
         connection_count,
         follower_count,
     )

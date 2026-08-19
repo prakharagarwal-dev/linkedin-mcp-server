@@ -10,20 +10,14 @@ from linkedin_mcp.infra.cursor import (
     cursor_binding,
     select_page,
 )
-from linkedin_mcp.tools._shared.models import (
-    CapabilityName,
+from linkedin_mcp.tools.connections.search.evidence import source_from_people_search
+from linkedin_mcp.tools.connections.search.models import (
+    ConnectionsSearchInput,
+    ConnectionsSearchOutput,
     PaginationMetadata,
     StopReason,
 )
-from linkedin_mcp.tools.connections.search.evidence import source_from_people_search
-from linkedin_mcp.tools.connections.search.models.connections_search_input import (
-    ConnectionsSearchInput,
-)
-from linkedin_mcp.tools.connections.search.models.connections_search_output import (
-    ConnectionsSearchOutput,
-)
 from linkedin_mcp.tools.connections.search.page import ConnectionsSearchPage
-from linkedin_mcp.tools.people.models.person_connection_degree import PersonConnectionDegree
 
 
 async def execute(
@@ -37,7 +31,7 @@ async def execute(
         mode="json",
         exclude={"context_id", "request_id", "cursor", "page_size"},
     )
-    operation = CapabilityName.CONNECTIONS_SEARCH.value
+    operation = "linkedin.connections.search"
     state = await cursor_store.start(
         account_id=account_id,
         operation=operation,
@@ -48,7 +42,10 @@ async def execute(
         request,
         result_limit=cursor_store.traversal_limit(state, request.page_size),
     )
-    if any(person.connection_degree is not PersonConnectionDegree.FIRST for person in people):
+    if any(
+        person.connection_degree is None or person.connection_degree.value != "first"
+        for person in people
+    ):
         raise ParserDriftError(
             "LinkedIn Connections search returned a result that was not visibly first-degree."
         )

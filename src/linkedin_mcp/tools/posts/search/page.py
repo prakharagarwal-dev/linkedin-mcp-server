@@ -14,17 +14,21 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.tools._shared.models import StopReason
-from linkedin_mcp.tools.posts.models.post_author import PostAuthor
-from linkedin_mcp.tools.posts.search.models.post_content_type import PostContentType
-from linkedin_mcp.tools.posts.search.models.post_search_content_type import PostSearchContentType
-from linkedin_mcp.tools.posts.search.models.post_search_coverage import PostSearchCoverage
-from linkedin_mcp.tools.posts.search.models.post_search_date import PostSearchDate
-from linkedin_mcp.tools.posts.search.models.post_search_filters import PostSearchFilters
-from linkedin_mcp.tools.posts.search.models.post_search_input import PostSearchInput
-from linkedin_mcp.tools.posts.search.models.post_search_posted_by import PostSearchPostedBy
-from linkedin_mcp.tools.posts.search.models.post_search_sort import PostSearchSort
-from linkedin_mcp.tools.posts.search.models.post_summary import PostSummary
+from linkedin_mcp.tools.posts.search.models import (
+    PostAuthor as SearchPostAuthor,
+)
+from linkedin_mcp.tools.posts.search.models import (
+    PostContentType,
+    PostSearchContentType,
+    PostSearchCoverage,
+    PostSearchDate,
+    PostSearchFilters,
+    PostSearchInput,
+    PostSearchPostedBy,
+    PostSearchSort,
+    PostSummary,
+    StopReason,
+)
 from linkedin_mcp.tools.posts.surface import (
     COLLECTION_POLL_DELAY_MS,
     COUNT_PATTERNS,
@@ -39,6 +43,12 @@ from linkedin_mcp.tools.posts.surface import (
     post_reference_for_region,
     prepare_visible_content,
     unique_lines,
+)
+from linkedin_mcp.tools.posts.surface import (
+    PostAuthor as SurfacePostAuthor,
+)
+from linkedin_mcp.tools.posts.surface import (
+    PostContentType as SurfacePostContentType,
 )
 from linkedin_mcp.ui import LinkedInLocator as Locator
 from linkedin_mcp.ui import LinkedInPage as Page
@@ -566,7 +576,7 @@ def _requires_post_facet_resolution(filters: PostSearchFilters) -> bool:
     return any(getattr(filters, spec.names_field) for spec in _POST_FACETS)
 
 
-async def _post_text(region: Locator, *, author: PostAuthor) -> str | None:
+async def _post_text(region: Locator, *, author: SurfacePostAuthor) -> str | None:
     for selector in (
         "[data-post-text]",
         '[data-testid="post-text"]',
@@ -614,16 +624,16 @@ async def _post_summary_from_region(
     if text is None:
         text = await _post_text(region, author=header.author)
     engagement = await post_engagement(region)
-    content_type = PostContentType.REPOST
+    content_type = SurfacePostContentType.REPOST
     if len(body_boxes) < 2:
         content_type = (await post_content_fields(region, body)).content_type
     return PostSummary(
         post_ref=reference,
         post_url=HttpUrl(canonical_post_url(reference)),
-        author=header.author,
+        author=SearchPostAuthor.model_validate(header.author.model_dump()),
         text=text,
         posted_at_text=header.posted_at_text,
-        content_type=content_type,
+        content_type=PostContentType(content_type.value),
         reaction_count_text=engagement.reaction_count_text,
         comment_count_text=engagement.comment_count_text,
         repost_count_text=engagement.repost_count_text,

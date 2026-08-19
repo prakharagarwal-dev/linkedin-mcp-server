@@ -11,12 +11,14 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.tools._shared.models import EvidenceField
-from linkedin_mcp.tools.jobs.get.models.job_apply_method import JobApplyMethod
-from linkedin_mcp.tools.jobs.get.models.job_detail_input import JobDetailInput
-from linkedin_mcp.tools.jobs.get.models.job_detail_observation import JobDetailObservation
-from linkedin_mcp.tools.jobs.get.models.job_hiring_team_member import JobHiringTeamMember
-from linkedin_mcp.tools.jobs.models.job_workplace_type import JobWorkplaceType
+from linkedin_mcp.tools.jobs.get.models import (
+    EvidenceField,
+    JobApplyMethod,
+    JobDetailInput,
+    JobDetailObservation,
+    JobHiringTeamMember,
+    JobWorkplaceType,
+)
 from linkedin_mcp.tools.jobs.surface import (
     LISTED_PATTERN,
     WORKPLACE_LABELS,
@@ -109,7 +111,7 @@ def _visible_workplace(lines: list[str]) -> JobWorkplaceType | None:
     for line in lines:
         value = WORKPLACE_VALUES.get(line.casefold())
         if value is not None:
-            return value
+            return JobWorkplaceType(value)
     return None
 
 
@@ -457,7 +459,7 @@ class JobDetailPage:
             ("location", location),
             (
                 "workplace_type",
-                WORKPLACE_LABELS.get(workplace_type) if workplace_type is not None else None,
+                WORKPLACE_LABELS.get(workplace_type.value) if workplace_type is not None else None,
             ),
             ("employment_type", employment_type),
             ("listed_at_text", listed_at_text),

@@ -3,19 +3,21 @@
 from __future__ import annotations
 
 import hashlib
+from datetime import UTC, datetime
 
-from linkedin_mcp.errors import InvalidTargetError
-from linkedin_mcp.tools._shared.actions import (
+from pydantic import HttpUrl
+
+from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
+from linkedin_mcp.tools.invitations.accept.models import (
     ActionCommand,
     ActionInspection,
     ActionOutcome,
     ActionPageResult,
-    InvitationAcceptPayload,
-)
-from linkedin_mcp.tools.invitations.accept.models.invitation_accept_input import (
+    ActionTarget,
     InvitationAcceptInput,
 )
 from linkedin_mcp.tools.invitations.action_surface import InvitationActionSurface
+from linkedin_mcp.ui import LinkedInPage as Page
 from linkedin_mcp.ui.urls import canonical_profile_url
 
 
@@ -24,16 +26,43 @@ def _received_invitation_ref(profile_slug: str) -> str:
     return f"invitation:{digest}"
 
 
+async def _visible_text(page: Page) -> str:
+    for locator in (page.locator("main"), page.locator("body")):
+        if await locator.count() == 0:
+            continue
+        value = (await locator.first.inner_text()).strip()
+        if value:
+            return value
+    raise ParserDriftError("LinkedIn returned no visible connection text.")
+
+
 class AcceptInvitationPage(InvitationActionSurface):
     async def inspect_accept(
         self,
         request: InvitationAcceptInput,
     ) -> ActionInspection:
-        return await self._inspect_received_request(request.profile_slug)
+        async with self._playwright.page() as page:
+            await page.goto(canonical_profile_url(request.profile_slug))
+            main, name = await self._profile_identity(page)
+            accept, ignore = await self._incoming_request_controls(main, name)
+            if accept is None or ignore is None:
+                raise InvalidTargetError(
+                    "The exact profile has no current visible incoming connection request."
+                )
+            return ActionInspection(
+                target=ActionTarget(
+                    profile_slug=request.profile_slug,
+                    profile_url=HttpUrl(canonical_profile_url(request.profile_slug)),
+                    display_name=name,
+                    invitation_ref=_received_invitation_ref(request.profile_slug),
+                ),
+                current_state="received_invitation_pending",
+                source_url=HttpUrl(page.url),
+                captured_text=await _visible_text(page),
+                captured_at=datetime.now(UTC),
+            )
 
     async def perform_accept(self, command: ActionCommand) -> ActionPageResult:
-        if not isinstance(command.payload, InvitationAcceptPayload):
-            raise InvalidTargetError("The acceptance action payload is invalid.")
         expected_ref = _received_invitation_ref(command.target.profile_slug)
         if command.payload.invitation_ref != expected_ref:
             raise InvalidTargetError("The acceptance payload does not match the target invitation.")
@@ -128,3 +157,21 @@ class AcceptInvitationPage(InvitationActionSurface):
                     "both request removal and the first-degree connection state."
                 ),
             )
+
+    @staticmethod
+    async def _result(
+        page: Page,
+        outcome: ActionOutcome,
+        performed: bool | None,
+        final_state: str,
+        detail: str,
+    ) -> ActionPageResult:
+        return ActionPageResult(
+            outcome=outcome,
+            performed=performed,
+            final_state=final_state,
+            detail=detail,
+            source_url=HttpUrl(page.url),
+            captured_text=await _visible_text(page),
+            captured_at=datetime.now(UTC),
+        )

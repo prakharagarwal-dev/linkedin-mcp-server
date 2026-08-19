@@ -8,7 +8,7 @@ from typing import cast
 
 import pytest
 from playwright.async_api import Locator, Page, Route, async_playwright
-from pydantic import HttpUrl
+from pydantic import HttpUrl, ValidationError
 
 from linkedin_mcp.errors import (
     AuthenticationRequiredError,
@@ -16,28 +16,53 @@ from linkedin_mcp.errors import (
     InvalidTargetError,
     ParserDriftError,
 )
-from linkedin_mcp.tools._shared.actions import (
-    ActionCommand,
-    ActionOutcome,
-    ActionTarget,
-    ActionType,
-    InvitationAcceptPayload,
-    InvitationIgnorePayload,
-    InvitationSendPayload,
+from linkedin_mcp.tools.connections.list.models import (
+    ConnectionsListInput,
+    ConnectionsSortBy,
+    StopReason,
 )
-from linkedin_mcp.tools._shared.models import StopReason
-from linkedin_mcp.tools.connections.list.models.connections_list_input import ConnectionsListInput
-from linkedin_mcp.tools.connections.list.models.connections_sort_by import ConnectionsSortBy
 from linkedin_mcp.tools.connections.list.page import ConnectionsListPage
-from linkedin_mcp.tools.invitations.accept.models.invitation_accept_input import (
+from linkedin_mcp.tools.invitations.accept.models import (
+    ActionCommand as AcceptActionCommand,
+)
+from linkedin_mcp.tools.invitations.accept.models import (
+    ActionTarget as AcceptActionTarget,
+)
+from linkedin_mcp.tools.invitations.accept.models import (
+    ActionType as AcceptActionType,
+)
+from linkedin_mcp.tools.invitations.accept.models import (
     InvitationAcceptInput,
+    InvitationAcceptPayload,
 )
 from linkedin_mcp.tools.invitations.accept.page import AcceptInvitationPage
-from linkedin_mcp.tools.invitations.ignore.models.invitation_ignore_input import (
+from linkedin_mcp.tools.invitations.ignore.models import (
+    ActionCommand as IgnoreActionCommand,
+)
+from linkedin_mcp.tools.invitations.ignore.models import (
+    ActionTarget as IgnoreActionTarget,
+)
+from linkedin_mcp.tools.invitations.ignore.models import (
+    ActionType as IgnoreActionType,
+)
+from linkedin_mcp.tools.invitations.ignore.models import (
     InvitationIgnoreInput,
+    InvitationIgnorePayload,
 )
 from linkedin_mcp.tools.invitations.ignore.page import IgnoreInvitationPage
-from linkedin_mcp.tools.invitations.send.models.invitation_send_input import InvitationSendInput
+from linkedin_mcp.tools.invitations.send.models import (
+    ActionCommand as SendActionCommand,
+)
+from linkedin_mcp.tools.invitations.send.models import (
+    ActionTarget as SendActionTarget,
+)
+from linkedin_mcp.tools.invitations.send.models import (
+    ActionType as SendActionType,
+)
+from linkedin_mcp.tools.invitations.send.models import (
+    InvitationSendInput,
+    InvitationSendPayload,
+)
 from linkedin_mcp.tools.invitations.send.page import SendInvitationPage
 from linkedin_mcp.ui import LinkedInPlaywright
 from tests.support.playwright import adapt_browser
@@ -134,35 +159,19 @@ class SequencedConnectionFixtureBrowser(ConnectionFixtureBrowser):
         await super().navigate(page, url)
 
 
-def _command(
-    action_type: ActionType,
-    payload: InvitationSendPayload | InvitationAcceptPayload | InvitationIgnorePayload,
+def _invite_command(
+    note: str | None = "Hello Jane",
     *,
     name: str = "Jane Doe",
-) -> ActionCommand:
-    return ActionCommand(
-        action_type=action_type,
-        target=ActionTarget(
+) -> SendActionCommand:
+    return SendActionCommand(
+        action_type=SendActionType.INVITATION_SEND,
+        target=SendActionTarget(
             profile_slug="jane-doe",
             profile_url=HttpUrl("https://www.linkedin.com/in/jane-doe/"),
             display_name=name,
-            invitation_ref=(
-                None
-                if action_type is ActionType.INVITATION_SEND
-                else payload.invitation_ref
-                if isinstance(payload, (InvitationAcceptPayload, InvitationIgnorePayload))
-                else None
-            ),
         ),
-        payload=payload,
-    )
-
-
-def _invite_command(note: str | None = "Hello Jane", *, name: str = "Jane Doe") -> ActionCommand:
-    return _command(
-        ActionType.INVITATION_SEND,
-        InvitationSendPayload(note=note),
-        name=name,
+        payload=InvitationSendPayload(note=note),
     )
 
 
@@ -170,11 +179,16 @@ def _accept_command(
     invitation_ref: str = INVITATION_REF,
     *,
     name: str = "Jane Doe",
-) -> ActionCommand:
-    return _command(
-        ActionType.INVITATION_ACCEPT,
-        InvitationAcceptPayload(invitation_ref=invitation_ref),
-        name=name,
+) -> AcceptActionCommand:
+    return AcceptActionCommand(
+        action_type=AcceptActionType.INVITATION_ACCEPT,
+        target=AcceptActionTarget(
+            profile_slug="jane-doe",
+            profile_url=HttpUrl("https://www.linkedin.com/in/jane-doe/"),
+            display_name=name,
+            invitation_ref=invitation_ref,
+        ),
+        payload=InvitationAcceptPayload(invitation_ref=invitation_ref),
     )
 
 
@@ -182,11 +196,16 @@ def _ignore_command(
     invitation_ref: str = INVITATION_REF,
     *,
     name: str = "Jane Doe",
-) -> ActionCommand:
-    return _command(
-        ActionType.INVITATION_IGNORE,
-        InvitationIgnorePayload(invitation_ref=invitation_ref),
-        name=name,
+) -> IgnoreActionCommand:
+    return IgnoreActionCommand(
+        action_type=IgnoreActionType.INVITATION_IGNORE,
+        target=IgnoreActionTarget(
+            profile_slug="jane-doe",
+            profile_url=HttpUrl("https://www.linkedin.com/in/jane-doe/"),
+            display_name=name,
+            invitation_ref=invitation_ref,
+        ),
+        payload=InvitationIgnorePayload(invitation_ref=invitation_ref),
     )
 
 
@@ -507,7 +526,7 @@ async def test_invite_action_uses_current_dialog_and_exact_pending_postcondition
         finally:
             await browser.close()
 
-    assert result.outcome is ActionOutcome.VERIFIED
+    assert result.outcome.value == "verified"
     assert result.performed is True
     assert result.final_state == "pending_sent"
     assert "Pending" in result.captured_text
@@ -593,7 +612,7 @@ async def test_invite_fails_closed_for_current_dialog_drift_and_changed_target()
         finally:
             await browser.close()
 
-    assert changed.outcome is ActionOutcome.FAILED
+    assert changed.outcome.value == "failed"
     assert changed.final_state == "target_identity_changed"
 
 
@@ -719,10 +738,10 @@ async def test_invite_click_interruption_is_uncertain_and_fresh_connect_is_faile
         finally:
             await browser.close()
 
-    assert interrupted.outcome is ActionOutcome.UNCERTAIN
+    assert interrupted.outcome.value == "uncertain"
     assert interrupted.performed is None
     assert "did not complete" in interrupted.detail
-    assert failed.outcome is ActionOutcome.FAILED
+    assert failed.outcome.value == "failed"
     assert failed.performed is False
     assert failed.final_state == "invitation_not_sent"
     assert "still shows Connect" in failed.detail
@@ -753,10 +772,10 @@ async def test_invite_action_reports_missing_dialog_and_typed_click_uncertainty(
         finally:
             await browser.close()
 
-    assert no_dialog.outcome is ActionOutcome.FAILED
+    assert no_dialog.outcome.value == "failed"
     assert no_dialog.performed is False
     assert no_dialog.final_state == "connection_dialog_unavailable"
-    assert interrupted.outcome is ActionOutcome.UNCERTAIN
+    assert interrupted.outcome.value == "uncertain"
     assert interrupted.performed is None
     assert "Synthetic typed click failure" in interrupted.detail
 
@@ -807,10 +826,10 @@ async def test_invite_action_rejects_disabled_send_and_uncommitted_note_before_c
         finally:
             await browser.close()
 
-    assert disabled_result.outcome is ActionOutcome.FAILED
+    assert disabled_result.outcome.value == "failed"
     assert disabled_result.performed is False
     assert disabled_result.final_state == "invitation_send_not_actionable"
-    assert stale_result.outcome is ActionOutcome.FAILED
+    assert stale_result.outcome.value == "failed"
     assert stale_result.performed is False
     assert stale_result.final_state == "invitation_note_not_committed"
 
@@ -897,7 +916,7 @@ async def test_invite_action_fails_before_dispatch_for_current_ui_safety_errors(
         finally:
             await browser.close()
 
-    assert result.outcome is ActionOutcome.FAILED
+    assert result.outcome.value == "failed"
     assert result.performed is False
     assert result.final_state == final_state
 
@@ -933,7 +952,7 @@ async def test_invite_action_is_a_verified_noop_for_existing_terminal_state(
         finally:
             await browser.close()
 
-    assert result.outcome is ActionOutcome.VERIFIED
+    assert result.outcome.value == "verified"
     assert result.performed is False
     assert result.final_state == final_state
 
@@ -974,7 +993,7 @@ async def test_invite_post_click_reload_failure_is_uncertain_with_retained_evide
         finally:
             await browser.close()
 
-    assert result.outcome is ActionOutcome.UNCERTAIN
+    assert result.outcome.value == "uncertain"
     assert result.performed is None
     assert detail in result.detail
     assert "Jane Doe" in result.captured_text
@@ -1015,7 +1034,7 @@ async def test_invite_fresh_profile_ambiguous_state_is_uncertain(
         finally:
             await browser.close()
 
-    assert result.outcome is ActionOutcome.UNCERTAIN
+    assert result.outcome.value == "uncertain"
     assert result.performed is None
     assert result.final_state == "invitation_outcome_unknown"
     assert detail in result.detail
@@ -1070,7 +1089,7 @@ async def test_accept_and_ignore_inspect_exact_current_profile_controls() -> Non
 
     assert accepted.current_state == "received_invitation_pending"
     assert accepted.target.invitation_ref == INVITATION_REF
-    assert ignored.target == accepted.target
+    assert ignored.target.model_dump(mode="json") == accepted.target.model_dump(mode="json")
     assert "Accept" in accepted.captured_text
     assert "Ignore" in ignored.captured_text
     assert accepted.source_url.path == "/in/jane-doe/"
@@ -1090,7 +1109,7 @@ async def test_accept_action_verifies_exact_profile_terminal_state_after_reload(
         finally:
             await browser.close()
 
-    assert result.outcome is ActionOutcome.VERIFIED
+    assert result.outcome.value == "verified"
     assert result.performed is True
     assert result.final_state == "connected"
     assert "1st degree connection" in result.captured_text
@@ -1110,7 +1129,7 @@ async def test_ignore_action_verifies_request_removed_without_connection_after_r
         finally:
             await browser.close()
 
-    assert result.outcome is ActionOutcome.VERIFIED
+    assert result.outcome.value == "verified"
     assert result.performed is True
     assert result.final_state == "invitation_ignored"
     assert "2nd degree connection" in result.captured_text
@@ -1166,11 +1185,11 @@ async def test_incoming_actions_fail_closed_for_missing_pair_identity_and_click_
         finally:
             await browser.close()
 
-    assert changed.outcome is ActionOutcome.FAILED
+    assert changed.outcome.value == "failed"
     assert changed.final_state == "target_identity_changed"
-    assert interrupted_accept.outcome is ActionOutcome.UNCERTAIN
+    assert interrupted_accept.outcome.value == "uncertain"
     assert interrupted_accept.performed is None
-    assert interrupted_ignore.outcome is ActionOutcome.UNCERTAIN
+    assert interrupted_ignore.outcome.value == "uncertain"
     assert interrupted_ignore.performed is None
 
 
@@ -1209,25 +1228,24 @@ async def test_incoming_actions_require_their_distinct_fresh_profile_postconditi
         finally:
             await browser.close()
 
-    assert accepted.outcome is ActionOutcome.UNCERTAIN
+    assert accepted.outcome.value == "uncertain"
     assert accepted.final_state == "acceptance_outcome_unknown"
-    assert ignored.outcome is ActionOutcome.UNCERTAIN
+    assert ignored.outcome.value == "uncertain"
     assert ignored.final_state == "ignore_outcome_unknown"
 
 
 @pytest.mark.asyncio
 async def test_connection_action_payload_types_and_references_are_enforced() -> None:
     browser = cast(LinkedInPlaywright, object())
-    send = SendInvitationPage(browser)
     accept = AcceptInvitationPage(browser)
     ignore = IgnoreInvitationPage(browser)
 
-    with pytest.raises(InvalidTargetError, match="invitation action payload"):
-        await send.perform_send(_accept_command())
-    with pytest.raises(InvalidTargetError, match="acceptance action payload"):
-        await accept.perform_accept(_invite_command())
-    with pytest.raises(InvalidTargetError, match="ignore action payload"):
-        await ignore.perform_ignore(_accept_command())
+    with pytest.raises(ValidationError):
+        SendActionCommand.model_validate(_accept_command().model_dump(mode="json"))
+    with pytest.raises(ValidationError):
+        AcceptActionCommand.model_validate(_invite_command().model_dump(mode="json"))
+    with pytest.raises(ValidationError):
+        IgnoreActionCommand.model_validate(_accept_command().model_dump(mode="json"))
     with pytest.raises(InvalidTargetError, match="acceptance payload does not match"):
         await accept.perform_accept(_accept_command("invitation:" + "f" * 24))
     with pytest.raises(InvalidTargetError, match="ignore payload does not match"):

@@ -10,12 +10,13 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.tools.posts.get.models.post_detail_coverage import PostDetailCoverage
-from linkedin_mcp.tools.posts.get.models.post_evidence import PostEvidence
-from linkedin_mcp.tools.posts.get.models.post_get_input import PostGetInput
-from linkedin_mcp.tools.posts.get.models.post_observation import PostObservation
-from linkedin_mcp.tools.posts.get.models.post_reshared_content import PostResharedContent
-from linkedin_mcp.tools.posts.search.models.post_content_type import PostContentType
+from linkedin_mcp.tools.posts.get.models import (
+    PostDetailCoverage,
+    PostEvidence,
+    PostGetInput,
+    PostObservation,
+    PostResharedContent,
+)
 from linkedin_mcp.tools.posts.surface import (
     POST_MENU_PATTERN,
     PostContentFields,
@@ -30,6 +31,9 @@ from linkedin_mcp.tools.posts.surface import (
     post_header_fields,
     post_reference_for_region,
     visible_accessible_values,
+)
+from linkedin_mcp.tools.posts.surface import (
+    PostContentType as SurfacePostContentType,
 )
 from linkedin_mcp.ui import LinkedInLocator as Locator
 from linkedin_mcp.ui import LinkedInPage as Page
@@ -299,7 +303,7 @@ async def _parse_post_detail_page(
     if is_repost_wrapper:
         links, hashtags, mentions = await post_body_links(top_body)
         content = PostContentFields(
-            content_type=PostContentType.REPOST,
+            content_type=SurfacePostContentType.REPOST,
             attachments=(),
             links=links,
             hashtags=hashtags,
@@ -323,19 +327,27 @@ async def _parse_post_detail_page(
 
 
 def _reshared_content_from_detail(detail: _ParsedPostDetail) -> PostResharedContent:
-    return PostResharedContent(
-        post_ref=detail.displayed_post_ref,
-        author=detail.header.author,
-        text=detail.text,
-        posted_at_text=detail.header.posted_at_text,
-        edited=detail.header.edited,
-        content_type=detail.content.content_type,
-        attachments=detail.content.attachments,
-        links=detail.content.links,
-        hashtags=detail.content.hashtags,
-        mentions=detail.content.mentions,
-        poll=detail.content.poll,
-        visible_text=detail.captured_text,
+    return PostResharedContent.model_validate(
+        {
+            "post_ref": detail.displayed_post_ref,
+            "author": detail.header.author.model_dump(mode="python"),
+            "text": detail.text,
+            "posted_at_text": detail.header.posted_at_text,
+            "edited": detail.header.edited,
+            "content_type": detail.content.content_type.value,
+            "attachments": tuple(
+                item.model_dump(mode="python") for item in detail.content.attachments
+            ),
+            "links": tuple(item.model_dump(mode="python") for item in detail.content.links),
+            "hashtags": detail.content.hashtags,
+            "mentions": tuple(item.model_dump(mode="python") for item in detail.content.mentions),
+            "poll": (
+                detail.content.poll.model_dump(mode="python")
+                if detail.content.poll is not None
+                else None
+            ),
+            "visible_text": detail.captured_text,
+        }
     )
 
 
@@ -416,31 +428,48 @@ class PostDetailPage:
                 reshared_post_present=reshared is not None,
                 captured_at=captured_at,
             )
-            return PostObservation(
-                post_ref=request.post_ref,
-                displayed_post_ref=requested_detail.displayed_post_ref,
-                post_url=source_url,
-                author=requested_detail.header.author,
-                text=requested_detail.text,
-                posted_at_text=requested_detail.header.posted_at_text,
-                edited=requested_detail.header.edited,
-                visibility_text=requested_detail.header.visibility_text,
-                promoted=requested_detail.header.promoted,
-                content_type=requested_detail.content.content_type,
-                attachments=requested_detail.content.attachments,
-                links=requested_detail.content.links,
-                hashtags=requested_detail.content.hashtags,
-                mentions=requested_detail.content.mentions,
-                poll=requested_detail.content.poll,
-                reshared_post=reshared,
-                viewer_reaction=requested_detail.engagement.viewer_reaction,
-                reaction_count_text=requested_detail.engagement.reaction_count_text,
-                comment_count_text=requested_detail.engagement.comment_count_text,
-                repost_count_text=requested_detail.engagement.repost_count_text,
-                impression_count_text=requested_detail.engagement.impression_count_text,
-                comments_enabled=requested_detail.engagement.comments_enabled,
-                visible_text=captured_text,
-                evidence=tuple(evidence),
-                coverage=coverage,
-                captured_at=captured_at,
+            return PostObservation.model_validate(
+                {
+                    "post_ref": request.post_ref,
+                    "displayed_post_ref": requested_detail.displayed_post_ref,
+                    "post_url": source_url,
+                    "author": requested_detail.header.author.model_dump(mode="python"),
+                    "text": requested_detail.text,
+                    "posted_at_text": requested_detail.header.posted_at_text,
+                    "edited": requested_detail.header.edited,
+                    "visibility_text": requested_detail.header.visibility_text,
+                    "promoted": requested_detail.header.promoted,
+                    "content_type": requested_detail.content.content_type.value,
+                    "attachments": tuple(
+                        item.model_dump(mode="python")
+                        for item in requested_detail.content.attachments
+                    ),
+                    "links": tuple(
+                        item.model_dump(mode="python") for item in requested_detail.content.links
+                    ),
+                    "hashtags": requested_detail.content.hashtags,
+                    "mentions": tuple(
+                        item.model_dump(mode="python") for item in requested_detail.content.mentions
+                    ),
+                    "poll": (
+                        requested_detail.content.poll.model_dump(mode="python")
+                        if requested_detail.content.poll is not None
+                        else None
+                    ),
+                    "reshared_post": reshared,
+                    "viewer_reaction": (
+                        requested_detail.engagement.viewer_reaction.value
+                        if requested_detail.engagement.viewer_reaction is not None
+                        else None
+                    ),
+                    "reaction_count_text": requested_detail.engagement.reaction_count_text,
+                    "comment_count_text": requested_detail.engagement.comment_count_text,
+                    "repost_count_text": requested_detail.engagement.repost_count_text,
+                    "impression_count_text": requested_detail.engagement.impression_count_text,
+                    "comments_enabled": requested_detail.engagement.comments_enabled,
+                    "visible_text": captured_text,
+                    "evidence": tuple(evidence),
+                    "coverage": coverage,
+                    "captured_at": captured_at,
+                }
             )

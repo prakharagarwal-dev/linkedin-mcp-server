@@ -4,25 +4,25 @@ import re
 from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
+from pydantic import BaseModel
 
 from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import ErrorCode
 from linkedin_mcp.infra.cursor import CursorStore
 from linkedin_mcp.infra.queue import Scheduler, Worker
 from linkedin_mcp.tools import attach_tools
-from linkedin_mcp.tools._shared.models import CapabilityName, StrictModel
-from linkedin_mcp.tools.companies.search.models.company_search_filters import CompanySearchFilters
-from linkedin_mcp.tools.connections.search.models.connections_search_filters import (
+from linkedin_mcp.tools.companies.search.models import CompanySearchFilters
+from linkedin_mcp.tools.connections.search.models import (
     ConnectionsSearchFilters,
 )
-from linkedin_mcp.tools.jobs.search.models.job_search_filters import JobSearchFilters
-from linkedin_mcp.tools.people.get.models.person_profile_section_selector import (
+from linkedin_mcp.tools.jobs.search.models import JobSearchFilters
+from linkedin_mcp.tools.people.get.models import (
     PersonProfileSectionSelector,
 )
-from linkedin_mcp.tools.people.search.models.people_search_filters import PeopleSearchFilters
-from linkedin_mcp.tools.posts.create.models.post_create_mode import PostCreateMode
-from linkedin_mcp.tools.posts.react.models.reaction_state import ReactionState
-from linkedin_mcp.tools.posts.search.models.post_search_filters import PostSearchFilters
+from linkedin_mcp.tools.people.search.models import PeopleSearchFilters
+from linkedin_mcp.tools.posts.create.models import PostCreateMode
+from linkedin_mcp.tools.posts.react.models import ReactionState
+from linkedin_mcp.tools.posts.search.models import PostSearchFilters
 from linkedin_mcp.transport.server import create_mcp_server
 from tests.simulator import standard_scenario
 from tests.support.playwright import empty_playwright
@@ -30,7 +30,7 @@ from tests.verification_manifest import MOCK_VERIFICATION, missing_test_files
 
 ROOT = Path(__file__).parents[2]
 
-EXPECTED_FILTER_FIELDS: dict[type[StrictModel], frozenset[str]] = {
+EXPECTED_FILTER_FIELDS: dict[type[BaseModel], frozenset[str]] = {
     JobSearchFilters: frozenset(
         {
             "sort_by",
@@ -233,7 +233,6 @@ def test_manifest_matches_the_exact_public_tool_surface() -> None:
     registered_names = {tool.name for tool in tools}
 
     assert registered_names == set(MOCK_VERIFICATION)
-    assert {name.value for name in CapabilityName} <= registered_names
 
 
 def test_readme_tools_table_matches_the_exact_public_tool_surface() -> None:

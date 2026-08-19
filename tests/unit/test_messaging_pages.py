@@ -12,32 +12,29 @@ from pydantic import HttpUrl, ValidationError
 
 import linkedin_mcp.tools.messaging.search.page as messaging_pages
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
-from linkedin_mcp.tools._shared.actions import (
+from linkedin_mcp.tools.messaging.conversation.get.evidence import source_from_conversation
+from linkedin_mcp.tools.messaging.conversation.get.models import (
+    ConversationGetInput,
+    MessageAttachmentKind,
+    MessageDirection,
+)
+from linkedin_mcp.tools.messaging.conversation.get.page import ConversationGetPage
+from linkedin_mcp.tools.messaging.search.models import (
+    ConversationCategory,
+    ConversationFilter,
+    ConversationSearchInput,
+)
+from linkedin_mcp.tools.messaging.search.page import ConversationSearchPage
+from linkedin_mcp.tools.messaging.send.models import (
     ActionCommand,
     ActionOutcome,
     ActionTarget,
     ActionType,
-    InvitationSendPayload,
+    MessageFileInput,
     MessageGifInput,
+    MessageSendInput,
     MessageSendPayload,
 )
-from linkedin_mcp.tools.messaging.conversation.get.evidence import source_from_conversation
-from linkedin_mcp.tools.messaging.conversation.get.models.conversation_get_input import (
-    ConversationGetInput,
-)
-from linkedin_mcp.tools.messaging.conversation.get.models.message_attachment_kind import (
-    MessageAttachmentKind,
-)
-from linkedin_mcp.tools.messaging.conversation.get.models.message_direction import MessageDirection
-from linkedin_mcp.tools.messaging.conversation.get.page import ConversationGetPage
-from linkedin_mcp.tools.messaging.search.models.conversation_category import ConversationCategory
-from linkedin_mcp.tools.messaging.search.models.conversation_filter import ConversationFilter
-from linkedin_mcp.tools.messaging.search.models.conversation_search_input import (
-    ConversationSearchInput,
-)
-from linkedin_mcp.tools.messaging.search.page import ConversationSearchPage
-from linkedin_mcp.tools.messaging.send.models.message_file_input import MessageFileInput
-from linkedin_mcp.tools.messaging.send.models.message_send_input import MessageSendInput
 from linkedin_mcp.tools.messaging.send.page import MessageSendPage
 from linkedin_mcp.ui import LinkedInLocator, LinkedInPage, LinkedInPlaywright
 from tests.support.playwright import adapt_browser
@@ -1800,18 +1797,18 @@ async def test_composer_fallbacks_and_message_extraction_remain_bounded() -> Non
 
 @pytest.mark.asyncio
 async def test_message_action_payload_type_is_enforced_before_browser_access() -> None:
-    wrong = ActionCommand(
-        action_type=ActionType.INVITATION_SEND,
-        target=ActionTarget(
-            profile_slug="jane-doe",
-            profile_url=HttpUrl("https://www.linkedin.com/in/jane-doe/"),
-            display_name="Jane Doe",
-        ),
-        payload=InvitationSendPayload(note=None),
-    )
-
-    with pytest.raises(InvalidTargetError, match="message action payload"):
-        await MessageSendPage(cast(LinkedInPlaywright, object())).perform_message(wrong)
+    with pytest.raises(ValidationError):
+        ActionCommand.model_validate(
+            {
+                "action_type": "invitation_send",
+                "target": {
+                    "profile_slug": "jane-doe",
+                    "profile_url": "https://www.linkedin.com/in/jane-doe/",
+                    "display_name": "Jane Doe",
+                },
+                "payload": {"action_type": "invitation_send", "note": None},
+            }
+        )
 
 
 @pytest.mark.timeout(20)
@@ -1871,10 +1868,10 @@ def test_message_search_requires_one_current_search_criterion() -> None:
 def test_action_command_rejects_a_payload_from_another_action_type() -> None:
     valid = _message_command()
 
-    with pytest.raises(ValidationError, match="does not match"):
+    with pytest.raises(ValidationError, match="MESSAGE_SEND"):
         ActionCommand.model_validate(
             {
                 **valid.model_dump(mode="json"),
-                "action_type": ActionType.INVITATION_SEND.value,
+                "action_type": "invitation_send",
             }
         )

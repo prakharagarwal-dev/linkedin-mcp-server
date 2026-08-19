@@ -9,14 +9,13 @@ from linkedin_mcp.infra.cursor import (
     cursor_binding,
     select_page,
 )
-from linkedin_mcp.tools._shared.models import (
-    CapabilityName,
+from linkedin_mcp.tools.connections.list.evidence import source_from_connections
+from linkedin_mcp.tools.connections.list.models import (
+    ConnectionsListInput,
+    ConnectionsListOutput,
     PaginationMetadata,
     StopReason,
 )
-from linkedin_mcp.tools.connections.list.evidence import source_from_connections
-from linkedin_mcp.tools.connections.list.models.connections_list_input import ConnectionsListInput
-from linkedin_mcp.tools.connections.list.models.connections_list_output import ConnectionsListOutput
 from linkedin_mcp.tools.connections.list.page import ConnectionsListPage
 
 
@@ -31,7 +30,7 @@ async def execute(
         mode="json",
         exclude={"context_id", "request_id", "cursor", "page_size"},
     )
-    operation = CapabilityName.CONNECTIONS_LIST.value
+    operation = "linkedin.connections.list"
     state = await cursor_store.start(
         account_id=account_id,
         operation=operation,

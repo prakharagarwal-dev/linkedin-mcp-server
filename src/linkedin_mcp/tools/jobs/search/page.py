@@ -12,17 +12,20 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.tools._shared.models import EvidenceField, StopReason
-from linkedin_mcp.tools.jobs.models.job_workplace_type import JobWorkplaceType
-from linkedin_mcp.tools.jobs.search.models.job_benefit import JobBenefit
-from linkedin_mcp.tools.jobs.search.models.job_commitment import JobCommitment
-from linkedin_mcp.tools.jobs.search.models.job_employment_type import JobEmploymentType
-from linkedin_mcp.tools.jobs.search.models.job_experience_level import JobExperienceLevel
-from linkedin_mcp.tools.jobs.search.models.job_search_coverage import JobSearchCoverage
-from linkedin_mcp.tools.jobs.search.models.job_search_filters import JobSearchFilters
-from linkedin_mcp.tools.jobs.search.models.job_search_input import JobSearchInput
-from linkedin_mcp.tools.jobs.search.models.job_search_sort import JobSearchSort
-from linkedin_mcp.tools.jobs.search.models.job_summary import JobSummary
+from linkedin_mcp.tools.jobs.search.models import (
+    EvidenceField,
+    JobBenefit,
+    JobCommitment,
+    JobEmploymentType,
+    JobExperienceLevel,
+    JobSearchCoverage,
+    JobSearchFilters,
+    JobSearchInput,
+    JobSearchSort,
+    JobSummary,
+    JobWorkplaceType,
+    StopReason,
+)
 from linkedin_mcp.tools.jobs.surface import (
     LISTED_PATTERN,
     WORKPLACE_LABELS,
@@ -212,7 +215,7 @@ def _location_and_workplace(value: str) -> tuple[str, JobWorkplaceType | None]:
         return value, None
     return (
         match.group("location").strip(),
-        WORKPLACE_VALUES[match.group("workplace").casefold()],
+        JobWorkplaceType(WORKPLACE_VALUES[match.group("workplace").casefold()]),
     )
 
 
@@ -739,7 +742,7 @@ class JobSearchPage:
             ("location", location),
             (
                 "workplace_type",
-                WORKPLACE_LABELS.get(workplace_type) if workplace_type is not None else None,
+                WORKPLACE_LABELS.get(workplace_type.value) if workplace_type is not None else None,
             ),
             ("listed_at_text", listed_at_text),
             ("easy_apply", "Easy Apply" if easy_apply else None),

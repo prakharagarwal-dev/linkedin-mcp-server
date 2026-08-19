@@ -9,13 +9,11 @@ from urllib.parse import parse_qs, urljoin, urlsplit
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.tools.companies.get.models.company_get_input import CompanyGetInput
-from linkedin_mcp.tools.companies.get.models.company_profile_coverage import CompanyProfileCoverage
-from linkedin_mcp.tools.companies.get.models.company_profile_evidence import CompanyProfileEvidence
-from linkedin_mcp.tools.companies.get.models.company_profile_observation import (
+from linkedin_mcp.tools.companies.get.models import (
+    CompanyGetInput,
+    CompanyProfileCoverage,
+    CompanyProfileEvidence,
     CompanyProfileObservation,
-)
-from linkedin_mcp.tools.companies.get.models.company_profile_page_capture import (
     CompanyProfilePageCapture,
 )
 from linkedin_mcp.tools.companies.surface import (

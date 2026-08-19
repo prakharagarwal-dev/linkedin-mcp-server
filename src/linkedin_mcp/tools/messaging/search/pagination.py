@@ -9,17 +9,12 @@ from linkedin_mcp.infra.cursor import (
     cursor_binding,
     select_page,
 )
-from linkedin_mcp.tools._shared.models import (
-    CapabilityName,
+from linkedin_mcp.tools.messaging.search.evidence import source_from_conversation_search
+from linkedin_mcp.tools.messaging.search.models import (
+    ConversationSearchInput,
+    ConversationSearchOutput,
     PaginationMetadata,
     StopReason,
-)
-from linkedin_mcp.tools.messaging.search.evidence import source_from_conversation_search
-from linkedin_mcp.tools.messaging.search.models.conversation_search_input import (
-    ConversationSearchInput,
-)
-from linkedin_mcp.tools.messaging.search.models.conversation_search_output import (
-    ConversationSearchOutput,
 )
 from linkedin_mcp.tools.messaging.search.page import ConversationSearchPage
 
@@ -35,7 +30,7 @@ async def execute(
         mode="json",
         exclude={"context_id", "request_id", "cursor", "page_size"},
     )
-    operation = CapabilityName.MESSAGING_SEARCH.value
+    operation = "linkedin.messaging.search"
     state = await cursor_store.start(
         account_id=account_id,
         operation=operation,

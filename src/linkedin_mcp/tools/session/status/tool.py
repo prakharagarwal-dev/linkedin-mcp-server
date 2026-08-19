@@ -6,7 +6,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
 from linkedin_mcp.config import Settings
-from linkedin_mcp.tools.session.status.models.session_status_output import SessionStatusOutput
+from linkedin_mcp.tools.session.status.models import SessionStatusOutput
 from linkedin_mcp.ui import LinkedInPlaywright
 
 
@@ -14,13 +14,17 @@ def register(
     mcp: FastMCP[None],
     settings: Settings,
     playwright: LinkedInPlaywright,
-    annotations: ToolAnnotations,
 ) -> None:
     @mcp.tool(
         name="linkedin.session.status",
         title="LinkedIn Session Status",
         description="Return non-secret browser-session state for the configured account.",
-        annotations=annotations,
+        annotations=ToolAnnotations(
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
     )
     async def _session_status() -> SessionStatusOutput:
         return SessionStatusOutput(

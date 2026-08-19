@@ -2,25 +2,37 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable
 from typing import Annotated, Any
 
 from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from linkedin_mcp.errors import InternalServerError, LinkedInMCPError
 from linkedin_mcp.infra.queue import Scheduler, Task
-from linkedin_mcp.tools._shared.identifiers import PROFILE_SLUG_PATTERN
-from linkedin_mcp.tools._shared.tool import (
-    IdentifierArgument,
-    tool_result,
-)
 from linkedin_mcp.tools.people.get.evidence import sources_from_person_profile
-from linkedin_mcp.tools.people.get.models.people_get_input import PeopleGetInput
-from linkedin_mcp.tools.people.get.models.people_get_output import PeopleGetOutput
-from linkedin_mcp.tools.people.get.models.person_profile_section_selector import (
+from linkedin_mcp.tools.people.get.models import (
+    PROFILE_SLUG_PATTERN,
+    PeopleGetInput,
+    PeopleGetOutput,
     PersonProfileSectionSelector,
 )
 from linkedin_mcp.tools.people.get.page import PersonProfilePage
+
+IdentifierArgument = Annotated[
+    str,
+    Field(min_length=1, max_length=200, pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]*$"),
+]
+
+
+async def tool_result[ResultT](awaitable: Awaitable[ResultT]) -> ResultT:
+    try:
+        return await awaitable
+    except Exception as error:
+        safe = error if isinstance(error, LinkedInMCPError) else InternalServerError()
+        raise ToolError(f"{safe.code.value}: {safe.safe_message}") from error
 
 
 async def execute(request: PeopleGetInput, page: PersonProfilePage) -> PeopleGetOutput:
@@ -37,7 +49,6 @@ def register(
     mcp: FastMCP[None],
     scheduler: Scheduler,
     page: PersonProfilePage,
-    annotations: ToolAnnotations,
 ) -> None:
     @mcp.tool(
         name="linkedin.people.get",
@@ -48,7 +59,12 @@ def register(
             "section owned by the member, full retained text, field evidence, and bounded "
             "section-page coverage."
         ),
-        annotations=annotations,
+        annotations=ToolAnnotations(
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=True,
+        ),
     )
     async def _get_person(
         context_id: IdentifierArgument,

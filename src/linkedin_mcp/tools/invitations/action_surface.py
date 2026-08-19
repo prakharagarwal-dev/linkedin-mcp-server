@@ -2,25 +2,16 @@
 
 from __future__ import annotations
 
-import hashlib
 import re
-from datetime import UTC, datetime
 from urllib.parse import parse_qs, urljoin, urlsplit
 
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
-from pydantic import HttpUrl
 
-from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
-from linkedin_mcp.tools._shared.actions import (
-    ActionInspection,
-    ActionOutcome,
-    ActionPageResult,
-    ActionTarget,
-)
+from linkedin_mcp.errors import ParserDriftError
 from linkedin_mcp.ui import LinkedInLocator as Locator
 from linkedin_mcp.ui import LinkedInPage as Page
 from linkedin_mcp.ui import LinkedInPlaywright
-from linkedin_mcp.ui.urls import canonical_profile_url, profile_slug_from_url
+from linkedin_mcp.ui.urls import profile_slug_from_url
 
 _PROFILE_ACTION_SETTLE_ATTEMPTS = 24
 
@@ -39,11 +30,6 @@ async def _visible_text(page: Page) -> str:
         if value:
             return value
     raise ParserDriftError("LinkedIn returned no visible connection text.")
-
-
-def _received_invitation_ref(profile_slug: str) -> str:
-    digest = hashlib.sha256(f"received\x1f{profile_slug}".encode()).hexdigest()[:24]
-    return f"invitation:{digest}"
 
 
 async def _optional_unique_visible(
@@ -65,33 +51,6 @@ class InvitationActionSurface:
 
     def __init__(self, playwright: LinkedInPlaywright) -> None:
         self._playwright = playwright
-
-    async def _inspect_received_request(
-        self,
-        profile_slug: str,
-    ) -> ActionInspection:
-        async with self._playwright.page() as page:
-            await page.goto(canonical_profile_url(profile_slug))
-            main, name = await self._profile_identity(page)
-            accept, ignore = await self._incoming_request_controls(main, name)
-            if accept is None or ignore is None:
-                raise InvalidTargetError(
-                    "The exact profile has no current visible incoming connection request."
-                )
-            captured_text = await _visible_text(page)
-            reference = _received_invitation_ref(profile_slug)
-            return ActionInspection(
-                target=ActionTarget(
-                    profile_slug=profile_slug,
-                    profile_url=HttpUrl(canonical_profile_url(profile_slug)),
-                    display_name=name,
-                    invitation_ref=reference,
-                ),
-                current_state="received_invitation_pending",
-                source_url=HttpUrl(page.url),
-                captured_text=captured_text,
-                captured_at=datetime.now(UTC),
-            )
 
     async def _connect_control(
         self,
@@ -250,21 +209,3 @@ class InvitationActionSurface:
                 "The exact profile exposes an incomplete incoming-request action pair."
             )
         return accept, ignore
-
-    @staticmethod
-    async def _result(
-        page: Page,
-        outcome: ActionOutcome,
-        performed: bool | None,
-        final_state: str,
-        detail: str,
-    ) -> ActionPageResult:
-        return ActionPageResult(
-            outcome=outcome,
-            performed=performed,
-            final_state=final_state,
-            detail=detail,
-            source_url=HttpUrl(page.url),
-            captured_text=await _visible_text(page),
-            captured_at=datetime.now(UTC),
-        )

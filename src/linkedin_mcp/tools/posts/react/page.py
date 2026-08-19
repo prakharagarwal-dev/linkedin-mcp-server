@@ -9,20 +9,24 @@ from playwright.async_api import Error as PlaywrightError
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
-from linkedin_mcp.tools._shared.actions import (
+from linkedin_mcp.tools.posts.engagement_surface import (
+    PostEngagementSurface,
+    VisiblePostTarget,
+)
+from linkedin_mcp.tools.posts.react.models import (
     ActionCommand,
     ActionInspection,
     ActionOutcome,
     ActionPageResult,
-    ReactionSetPayload,
+    ActionTarget,
+    PostReactionInput,
+    ReactionState,
 )
-from linkedin_mcp.tools.posts.engagement_surface import PostEngagementSurface
-from linkedin_mcp.tools.posts.react.models.post_reaction_input import PostReactionInput
-from linkedin_mcp.tools.posts.react.models.reaction_state import ReactionState
 from linkedin_mcp.ui import LinkedInLocator as Locator
 from linkedin_mcp.ui import LinkedInPage as Page
 from linkedin_mcp.ui.urls import (
     canonical_post_url,
+    canonical_profile_url,
 )
 
 _REACTION_LABELS = {
@@ -81,6 +85,60 @@ async def _visible_text(page: Page) -> str:
 
 
 class PostReactionPage(PostEngagementSurface):
+    @staticmethod
+    def _action_target(target: VisiblePostTarget, post_ref: str) -> ActionTarget:
+        actor_url = HttpUrl(canonical_profile_url(target.actor_slug))
+        return ActionTarget(
+            profile_slug=target.actor_slug,
+            profile_url=actor_url,
+            display_name=target.actor_name,
+            actor_profile_slug=target.actor_slug,
+            actor_profile_url=actor_url,
+            actor_display_name=target.actor_name,
+            post_ref=post_ref,
+            post_url=HttpUrl(canonical_post_url(post_ref)),
+            content_author_name=target.content_author_name,
+            content_author_url=target.content_author_url,
+        )
+
+    @staticmethod
+    def _matches_inspected_target(
+        requested: ActionTarget,
+        current: VisiblePostTarget,
+    ) -> bool:
+        return (
+            (requested.actor_profile_slug or requested.profile_slug) == current.actor_slug
+            and (requested.actor_display_name or requested.display_name).casefold()
+            == current.actor_name.casefold()
+            and requested.content_author_name is not None
+            and requested.content_author_name.casefold() == current.content_author_name.casefold()
+            and (
+                requested.content_author_url is None
+                or (
+                    current.content_author_url is not None
+                    and str(requested.content_author_url) == str(current.content_author_url)
+                )
+            )
+        )
+
+    @staticmethod
+    async def _result(
+        page: Page,
+        outcome: ActionOutcome,
+        performed: bool | None,
+        final_state: str,
+        detail: str,
+    ) -> ActionPageResult:
+        return ActionPageResult(
+            outcome=outcome,
+            performed=performed,
+            final_state=final_state,
+            detail=detail,
+            source_url=HttpUrl(page.url),
+            captured_text=await _visible_text(page),
+            captured_at=datetime.now(UTC),
+        )
+
     async def inspect_reaction(
         self,
         request: PostReactionInput,
@@ -109,8 +167,6 @@ class PostReactionPage(PostEngagementSurface):
             )
 
     async def perform_reaction(self, command: ActionCommand) -> ActionPageResult:
-        if not isinstance(command.payload, ReactionSetPayload):
-            raise InvalidTargetError("The reaction action payload is invalid.")
         payload = command.payload
         async with self._playwright.page() as page:
             await page.goto(canonical_post_url(payload.post_ref))

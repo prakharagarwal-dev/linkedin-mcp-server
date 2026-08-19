@@ -6,10 +6,9 @@ import re
 from urllib.parse import parse_qs, urlsplit, urlunsplit
 
 from linkedin_mcp.errors import InvalidTargetError
-from linkedin_mcp.tools._shared.identifiers import (
-    PROFILE_SLUG_PATTERN,
-    PROFILE_SLUG_SEGMENT_PATTERN,
-)
+
+PROFILE_SLUG_SEGMENT_PATTERN = r"[A-Za-z0-9][A-Za-z0-9-]{2,199}"
+PROFILE_SLUG_PATTERN = rf"^{PROFILE_SLUG_SEGMENT_PATTERN}$"
 
 _JOB_PATH = re.compile(r"^/jobs/view/(?P<job_id>[0-9]{5,30})(?:/|$)")
 _PROFILE_PATH = re.compile(rf"^/in/(?P<profile_slug>{PROFILE_SLUG_SEGMENT_PATTERN})(?:/|$)")

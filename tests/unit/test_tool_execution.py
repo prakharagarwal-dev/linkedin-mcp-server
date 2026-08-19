@@ -3,213 +3,364 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any, cast
 
 import pytest
+from mcp.server.fastmcp.exceptions import ToolError
 from pydantic import HttpUrl
 
 from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import (
-    InternalServerError,
     InvalidCursorError,
     InvalidTargetError,
     ParserDriftError,
 )
 from linkedin_mcp.infra.cursor import CursorStore
-from linkedin_mcp.tools._shared.actions import (
-    ActionCommand,
-    ActionInspection,
-    ActionOutcome,
-    ActionOutput,
-    ActionPageResult,
-    ActionTarget,
-    ReactionSetPayload,
-    ReactionState,
-)
-from linkedin_mcp.tools._shared.models import (
-    EvidenceField,
-    StopReason,
-)
-from linkedin_mcp.tools._shared.tool import safe_capability_error
 from linkedin_mcp.tools.companies.get import tool as company_get_tool
-from linkedin_mcp.tools.companies.get.models.company_get_input import CompanyGetInput
-from linkedin_mcp.tools.companies.get.models.company_get_output import CompanyGetOutput
-from linkedin_mcp.tools.companies.get.models.company_profile_coverage import CompanyProfileCoverage
-from linkedin_mcp.tools.companies.get.models.company_profile_evidence import CompanyProfileEvidence
-from linkedin_mcp.tools.companies.get.models.company_profile_observation import (
+from linkedin_mcp.tools.companies.get.models import (
+    CompanyGetInput,
+    CompanyGetOutput,
+    CompanyProfileCoverage,
+    CompanyProfileEvidence,
     CompanyProfileObservation,
-)
-from linkedin_mcp.tools.companies.get.models.company_profile_page_capture import (
     CompanyProfilePageCapture,
 )
 from linkedin_mcp.tools.companies.get.page import CompanyProfilePage
 from linkedin_mcp.tools.companies.search import pagination as company_search
-from linkedin_mcp.tools.companies.search.models.company_search_coverage import CompanySearchCoverage
-from linkedin_mcp.tools.companies.search.models.company_search_input import CompanySearchInput
-from linkedin_mcp.tools.companies.search.models.company_search_output import CompanySearchOutput
-from linkedin_mcp.tools.companies.search.models.company_summary import CompanySummary
+from linkedin_mcp.tools.companies.search.models import (
+    CompanySearchCoverage,
+    CompanySearchInput,
+    CompanySearchOutput,
+    CompanySummary,
+)
+from linkedin_mcp.tools.companies.search.models import (
+    StopReason as CompanyStopReason,
+)
 from linkedin_mcp.tools.companies.search.page import CompanySearchPage
 from linkedin_mcp.tools.connections.list import pagination as connections_list
-from linkedin_mcp.tools.connections.list.models.connection_summary import ConnectionSummary
-from linkedin_mcp.tools.connections.list.models.connections_list_coverage import (
+from linkedin_mcp.tools.connections.list.models import (
     ConnectionsListCoverage,
-)
-from linkedin_mcp.tools.connections.list.models.connections_list_input import ConnectionsListInput
-from linkedin_mcp.tools.connections.list.models.connections_list_output import (
+    ConnectionsListInput,
     ConnectionsListOutput,
+    ConnectionSummary,
+)
+from linkedin_mcp.tools.connections.list.models import (
+    StopReason as ConnectionsStopReason,
 )
 from linkedin_mcp.tools.connections.list.page import ConnectionsListPage
 from linkedin_mcp.tools.connections.search import pagination as connections_search
-from linkedin_mcp.tools.connections.search.models.connections_search_filters import (
+from linkedin_mcp.tools.connections.search.models import (
     ConnectionsSearchFilters,
-)
-from linkedin_mcp.tools.connections.search.models.connections_search_input import (
     ConnectionsSearchInput,
-)
-from linkedin_mcp.tools.connections.search.models.connections_search_output import (
     ConnectionsSearchOutput,
+)
+from linkedin_mcp.tools.connections.search.models import (
+    PeopleSearchCoverage as ConnectionsSearchCoverage,
+)
+from linkedin_mcp.tools.connections.search.models import (
+    PersonConnectionDegree as ConnectionSearchDegree,
+)
+from linkedin_mcp.tools.connections.search.models import (
+    PersonSummary as ConnectionSearchPerson,
+)
+from linkedin_mcp.tools.connections.search.models import (
+    StopReason as ConnectionsSearchStopReason,
 )
 from linkedin_mcp.tools.connections.search.page import ConnectionsSearchPage
 from linkedin_mcp.tools.invitations.accept import tool as invitation_accept_tool
-from linkedin_mcp.tools.invitations.accept.models.invitation_accept_input import (
+from linkedin_mcp.tools.invitations.accept.models import (
+    ActionCommand as AcceptActionCommand,
+)
+from linkedin_mcp.tools.invitations.accept.models import (
+    ActionInspection as AcceptActionInspection,
+)
+from linkedin_mcp.tools.invitations.accept.models import (
+    ActionOutcome as AcceptActionOutcome,
+)
+from linkedin_mcp.tools.invitations.accept.models import (
+    ActionOutput as AcceptActionOutput,
+)
+from linkedin_mcp.tools.invitations.accept.models import (
+    ActionPageResult as AcceptActionPageResult,
+)
+from linkedin_mcp.tools.invitations.accept.models import (
+    ActionTarget as AcceptActionTarget,
+)
+from linkedin_mcp.tools.invitations.accept.models import (
     InvitationAcceptInput,
 )
 from linkedin_mcp.tools.invitations.accept.page import AcceptInvitationPage
 from linkedin_mcp.tools.invitations.ignore import tool as invitation_ignore_tool
-from linkedin_mcp.tools.invitations.ignore.models.invitation_ignore_input import (
+from linkedin_mcp.tools.invitations.ignore.models import (
+    ActionCommand as IgnoreActionCommand,
+)
+from linkedin_mcp.tools.invitations.ignore.models import (
+    ActionInspection as IgnoreActionInspection,
+)
+from linkedin_mcp.tools.invitations.ignore.models import (
+    ActionOutcome as IgnoreActionOutcome,
+)
+from linkedin_mcp.tools.invitations.ignore.models import (
+    ActionOutput as IgnoreActionOutput,
+)
+from linkedin_mcp.tools.invitations.ignore.models import (
+    ActionPageResult as IgnoreActionPageResult,
+)
+from linkedin_mcp.tools.invitations.ignore.models import (
+    ActionTarget as IgnoreActionTarget,
+)
+from linkedin_mcp.tools.invitations.ignore.models import (
     InvitationIgnoreInput,
 )
 from linkedin_mcp.tools.invitations.ignore.page import IgnoreInvitationPage
 from linkedin_mcp.tools.invitations.list import pagination as invitations_list
-from linkedin_mcp.tools.invitations.list.models.invitation_available_action import (
-    InvitationAvailableAction,
-)
-from linkedin_mcp.tools.invitations.list.models.invitation_direction import InvitationDirection
-from linkedin_mcp.tools.invitations.list.models.invitation_entity import InvitationEntity
-from linkedin_mcp.tools.invitations.list.models.invitation_entity_type import InvitationEntityType
-from linkedin_mcp.tools.invitations.list.models.invitation_evidence import InvitationEvidence
-from linkedin_mcp.tools.invitations.list.models.invitation_filter import (
+from linkedin_mcp.tools.invitations.list.models import (
     CURRENT_RECEIVED_INVITATION_VIEWS,
+    InvitationAvailableAction,
+    InvitationDirection,
+    InvitationEntity,
+    InvitationEntityType,
+    InvitationEvidence,
     InvitationFilter,
-)
-from linkedin_mcp.tools.invitations.list.models.invitation_list_coverage import (
     InvitationListCoverage,
+    InvitationListInput,
+    InvitationListOutput,
+    InvitationSummary,
+    InvitationType,
 )
-from linkedin_mcp.tools.invitations.list.models.invitation_list_input import InvitationListInput
-from linkedin_mcp.tools.invitations.list.models.invitation_list_output import InvitationListOutput
-from linkedin_mcp.tools.invitations.list.models.invitation_summary import InvitationSummary
-from linkedin_mcp.tools.invitations.list.models.invitation_type import InvitationType
+from linkedin_mcp.tools.invitations.list.models import (
+    StopReason as InvitationStopReason,
+)
 from linkedin_mcp.tools.invitations.list.page import InvitationListPage
 from linkedin_mcp.tools.invitations.send import tool as invitation_send_tool
-from linkedin_mcp.tools.invitations.send.models.invitation_send_input import InvitationSendInput
+from linkedin_mcp.tools.invitations.send.models import (
+    ActionCommand as SendActionCommand,
+)
+from linkedin_mcp.tools.invitations.send.models import (
+    ActionInspection as SendActionInspection,
+)
+from linkedin_mcp.tools.invitations.send.models import (
+    ActionOutcome as SendActionOutcome,
+)
+from linkedin_mcp.tools.invitations.send.models import (
+    ActionOutput as SendActionOutput,
+)
+from linkedin_mcp.tools.invitations.send.models import (
+    ActionPageResult as SendActionPageResult,
+)
+from linkedin_mcp.tools.invitations.send.models import (
+    ActionTarget as SendActionTarget,
+)
+from linkedin_mcp.tools.invitations.send.models import (
+    InvitationSendInput,
+)
 from linkedin_mcp.tools.invitations.send.page import SendInvitationPage
 from linkedin_mcp.tools.jobs.get import tool as job_get_tool
-from linkedin_mcp.tools.jobs.get.models.job_detail_input import JobDetailInput
-from linkedin_mcp.tools.jobs.get.models.job_detail_observation import JobDetailObservation
-from linkedin_mcp.tools.jobs.get.models.job_detail_output import JobDetailOutput
+from linkedin_mcp.tools.jobs.get.models import (
+    EvidenceField,
+    JobDetailInput,
+    JobDetailObservation,
+    JobDetailOutput,
+)
 from linkedin_mcp.tools.jobs.get.page import JobDetailPage
 from linkedin_mcp.tools.jobs.search import pagination as job_search
-from linkedin_mcp.tools.jobs.search.models.job_search_coverage import JobSearchCoverage
-from linkedin_mcp.tools.jobs.search.models.job_search_input import JobSearchInput
-from linkedin_mcp.tools.jobs.search.models.job_search_output import JobSearchOutput
-from linkedin_mcp.tools.jobs.search.models.job_summary import JobSummary
+from linkedin_mcp.tools.jobs.search.models import (
+    JobSearchCoverage,
+    JobSearchInput,
+    JobSearchOutput,
+    JobSummary,
+)
+from linkedin_mcp.tools.jobs.search.models import (
+    StopReason as JobStopReason,
+)
 from linkedin_mcp.tools.jobs.search.page import JobSearchPage
 from linkedin_mcp.tools.messaging.conversation.get import tool as conversation_get_tool
-from linkedin_mcp.tools.messaging.conversation.get.models.conversation_coverage import (
+from linkedin_mcp.tools.messaging.conversation.get.models import (
     ConversationCoverage,
-)
-from linkedin_mcp.tools.messaging.conversation.get.models.conversation_get_input import (
     ConversationGetInput,
-)
-from linkedin_mcp.tools.messaging.conversation.get.models.conversation_get_output import (
     ConversationGetOutput,
-)
-from linkedin_mcp.tools.messaging.conversation.get.models.conversation_observation import (
     ConversationObservation,
-)
-from linkedin_mcp.tools.messaging.conversation.get.models.message_direction import MessageDirection
-from linkedin_mcp.tools.messaging.conversation.get.models.message_observation import (
+    MessageDirection,
     MessageObservation,
+)
+from linkedin_mcp.tools.messaging.conversation.get.models import (
+    StopReason as ConversationStopReason,
 )
 from linkedin_mcp.tools.messaging.conversation.get.page import ConversationGetPage
 from linkedin_mcp.tools.messaging.search import pagination as messaging_search
-from linkedin_mcp.tools.messaging.search.models.conversation_filter import ConversationFilter
-from linkedin_mcp.tools.messaging.search.models.conversation_search_coverage import (
+from linkedin_mcp.tools.messaging.search.models import (
+    ConversationFilter,
     ConversationSearchCoverage,
-)
-from linkedin_mcp.tools.messaging.search.models.conversation_search_input import (
     ConversationSearchInput,
-)
-from linkedin_mcp.tools.messaging.search.models.conversation_search_output import (
     ConversationSearchOutput,
+    ConversationSummary,
 )
-from linkedin_mcp.tools.messaging.search.models.conversation_summary import ConversationSummary
+from linkedin_mcp.tools.messaging.search.models import (
+    StopReason as MessagingStopReason,
+)
 from linkedin_mcp.tools.messaging.search.page import ConversationSearchPage
 from linkedin_mcp.tools.messaging.send import tool as message_send_tool
-from linkedin_mcp.tools.messaging.send.models.message_send_input import MessageSendInput
+from linkedin_mcp.tools.messaging.send.models import (
+    ActionCommand as MessageActionCommand,
+)
+from linkedin_mcp.tools.messaging.send.models import (
+    ActionInspection as MessageActionInspection,
+)
+from linkedin_mcp.tools.messaging.send.models import (
+    ActionOutcome as MessageActionOutcome,
+)
+from linkedin_mcp.tools.messaging.send.models import (
+    ActionOutput as MessageActionOutput,
+)
+from linkedin_mcp.tools.messaging.send.models import (
+    ActionPageResult as MessageActionPageResult,
+)
+from linkedin_mcp.tools.messaging.send.models import (
+    ActionTarget as MessageActionTarget,
+)
+from linkedin_mcp.tools.messaging.send.models import (
+    MessageSendInput,
+)
 from linkedin_mcp.tools.messaging.send.page import MessageSendPage
 from linkedin_mcp.tools.people.get import tool as people_get_tool
-from linkedin_mcp.tools.people.get.models.people_get_input import PeopleGetInput
-from linkedin_mcp.tools.people.get.models.people_get_output import PeopleGetOutput
-from linkedin_mcp.tools.people.get.models.person_profile_coverage import PersonProfileCoverage
-from linkedin_mcp.tools.people.get.models.person_profile_evidence import PersonProfileEvidence
-from linkedin_mcp.tools.people.get.models.person_profile_observation import PersonProfileObservation
-from linkedin_mcp.tools.people.get.models.person_profile_page_capture import (
+from linkedin_mcp.tools.people.get.models import (
+    PeopleGetInput,
+    PeopleGetOutput,
+    PersonProfileCoverage,
+    PersonProfileEvidence,
+    PersonProfileObservation,
     PersonProfilePageCapture,
-)
-from linkedin_mcp.tools.people.get.models.person_profile_section_selector import (
     PersonProfileSectionSelector,
 )
 from linkedin_mcp.tools.people.get.page import PersonProfilePage
-from linkedin_mcp.tools.people.models.person_connection_degree import PersonConnectionDegree
 from linkedin_mcp.tools.people.search import pagination as people_search
-from linkedin_mcp.tools.people.search.models.people_search_connection_degree import (
+from linkedin_mcp.tools.people.search.models import (
     PeopleSearchConnectionDegree,
+    PeopleSearchCoverage,
+    PeopleSearchInput,
+    PeopleSearchOutput,
+    PersonConnectionDegree,
+    PersonSummary,
 )
-from linkedin_mcp.tools.people.search.models.people_search_coverage import PeopleSearchCoverage
-from linkedin_mcp.tools.people.search.models.people_search_input import PeopleSearchInput
-from linkedin_mcp.tools.people.search.models.people_search_output import PeopleSearchOutput
-from linkedin_mcp.tools.people.search.models.person_summary import PersonSummary
+from linkedin_mcp.tools.people.search.models import (
+    StopReason as PeopleStopReason,
+)
 from linkedin_mcp.tools.people.search.page import PeopleSearchPage
 from linkedin_mcp.tools.posts.comment import tool as post_comment_tool
-from linkedin_mcp.tools.posts.comment.models.post_comment_input import PostCommentInput
+from linkedin_mcp.tools.posts.comment.models import (
+    ActionCommand as CommentActionCommand,
+)
+from linkedin_mcp.tools.posts.comment.models import (
+    ActionInspection as CommentActionInspection,
+)
+from linkedin_mcp.tools.posts.comment.models import (
+    ActionOutcome as CommentActionOutcome,
+)
+from linkedin_mcp.tools.posts.comment.models import (
+    ActionOutput as CommentActionOutput,
+)
+from linkedin_mcp.tools.posts.comment.models import (
+    ActionPageResult as CommentActionPageResult,
+)
+from linkedin_mcp.tools.posts.comment.models import (
+    ActionTarget as CommentActionTarget,
+)
+from linkedin_mcp.tools.posts.comment.models import (
+    PostCommentInput,
+)
 from linkedin_mcp.tools.posts.comment.page import PostCommentPage
 from linkedin_mcp.tools.posts.comments.list import pagination as post_comments_list
-from linkedin_mcp.tools.posts.comments.list.models.comment_observation import CommentObservation
-from linkedin_mcp.tools.posts.comments.list.models.comment_sort import CommentSort
-from linkedin_mcp.tools.posts.comments.list.models.comment_thread import CommentThread
-from linkedin_mcp.tools.posts.comments.list.models.post_comments_coverage import (
+from linkedin_mcp.tools.posts.comments.list.models import (
+    CommentObservation,
+    CommentSort,
+    CommentThread,
     PostCommentsCoverage,
-)
-from linkedin_mcp.tools.posts.comments.list.models.post_comments_list_input import (
     PostCommentsListInput,
-)
-from linkedin_mcp.tools.posts.comments.list.models.post_comments_list_output import (
     PostCommentsListOutput,
+)
+from linkedin_mcp.tools.posts.comments.list.models import (
+    PostAuthor as CommentPostAuthor,
+)
+from linkedin_mcp.tools.posts.comments.list.models import (
+    PostAuthorType as CommentPostAuthorType,
 )
 from linkedin_mcp.tools.posts.comments.list.page import PostCommentsPage
 from linkedin_mcp.tools.posts.create import tool as post_create_tool
-from linkedin_mcp.tools.posts.create.models.post_create_input import PostCreateInput
-from linkedin_mcp.tools.posts.create.models.text_post_content import TextPostContent
+from linkedin_mcp.tools.posts.create.models import (
+    ActionCommand as PostActionCommand,
+)
+from linkedin_mcp.tools.posts.create.models import (
+    ActionInspection as PostActionInspection,
+)
+from linkedin_mcp.tools.posts.create.models import (
+    ActionOutcome as PostActionOutcome,
+)
+from linkedin_mcp.tools.posts.create.models import (
+    ActionOutput as PostActionOutput,
+)
+from linkedin_mcp.tools.posts.create.models import (
+    ActionPageResult as PostActionPageResult,
+)
+from linkedin_mcp.tools.posts.create.models import (
+    ActionTarget as PostActionTarget,
+)
+from linkedin_mcp.tools.posts.create.models import (
+    PostCreateInput,
+    TextPostContent,
+)
 from linkedin_mcp.tools.posts.create.page import PostPublishingPage
 from linkedin_mcp.tools.posts.get import tool as post_get_tool
-from linkedin_mcp.tools.posts.get.models.post_author_type import PostAuthorType
-from linkedin_mcp.tools.posts.get.models.post_detail_coverage import PostDetailCoverage
-from linkedin_mcp.tools.posts.get.models.post_evidence import PostEvidence
-from linkedin_mcp.tools.posts.get.models.post_get_input import PostGetInput
-from linkedin_mcp.tools.posts.get.models.post_get_output import PostGetOutput
-from linkedin_mcp.tools.posts.get.models.post_observation import PostObservation
+from linkedin_mcp.tools.posts.get.models import (
+    PostAuthor as GetPostAuthor,
+)
+from linkedin_mcp.tools.posts.get.models import (
+    PostDetailCoverage,
+    PostEvidence,
+    PostGetInput,
+    PostGetOutput,
+    PostObservation,
+)
 from linkedin_mcp.tools.posts.get.page import PostDetailPage
-from linkedin_mcp.tools.posts.models.post_author import PostAuthor
 from linkedin_mcp.tools.posts.react import tool as post_react_tool
-from linkedin_mcp.tools.posts.react.models.post_reaction_input import PostReactionInput
+from linkedin_mcp.tools.posts.react.models import (
+    ActionCommand as ReactionActionCommand,
+)
+from linkedin_mcp.tools.posts.react.models import (
+    ActionInspection as ReactionActionInspection,
+)
+from linkedin_mcp.tools.posts.react.models import (
+    ActionOutcome as ReactionActionOutcome,
+)
+from linkedin_mcp.tools.posts.react.models import (
+    ActionOutput as ReactionActionOutput,
+)
+from linkedin_mcp.tools.posts.react.models import (
+    ActionPageResult as ReactionActionPageResult,
+)
+from linkedin_mcp.tools.posts.react.models import (
+    ActionTarget as ReactionActionTarget,
+)
+from linkedin_mcp.tools.posts.react.models import (
+    PostReactionInput,
+    ReactionState,
+)
 from linkedin_mcp.tools.posts.react.page import PostReactionPage
 from linkedin_mcp.tools.posts.search import pagination as post_search
-from linkedin_mcp.tools.posts.search.models.post_search_coverage import PostSearchCoverage
-from linkedin_mcp.tools.posts.search.models.post_search_input import PostSearchInput
-from linkedin_mcp.tools.posts.search.models.post_search_output import PostSearchOutput
-from linkedin_mcp.tools.posts.search.models.post_summary import PostSummary
+from linkedin_mcp.tools.posts.search.models import (
+    PostAuthor,
+    PostSearchCoverage,
+    PostSearchInput,
+    PostSearchOutput,
+    PostSummary,
+)
+from linkedin_mcp.tools.posts.search.models import (
+    PostAuthorType as SearchPostAuthorType,
+)
+from linkedin_mcp.tools.posts.search.models import (
+    StopReason as PostStopReason,
+)
 from linkedin_mcp.tools.posts.search.page import PostSearchPage
 
 
@@ -245,7 +396,7 @@ class FakeJobSearch:
                 pages_visited=1,
                 result_count=1,
                 max_results=request.page_size,
-                stop_reason=StopReason.VISIBLE_PAGE_COMPLETE,
+                stop_reason=JobStopReason.VISIBLE_PAGE_COMPLETE,
                 captured_at=now,
             ),
             job.visible_text,
@@ -289,9 +440,9 @@ class PaginatedFakeJobSearch(FakeJobSearch):
                 result_count=len(jobs),
                 max_results=limit,
                 stop_reason=(
-                    StopReason.RESULT_LIMIT
+                    JobStopReason.RESULT_LIMIT
                     if limit < len(self._jobs)
-                    else StopReason.VISIBLE_PAGE_COMPLETE
+                    else JobStopReason.VISIBLE_PAGE_COMPLETE
                 ),
                 captured_at=datetime.now(UTC),
             ),
@@ -330,13 +481,11 @@ class FakePeopleSearch:
 
     async def collect(
         self,
-        request: PeopleSearchInput | ConnectionsSearchInput,
+        request: PeopleSearchInput,
         *,
         result_limit: int | None = None,
     ) -> tuple[tuple[PersonSummary, ...], PeopleSearchCoverage, str, str]:
         del result_limit
-        if isinstance(request, ConnectionsSearchInput):
-            request = request.as_people_search_input()
         self.calls += 1
         now = datetime.now(UTC)
         visible_text = "Jane Doe\nStaff Engineer at Acme Cloud\nBengaluru, Karnataka"
@@ -357,7 +506,7 @@ class FakePeopleSearch:
                 pages_visited=1,
                 result_count=1,
                 max_results=request.page_size,
-                stop_reason=StopReason.VISIBLE_PAGE_COMPLETE,
+                stop_reason=PeopleStopReason.VISIBLE_PAGE_COMPLETE,
                 captured_at=now,
             ),
             visible_text,
@@ -365,26 +514,54 @@ class FakePeopleSearch:
         )
 
 
-class FakeNonConnectionPeopleSearch(FakePeopleSearch):
+class FakeConnectionsSearch:
+    connection_degree = ConnectionSearchDegree.FIRST
+
+    def __init__(self) -> None:
+        self.calls = 0
+
     async def collect(
         self,
-        request: PeopleSearchInput | ConnectionsSearchInput,
+        request: ConnectionsSearchInput,
         *,
         result_limit: int | None = None,
-    ) -> tuple[tuple[PersonSummary, ...], PeopleSearchCoverage, str, str]:
-        people, coverage, captured_text, source_url = await super().collect(
-            request,
-            result_limit=result_limit,
+    ) -> tuple[
+        tuple[ConnectionSearchPerson, ...],
+        ConnectionsSearchCoverage,
+        str,
+        str,
+    ]:
+        del result_limit
+        self.calls += 1
+        now = datetime.now(UTC)
+        visible_text = "Jane Doe\nStaff Engineer at Acme Cloud\nBengaluru, Karnataka"
+        person = ConnectionSearchPerson(
+            profile_slug="jane-doe",
+            profile_url=HttpUrl("https://www.linkedin.com/in/jane-doe/"),
+            name="Jane Doe",
+            headline="Staff Engineer at Acme Cloud",
+            location="Bengaluru, Karnataka",
+            connection_degree=self.connection_degree,
+            visible_text=visible_text,
         )
         return (
-            tuple(
-                person.model_copy(update={"connection_degree": PersonConnectionDegree.SECOND})
-                for person in people
+            (person,),
+            ConnectionsSearchCoverage(
+                query=request.query,
+                filters=request.as_people_search_input().filters,
+                pages_visited=1,
+                result_count=1,
+                max_results=request.page_size,
+                stop_reason=ConnectionsSearchStopReason.VISIBLE_PAGE_COMPLETE,
+                captured_at=now,
             ),
-            coverage,
-            captured_text,
-            source_url,
+            visible_text,
+            "https://www.linkedin.com/search/results/people/?keywords=python",
         )
+
+
+class FakeNonConnectionSearch(FakeConnectionsSearch):
+    connection_degree = ConnectionSearchDegree.SECOND
 
 
 class FakePersonProfile:
@@ -481,7 +658,7 @@ class FakeCompanySearch:
                 pages_visited=1,
                 result_count=1,
                 max_results=request.page_size,
-                stop_reason=StopReason.VISIBLE_PAGE_COMPLETE,
+                stop_reason=CompanyStopReason.VISIBLE_PAGE_COMPLETE,
                 captured_at=now,
             ),
             visible_text,
@@ -560,7 +737,7 @@ class FakeCompanyProfile:
 
 def _post_author() -> PostAuthor:
     return PostAuthor(
-        author_type=PostAuthorType.MEMBER,
+        author_type=SearchPostAuthorType.MEMBER,
         name="Jane Doe",
         profile_slug="jane-doe",
         author_url=HttpUrl("https://www.linkedin.com/in/jane-doe/"),
@@ -606,7 +783,7 @@ class FakePostSearch:
                 result_count=1,
                 unsupported_result_count=1,
                 max_results=request.page_size,
-                stop_reason=StopReason.VISIBLE_PAGE_COMPLETE,
+                stop_reason=PostStopReason.VISIBLE_PAGE_COMPLETE,
                 captured_at=now,
             ),
             visible_text,
@@ -630,7 +807,7 @@ class FakePostDetail:
             post_ref=request.post_ref,
             displayed_post_ref=request.post_ref,
             post_url=post_url,
-            author=_post_author(),
+            author=GetPostAuthor.model_validate(_post_author().model_dump(mode="python")),
             text="A practical guide to reliable Python services.",
             posted_at_text="2h",
             reaction_count_text="12 reactions",
@@ -686,8 +863,8 @@ class FakePostComments:
         top = CommentObservation(
             comment_ref=top_ref,
             post_ref=request.post_ref,
-            author=PostAuthor(
-                author_type=PostAuthorType.MEMBER,
+            author=CommentPostAuthor(
+                author_type=CommentPostAuthorType.MEMBER,
                 name="Alex Ray",
                 profile_slug="alex-ray",
                 author_url=HttpUrl("https://www.linkedin.com/in/alex-ray/"),
@@ -702,7 +879,7 @@ class FakePostComments:
             comment_ref=f"comment:{request.post_ref}:112",
             post_ref=request.post_ref,
             parent_comment_ref=top_ref,
-            author=_post_author(),
+            author=CommentPostAuthor.model_validate(_post_author().model_dump(mode="python")),
             text="Thank you!",
             posted_at_text="45m",
             visible_text=reply_text,
@@ -807,7 +984,7 @@ class FakeInvitationList:
                 neighboring_recommendation_count=0,
                 invitation_type_counts={InvitationType.CONNECTION_REQUEST: 1},
                 entity_type_counts={InvitationEntityType.PERSON: 1},
-                stop_reason=StopReason.VISIBLE_PAGE_COMPLETE,
+                stop_reason=InvitationStopReason.VISIBLE_PAGE_COMPLETE,
                 captured_at=now,
             ),
             text,
@@ -901,9 +1078,9 @@ class PaginatedFakeInvitationList(FakeInvitationList):
                 invitation_type_counts={InvitationType.CONNECTION_REQUEST: len(visible_items)},
                 entity_type_counts={InvitationEntityType.PERSON: len(visible_items)},
                 stop_reason=(
-                    StopReason.VISIBLE_PAGE_COMPLETE
+                    InvitationStopReason.VISIBLE_PAGE_COMPLETE
                     if len(visible_items) == len(all_items)
-                    else StopReason.RESULT_LIMIT
+                    else InvitationStopReason.RESULT_LIMIT
                 ),
                 captured_at=captured_at,
             ),
@@ -946,7 +1123,7 @@ class ImplicitEmptyInvitationList(FakeInvitationList):
                 neighboring_recommendation_count=0,
                 invitation_type_counts={},
                 entity_type_counts={},
-                stop_reason=StopReason.VISIBLE_PAGE_COMPLETE,
+                stop_reason=InvitationStopReason.VISIBLE_PAGE_COMPLETE,
                 captured_at=captured_at,
             ),
             "Manage invitations",
@@ -979,7 +1156,7 @@ class FakeConnectionsList:
                 rounds_visited=1,
                 result_count=1,
                 max_results=request.page_size,
-                stop_reason=StopReason.VISIBLE_PAGE_COMPLETE,
+                stop_reason=ConnectionsStopReason.VISIBLE_PAGE_COMPLETE,
                 captured_at=now,
             ),
             text,
@@ -1016,7 +1193,7 @@ class FakeConversationSearch:
                 rounds_visited=1,
                 result_count=1,
                 max_results=request.page_size,
-                stop_reason=StopReason.VISIBLE_PAGE_COMPLETE,
+                stop_reason=MessagingStopReason.VISIBLE_PAGE_COMPLETE,
                 captured_at=now,
             ),
             text,
@@ -1033,14 +1210,22 @@ class FakeInvitationActions:
     async def inspect_send(
         self,
         request: InvitationSendInput,
-    ) -> ActionInspection:
-        return _action_capture(request.profile_slug)
+    ) -> SendActionInspection:
+        return _action_capture(
+            SendActionInspection,
+            SendActionTarget,
+            request.profile_slug,
+        )
 
     async def inspect_accept(
         self,
         request: InvitationAcceptInput,
-    ) -> ActionInspection:
-        capture = _action_capture(request.profile_slug)
+    ) -> AcceptActionInspection:
+        capture = _action_capture(
+            AcceptActionInspection,
+            AcceptActionTarget,
+            request.profile_slug,
+        )
         return capture.model_copy(
             update={
                 "target": capture.target.model_copy(
@@ -1053,26 +1238,47 @@ class FakeInvitationActions:
     async def inspect_ignore(
         self,
         request: InvitationIgnoreInput,
-    ) -> ActionInspection:
-        return await self.inspect_accept(
-            InvitationAcceptInput(
-                context_id=request.context_id,
-                request_id=request.request_id,
-                profile_slug=request.profile_slug,
-            )
+    ) -> IgnoreActionInspection:
+        capture = _action_capture(
+            IgnoreActionInspection,
+            IgnoreActionTarget,
+            request.profile_slug,
+        )
+        return capture.model_copy(
+            update={
+                "target": capture.target.model_copy(
+                    update={"invitation_ref": "invitation:" + "a" * 24}
+                ),
+                "current_state": "received_invitation_pending",
+            }
         )
 
-    async def perform_send(self, command: ActionCommand) -> ActionPageResult:
+    async def perform_send(self, command: SendActionCommand) -> SendActionPageResult:
+        del command
         self.invite_actions += 1
-        return _page_result("pending_sent")
+        return _page_result(
+            SendActionPageResult,
+            SendActionOutcome.VERIFIED,
+            "pending_sent",
+        )
 
-    async def perform_accept(self, command: ActionCommand) -> ActionPageResult:
+    async def perform_accept(self, command: AcceptActionCommand) -> AcceptActionPageResult:
+        del command
         self.accept_actions += 1
-        return _page_result("connected")
+        return _page_result(
+            AcceptActionPageResult,
+            AcceptActionOutcome.VERIFIED,
+            "connected",
+        )
 
-    async def perform_ignore(self, command: ActionCommand) -> ActionPageResult:
+    async def perform_ignore(self, command: IgnoreActionCommand) -> IgnoreActionPageResult:
+        del command
         self.ignore_actions += 1
-        return _page_result("invitation_ignored")
+        return _page_result(
+            IgnoreActionPageResult,
+            IgnoreActionOutcome.VERIFIED,
+            "invitation_ignored",
+        )
 
 
 class FakePostPublishing:
@@ -1082,9 +1288,13 @@ class FakePostPublishing:
     async def inspect_post(
         self,
         request: PostCreateInput,
-    ) -> ActionInspection:
+    ) -> PostActionInspection:
         del request
-        capture = _action_capture("current-member")
+        capture = _action_capture(
+            PostActionInspection,
+            PostActionTarget,
+            "current-member",
+        )
         return capture.model_copy(
             update={
                 "target": capture.target.model_copy(
@@ -1099,10 +1309,14 @@ class FakePostPublishing:
             }
         )
 
-    async def perform_post(self, command: ActionCommand) -> ActionPageResult:
+    async def perform_post(self, command: PostActionCommand) -> PostActionPageResult:
         del command
         self.post_actions += 1
-        return _page_result("post_published:activity:7312345678901234567")
+        return _page_result(
+            PostActionPageResult,
+            PostActionOutcome.VERIFIED,
+            "post_published:activity:7312345678901234567",
+        )
 
 
 class FakePostEngagement:
@@ -1113,8 +1327,12 @@ class FakePostEngagement:
     async def inspect_comment(
         self,
         request: PostCommentInput,
-    ) -> ActionInspection:
-        capture = _action_capture("current-member")
+    ) -> CommentActionInspection:
+        capture = _action_capture(
+            CommentActionInspection,
+            CommentActionTarget,
+            "current-member",
+        )
         return capture.model_copy(
             update={
                 "target": capture.target.model_copy(
@@ -1135,16 +1353,27 @@ class FakePostEngagement:
             }
         )
 
-    async def perform_comment(self, command: ActionCommand) -> ActionPageResult:
+    async def perform_comment(
+        self,
+        command: CommentActionCommand,
+    ) -> CommentActionPageResult:
         del command
         self.comment_actions += 1
-        return _page_result("comment_published:comment:activity:7312345678901234567:900")
+        return _page_result(
+            CommentActionPageResult,
+            CommentActionOutcome.VERIFIED,
+            "comment_published:comment:activity:7312345678901234567:900",
+        )
 
     async def inspect_reaction(
         self,
         request: PostReactionInput,
-    ) -> ActionInspection:
-        capture = _action_capture("current-member")
+    ) -> ReactionActionInspection:
+        capture = _action_capture(
+            ReactionActionInspection,
+            ReactionActionTarget,
+            "current-member",
+        )
         return capture.model_copy(
             update={
                 "target": capture.target.model_copy(
@@ -1166,24 +1395,38 @@ class FakePostEngagement:
             }
         )
 
-    async def perform_reaction(self, command: ActionCommand) -> ActionPageResult:
-        assert isinstance(command.payload, ReactionSetPayload)
+    async def perform_reaction(
+        self,
+        command: ReactionActionCommand,
+    ) -> ReactionActionPageResult:
         self.reaction_actions += 1
-        return _page_result(f"reaction_set:{command.payload.desired_reaction.value}")
+        return _page_result(
+            ReactionActionPageResult,
+            ReactionActionOutcome.VERIFIED,
+            f"reaction_set:{command.payload.desired_reaction.value}",
+        )
 
 
 class MissingReferenceActions(FakeInvitationActions):
     async def inspect_accept(
         self,
         request: InvitationAcceptInput,
-    ) -> ActionInspection:
-        return _action_capture(request.profile_slug)
+    ) -> AcceptActionInspection:
+        return _action_capture(
+            AcceptActionInspection,
+            AcceptActionTarget,
+            request.profile_slug,
+        )
 
     async def inspect_ignore(
         self,
         request: InvitationIgnoreInput,
-    ) -> ActionInspection:
-        return _action_capture(request.profile_slug)
+    ) -> IgnoreActionInspection:
+        return _action_capture(
+            IgnoreActionInspection,
+            IgnoreActionTarget,
+            request.profile_slug,
+        )
 
 
 class InterruptedInvitationActions(FakeInvitationActions):
@@ -1191,7 +1434,7 @@ class InterruptedInvitationActions(FakeInvitationActions):
         super().__init__()
         self.cancelled = cancelled
 
-    async def perform_send(self, command: ActionCommand) -> ActionPageResult:
+    async def perform_send(self, command: SendActionCommand) -> SendActionPageResult:
         del command
         if self.cancelled:
             raise asyncio.CancelledError
@@ -1199,7 +1442,7 @@ class InterruptedInvitationActions(FakeInvitationActions):
 
 
 class RejectedInvitationActions(FakeInvitationActions):
-    async def perform_send(self, command: ActionCommand) -> ActionPageResult:
+    async def perform_send(self, command: SendActionCommand) -> SendActionPageResult:
         del command
         raise InvalidTargetError("The exact invitation target is no longer available.")
 
@@ -1239,7 +1482,7 @@ class FakeConversation:
                 messages_returned=2,
                 max_messages=request.max_messages,
                 rounds_visited=1,
-                stop_reason=StopReason.VISIBLE_PAGE_COMPLETE,
+                stop_reason=ConversationStopReason.VISIBLE_PAGE_COMPLETE,
                 history_complete=True,
                 truncated=False,
                 captured_at=now,
@@ -1250,10 +1493,15 @@ class FakeConversation:
     async def inspect_message(
         self,
         request: MessageSendInput,
-    ) -> ActionInspection:
-        return _action_capture(request.profile_slug or "jane-doe").model_copy(
+    ) -> MessageActionInspection:
+        capture = _action_capture(
+            MessageActionInspection,
+            MessageActionTarget,
+            request.profile_slug or "jane-doe",
+        )
+        return capture.model_copy(
             update={
-                "target": ActionTarget(
+                "target": MessageActionTarget(
                     profile_slug=request.profile_slug or "jane-doe",
                     profile_url=HttpUrl("https://www.linkedin.com/in/jane-doe/"),
                     display_name="Jane Doe",
@@ -1264,14 +1512,26 @@ class FakeConversation:
             }
         )
 
-    async def perform_message(self, command: ActionCommand) -> ActionPageResult:
+    async def perform_message(
+        self,
+        command: MessageActionCommand,
+    ) -> MessageActionPageResult:
+        del command
         self.message_actions += 1
-        return _page_result("message_sent")
+        return _page_result(
+            MessageActionPageResult,
+            MessageActionOutcome.VERIFIED,
+            "message_sent",
+        )
 
 
-def _action_capture(profile_slug: str) -> ActionInspection:
-    return ActionInspection(
-        target=ActionTarget(
+def _action_capture[InspectionT, TargetT](
+    inspection_type: Callable[..., InspectionT],
+    target_type: Callable[..., TargetT],
+    profile_slug: str,
+) -> InspectionT:
+    return inspection_type(
+        target=target_type(
             profile_slug=profile_slug,
             profile_url=HttpUrl(f"https://www.linkedin.com/in/{profile_slug}/"),
             display_name="Jane Doe",
@@ -1283,9 +1543,13 @@ def _action_capture(profile_slug: str) -> ActionInspection:
     )
 
 
-def _page_result(final_state: str) -> ActionPageResult:
-    return ActionPageResult(
-        outcome=ActionOutcome.VERIFIED,
+def _page_result[ResultT](
+    result_type: Callable[..., ResultT],
+    outcome: object,
+    final_state: str,
+) -> ResultT:
+    return result_type(
+        outcome=outcome,
         performed=True,
         final_state=final_state,
         detail=f"LinkedIn visibly confirmed {final_state}.",
@@ -1309,6 +1573,7 @@ class _ToolHarness:
         job_search_page: FakeJobSearch,
         job_detail_page: FakeJobDetail,
         people_search_page: FakePeopleSearch,
+        connections_search_page: FakeConnectionsSearch,
         person_profile_page: FakePersonProfile,
         company_search_page: FakeCompanySearch,
         company_profile_page: FakeCompanyProfile,
@@ -1332,7 +1597,7 @@ class _ToolHarness:
         self._job_search = cast(JobSearchPage, job_search_page)
         self._job_detail = cast(JobDetailPage, job_detail_page)
         self._people_search = cast(PeopleSearchPage, people_search_page)
-        self._connections_search = cast(ConnectionsSearchPage, people_search_page)
+        self._connections_search = cast(ConnectionsSearchPage, connections_search_page)
         self._person_profile = cast(PersonProfilePage, person_profile_page)
         self._company_search = cast(CompanySearchPage, company_search_page)
         self._company_profile = cast(CompanyProfilePage, company_profile_page)
@@ -1447,25 +1712,25 @@ class _ToolHarness:
     async def get_conversation(self, request: ConversationGetInput) -> ConversationGetOutput:
         return await conversation_get_tool.execute(request, self._conversation_read)
 
-    async def create_post(self, request: PostCreateInput) -> ActionOutput:
+    async def create_post(self, request: PostCreateInput) -> PostActionOutput:
         return await post_create_tool.execute(request, self._post_publishing)
 
-    async def comment_on_post(self, request: PostCommentInput) -> ActionOutput:
+    async def comment_on_post(self, request: PostCommentInput) -> CommentActionOutput:
         return await post_comment_tool.execute(request, self._post_comment)
 
-    async def react_to_post(self, request: PostReactionInput) -> ActionOutput:
+    async def react_to_post(self, request: PostReactionInput) -> ReactionActionOutput:
         return await post_react_tool.execute(request, self._post_reaction)
 
-    async def send_invitation(self, request: InvitationSendInput) -> ActionOutput:
+    async def send_invitation(self, request: InvitationSendInput) -> SendActionOutput:
         return await invitation_send_tool.execute(request, self._invitation_send)
 
-    async def accept_invitation(self, request: InvitationAcceptInput) -> ActionOutput:
+    async def accept_invitation(self, request: InvitationAcceptInput) -> AcceptActionOutput:
         return await invitation_accept_tool.execute(request, self._invitation_accept)
 
-    async def ignore_invitation(self, request: InvitationIgnoreInput) -> ActionOutput:
+    async def ignore_invitation(self, request: InvitationIgnoreInput) -> IgnoreActionOutput:
         return await invitation_ignore_tool.execute(request, self._invitation_ignore)
 
-    async def send_message(self, request: MessageSendInput) -> ActionOutput:
+    async def send_message(self, request: MessageSendInput) -> MessageActionOutput:
         return await message_send_tool.execute(request, self._message_send)
 
 
@@ -1473,6 +1738,7 @@ def _tools(
     search: FakeJobSearch,
     detail: FakeJobDetail,
     people_search: FakePeopleSearch | None = None,
+    connections_search_page: FakeConnectionsSearch | None = None,
     person_profile: FakePersonProfile | None = None,
     company_search: FakeCompanySearch | None = None,
     company_profile: FakeCompanyProfile | None = None,
@@ -1496,6 +1762,7 @@ def _tools(
         job_search_page=search,
         job_detail_page=detail,
         people_search_page=selected_people_search,
+        connections_search_page=connections_search_page or FakeConnectionsSearch(),
         person_profile_page=person_profile or FakePersonProfile(),
         company_search_page=company_search or FakeCompanySearch(),
         company_profile_page=company_profile or FakeCompanyProfile(),
@@ -1544,7 +1811,7 @@ _READ_FAILURE_CASES: tuple[tuple[str, str, str, object], ...] = (
         ),
     ),
     (
-        "_people_search",
+        "_connections_search",
         "collect",
         "search_connections",
         ConnectionsSearchInput(
@@ -1788,7 +2055,7 @@ async def test_invitation_cursor_walks_live_prefix_without_duplicates() -> None:
     assert first.coverage.advertised_count == 5
     assert first.coverage.unique_count == 3
     assert first.coverage.result_count == 2
-    assert first.coverage.stop_reason is StopReason.RESULT_LIMIT
+    assert first.coverage.stop_reason is InvitationStopReason.RESULT_LIMIT
     assert first.pagination.consistency == "live_deduplicated"
     assert first.pagination.cumulative_count == 2
     assert first.pagination.next_cursor is not None
@@ -1854,7 +2121,7 @@ async def test_invitation_cursor_walks_live_prefix_without_duplicates() -> None:
     assert third.pagination.cumulative_count == 5
     assert third.pagination.has_more is False
     assert third.pagination.truncated is False
-    assert third.coverage.stop_reason is StopReason.VISIBLE_PAGE_COMPLETE
+    assert third.coverage.stop_reason is InvitationStopReason.VISIBLE_PAGE_COMPLETE
     assert third.coverage.result_count == 2
 
     with pytest.raises(InvalidCursorError, match="consumed"):
@@ -1884,7 +2151,7 @@ async def test_unadvertised_empty_invitation_view_survives_tools_evidence() -> N
     assert output.invitations == ()
     assert output.coverage.advertised_count is None
     assert output.coverage.unadvertised_empty_views == (InvitationFilter.PEOPLE,)
-    assert output.coverage.stop_reason is StopReason.VISIBLE_PAGE_COMPLETE
+    assert output.coverage.stop_reason is InvitationStopReason.VISIBLE_PAGE_COMPLETE
     assert output.pagination.has_more is False
     assert output.pagination.truncated is False
     assert len(output.sources) == 1
@@ -1933,11 +2200,11 @@ async def test_repeated_people_search_executes_provider_each_time() -> None:
 
 @pytest.mark.asyncio
 async def test_repeated_connections_search_executes_provider_each_time() -> None:
-    people_search = FakePeopleSearch()
+    connections_search_page = FakeConnectionsSearch()
     tools = _tools(
         FakeJobSearch(),
         FakeJobDetail(),
-        people_search=people_search,
+        connections_search_page=connections_search_page,
     )
     request = ConnectionsSearchInput(
         context_id="connections-context",
@@ -1954,7 +2221,7 @@ async def test_repeated_connections_search_executes_provider_each_time() -> None
     assert second.people == first.people
     assert first.people[0].profile_slug == "jane-doe"
     assert first.coverage.filters.connection_degrees == (PeopleSearchConnectionDegree.FIRST,)
-    assert people_search.calls == 2
+    assert connections_search_page.calls == 2
 
 
 @pytest.mark.asyncio
@@ -1962,7 +2229,7 @@ async def test_connections_search_rejects_non_first_degree_results() -> None:
     tools = _tools(
         FakeJobSearch(),
         FakeJobDetail(),
-        people_search=FakeNonConnectionPeopleSearch(),
+        connections_search_page=FakeNonConnectionSearch(),
     )
 
     with pytest.raises(ParserDriftError, match="not visibly first-degree"):
@@ -2250,7 +2517,7 @@ async def test_all_seven_actions_run_directly_with_typed_evidence() -> None:
         ),
     )
 
-    assert [output.result.outcome for output in outputs] == [ActionOutcome.VERIFIED] * 7
+    assert [output.result.outcome.value for output in outputs] == ["verified"] * 7
     assert [output.result.performed for output in outputs] == [True] * 7
     assert all(
         output.sources[0].source_type.value == "linkedin_action_execution" for output in outputs
@@ -2327,7 +2594,7 @@ async def test_interrupted_action_is_uncertain_but_cancellation_propagates(
             await tools.send_invitation(request)
     else:
         output = await tools.send_invitation(request)
-        assert output.result.outcome is ActionOutcome.UNCERTAIN
+        assert output.result.outcome.value == "uncertain"
         assert output.result.performed is None
         assert output.result.final_state == "unknown_after_interruption"
         assert output.sources == ()
@@ -2351,9 +2618,14 @@ async def test_known_precondition_error_is_not_misreported_as_uncertain() -> Non
         )
 
 
-def test_safe_capability_error_preserves_known_errors_and_hides_unknown_details() -> None:
-    known = InvalidTargetError("Safe target error.")
-    assert safe_capability_error(known) is known
-    projected = safe_capability_error(RuntimeError("secret"))
-    assert isinstance(projected, InternalServerError)
-    assert "secret" not in projected.safe_message
+@pytest.mark.asyncio
+async def test_tool_result_preserves_known_errors_and_hides_unknown_details() -> None:
+    async def fail(error: Exception) -> None:
+        raise error
+
+    with pytest.raises(ToolError, match="invalid_target: Safe target error"):
+        await invitation_send_tool.tool_result(fail(InvalidTargetError("Safe target error.")))
+
+    with pytest.raises(ToolError) as raised:
+        await invitation_send_tool.tool_result(fail(RuntimeError("secret")))
+    assert "secret" not in str(raised.value)
