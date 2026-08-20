@@ -30,8 +30,8 @@ compact variant required by that schema.
 
 ## Release contract
 
-1. Update the version in `pyproject.toml`, `server.json`,
-   `packaging/mcpb/manifest.json`, `Dockerfile`, `CITATION.cff`, and
+1. Update the version in `pyproject.toml`, `server.json`, `manifest.json`,
+   `Dockerfile`, `CITATION.cff`, and
    `src/linkedin_mcp/__init__.py`, then regenerate `uv.lock`.
 2. Move the release notes from `Unreleased` to the matching version in
    `CHANGELOG.md`.
@@ -75,10 +75,9 @@ Registry, or downstream catalog discovery. The hidden `mcp-name` marker
 remains in the packaged README so the PyPI distribution can also prove
 registry ownership in a future metadata version.
 
-`packaging/mcpb/manifest.json` is the canonical desktop-bundle manifest. The
-release workflow stages the runtime-only project files and icon before packing
-the `.mcpb` artifact; generated bundles are release artifacts and are not
-committed.
+The root `manifest.json` is the canonical desktop-bundle manifest. The release
+workflow stages the runtime-only project files and icon before packing the
+`.mcpb` artifact; generated bundles are release artifacts and are not committed.
 
 Third-party catalogs should point to the canonical GitHub repository, PyPI
 project, Official MCP Registry entry, GitHub release, or GHCR package. A

@@ -48,7 +48,7 @@ PUBLIC_REPOSITORY_FILES = {
     "SECURITY.md",
     "docs/DISTRIBUTION.md",
     "docs/PUBLISHING.md",
-    "packaging/mcpb/manifest.json",
+    "manifest.json",
     "server.json",
 }
 
@@ -253,6 +253,7 @@ def test_public_repository_metadata_is_complete() -> None:
     missing = sorted(path for path in PUBLIC_REPOSITORY_FILES if not (ROOT / path).is_file())
 
     assert missing == []
+    assert not (ROOT / "packaging").exists()
     assert "Apache License" in (ROOT / "LICENSE").read_text(encoding="utf-8")
     assert "Report a vulnerability privately" in (ROOT / "SECURITY.md").read_text(encoding="utf-8")
 
@@ -260,7 +261,7 @@ def test_public_repository_metadata_is_complete() -> None:
 def test_supported_runtime_versions_and_platforms_are_consistent() -> None:
     configuration = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     project = configuration["project"]
-    bundle = json.loads((ROOT / "packaging" / "mcpb" / "manifest.json").read_text(encoding="utf-8"))
+    bundle = json.loads((ROOT / "manifest.json").read_text(encoding="utf-8"))
     workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 
     assert project["requires-python"] == ">=3.12,<3.15"
@@ -293,6 +294,9 @@ def test_release_workflow_has_a_non_mutating_pypi_retry_target() -> None:
     assert "          - all\n          - pypi\n" in workflow
     assert workflow.count(all_surfaces_gate) == 2
     assert all_surfaces_gate not in pypi_job
+    assert "packaging/mcpb" not in workflow
+    assert "jq -r .version manifest.json" in workflow
+    assert "cp manifest.json .release/mcpb/manifest.json" in workflow
 
 
 def test_registry_workflow_publishes_immutable_oci_and_mcpb_packages() -> None:
@@ -312,7 +316,7 @@ def test_registry_workflow_publishes_immutable_oci_and_mcpb_packages() -> None:
 
 def test_registry_and_bundle_metadata_share_the_release_identity() -> None:
     registry = json.loads((ROOT / "server.json").read_text(encoding="utf-8"))
-    bundle = json.loads((ROOT / "packaging" / "mcpb" / "manifest.json").read_text(encoding="utf-8"))
+    bundle = json.loads((ROOT / "manifest.json").read_text(encoding="utf-8"))
     configuration = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     project = configuration["project"]
     readme = (ROOT / "README.md").read_text(encoding="utf-8")

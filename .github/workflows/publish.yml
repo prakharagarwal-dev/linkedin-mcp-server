@@ -59,7 +59,7 @@ jobs:
           VERSION="$(uv version --short)"
           test "$RELEASE_TAG" = "v$VERSION"
           test "$(jq -r .version server.json)" = "$VERSION"
-          test "$(jq -r .version packaging/mcpb/manifest.json)" = "$VERSION"
+          test "$(jq -r .version manifest.json)" = "$VERSION"
 
       - name: Build and check Python distributions
         run: |
@@ -69,7 +69,7 @@ jobs:
       - name: Stage and validate MCPB bundle
         run: |
           mkdir -p .release/mcpb
-          cp packaging/mcpb/manifest.json .release/mcpb/manifest.json
+          cp manifest.json .release/mcpb/manifest.json
           cp pyproject.toml uv.lock README.md PRIVACY.md LICENSE .release/mcpb/
           git archive HEAD src | tar -x -C .release/mcpb
           cp assets/icon.png .release/mcpb/icon.png
