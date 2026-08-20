@@ -12,6 +12,8 @@ import pytest
 from playwright.async_api import Locator, Page, Route, async_playwright
 from pydantic import HttpUrl, ValidationError
 
+from linkedin_mcp.browser import BrowserManager
+from linkedin_mcp.browser.urls import post_reference_from_value
 from linkedin_mcp.errors import ParserDriftError
 from linkedin_mcp.tools.posts.comments.list.evidence import source_from_post_comments
 from linkedin_mcp.tools.posts.comments.list.models import (
@@ -46,8 +48,6 @@ from linkedin_mcp.tools.posts.search.models import (
     StopReason,
 )
 from linkedin_mcp.tools.posts.search.page import PostSearchPage
-from linkedin_mcp.ui import LinkedInPlaywright
-from linkedin_mcp.ui.urls import post_reference_from_value
 from tests.support.playwright import adapt_browser
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
@@ -265,9 +265,9 @@ def test_post_contracts_reject_unsafe_or_conflicting_requests() -> None:
         )
 
     with pytest.raises(ValueError, match="Post search page bound"):
-        PostSearchPage(cast(LinkedInPlaywright, object()), max_pages=0)
+        PostSearchPage(cast(BrowserManager, object()), max_pages=0)
     with pytest.raises(ValueError, match="Comment expansion bound"):
-        PostCommentsPage(cast(LinkedInPlaywright, object()), max_expansion_rounds=-1)
+        PostCommentsPage(cast(BrowserManager, object()), max_expansion_rounds=-1)
     with pytest.raises(ValidationError, match="conflict with pages_visited"):
         PostDetailCoverage(
             requested_post_ref=POST_REF,

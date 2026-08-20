@@ -10,9 +10,12 @@ from datetime import UTC, datetime
 from typing import Literal, cast
 from urllib.parse import parse_qs, unquote, urljoin, urlsplit
 
+from playwright.async_api import Locator, Page
 from pydantic import HttpUrl
 
+from linkedin_mcp.browser import BrowserManager
 from linkedin_mcp.errors import BrowserUnavailableError, ParserDriftError
+from linkedin_mcp.infra.playwright.collections import wait_for_collection_change
 from linkedin_mcp.tools.invitations.list.models import (
     CURRENT_RECEIVED_INVITATION_VIEWS,
     InvitationAvailableAction,
@@ -27,10 +30,6 @@ from linkedin_mcp.tools.invitations.list.models import (
     InvitationType,
     StopReason,
 )
-from linkedin_mcp.ui import LinkedInLocator as Locator
-from linkedin_mcp.ui import LinkedInPage as Page
-from linkedin_mcp.ui import LinkedInPlaywright
-from linkedin_mcp.ui.collections import wait_for_collection_change
 
 InvitationProgressReporter = Callable[[int, int, str], Awaitable[None]]
 
@@ -1263,7 +1262,7 @@ async def _implicit_sent_empty_inventory(page: Page) -> _VisibleInventory:
 
 async def _select_visible_view(
     page: Page,
-    playwright: LinkedInPlaywright,
+    browser: BrowserManager,
     direction: InvitationDirection,
     invitation_filter: InvitationFilter,
 ) -> _VisibleInventory:
@@ -1290,14 +1289,14 @@ async def _select_visible_view(
             name=_BUCKET_PICKER_PATTERN,
             description="Focused/Other selector",
         )
-        await picker.click()
+        await browser.paced.click(picker)
         option = await _unique_visible_role_control(
             page,
             role="menuitem",
             name=_CONTROL_NAME_PATTERNS[invitation_filter],
             description=f"{invitation_filter.value} menu option",
         )
-        await option.click()
+        await browser.paced.click(option)
     elif invitation_filter in _CATEGORY_FILTERS:
         try:
             control = await _unique_visible_role_control(
@@ -1311,7 +1310,7 @@ async def _select_visible_view(
             # Returning through the visible Focused picker restores them.
             await _select_visible_view(
                 page,
-                playwright,
+                browser,
                 direction,
                 InvitationFilter.FOCUSED,
             )
@@ -1328,7 +1327,7 @@ async def _select_visible_view(
                     f"{invitation_filter.value} filter control."
                 ) from None
             control = category_controls[0]
-        await control.click()
+        await browser.paced.click(control)
     elif invitation_filter is InvitationFilter.PEOPLE:
         controls: list[Locator] = []
         for role in ("link", "radio", "button"):
@@ -1345,7 +1344,7 @@ async def _select_visible_view(
             raise ParserDriftError(
                 "LinkedIn Invitations has no unique current People filter control."
             )
-        await controls[0].click()
+        await browser.paced.click(controls[0])
     else:
         raise ValueError("The synthetic All filter cannot be selected directly.")
     inventory = await _wait_for_inventory(page, invitation_filter)
@@ -1381,13 +1380,14 @@ class InvitationListPage:
 
     def __init__(
         self,
-        playwright: LinkedInPlaywright,
+        browser: BrowserManager,
         *,
         max_scroll_rounds: int,
     ) -> None:
         if max_scroll_rounds < 1:
             raise ValueError("Invitation collection requires a positive scroll bound.")
-        self._playwright = playwright
+        self._browser = browser
+        self._paced = browser.paced
         self._max_scroll_rounds = max_scroll_rounds
 
     async def collect(
@@ -1441,8 +1441,8 @@ class InvitationListPage:
         observed_view_memberships = 0
         completed_views = 0
         stop_reason = StopReason.VISIBLE_PAGE_COMPLETE
-        async with self._playwright.page() as page:
-            await page.goto(navigation_url)
+        async with self._browser.page() as page:
+            await self._paced.goto(page, navigation_url)
             mains = page.locator("main")
             if await mains.count() != 1:
                 raise ParserDriftError("LinkedIn Invitations has no unique current main surface.")
@@ -1451,7 +1451,7 @@ class InvitationListPage:
             for invitation_filter in views:
                 inventories[invitation_filter] = await _select_visible_view(
                     page,
-                    self._playwright,
+                    self._browser,
                     request.direction,
                     invitation_filter,
                 )
@@ -1468,7 +1468,7 @@ class InvitationListPage:
             for view_index, invitation_filter in enumerate(views):
                 inventory = await _select_visible_view(
                     page,
-                    self._playwright,
+                    self._browser,
                     request.direction,
                     invitation_filter,
                 )
@@ -1523,7 +1523,7 @@ class InvitationListPage:
             for invitation_filter, expected in inventories.items():
                 current = await _select_visible_view(
                     page,
-                    self._playwright,
+                    self._browser,
                     request.direction,
                     invitation_filter,
                 )
@@ -1681,15 +1681,15 @@ class InvitationListPage:
             load_more = await _unique_load_more(page)
             baseline = observation.signature
             if load_more is not None:
-                await load_more.click()
+                await self._paced.click(load_more)
             else:
                 mains = page.locator("main")
                 if await mains.count() != 1:
                     raise ParserDriftError(
                         "LinkedIn Invitations has no unique current main surface."
                     )
-                await mains.first.hover()
-                await page.mouse.wheel(0, _SCROLL_DELTA)
+                await self._paced.hover(mains.first)
+                await self._paced.wheel(page.mouse, 0, _SCROLL_DELTA)
             scroll_rounds += 1
             await wait_for_collection_change(
                 page,

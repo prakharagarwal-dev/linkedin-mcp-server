@@ -5,8 +5,10 @@ from __future__ import annotations
 import hashlib
 from datetime import UTC, datetime
 
+from playwright.async_api import Page
 from pydantic import HttpUrl
 
+from linkedin_mcp.browser.urls import canonical_profile_url
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
 from linkedin_mcp.tools.invitations.action_surface import InvitationActionSurface
 from linkedin_mcp.tools.invitations.ignore.models import (
@@ -17,8 +19,6 @@ from linkedin_mcp.tools.invitations.ignore.models import (
     ActionTarget,
     InvitationIgnoreInput,
 )
-from linkedin_mcp.ui import LinkedInPage as Page
-from linkedin_mcp.ui.urls import canonical_profile_url
 
 
 def _received_invitation_ref(profile_slug: str) -> str:
@@ -41,8 +41,8 @@ class IgnoreInvitationPage(InvitationActionSurface):
         self,
         request: InvitationIgnoreInput,
     ) -> ActionInspection:
-        async with self._playwright.page() as page:
-            await page.goto(canonical_profile_url(request.profile_slug))
+        async with self._browser.page() as page:
+            await self._paced.goto(page, canonical_profile_url(request.profile_slug))
             main, name = await self._profile_identity(page)
             accept, ignore = await self._incoming_request_controls(main, name)
             if accept is None or ignore is None:
@@ -66,8 +66,8 @@ class IgnoreInvitationPage(InvitationActionSurface):
         expected_ref = _received_invitation_ref(command.target.profile_slug)
         if command.payload.invitation_ref != expected_ref:
             raise InvalidTargetError("The ignore payload does not match the target invitation.")
-        async with self._playwright.page() as page:
-            await page.goto(canonical_profile_url(command.target.profile_slug))
+        async with self._browser.page() as page:
+            await self._paced.goto(page, canonical_profile_url(command.target.profile_slug))
             main, name = await self._profile_identity(page)
             if name.casefold() != command.target.display_name.casefold():
                 return await self._result(
@@ -87,7 +87,7 @@ class IgnoreInvitationPage(InvitationActionSurface):
                     "The exact profile no longer exposes the requested incoming request.",
                 )
             try:
-                await ignore.click()
+                await self._paced.click(ignore)
             except Exception:
                 return await self._result(
                     page,
@@ -101,7 +101,7 @@ class IgnoreInvitationPage(InvitationActionSurface):
                 if current_accept is None and current_ignore is None:
                     break
                 await page.wait_for_timeout(250)
-            await page.goto(canonical_profile_url(command.target.profile_slug))
+            await self._paced.goto(page, canonical_profile_url(command.target.profile_slug))
             main, visible_name = await self._profile_identity(page)
             current_accept, current_ignore = await self._incoming_request_controls(
                 main,

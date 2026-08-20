@@ -11,6 +11,7 @@ from playwright.async_api import Locator, Page, Route, async_playwright
 from pydantic import HttpUrl, ValidationError
 
 import linkedin_mcp.tools.messaging.search.page as messaging_pages
+from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
 from linkedin_mcp.tools.messaging.conversation.get.evidence import source_from_conversation
 from linkedin_mcp.tools.messaging.conversation.get.models import (
@@ -36,8 +37,7 @@ from linkedin_mcp.tools.messaging.send.models import (
     MessageSendPayload,
 )
 from linkedin_mcp.tools.messaging.send.page import MessageSendPage
-from linkedin_mcp.ui import LinkedInLocator, LinkedInPage, LinkedInPlaywright
-from tests.support.playwright import adapt_browser
+from tests.support.playwright import adapt_browser, empty_browser
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 MESSAGING_FIXTURES = FIXTURES / "messaging" / "latest"
@@ -333,20 +333,18 @@ async def test_inbox_and_conversation_fixtures_extract_both_message_directions()
             await page.set_content(
                 (MESSAGING_FIXTURES / "current.html").read_text(encoding="utf-8")
             )
-            summaries = await ConversationSearchPage.extract_visible_conversations(
-                cast(LinkedInPage, page)
-            )
+            summaries = await ConversationSearchPage.extract_visible_conversations(page)
             await page.locator("#thread").evaluate("element => element.classList.remove('hidden')")
             conversation_root = page.get_by_role(
                 "region",
                 name="Conversation with Jane Doe",
             )
             observation = await ConversationGetPage(
-                cast(LinkedInPlaywright, object()),
+                empty_browser(Settings(browser_action_delay_seconds=0)),
                 max_history_rounds=1,
             )._extract(  # pyright: ignore[reportPrivateUsage]
-                cast(LinkedInPage, page),
-                cast(LinkedInLocator, conversation_root),
+                page,
+                conversation_root,
                 conversation_ref=None,
                 profile_slug="jane-doe",
                 participant_name="Jane Doe",
@@ -406,14 +404,11 @@ async def test_current_thread_sender_names_resolve_outgoing_grouped_messages() -
         try:
             await page.set_content(html)
             observation = await ConversationGetPage(
-                cast(LinkedInPlaywright, object()),
+                empty_browser(Settings(browser_action_delay_seconds=0)),
                 max_history_rounds=1,
             )._extract(  # pyright: ignore[reportPrivateUsage]
-                cast(LinkedInPage, page),
-                cast(
-                    LinkedInLocator,
-                    page.get_by_role("region", name="Conversation with Jane Doe"),
-                ),
+                page,
+                page.get_by_role("region", name="Conversation with Jane Doe"),
                 conversation_ref=None,
                 profile_slug="jane-doe",
                 participant_name="Jane Doe",
@@ -439,14 +434,11 @@ async def test_conversation_history_collects_virtualized_older_messages() -> Non
         try:
             await page.set_content(html)
             observation = await ConversationGetPage(
-                cast(LinkedInPlaywright, object()),
+                empty_browser(Settings(browser_action_delay_seconds=0)),
                 max_history_rounds=8,
             )._extract(  # pyright: ignore[reportPrivateUsage]
-                cast(LinkedInPage, page),
-                cast(
-                    LinkedInLocator,
-                    page.get_by_role("region", name="Conversation with Jane Doe"),
-                ),
+                page,
+                page.get_by_role("region", name="Conversation with Jane Doe"),
                 conversation_ref=None,
                 profile_slug="jane-doe",
                 participant_name="Jane Doe",
@@ -728,9 +720,7 @@ async def test_malformed_conversation_cards_are_ignored_without_identity_guessin
 
     monkeypatch.setattr(messaging_pages, "_raw_conversation_cards", malformed_cards)
 
-    conversations = await ConversationSearchPage.extract_visible_conversations(
-        cast(LinkedInPage, object())
-    )
+    conversations = await ConversationSearchPage.extract_visible_conversations(cast(Page, object()))
 
     assert len(conversations) == 1
     assert conversations[0].participant_name == "Fallback Person"
@@ -1095,11 +1085,8 @@ async def test_message_read_and_direct_file_send_cover_visible_attachments(
             await page.set_content(html)
             await page.locator("#thread").evaluate("element => element.classList.remove('hidden')")
             observation = await reader._extract(  # pyright: ignore[reportPrivateUsage]
-                cast(LinkedInPage, page),
-                cast(
-                    LinkedInLocator,
-                    page.get_by_role("region", name="Conversation with Jane Doe"),
-                ),
+                page,
+                page.get_by_role("region", name="Conversation with Jane Doe"),
                 conversation_ref=None,
                 profile_slug="jane-doe",
                 participant_name="Jane Doe",
@@ -1406,7 +1393,7 @@ async def test_profile_compose_rejects_multiple_visible_recipient_pills() -> Non
             await page.route(url, fulfill, times=1)
             await page.goto(url)
             overlays = await MessageSendPage._profile_message_overlays(  # pyright: ignore[reportPrivateUsage]
-                cast(LinkedInPage, page),
+                page,
                 profile_name="Jane Doe",
             )
         finally:
@@ -1499,12 +1486,12 @@ async def test_profile_page_fallback_selects_visual_nearest_message_action() -> 
         try:
             await page.set_content(html)
             candidates = await MessageSendPage._visible_profile_message_controls(  # pyright: ignore[reportPrivateUsage]
-                cast(LinkedInLocator, page.locator("main")),
+                page.locator("main"),
                 profile_name="Jane Doe",
             )
             selected = await MessageSendPage._nearest_profile_message_control(  # pyright: ignore[reportPrivateUsage]
                 candidates,
-                anchor=cast(LinkedInLocator, page.locator("#profile-introduction")),
+                anchor=page.locator("#profile-introduction"),
             )
             assert selected is not None
             selected_id = await selected.get_attribute("id")
@@ -1749,7 +1736,7 @@ async def test_composer_fallbacks_and_message_extraction_remain_bounded() -> Non
             await page.set_content(html)
             root = page.locator("main")
             composer = await MessageSendPage._composer(  # pyright: ignore[reportPrivateUsage]
-                cast(LinkedInLocator, root)
+                root
             )
             await composer.fill("draft")
             assert (
@@ -1759,11 +1746,11 @@ async def test_composer_fallbacks_and_message_extraction_remain_bounded() -> Non
                 == "draft"
             )
             observation = await ConversationGetPage(
-                cast(LinkedInPlaywright, object()),
+                empty_browser(Settings(browser_action_delay_seconds=0)),
                 max_history_rounds=1,
             )._extract(  # pyright: ignore[reportPrivateUsage]
-                cast(LinkedInPage, page),
-                cast(LinkedInLocator, root),
+                page,
+                root,
                 conversation_ref=None,
                 profile_slug=None,
                 participant_name="Jane Doe",
@@ -1774,14 +1761,14 @@ async def test_composer_fallbacks_and_message_extraction_remain_bounded() -> Non
             await page.set_content("<html><body><main>Empty conversation</main></body></html>")
             with pytest.raises(InvalidTargetError, match="composer"):
                 await MessageSendPage._composer(  # pyright: ignore[reportPrivateUsage]
-                    cast(LinkedInLocator, page.locator("main"))
+                    page.locator("main")
                 )
             await page.set_content(
                 "<html><body><main><textarea></textarea><textarea></textarea></main></body></html>"
             )
             with pytest.raises(InvalidTargetError, match="unique"):
                 await MessageSendPage._composer(  # pyright: ignore[reportPrivateUsage]
-                    cast(LinkedInLocator, page.locator("main"))
+                    page.locator("main")
                 )
         finally:
             await browser.close()
@@ -1820,11 +1807,11 @@ async def test_missing_visible_messaging_containers_fail_closed() -> None:
             await page.set_content("<html><body><main></main></body></html>")
             with pytest.raises(ParserDriftError, match="no visible text"):
                 await messaging_pages._visible_text(  # pyright: ignore[reportPrivateUsage]
-                    cast(LinkedInLocator, page.locator("main"))
+                    page.locator("main")
                 )
             with pytest.raises(ParserDriftError, match="no visible container"):
                 await messaging_pages._visible_text(  # pyright: ignore[reportPrivateUsage]
-                    cast(LinkedInLocator, page.locator("section"))
+                    page.locator("section")
                 )
         finally:
             await browser.close()

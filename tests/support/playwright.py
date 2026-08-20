@@ -1,9 +1,13 @@
-"""Adapt existing offline page providers to the tool-facing Playwright facade."""
+"""Adapt offline page providers to the production browser and pacing boundary."""
 
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncGenerator, Awaitable, Callable
+from collections.abc import (
+    AsyncGenerator,
+    Awaitable,
+    Callable,
+)
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, cast
@@ -11,14 +15,14 @@ from typing import Any, cast
 from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
+from linkedin_mcp.browser import BrowserManager
+from linkedin_mcp.browser.manager import AccessHook, PageFactory
 from linkedin_mcp.config import Settings
-from linkedin_mcp.ui import LinkedInPlaywright
-from linkedin_mcp.ui.playwright import (
+from linkedin_mcp.infra.playwright.pacer import (
     ClickHook,
     NavigateHook,
     NavigationClickHook,
-    RawPageFactory,
-    SafetyHook,
+    Paced,
 )
 
 
@@ -27,17 +31,20 @@ def test_settings(root: Path | None = None) -> Settings:
     return Settings(
         browser_auto_install=False,
         browser_profile_path=base / "profile",
-        minimum_navigation_interval_seconds=0,
+        browser_action_delay_seconds=0,
         runtime_lock_path=base / "runtime.lock",
     )
 
 
-def adapt_browser(provider: object, *, settings: Settings | None = None) -> LinkedInPlaywright:
-    """Wrap a legacy offline page provider without exposing it to production tools."""
+def adapt_browser(provider: object, *, settings: Settings | None = None) -> BrowserManager:
+    """Adapt an offline raw-page provider to the production dependencies."""
 
     effective_settings = settings or test_settings()
-    page_factory = cast(RawPageFactory, _required_hook(provider, "page"))
-    navigate = cast(NavigateHook | None, _optional_hook(provider, "navigate"))
+    page_factory = cast(PageFactory, _required_hook(provider, "page"))
+    legacy_navigate = cast(
+        Callable[[Page, str], Awaitable[None]] | None,
+        _optional_hook(provider, "navigate"),
+    )
     legacy_click = cast(
         Callable[[Page, Locator], Awaitable[None]] | None,
         _optional_hook(provider, "click_visible_control"),
@@ -46,26 +53,35 @@ def adapt_browser(provider: object, *, settings: Settings | None = None) -> Link
         Callable[[Page, Locator], Awaitable[str]] | None,
         _optional_hook(provider, "navigate_via_visible_control"),
     )
+    navigate = _bounded_navigation_hook(legacy_navigate, effective_settings)
     click = _bounded_click_hook(legacy_click, effective_settings)
     navigate_via_click = _bounded_navigation_click_hook(
         legacy_navigation_click,
         effective_settings,
     )
-    assert_safe = cast(SafetyHook | None, _optional_hook(provider, "assert_safe"))
-    return LinkedInPlaywright.for_testing(
+    assert_access = cast(AccessHook | None, _optional_hook(provider, "assert_safe"))
+    paced = Paced(
+        effective_settings.browser_action_delay_seconds,
+        navigate_hook=navigate,
+        click_hook=click,
+        navigation_click_hook=navigate_via_click,
+    )
+    return BrowserManager.for_testing(
         effective_settings,
+        paced,
         page_factory=page_factory,
-        navigate=navigate,
-        click=click,
-        navigate_via_click=navigate_via_click,
-        assert_safe=assert_safe,
+        assert_access=assert_access,
     )
 
 
-def empty_playwright(settings: Settings) -> LinkedInPlaywright:
-    """Create status-capable UI wiring for protocol tests that replace every page object."""
+def empty_browser(settings: Settings) -> BrowserManager:
+    """Create status-capable browser wiring when tests replace every page object."""
 
-    return LinkedInPlaywright.for_testing(settings, page_factory=_unavailable_page)
+    return BrowserManager.for_testing(
+        settings,
+        Paced(0),
+        page_factory=_unavailable_page,
+    )
 
 
 @asynccontextmanager
@@ -94,8 +110,21 @@ def _bounded_click_hook(
     if hook is None:
         return None
 
-    async def bounded(page: Page, locator: Locator, options: dict[str, Any]) -> None:
-        await _run_bounded(hook(page, locator), options, settings)
+    async def bounded(locator: Locator, options: dict[str, Any]) -> None:
+        await _run_bounded(hook(locator.page, locator), options, settings)
+
+    return bounded
+
+
+def _bounded_navigation_hook(
+    hook: Callable[[Page, str], Awaitable[None]] | None,
+    settings: Settings,
+) -> NavigateHook | None:
+    if hook is None:
+        return None
+
+    async def bounded(page: Page, url: str, options: dict[str, Any]) -> None:
+        await _run_bounded(hook(page, url), options, settings)
 
     return bounded
 

@@ -10,13 +10,11 @@ from typing import Annotated, cast
 from urllib.parse import urljoin, urlsplit
 
 from playwright.async_api import Error as PlaywrightError
+from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
-from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
-from linkedin_mcp.ui import LinkedInLocator as Locator
-from linkedin_mcp.ui import LinkedInPage as Page
-from linkedin_mcp.ui.urls import (
+from linkedin_mcp.browser.urls import (
     canonical_company_url,
     comment_reference_from_value,
     company_slug_from_url,
@@ -25,6 +23,8 @@ from linkedin_mcp.ui.urls import (
     profile_slug_from_url,
     validate_linkedin_url,
 )
+from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
+from linkedin_mcp.infra.playwright import Paced
 
 COUNT_PATTERNS = {
     "reaction": re.compile(
@@ -318,7 +318,7 @@ async def prepare_visible_content(page: Page) -> None:
         raise ParserDriftError("LinkedIn content surface has no visible main region.") from error
 
 
-async def post_reference_for_region(region: Locator) -> str | None:
+async def post_reference_for_region(paced: Paced, region: Locator) -> str | None:
     for attribute in ("data-post-urn", "data-urn", "data-id", "data-activity-urn"):
         value = await region.get_attribute(attribute)
         if value and (reference := post_reference_from_value(value)):
@@ -341,10 +341,10 @@ async def post_reference_for_region(region: Locator) -> str | None:
     page = region.page
     source_url = page.url
     try:
-        installed = cast(bool, await page.evaluate(INSTALL_CLIPBOARD_CAPTURE))
+        installed = cast(bool, await paced.evaluate(page, INSTALL_CLIPBOARD_CAPTURE))
         if not installed:
             raise ParserDriftError("LinkedIn post link capture is unavailable in this browser.")
-        await visible_openers[0].click()
+        await paced.click(visible_openers[0])
         copy_control = page.get_by_text(re.compile(r"copy link", re.IGNORECASE))
         visible_copy_controls: list[Locator] = []
         for _ in range(30):
@@ -363,13 +363,13 @@ async def post_reference_for_region(region: Locator) -> str | None:
             raise ParserDriftError(
                 "LinkedIn post menu has no unique visible Copy link to post control."
             )
-        await visible_copy_controls[0].click()
+        await paced.click(visible_copy_controls[0])
         copied_value: str | None = None
         for _ in range(20):
             await page.wait_for_timeout(100)
             copied_value = cast(
                 str | None,
-                await page.evaluate("window.__linkedinMcpCopiedPostLink"),
+                await paced.evaluate(page, "window.__linkedinMcpCopiedPostLink"),
             )
             if copied_value:
                 break
@@ -381,9 +381,9 @@ async def post_reference_for_region(region: Locator) -> str | None:
         ) from error
     finally:
         with suppress(PlaywrightError):
-            await page.evaluate(RESTORE_CLIPBOARD_CAPTURE)
+            await paced.evaluate(page, RESTORE_CLIPBOARD_CAPTURE)
         with suppress(PlaywrightError):
-            await page.keyboard.press("Escape")
+            await paced.keyboard_press(page.keyboard, "Escape")
     if not copied_value:
         raise ParserDriftError("LinkedIn Copy link to post returned no stable visible link.")
     parsed_copy = urlsplit(copied_value)
@@ -481,12 +481,15 @@ def first_count(lines: list[str], kind: str) -> str | None:
     )
 
 
-async def regions_for_post(page: Page, post_ref: str) -> list[Locator]:
+async def regions_for_post(paced: Paced, page: Page, post_ref: str) -> list[Locator]:
     candidates = page.locator("main").locator(POST_REGION_SELECTOR)
     matches: list[Locator] = []
     for index in range(min(await candidates.count(), 500)):
         candidate = candidates.nth(index)
-        if await candidate.is_visible() and await post_reference_for_region(candidate) == post_ref:
+        if (
+            await candidate.is_visible()
+            and await post_reference_for_region(paced, candidate) == post_ref
+        ):
             matches.append(candidate)
     return matches
 
@@ -512,7 +515,7 @@ def https_url(value: str | None) -> HttpUrl | None:
     return HttpUrl(absolute)
 
 
-async def detail_post_regions(page: Page) -> list[tuple[Locator, str]]:
+async def detail_post_regions(paced: Paced, page: Page) -> list[tuple[Locator, str]]:
     menus = await bounded_visible_locators(
         page.locator("main").get_by_role(
             "button",
@@ -528,24 +531,25 @@ async def detail_post_regions(page: Page) -> list[tuple[Locator, str]]:
         )
         if not await region.count():
             continue
-        reference = await post_reference_for_region(region.first)
+        reference = await post_reference_for_region(paced, region.first)
         if reference is not None:
             values.append((region.first, reference))
     return values
 
 
 async def detail_region_for_post(
+    paced: Paced,
     page: Page,
     requested_post_ref: str,
 ) -> tuple[Locator, str]:
-    exact_regions = await regions_for_post(page, requested_post_ref)
+    exact_regions = await regions_for_post(paced, page, requested_post_ref)
     if len(exact_regions) == 1:
         return exact_regions[0], requested_post_ref
     if len(exact_regions) > 1:
         raise ParserDriftError(
             "LinkedIn post detail exposed multiple visible copies of the requested post."
         )
-    regions = await detail_post_regions(page)
+    regions = await detail_post_regions(paced, page)
     exact = [
         (region, reference) for region, reference in regions if reference == requested_post_ref
     ]
@@ -1584,7 +1588,7 @@ async def post_author_from_region(region: Locator) -> PostAuthor:
     return (await post_header_fields(region)).author
 
 
-async def region_for_post(page: Page, post_ref: str) -> Locator:
+async def region_for_post(paced: Paced, page: Page, post_ref: str) -> Locator:
     """Resolve the sole visible detail region for a requested post reference.
 
     LinkedIn can keep an activity URL in the address bar while rendering that
@@ -1593,7 +1597,7 @@ async def region_for_post(page: Page, post_ref: str) -> Locator:
     same bounded alias rule or they reject the exact post they just read.
     """
 
-    region, _ = await detail_region_for_post(page, post_ref)
+    region, _ = await detail_region_for_post(paced, page, post_ref)
     return region
 
 

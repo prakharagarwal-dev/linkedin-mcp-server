@@ -6,9 +6,9 @@ from datetime import datetime
 
 from pydantic import HttpUrl
 
+from linkedin_mcp.browser.urls import post_reference_from_value
 from linkedin_mcp.errors import ParserDriftError
 from linkedin_mcp.tools.posts.get.models import PostObservation, SourceReference, SourceType
-from linkedin_mcp.ui.urls import post_reference_from_value
 
 
 def stable_source_id(

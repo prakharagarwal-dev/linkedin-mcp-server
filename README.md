@@ -400,13 +400,13 @@ Send <message> on LinkedIn to <profile URL>.
 [Scheduler -> Worker] ---> [Process-local cursors]
                |
                v
- [Tool-owned execution + page object]
+ [Tool-owned execution + raw Page/Locator]
                |
                v
- [Paced LinkedInPlaywright facade]
+ [infra.playwright.Paced actions]
                |
                v
-[BrowserManager: one context] <--> [Persistent auth profile]
+[BrowserManager: pages + one context] <--> [Persistent auth profile]
                |
         visible web UI only
                v
@@ -417,8 +417,8 @@ Everything runs locally. There is no hosted backend, telemetry, database,
 external queue, LangGraph runtime, or credential service. Browser cookies live
 only in the local Playwright profile. The first client starts one shared local
 runtime; later clients attach to it. A bounded FIFO queue feeds one worker, so
-browser calls run one at a time. Calls execute freshly; only queue, pacing, and
-cursor coordination live in runtime memory.
+browser calls run one at a time. Calls execute freshly; only queue, browser
+status, and cursor coordination live in runtime memory.
 Read the full [architecture](docs/ARCHITECTURE.md) and [privacy policy](PRIVACY.md).
 
 ## 🔒 Privacy Policy

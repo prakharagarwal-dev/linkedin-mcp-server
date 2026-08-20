@@ -16,6 +16,7 @@ from mcp.shared.message import SessionMessage
 from pydantic import HttpUrl
 
 from linkedin_mcp import __version__
+from linkedin_mcp.browser import BrowserManager
 from linkedin_mcp.config import Settings
 from linkedin_mcp.infra.cursor import CursorStore
 from linkedin_mcp.infra.queue import Scheduler, Worker
@@ -296,8 +297,7 @@ from linkedin_mcp.tools.posts.search.models import (
 )
 from linkedin_mcp.tools.posts.search.page import PostSearchPage
 from linkedin_mcp.transport.server import create_mcp_server
-from linkedin_mcp.ui import LinkedInPlaywright
-from tests.support.playwright import empty_playwright
+from tests.support.playwright import empty_browser
 
 ROOT = Path(__file__).parents[2]
 
@@ -933,14 +933,14 @@ class ProtocolNetwork:
 
 def protocol_server(
     root: Path,
-) -> tuple[FastMCP[None], Scheduler, LinkedInPlaywright, CursorStore]:
+) -> tuple[FastMCP[None], Scheduler, BrowserManager, CursorStore]:
     settings = Settings(
         browser_auto_install=False,
         browser_profile_path=root / "profile",
-        minimum_navigation_interval_seconds=0,
+        browser_action_delay_seconds=0,
         runtime_lock_path=root / "runtime.lock",
     )
-    playwright = empty_playwright(settings)
+    browser = empty_browser(settings)
     network = ProtocolNetwork()
     cursor_store = CursorStore(
         ttl_seconds=settings.pagination_cursor_ttl_seconds,
@@ -953,7 +953,7 @@ def protocol_server(
     attach_tool_implementations(
         mcp,
         settings=settings,
-        playwright=playwright,
+        browser=browser,
         scheduler=scheduler,
         cursor_store=cursor_store,
         job_search=cast(JobSearchPage, ProtocolJobSearch()),
@@ -978,7 +978,7 @@ def protocol_server(
         conversation_read=cast(ConversationGetPage, network),
         message_send=cast(MessageSendPage, network),
     )
-    return mcp, scheduler, playwright, cursor_store
+    return mcp, scheduler, browser, cursor_store
 
 
 @asynccontextmanager

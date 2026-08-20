@@ -4,12 +4,12 @@ import json
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import cast
 
 import pytest
 from playwright.async_api import Locator, Page, Route, async_playwright
 from pydantic import HttpUrl, ValidationError
 
+from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import (
     AuthenticationRequiredError,
     BrowserUnavailableError,
@@ -64,8 +64,7 @@ from linkedin_mcp.tools.invitations.send.models import (
     InvitationSendPayload,
 )
 from linkedin_mcp.tools.invitations.send.page import SendInvitationPage
-from linkedin_mcp.ui import LinkedInPlaywright
-from tests.support.playwright import adapt_browser
+from tests.support.playwright import adapt_browser, empty_browser
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 ACTION_FIXTURES = FIXTURES / "invitations" / "actions" / "latest"
@@ -967,7 +966,7 @@ async def test_invite_action_is_a_verified_noop_for_existing_terminal_state(
         ),
         (
             RuntimeError("Synthetic Playwright reload failure."),
-            "fresh profile verification failed",
+            "fresh profile could not be read",
         ),
     ],
     ids=["typed-browser-error", "unexpected-browser-error"],
@@ -1236,7 +1235,7 @@ async def test_incoming_actions_require_their_distinct_fresh_profile_postconditi
 
 @pytest.mark.asyncio
 async def test_connection_action_payload_types_and_references_are_enforced() -> None:
-    browser = cast(LinkedInPlaywright, object())
+    browser = empty_browser(Settings(browser_action_delay_seconds=0))
     accept = AcceptInvitationPage(browser)
     ignore = IgnoreInvitationPage(browser)
 

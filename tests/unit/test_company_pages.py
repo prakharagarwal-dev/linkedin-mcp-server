@@ -11,6 +11,7 @@ import pytest
 from playwright.async_api import Locator, Page, async_playwright
 from pydantic import ValidationError
 
+from linkedin_mcp.browser import BrowserManager
 from linkedin_mcp.errors import ParserDriftError
 from linkedin_mcp.tools.companies.get.evidence import sources_from_company_profile
 from linkedin_mcp.tools.companies.get.models import (
@@ -26,7 +27,6 @@ from linkedin_mcp.tools.companies.search.models import (
     StopReason,
 )
 from linkedin_mcp.tools.companies.search.page import CompanySearchPage
-from linkedin_mcp.ui import LinkedInPlaywright
 from tests.support.playwright import adapt_browser
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
@@ -115,7 +115,7 @@ def test_company_contracts_reject_unbounded_search_and_invalid_filters() -> None
         )
 
     with pytest.raises(ValueError, match="page bound"):
-        CompanySearchPage(cast(LinkedInPlaywright, object()), max_pages=0)
+        CompanySearchPage(cast(BrowserManager, object()), max_pages=0)
 
 
 def test_company_search_url_encodes_every_visible_filter() -> None:

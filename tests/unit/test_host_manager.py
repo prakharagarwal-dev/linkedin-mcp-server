@@ -490,7 +490,7 @@ async def test_run_host_owns_and_closes_its_listener(
             events.append("lock-released")
 
     class FakeBrowser:
-        def __init__(self, _: Settings) -> None:
+        def __init__(self, _: Settings, __: object) -> None:
             events.append("browser-created")
             self.setup_state = object()
 
@@ -503,19 +503,6 @@ async def test_run_host_owns_and_closes_its_listener(
 
         async def close(self) -> None:
             events.append("browser-closed")
-
-    class FakePlaywright:
-        def __init__(
-            self,
-            observed_context: object,
-            _: Settings,
-            **__: object,
-        ) -> None:
-            assert observed_context is context
-            events.append("playwright-created")
-
-        async def close(self) -> None:
-            events.append("playwright-closed")
 
     class FakeScheduler:
         def __init__(self, *_: object, **__: object) -> None:
@@ -568,7 +555,6 @@ async def test_run_host_owns_and_closes_its_listener(
 
     monkeypatch.setattr(host, "AccountProcessLock", FakeLock)
     monkeypatch.setattr(host, "BrowserManager", FakeBrowser)
-    monkeypatch.setattr(host, "LinkedInPlaywright", FakePlaywright)
     monkeypatch.setattr(host, "Scheduler", FakeScheduler)
     monkeypatch.setattr(host, "CursorStore", FakeCursorStore)
     monkeypatch.setattr(host, "create_mcp_server", fake_mcp)
@@ -587,7 +573,6 @@ async def test_run_host_owns_and_closes_its_listener(
         "lock-acquired",
         "browser-created",
         "browser-started",
-        "playwright-created",
         "scheduler-created",
         "cursor-created",
         "mcp-created",
@@ -599,7 +584,6 @@ async def test_run_host_owns_and_closes_its_listener(
         "scheduler-quiesced",
         "scheduler-closed",
         "cursor-closed",
-        "playwright-closed",
         "browser-closed",
         "lock-released",
     ]

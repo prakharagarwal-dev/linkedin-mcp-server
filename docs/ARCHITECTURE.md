@@ -18,10 +18,10 @@ Scheduler ── asyncio.Queue ──> Worker
                                   │ calls the tool's execute function
                                   ▼
                          tool page object
-                                  │ Playwright-style calls
+                                  │ raw reads; paced actions
                                   ▼
-                         LinkedInPlaywright
-                                  │ paced, safety-checked visible UI
+                     BrowserManager + Paced
+                                  │ visible Playwright UI
                                   ▼
                               LinkedIn
 ```
@@ -99,7 +99,7 @@ to:
 
 - queued and active tasks;
 - pagination cursors; and
-- navigation pacing.
+- browser authentication and access-pause state.
 
 Restarting clears that state. The Chromium profile is the only persistent
 server-owned state and contains LinkedIn authentication data.
@@ -107,18 +107,21 @@ server-owned state and contains LinkedIn authentication data.
 ## Browser safety
 
 `BrowserManager` owns Playwright, the worker's one persistent Chromium context,
-visible login/logout, and clean shutdown. On startup it synchronously validates
-the saved session. If authentication is required, it closes the context, waits
-for visible headed login, reopens the configured context, and validates it
-again. `HostManager` does not start the queue or publish the endpoint until this
+fresh task-page creation and popup cleanup, visible login/logout, access-state
+checks, and clean shutdown. On startup it synchronously validates the saved
+session. If authentication is required, it closes the context, waits for visible
+headed login, reopens the configured context, and validates it again.
+`HostManager` does not start the queue or publish the endpoint until this
 finishes.
 
-`LinkedInPlaywright` sits above that context. It creates and cleans up a fresh
-page (including popups) for each task and wraps official Playwright `Page` and
-`Locator` calls with pacing, exact-host validation, and safety checks. Tool page
-objects use this Playwright-style facade and never interact with
-`BrowserManager`. The one queue worker serializes all tool browser operations,
-so there is no second browser lock.
+`Paced` is a small action wrapper in `infra/playwright/pacer.py`. The host creates
+it once with the configured fixed delay and supplies it through
+`BrowserManager`. Tool page objects use official Playwright `Page` and `Locator`
+objects directly for reads and locator construction, then invoke mutations as
+`self._paced.click(locator)`, `self._paced.fill(locator, value)`, or another
+specific paced action. `Paced` has no lock, background task, safety policy, or
+global state. The one queue worker serializes all tool browser operations, so
+there is no second browser lock.
 
 Authentication expiry, checkpoints, restriction pages, and configuration
 failures pause an already running facade or fail startup. Navigation is limited
@@ -130,13 +133,13 @@ arbitrary clicks, JavaScript, requests, or browser pages.
 ```text
 linkedin_mcp/
 ├── __main__.py              public CLI/private-host process dispatch
-├── browser/                 Chromium setup, profile, context, login/logout
-├── ui/                      paced/safe Playwright Page and Locator facade
+├── browser/                 Chromium pages/context, access, URLs, login/logout
 ├── transport/               FastMCP HTTP server and stdio bridge
 ├── host/                    HostManager and account process lock
 ├── infra/
 │   ├── queue/               Task, Scheduler, Worker
-│   └── cursor/store.py      bounded process-local cursor state
+│   ├── cursor/store.py      bounded process-local cursor state
+│   └── playwright/          Paced actions and collection settling
 ├── cli/                     CLI assembly and commands
 └── tools/
     ├── server/status/
@@ -153,7 +156,7 @@ linkedin_mcp/
 
 `HostManager` is the process composition root. It handles stdio attachment or
 Streamable HTTP ownership, acquires the account lock, starts and authenticates
-the browser, creates `LinkedInPlaywright`, constructs the scheduler/cursor/MCP
+the browser with its `Paced` dependency, constructs the scheduler/cursor/MCP
 tools, starts the scheduler, and only then binds and publishes the endpoint. It
 closes those components in reverse order. There is no dependency container,
 service locator, browser runtime wrapper, or module-global runtime singleton.
@@ -170,8 +173,9 @@ pagination.py    collection/output assembly, only when the tool paginates
 ```
 
 Named domain modules such as `posts/surface.py` contain visible-UI mechanics
-that are genuinely shared by neighboring page objects. Reusable Playwright
-mechanics live in `ui/`. Tool contracts, evidence construction, annotations,
+that are genuinely shared by neighboring page objects. Generic pacing and
+collection-settling mechanics live in `infra/playwright/`. Browser lifecycle,
+access checks, and URL validation live in `browser/`. Tool contracts, evidence construction, annotations,
 safe MCP error projection, and single-attempt write execution stay in the leaf
 that exposes them. There is no `tools/_shared/`, `tools/action.py`,
 `operation.py`, capability registry, aggregate model facade, or central

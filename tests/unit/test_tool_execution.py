@@ -1560,7 +1560,7 @@ def _page_result[ResultT](
 
 
 def _settings() -> Settings:
-    return Settings(minimum_navigation_interval_seconds=0)
+    return Settings(browser_action_delay_seconds=0)
 
 
 class _ToolHarness:

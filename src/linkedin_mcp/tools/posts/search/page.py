@@ -10,10 +10,21 @@ from typing import cast
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 from playwright.async_api import Error as PlaywrightError
+from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
+from linkedin_mcp.browser import BrowserManager
+from linkedin_mcp.browser.urls import (
+    canonical_post_url,
+)
 from linkedin_mcp.errors import ParserDriftError
+from linkedin_mcp.infra.playwright import Paced
+from linkedin_mcp.infra.playwright.collections import (
+    CollectionSettleOutcome,
+    visible_locator_signature,
+    wait_for_collection_initial_state,
+)
 from linkedin_mcp.tools.posts.search.models import (
     PostAuthor as SearchPostAuthor,
 )
@@ -49,17 +60,6 @@ from linkedin_mcp.tools.posts.surface import (
 )
 from linkedin_mcp.tools.posts.surface import (
     PostContentType as SurfacePostContentType,
-)
-from linkedin_mcp.ui import LinkedInLocator as Locator
-from linkedin_mcp.ui import LinkedInPage as Page
-from linkedin_mcp.ui import LinkedInPlaywright
-from linkedin_mcp.ui.collections import (
-    CollectionSettleOutcome,
-    visible_locator_signature,
-    wait_for_collection_initial_state,
-)
-from linkedin_mcp.ui.urls import (
-    canonical_post_url,
 )
 
 _CONTENT_SEARCH_URL = "https://www.linkedin.com/search/results/content/"
@@ -213,7 +213,7 @@ async def _wait_for_post_search_state(page: Page) -> CollectionSettleOutcome:
     return result.outcome
 
 
-async def _expand_search_post_body(page: Page, region: Locator) -> None:
+async def _expand_search_post_body(paced: Paced, page: Page, region: Locator) -> None:
     source_url = page.url
     bodies = await post_body_boxes(region)
     if len(bodies) > 2:
@@ -244,7 +244,7 @@ async def _expand_search_post_body(page: Page, region: Locator) -> None:
                 break
             before_text = (await body.inner_text()).strip()
             try:
-                await expandable.click(timeout=2_000)
+                await paced.click(expandable, timeout=2_000)
                 await page.wait_for_timeout(100)
             except PlaywrightTimeoutError:
                 if not await expandable.is_visible():
@@ -252,8 +252,8 @@ async def _expand_search_post_body(page: Page, region: Locator) -> None:
                 # Current search cards can paint their text layer over the visible
                 # expansion button. Keyboard activation preserves the same exact,
                 # user-facing control without bypassing its semantics.
-                await expandable.focus()
-                await expandable.press("Enter")
+                await paced.focus(expandable)
+                await paced.press(expandable, "Enter")
                 await page.wait_for_timeout(100)
             if page.url != source_url:
                 raise ParserDriftError("A LinkedIn content expansion unexpectedly navigated away.")
@@ -433,6 +433,7 @@ async def _exact_post_option(
 
 
 async def _select_post_facet_names(
+    paced: Paced,
     page: Page,
     panel: Locator,
     requested_names: tuple[str, ...],
@@ -443,7 +444,7 @@ async def _select_post_facet_names(
         selected = await _selected_post_facet(region, requested_name)
         if selected is not None:
             if not await selected.is_checked():
-                await selected.check()
+                await paced.check(selected)
             continue
         add_buttons = region.get_by_role(
             "button",
@@ -459,16 +460,16 @@ async def _select_post_facet_names(
             raise ParserDriftError(
                 f"LinkedIn's visible {spec.add_button_name.lower()} control was ambiguous."
             )
-        await visible_buttons[0].click()
+        await paced.click(visible_buttons[0])
         textbox = region.get_by_placeholder(spec.add_button_name, exact=True)
         try:
             await textbox.first.wait_for(state="visible", timeout=5_000)
-            await textbox.first.fill(requested_name)
+            await paced.fill(textbox.first, requested_name)
         except PlaywrightTimeoutError as error:
             raise ParserDriftError(
                 f"LinkedIn's visible {spec.add_button_name.lower()} input was unavailable."
             ) from error
-        await (await _exact_post_option(page, requested_name)).click()
+        await paced.click(await _exact_post_option(page, requested_name))
         await page.wait_for_timeout(200)
 
 
@@ -523,7 +524,7 @@ def _validate_resolved_post_facets(
 
 
 async def _resolve_post_facets(
-    playwright: LinkedInPlaywright,
+    browser: BrowserManager,
     page: Page,
     filters: PostSearchFilters,
 ) -> _ResolvedPostFacets:
@@ -544,7 +545,7 @@ async def _resolve_post_facets(
     ]
     if len(visible) != 1:
         raise ParserDriftError("LinkedIn post search has no unique visible All filters control.")
-    await visible[0].click()
+    await browser.paced.click(visible[0])
     panel: Locator | None = None
     for _ in range(50):
         panel = await _post_filter_panel(page)
@@ -555,7 +556,7 @@ async def _resolve_post_facets(
         raise ParserDriftError("LinkedIn's visible Posts All-filters panel was unavailable.")
     for spec in _POST_FACETS:
         names = cast(tuple[str, ...], getattr(filters, spec.names_field))
-        await _select_post_facet_names(page, panel, names, spec)
+        await _select_post_facet_names(browser.paced, page, panel, names, spec)
     show_results = panel.get_by_role(
         "link",
         name=re.compile(r"^show results$", re.IGNORECASE),
@@ -566,7 +567,10 @@ async def _resolve_post_facets(
         raise ParserDriftError(
             "LinkedIn's visible Show results control was unavailable for Posts search."
         ) from error
-    submitted_url = await show_results.first.click_and_wait_for_navigation()
+    submitted_url = await browser.paced.click_and_wait_for_navigation(
+        page,
+        show_results.first,
+    )
     resolved = _resolved_post_facets_from_url(submitted_url)
     _validate_resolved_post_facets(filters, resolved)
     return resolved
@@ -605,11 +609,12 @@ async def _post_text(region: Locator, *, author: SurfacePostAuthor) -> str | Non
 
 
 async def _post_summary_from_region(
+    paced: Paced,
     region: Locator,
     *,
     known_reference: str | None = None,
 ) -> PostSummary | None:
-    reference = known_reference or await post_reference_for_region(region)
+    reference = known_reference or await post_reference_for_region(paced, region)
     visible_text = (await region.inner_text()).strip()
     if reference is None or not visible_text:
         return None
@@ -642,6 +647,7 @@ async def _post_summary_from_region(
 
 
 async def _visible_posts(
+    paced: Paced,
     page: Page,
     *,
     result_limit: int,
@@ -656,7 +662,7 @@ async def _visible_posts(
         candidate = candidates.nth(index)
         if not await candidate.is_visible():
             continue
-        reference = await post_reference_for_region(candidate)
+        reference = await post_reference_for_region(paced, candidate)
         if reference is None:
             menus = candidate.get_by_role("button", name=POST_MENU_PATTERN)
             has_visible_post_menu = False
@@ -684,14 +690,15 @@ async def _visible_posts(
             raise ParserDriftError(
                 "LinkedIn post search changed an inventoried result before extraction."
             )
-        await _expand_search_post_body(page, candidate)
-        stable_reference = await post_reference_for_region(candidate)
+        await _expand_search_post_body(paced, page, candidate)
+        stable_reference = await post_reference_for_region(paced, candidate)
         if stable_reference != reference:
             raise ParserDriftError(
                 "LinkedIn post search changed an exact result identity during extraction."
             )
         try:
             summary = await _post_summary_from_region(
+                paced,
                 candidate,
                 known_reference=reference,
             )
@@ -707,10 +714,11 @@ async def _visible_posts(
 
 
 class PostSearchPage:
-    def __init__(self, playwright: LinkedInPlaywright, *, max_pages: int) -> None:
+    def __init__(self, browser: BrowserManager, *, max_pages: int) -> None:
         if max_pages < 1:
             raise ValueError("Post search page bound must be positive.")
-        self._playwright = playwright
+        self._browser = browser
+        self._paced = browser.paced
         self._max_pages = max_pages
 
     @staticmethod
@@ -732,11 +740,11 @@ class PostSearchPage:
         pages_visited = 0
         unsupported_result_count = 0
         stop_reason = StopReason.SAFETY_BOUND
-        async with self._playwright.page() as page:
+        async with self._browser.page() as page:
             if _requires_post_facet_resolution(request.filters):
-                await page.goto(_build_post_search_url(request, page_index=1))
+                await self._paced.goto(page, _build_post_search_url(request, page_index=1))
                 resolved = await _resolve_post_facets(
-                    self._playwright,
+                    self._browser,
                     page,
                     request.filters,
                 )
@@ -746,10 +754,11 @@ class PostSearchPage:
                     page_index=page_index,
                     resolved=resolved,
                 )
-                await page.goto(target)
+                await self._paced.goto(page, target)
                 rendered_state = await _wait_for_post_search_state(page)
                 await prepare_visible_content(page)
                 visible_batch = await _visible_posts(
+                    self._paced,
                     page,
                     result_limit=limit - len(posts),
                     excluded_refs=frozenset(posts),

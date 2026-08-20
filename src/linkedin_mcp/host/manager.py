@@ -26,6 +26,7 @@ from linkedin_mcp.host.lock import (
     run_owned_operation,
 )
 from linkedin_mcp.infra.cursor import CursorStore
+from linkedin_mcp.infra.playwright import Paced
 from linkedin_mcp.infra.queue import Scheduler, Worker
 from linkedin_mcp.tools import attach_tools
 from linkedin_mcp.transport.server import (
@@ -36,7 +37,6 @@ from linkedin_mcp.transport.server import (
     serve_http,
 )
 from linkedin_mcp.transport.stdio import run_stdio_proxy
-from linkedin_mcp.ui import LinkedInPlaywright
 
 _RUNTIME_OWNER_COMMAND = "shared-runtime"
 _RUNTIME_MODULE = "linkedin_mcp"
@@ -91,7 +91,6 @@ class HostManager:
         self.settings = settings
         self._process_lock: AccountProcessLock | None = None
         self._browser: BrowserManager | None = None
-        self._playwright: LinkedInPlaywright | None = None
         self._scheduler: Scheduler | None = None
         self._scheduler_started = False
         self._cursor_store: CursorStore | None = None
@@ -137,7 +136,10 @@ class HostManager:
         """Perform visible login while exclusively owning the browser profile."""
 
         async def operation() -> None:
-            browser = BrowserManager(self.settings)
+            browser = BrowserManager(
+                self.settings,
+                Paced(self.settings.browser_action_delay_seconds),
+            )
             try:
                 await browser.login()
             finally:
@@ -149,7 +151,10 @@ class HostManager:
         """Perform visible logout while exclusively owning the browser profile."""
 
         async def operation() -> bool:
-            browser = BrowserManager(self.settings)
+            browser = BrowserManager(
+                self.settings,
+                Paced(self.settings.browser_action_delay_seconds),
+            )
             try:
                 return await browser.logout()
             finally:
@@ -172,14 +177,11 @@ class HostManager:
         )
         self._process_lock.acquire()
         try:
-            self._browser = BrowserManager(self.settings)
-            context = await self._browser.start()
-            self._playwright = LinkedInPlaywright(
-                context,
+            self._browser = BrowserManager(
                 self.settings,
-                browser_setup_state=self._browser.setup_state,
-                profile_present=self._browser.profile_present(),
+                Paced(self.settings.browser_action_delay_seconds),
             )
+            await self._browser.start()
             self._scheduler = Scheduler(Worker(), capacity=self.settings.queue_capacity)
             self._cursor_store = CursorStore(
                 ttl_seconds=self.settings.pagination_cursor_ttl_seconds,
@@ -190,7 +192,7 @@ class HostManager:
             attach_tools(
                 self._mcp,
                 settings=self.settings,
-                playwright=self._playwright,
+                browser=self._browser,
                 scheduler=self._scheduler,
                 cursor_store=self._cursor_store,
             )
@@ -213,7 +215,6 @@ class HostManager:
         listener = self._listener
         scheduler = self._scheduler
         cursor_store = self._cursor_store
-        playwright = self._playwright
         browser = self._browser
         process_lock = self._process_lock
         scheduler_started = self._scheduler_started
@@ -221,7 +222,6 @@ class HostManager:
         self._listener = None
         self._scheduler = None
         self._cursor_store = None
-        self._playwright = None
         self._browser = None
         self._process_lock = None
         self._mcp = None
@@ -242,15 +242,11 @@ class HostManager:
                         await cursor_store.close()
                 finally:
                     try:
-                        if playwright is not None:
-                            await playwright.close()
+                        if browser is not None:
+                            await browser.close()
                     finally:
-                        try:
-                            if browser is not None:
-                                await browser.close()
-                        finally:
-                            if process_lock is not None:
-                                process_lock.release()
+                        if process_lock is not None:
+                            process_lock.release()
 
 
 def host_endpoint(settings: Settings) -> str:

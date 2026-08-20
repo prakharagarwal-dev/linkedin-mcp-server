@@ -7,9 +7,16 @@ from datetime import UTC, datetime
 from urllib.parse import urljoin
 
 from playwright.async_api import Error as PlaywrightError
+from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
+from linkedin_mcp.browser import BrowserManager
+from linkedin_mcp.browser.urls import (
+    canonical_job_url,
+    canonical_profile_url,
+    profile_slug_from_url,
+)
 from linkedin_mcp.errors import ParserDriftError
 from linkedin_mcp.tools.jobs.get.models import (
     EvidenceField,
@@ -29,14 +36,6 @@ from linkedin_mcp.tools.jobs.surface import (
 )
 from linkedin_mcp.tools.jobs.surface import (
     lines as visible_text_lines,
-)
-from linkedin_mcp.ui import LinkedInLocator as Locator
-from linkedin_mcp.ui import LinkedInPage as Page
-from linkedin_mcp.ui import LinkedInPlaywright
-from linkedin_mcp.ui.urls import (
-    canonical_job_url,
-    canonical_profile_url,
-    profile_slug_from_url,
 )
 
 _EMPLOYMENT_TYPES = (
@@ -281,12 +280,13 @@ async def _visible_description(description_box: Locator) -> str:
 
 
 class JobDetailPage:
-    def __init__(self, playwright: LinkedInPlaywright) -> None:
-        self._playwright = playwright
+    def __init__(self, browser: BrowserManager) -> None:
+        self._browser = browser
+        self._paced = browser.paced
 
     async def read(self, request: JobDetailInput) -> JobDetailObservation:
-        async with self._playwright.page() as page:
-            await page.goto(canonical_job_url(request.job_id))
+        async with self._browser.page() as page:
+            await self._paced.goto(page, canonical_job_url(request.job_id))
             await self._wait_until_ready(page, request.job_id)
             await self._expand_description(page)
             return await self.extract_visible_job(page, request.job_id)
@@ -329,7 +329,7 @@ class JobDetailPage:
         spans = expand_button.locator("span")
         click_target = spans.last if await spans.count() > 0 else expand_button
         try:
-            await click_target.click()
+            await self._paced.click(click_target)
         except PlaywrightError as error:
             raise ParserDriftError(
                 "LinkedIn job detail exposed its description expansion control "

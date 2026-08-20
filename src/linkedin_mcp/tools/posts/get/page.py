@@ -6,9 +6,14 @@ import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
+from linkedin_mcp.browser import BrowserManager
+from linkedin_mcp.browser.urls import (
+    canonical_post_url,
+)
 from linkedin_mcp.errors import ParserDriftError
 from linkedin_mcp.tools.posts.get.models import (
     PostDetailCoverage,
@@ -35,12 +40,6 @@ from linkedin_mcp.tools.posts.surface import (
 from linkedin_mcp.tools.posts.surface import (
     PostContentType as SurfacePostContentType,
 )
-from linkedin_mcp.ui import LinkedInLocator as Locator
-from linkedin_mcp.ui import LinkedInPage as Page
-from linkedin_mcp.ui import LinkedInPlaywright
-from linkedin_mcp.ui.urls import (
-    canonical_post_url,
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,7 +57,7 @@ class _ParsedPostDetail:
 
 
 async def _expand_exact_post_body(
-    playwright: LinkedInPlaywright,
+    browser: BrowserManager,
     page: Page,
     body: Locator | None,
 ) -> bool:
@@ -84,7 +83,7 @@ async def _expand_exact_post_body(
         if re.search(r"\b(?:comments?|repl(?:y|ies))\b", label, re.IGNORECASE):
             continue
         try:
-            await button.click(timeout=2_000)
+            await browser.paced.click(button, timeout=2_000)
             await page.wait_for_timeout(100)
         except PlaywrightTimeoutError as error:
             if not await button.is_visible():
@@ -92,7 +91,6 @@ async def _expand_exact_post_body(
             raise ParserDriftError("LinkedIn post text could not be fully expanded.") from error
         if page.url != source_url:
             raise ParserDriftError("LinkedIn post text expansion unexpectedly navigated away.")
-        await page.assert_safe()
     remaining = await bounded_visible_locators(
         scope.locator('[data-testid="expandable-text-button"]'),
         limit=5,
@@ -241,6 +239,7 @@ def _post_evidence(
 
 
 async def _original_post_reference(
+    browser: BrowserManager,
     *,
     requested_post_ref: str,
     displayed_post_ref: str,
@@ -249,7 +248,7 @@ async def _original_post_reference(
     if displayed_post_ref != requested_post_ref:
         return displayed_post_ref
     embedded_region = await _embedded_post_region(embedded_body)
-    original_post_ref = await post_reference_for_region(embedded_region)
+    original_post_ref = await post_reference_for_region(browser.paced, embedded_region)
     if original_post_ref is None or original_post_ref == requested_post_ref:
         raise ParserDriftError(
             "LinkedIn repost has no distinct stable visible original-post reference."
@@ -258,14 +257,18 @@ async def _original_post_reference(
 
 
 async def _parse_post_detail_page(
-    playwright: LinkedInPlaywright,
+    browser: BrowserManager,
     page: Page,
     *,
     requested_post_ref: str,
     source_url: HttpUrl,
     allow_repost_wrapper: bool,
 ) -> _ParsedPostDetail:
-    region, displayed_post_ref = await detail_region_for_post(page, requested_post_ref)
+    region, displayed_post_ref = await detail_region_for_post(
+        browser.paced,
+        page,
+        requested_post_ref,
+    )
     body_boxes = await post_body_boxes(region)
     if len(body_boxes) > 2:
         raise ParserDriftError("LinkedIn post detail exposed more than one bounded repost layer.")
@@ -274,6 +277,7 @@ async def _parse_post_detail_page(
         raise ParserDriftError("LinkedIn repost nesting exceeded the two-page safety bound.")
     original_post_ref = (
         await _original_post_reference(
+            browser,
             requested_post_ref=requested_post_ref,
             displayed_post_ref=displayed_post_ref,
             embedded_body=body_boxes[1],
@@ -282,11 +286,12 @@ async def _parse_post_detail_page(
         else None
     )
     top_body = body_boxes[0] if body_boxes else None
-    text_expanded = await _expand_exact_post_body(playwright, page, top_body)
+    text_expanded = await _expand_exact_post_body(browser, page, top_body)
 
     # Expansion can rerender the post. Reacquire exact locators and assert that its
     # stable visible identity and wrapper shape did not change under us.
     region, stable_displayed_post_ref = await detail_region_for_post(
+        browser.paced,
         page,
         requested_post_ref,
     )
@@ -358,15 +363,16 @@ def _combined_post_capture(details: tuple[_ParsedPostDetail, ...]) -> str:
 
 
 class PostDetailPage:
-    def __init__(self, playwright: LinkedInPlaywright) -> None:
-        self._playwright = playwright
+    def __init__(self, browser: BrowserManager) -> None:
+        self._browser = browser
+        self._paced = browser.paced
 
     async def read(self, request: PostGetInput) -> PostObservation:
         target = canonical_post_url(request.post_ref)
-        async with self._playwright.page() as page:
-            await page.goto(target)
+        async with self._browser.page() as page:
+            await self._paced.goto(page, target)
             requested_detail = await _parse_post_detail_page(
-                self._playwright,
+                self._browser,
                 page,
                 requested_post_ref=request.post_ref,
                 source_url=HttpUrl(target),
@@ -377,9 +383,9 @@ class PostDetailPage:
             reshared: PostResharedContent | None = None
             if requested_detail.original_post_ref is not None:
                 original_target = canonical_post_url(requested_detail.original_post_ref)
-                await page.goto(original_target)
+                await self._paced.goto(page, original_target)
                 original_detail = await _parse_post_detail_page(
-                    self._playwright,
+                    self._browser,
                     page,
                     requested_post_ref=requested_detail.original_post_ref,
                     source_url=HttpUrl(original_target),

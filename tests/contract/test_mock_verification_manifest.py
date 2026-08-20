@@ -25,7 +25,7 @@ from linkedin_mcp.tools.posts.react.models import ReactionState
 from linkedin_mcp.tools.posts.search.models import PostSearchFilters
 from linkedin_mcp.transport.server import create_mcp_server
 from tests.simulator import standard_scenario
-from tests.support.playwright import empty_playwright
+from tests.support.playwright import empty_browser
 from tests.verification_manifest import MOCK_VERIFICATION, missing_test_files
 
 ROOT = Path(__file__).parents[2]
@@ -209,7 +209,7 @@ EXPECTED_ERROR_CODES = frozenset(
 
 def _production_mcp() -> FastMCP[None]:
     settings = Settings()
-    playwright = empty_playwright(settings)
+    browser = empty_browser(settings)
     scheduler = Scheduler(Worker(), capacity=settings.queue_capacity)
     cursor_store = CursorStore(
         ttl_seconds=settings.pagination_cursor_ttl_seconds,
@@ -220,7 +220,7 @@ def _production_mcp() -> FastMCP[None]:
     attach_tools(
         mcp,
         settings=settings,
-        playwright=playwright,
+        browser=browser,
         scheduler=scheduler,
         cursor_store=cursor_store,
     )

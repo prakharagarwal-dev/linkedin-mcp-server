@@ -19,7 +19,7 @@ Trust is split between:
 
 The server has no database, application-secret service, scope allowlist,
 server-side approval ledger, call-result cache, or evidence store. Only active
-queue coordination, pacing, and cursors live in process memory.
+queue coordination, browser status, and cursors live in process memory.
 
 ## Authentication profile
 
@@ -126,7 +126,7 @@ The browser layer enforces:
 - exact configured LinkedIn hosts;
 - one configured account and one elected runtime owner;
 - one persistent context and serialized operations;
-- internal navigation pacing;
+- a fixed delay before configured Playwright actions;
 - private traversal, scrolling, detail, and expansion bounds behind typed
   `page_size` and opaque cursor contracts;
 - authentication, authwall, checkpoint, permission, and restriction guards;
@@ -158,7 +158,8 @@ The project does not implement:
 
 One bounded FIFO scheduler backed by `asyncio.Queue` supplies backpressure and
 one worker serializes tool execution. It never interrupts one browser call to
-serve another. Queue entries and pacing history are not durable.
+serve another. Queue entries are not durable, and the fixed action pacer keeps
+no history.
 
 Every MCP tool invocation gets its own queue item and executes freshly. The
 server does not cache completed reads, coalesce duplicate submissions, record
@@ -251,8 +252,8 @@ stdio is the recommended local transport.
 Streamable HTTP is restricted to `127.0.0.1`, `::1`, or `localhost`. This
 release has no HTTP authentication and must not be exposed on a LAN or public
 interface. Stdio bridges and direct HTTP clients share the same account,
-browser context, pacing, and FIFO queue. Cursors remain isolated by their
-server-assigned MCP-session identities.
+browser context, pacing configuration, and FIFO queue. Cursors remain bound to
+their account, capability, and semantic filters.
 
 ## Reporting a vulnerability
 

@@ -78,7 +78,7 @@ through their own tool-permission interface.
 | `BROWSER_INSTALL_TIMEOUT_SECONDS` | `600` | Browser installation time bound |
 | `ALLOWED_HOSTS` | exact LinkedIn hosts | Navigation hostname allowlist |
 | `QUEUE_CAPACITY` | `100` | Maximum waiting process-local capability calls |
-| `MINIMUM_NAVIGATION_INTERVAL_SECONDS` | `2` | Minimum internal delay between navigations |
+| `BROWSER_ACTION_DELAY_SECONDS` | `2` | Fixed delay before paced Playwright actions |
 | `JOB_SEARCH_MAX_PAGES_PER_CALL` | `100` | Private job-search traversal safety bound |
 | `PEOPLE_SEARCH_MAX_PAGES_PER_CALL` | `100` | Private people-search traversal safety bound |
 | `PROFILE_MAX_DETAIL_PAGES_PER_CALL` | `20` | Private member-profile detail-page bound |
@@ -216,7 +216,7 @@ does not implement HTTP authentication.
 ## Process-local state
 
 The server does not retain call results or evidence. Every tool invocation is
-executed freshly. Queue state, navigation pacing, and continuation cursors exist
+executed freshly. Queue state, browser status, and continuation cursors exist
 only in shared-host memory; a host restart clears them. Cursors are opaque,
 single-use, and bound to their account, capability, and semantic filters; they
 remain usable after an MCP client reconnects. The persistent browser profile,

@@ -9,10 +9,22 @@ from datetime import UTC, datetime
 from typing import cast
 from urllib.parse import parse_qs, urlencode, urljoin, urlsplit
 
+from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
+from linkedin_mcp.browser import BrowserManager
+from linkedin_mcp.browser.urls import (
+    canonical_company_url,
+    company_slug_from_url,
+)
 from linkedin_mcp.errors import ParserDriftError
+from linkedin_mcp.infra.playwright import Paced
+from linkedin_mcp.infra.playwright.collections import (
+    CollectionSettleOutcome,
+    visible_locator_signature,
+    wait_for_collection_initial_state,
+)
 from linkedin_mcp.tools.companies.search.models import (
     CompanySearchCoverage,
     CompanySearchFilters,
@@ -30,18 +42,6 @@ from linkedin_mcp.tools.companies.surface import (
     expand_and_scroll,
     first_visible_text,
     unique_lines,
-)
-from linkedin_mcp.ui import LinkedInLocator as Locator
-from linkedin_mcp.ui import LinkedInPage as Page
-from linkedin_mcp.ui import LinkedInPlaywright
-from linkedin_mcp.ui.collections import (
-    CollectionSettleOutcome,
-    visible_locator_signature,
-    wait_for_collection_initial_state,
-)
-from linkedin_mcp.ui.urls import (
-    canonical_company_url,
-    company_slug_from_url,
 )
 
 _COMPANY_SEARCH_URL = "https://www.linkedin.com/search/results/companies/"
@@ -295,6 +295,7 @@ async def _exact_company_typeahead_option(
 
 
 async def _select_company_facet_names(
+    paced: Paced,
     page: Page,
     panel: Locator,
     requested_names: tuple[str, ...],
@@ -309,7 +310,7 @@ async def _select_company_facet_names(
         )
         if checkbox is not None:
             if not await checkbox.is_checked():
-                await checkbox.check()
+                await paced.check(checkbox)
                 await page.wait_for_timeout(200)
             continue
 
@@ -329,7 +330,7 @@ async def _select_company_facet_names(
             raise ParserDriftError(
                 f"LinkedIn's visible {facet.add_button_name.lower()} control was ambiguous."
             )
-        await visible_buttons[0].click()
+        await paced.click(visible_buttons[0])
         textbox = region.get_by_placeholder(
             re.compile(
                 rf"^{re.escape(facet.add_button_name)}$",
@@ -338,18 +339,18 @@ async def _select_company_facet_names(
         )
         try:
             await textbox.first.wait_for(state="visible", timeout=5_000)
-            await textbox.first.fill(requested_name)
+            await paced.fill(textbox.first, requested_name)
         except PlaywrightTimeoutError as error:
             raise ParserDriftError(
                 f"LinkedIn's visible {facet.add_button_name.lower()} input was unavailable."
             ) from error
-        await (
+        await paced.click(
             await _exact_company_typeahead_option(
                 page,
                 requested_name,
                 id_field_name=facet.id_field_name,
             )
-        ).click()
+        )
         for _ in range(10):
             checkbox = await _exact_company_checkbox(
                 region,
@@ -419,7 +420,7 @@ def _validate_resolved_company_facets(
 
 
 async def _resolve_named_company_facets(
-    playwright: LinkedInPlaywright,
+    browser: BrowserManager,
     page: Page,
     filters: CompanySearchFilters,
 ) -> _ResolvedCompanyFacets:
@@ -440,16 +441,18 @@ async def _resolve_named_company_facets(
     ]
     if len(visible_controls) != 1:
         raise ParserDriftError("LinkedIn Company search has no unique visible All filters control.")
-    await visible_controls[0].click()
+    await browser.paced.click(visible_controls[0])
 
     panel = await _company_filter_panel(page)
     await _select_company_facet_names(
+        browser.paced,
         page,
         panel,
         filters.location_names,
         _LOCATION_TYPEAHEAD,
     )
     await _select_company_facet_names(
+        browser.paced,
         page,
         panel,
         filters.industry_names,
@@ -465,7 +468,10 @@ async def _resolve_named_company_facets(
         raise ParserDriftError(
             "LinkedIn's visible Show results control was unavailable for Company search."
         ) from error
-    submitted_url = await show_results.first.click_and_wait_for_navigation()
+    submitted_url = await browser.paced.click_and_wait_for_navigation(
+        page,
+        show_results.first,
+    )
     resolved = _ResolvedCompanyFacets(
         location_ids=_company_query_array_values(
             submitted_url,
@@ -558,10 +564,11 @@ async def _extract_company_results(page: Page) -> tuple[CompanySummary, ...]:
 
 
 class CompanySearchPage:
-    def __init__(self, playwright: LinkedInPlaywright, *, max_pages: int) -> None:
+    def __init__(self, browser: BrowserManager, *, max_pages: int) -> None:
         if max_pages < 1:
             raise ValueError("Company search page bound must be positive.")
-        self._playwright = playwright
+        self._browser = browser
+        self._paced = browser.paced
         self._max_pages = max_pages
 
     @staticmethod
@@ -591,11 +598,11 @@ class CompanySearchPage:
         resolved = _ResolvedCompanyFacets()
         pages_visited = 0
         stop_reason = StopReason.SAFETY_BOUND
-        async with self._playwright.page() as page:
+        async with self._browser.page() as page:
             if request.filters.location_names or request.filters.industry_names:
-                await page.goto(self.build_url(request, page_index=1))
+                await self._paced.goto(page, self.build_url(request, page_index=1))
                 resolved = await _resolve_named_company_facets(
-                    self._playwright,
+                    self._browser,
                     page,
                     request.filters,
                 )
@@ -606,8 +613,8 @@ class CompanySearchPage:
                     page_index=page_index,
                     resolved=resolved,
                 )
-                await page.goto(target)
-                await expand_and_scroll(page)
+                await self._paced.goto(page, target)
+                await expand_and_scroll(self._paced, page)
                 rendered_state = await _wait_for_company_search_state(page)
                 visible_text = (await page.locator("main").inner_text()).strip()
                 if not visible_text:

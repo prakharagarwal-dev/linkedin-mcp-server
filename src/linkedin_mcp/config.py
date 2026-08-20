@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     allowed_hosts: tuple[str, ...] = ("www.linkedin.com", "linkedin.com")
 
     queue_capacity: int = Field(default=100, ge=1, le=10_000)
-    minimum_navigation_interval_seconds: float = Field(default=2.0, ge=0, le=120)
+    browser_action_delay_seconds: float = Field(default=2.0, ge=0, le=120)
     job_search_max_pages_per_call: int = Field(default=100, ge=1, le=100)
     people_search_max_pages_per_call: int = Field(default=100, ge=1, le=100)
     profile_max_detail_pages_per_call: int = Field(default=20, ge=0, le=50)

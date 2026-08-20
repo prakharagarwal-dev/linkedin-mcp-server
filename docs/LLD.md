@@ -10,7 +10,7 @@ and puts LinkedIn behavior inside the tool that owns it.
 │ HostManager                                                      │
 │                                                                  │
 │ transport: attach stdio or own Streamable HTTP                   │
-│ startup: lock -> browser/login -> UI -> queue/tools -> listener  │
+│ startup: lock -> browser/login -> queue/tools -> listener       │
 │ shutdown: exact reverse order                                    │
 └──────────────┬───────────────────────────────────────────────────┘
                │ supplies each tool only its concrete dependencies
@@ -61,33 +61,36 @@ Responsibilities are intentionally narrow:
   the browser only during awaited startup authentication and after worker
   shutdown, so browser access needs no additional operation lock.
 
-## Browser and UI classes
+## Browser and Playwright classes
 
 ```text
 HostManager
-    │ start / login / logout / close
+    │ creates and supplies
+    ├──────────────────────────────┐
+    ▼                              ▼
+BrowserManager                  Paced
+    │                              │ fixed sleep before actions
+    │ owns                         │ click / fill / press / goto / ...
     ▼
-BrowserManager ──> official Playwright ──> persistent BrowserContext
-                                             │ supplied once
-                                             ▼
-                                    LinkedInPlaywright
-                                      │            │
-                         page() owns  │            │ pacing/safety
-                                      ▼            ▼
-                                LinkedInPage ──> LinkedInLocator
-                                      │               │
-                                      └──── official Page/Locator
+official Playwright ──> persistent BrowserContext
+                              │ BrowserManager.page()
+                              ▼
+                         raw Page / Locator
+                              ▲
+                              │ reads directly; actions through Paced
+                         tool page object
 ```
 
 - `BrowserManager` owns Chromium installation readiness, the persistent
-  context, saved-session validation, visible login/logout, and browser close.
-- `LinkedInPlaywright` owns navigation pacing, exact-host validation, access
-  pause state, task-page creation, popup cleanup, and safety checks.
-- `LinkedInPage` and `LinkedInLocator` preserve familiar Playwright calls such
-  as `page.goto(...)` and `locator.click()` while routing guarded actions
-  through `LinkedInPlaywright`.
-- Tool page objects depend only on `LinkedInPlaywright`; they never call
-  `BrowserManager` or own a persistent context.
+  context, saved-session validation, visible login/logout, task-page creation,
+  popup cleanup, access-pause state, and browser close.
+- `Paced` owns one fixed delay value and thin wrappers around specific official
+  Playwright mutations. It has no lock, singleton, background task, or browser
+  safety responsibility.
+- Tool page objects ask `BrowserManager.page()` for a raw task-scoped `Page`.
+  They read and construct locators directly, and perform mutations through the
+  manager-supplied `Paced`, for example `await self._paced.fill(locator, value)`.
+- Tools never create or close a persistent browser context.
 
 ## Startup and transport sequence
 
@@ -106,7 +109,7 @@ HostManager.ensure_host()                      │
                          │   validate saved session
                          │   await visible login when required
                          │   reopen and revalidate
-                         │ create LinkedInPlaywright
+                         │ create BrowserManager(Paced(...))
                          │ create CursorStore, Scheduler, FastMCP/tools
                          │ start Scheduler
                          │ bind and publish loopback endpoint
@@ -120,7 +123,7 @@ HostManager.ensure_host()                      │
 Both launch methods reach the same host, browser context, queue, and worker.
 The stdio bridge is only a transport adapter; disconnecting it does not close
 the shared host. `HostManager.close()` closes the listener, quiesces and closes
-the scheduler, closes cursor state and the UI facade, closes Chromium, then
+the scheduler, closes cursor state and Chromium through `BrowserManager`, then
 releases the account lock.
 
 Read tasks are interruptible. Write tasks set `interruptible=False`, so a
@@ -159,7 +162,9 @@ pagination.py
    └── returns JobSearchOutput
                     │
                     ▼
-page.py ──> LinkedInPlaywright ──> wrapped official Playwright controls
+page.py ──> BrowserManager.page() ──> raw official Page/Locator
+    │
+    └────> Paced ──> selected Playwright actions
 ```
 
 A non-paginated read keeps its small `execute(...)` function directly in
@@ -244,13 +249,13 @@ __main__.py ──> cli/ or private HostManager
 HostManager ──> transport/{server,stdio}
       │
       ├──────> browser/ ──> official Playwright
-      ├──────> ui/ ──> supplied BrowserContext
-      ├──────> infra/{queue,cursor}
+      ├──────> infra/{queue,cursor,playwright}
       └──────> tools/ (one-time explicit registration)
                          │
                          ├──> infra/queue: Task, Scheduler
                          ├──> infra/cursor: CursorStore (collections only)
-                         ├──> ui/: LinkedInPlaywright Page/Locator facade
+                         ├──> browser/: BrowserManager and task pages
+                         ├──> infra/playwright: Paced and collection settling
                          └──> owned models, page, evidence, optional pagination
 
 transport/stdio.py ──> shared host endpoint
@@ -258,4 +263,4 @@ transport/stdio.py ──> shared host endpoint
 
 Transport does not import MCP tool definitions; `HostManager` performs the
 single composition step. Page objects never retain a Playwright `Page`; they
-obtain a task-scoped wrapped page from `LinkedInPlaywright`.
+obtain a task-scoped raw page from `BrowserManager` for each call.

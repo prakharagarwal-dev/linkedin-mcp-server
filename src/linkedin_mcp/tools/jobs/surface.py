@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from linkedin_mcp.ui import LinkedInLocator as Locator
+from playwright.async_api import Locator
 
 LISTED_PATTERN = re.compile(
     r"\b(?:reposted\s+)?(?:\d+\s+)?(?:minute|hour|day|week|month)s?\s+ago\b|\breposted\b",
