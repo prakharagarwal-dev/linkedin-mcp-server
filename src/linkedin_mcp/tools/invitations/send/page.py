@@ -9,16 +9,15 @@ from playwright.async_api import Error as PlaywrightError
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import InvalidTargetError, LinkedInMCPError, ParserDriftError
-from linkedin_mcp.tools._shared.actions import (
+from linkedin_mcp.tools.invitations.action_surface import InvitationActionSurface
+from linkedin_mcp.tools.invitations.send.models import (
     ActionCommand,
     ActionInspection,
     ActionOutcome,
     ActionPageResult,
     ActionTarget,
-    InvitationSendPayload,
+    InvitationSendInput,
 )
-from linkedin_mcp.tools.invitations.action_surface import InvitationActionSurface
-from linkedin_mcp.tools.invitations.send.models.invitation_send_input import InvitationSendInput
 from linkedin_mcp.ui import LinkedInLocator as Locator
 from linkedin_mcp.ui import LinkedInPage as Page
 from linkedin_mcp.ui.urls import canonical_profile_url
@@ -56,6 +55,24 @@ async def _wait_for_unique_visible(
 
 
 class SendInvitationPage(InvitationActionSurface):
+    @staticmethod
+    async def _result(
+        page: Page,
+        outcome: ActionOutcome,
+        performed: bool | None,
+        final_state: str,
+        detail: str,
+    ) -> ActionPageResult:
+        return ActionPageResult(
+            outcome=outcome,
+            performed=performed,
+            final_state=final_state,
+            detail=detail,
+            source_url=HttpUrl(page.url),
+            captured_text=await _visible_text(page),
+            captured_at=datetime.now(UTC),
+        )
+
     async def inspect_send(
         self,
         request: InvitationSendInput,
@@ -162,8 +179,6 @@ class SendInvitationPage(InvitationActionSurface):
             ) from error
 
     async def perform_send(self, command: ActionCommand) -> ActionPageResult:
-        if not isinstance(command.payload, InvitationSendPayload):
-            raise InvalidTargetError("The invitation action payload is invalid.")
         async with self._playwright.page() as page:
             await page.goto(canonical_profile_url(command.target.profile_slug))
             main, name = await self._profile_identity(page)

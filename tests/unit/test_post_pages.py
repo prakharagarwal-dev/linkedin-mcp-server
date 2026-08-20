@@ -13,29 +13,38 @@ from playwright.async_api import Locator, Page, Route, async_playwright
 from pydantic import HttpUrl, ValidationError
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.tools._shared.actions import ReactionState
-from linkedin_mcp.tools._shared.models import StopReason
 from linkedin_mcp.tools.posts.comments.list.evidence import source_from_post_comments
-from linkedin_mcp.tools.posts.comments.list.models.comment_sort import CommentSort
-from linkedin_mcp.tools.posts.comments.list.models.post_comments_list_input import (
+from linkedin_mcp.tools.posts.comments.list.models import (
+    CommentSort,
     PostCommentsListInput,
 )
 from linkedin_mcp.tools.posts.comments.list.page import PostCommentsPage
 from linkedin_mcp.tools.posts.get.evidence import source_from_post
-from linkedin_mcp.tools.posts.get.models.post_author_type import PostAuthorType
-from linkedin_mcp.tools.posts.get.models.post_detail_coverage import PostDetailCoverage
-from linkedin_mcp.tools.posts.get.models.post_get_input import PostGetInput
-from linkedin_mcp.tools.posts.get.models.post_observation import PostObservation
-from linkedin_mcp.tools.posts.get.models.post_poll_state import PostPollState
+from linkedin_mcp.tools.posts.get.models import (
+    PostAuthorType,
+    PostDetailCoverage,
+    PostGetInput,
+    PostObservation,
+    PostPollState,
+    ReactionState,
+)
+from linkedin_mcp.tools.posts.get.models import (
+    PostContentType as DetailPostContentType,
+)
 from linkedin_mcp.tools.posts.get.page import PostDetailPage
 from linkedin_mcp.tools.posts.search.evidence import source_from_post_search
-from linkedin_mcp.tools.posts.search.models.post_content_type import PostContentType
-from linkedin_mcp.tools.posts.search.models.post_search_content_type import PostSearchContentType
-from linkedin_mcp.tools.posts.search.models.post_search_date import PostSearchDate
-from linkedin_mcp.tools.posts.search.models.post_search_filters import PostSearchFilters
-from linkedin_mcp.tools.posts.search.models.post_search_input import PostSearchInput
-from linkedin_mcp.tools.posts.search.models.post_search_posted_by import PostSearchPostedBy
-from linkedin_mcp.tools.posts.search.models.post_search_sort import PostSearchSort
+from linkedin_mcp.tools.posts.search.models import (
+    PostContentType as SearchPostContentType,
+)
+from linkedin_mcp.tools.posts.search.models import (
+    PostSearchContentType,
+    PostSearchDate,
+    PostSearchFilters,
+    PostSearchInput,
+    PostSearchPostedBy,
+    PostSearchSort,
+    StopReason,
+)
 from linkedin_mcp.tools.posts.search.page import PostSearchPage
 from linkedin_mcp.ui import LinkedInPlaywright
 from linkedin_mcp.ui.urls import post_reference_from_value
@@ -227,10 +236,10 @@ def test_post_contracts_reject_unsafe_or_conflicting_requests() -> None:
         PostSearchPostedBy.PEOPLE_YOU_FOLLOW,
     )
     assert {
-        PostContentType.LINK,
-        PostContentType.LIVE_VIDEO,
-        PostContentType.REPOST,
-    }.issubset(set(PostContentType))
+        SearchPostContentType.LINK,
+        SearchPostContentType.LIVE_VIDEO,
+        SearchPostContentType.REPOST,
+    }.issubset(set(SearchPostContentType))
     post_schema = PostObservation.model_json_schema()
     assert {
         "displayed_post_ref",
@@ -377,7 +386,7 @@ async def test_post_search_resolves_all_named_facets_and_extracts_stable_results
     assert posts[0].posted_at_text == "2h • Edited •"
     assert posts[0].text is not None and "#python" in posts[0].text
     assert "… more" not in posts[0].text
-    assert posts[0].content_type is PostContentType.TEXT
+    assert posts[0].content_type is SearchPostContentType.TEXT
     assert posts[0].reaction_count_text == "12"
     assert posts[0].comment_count_text == "3"
     assert posts[0].repost_count_text == "1"
@@ -627,7 +636,7 @@ async def test_post_detail_image_preserves_current_visible_contract_and_evidence
     assert post.posted_at_text == "2mo • Edited"
     assert post.edited is True
     assert post.visibility_text == "Visibility: Global"
-    assert post.content_type is PostContentType.IMAGE
+    assert post.content_type is DetailPostContentType.IMAGE
     assert len(post.attachments) == 1
     assert post.attachments[0].label == "Reliability architecture diagram"
     assert post.links[0].label == "Read the guide"
@@ -692,13 +701,13 @@ async def test_post_detail_extracts_current_video_document_article_and_poll_vari
             await browser.close()
 
     text_post = observations[TEXT_POST_REF]
-    assert text_post.content_type is PostContentType.TEXT
+    assert text_post.content_type is DetailPostContentType.TEXT
     assert text_post.attachments == ()
     assert text_post.hashtags == ("#reliability",)
     assert text_post.comments_enabled is False
 
     video = observations[VIDEO_POST_REF]
-    assert video.content_type is PostContentType.VIDEO
+    assert video.content_type is DetailPostContentType.VIDEO
     assert video.author.author_type is PostAuthorType.COMPANY
     assert video.author.company_slug == "example-labs"
     assert video.author.follower_count_text == "42,115 followers"
@@ -710,12 +719,12 @@ async def test_post_detail_extracts_current_video_document_article_and_poll_vari
     assert video.viewer_reaction is ReactionState.NONE
 
     live_video = observations[LIVE_VIDEO_POST_REF]
-    assert live_video.content_type is PostContentType.LIVE_VIDEO
+    assert live_video.content_type is DetailPostContentType.LIVE_VIDEO
     assert len(live_video.attachments) == 1
-    assert live_video.attachments[0].content_type is PostContentType.LIVE_VIDEO
+    assert live_video.attachments[0].content_type is DetailPostContentType.LIVE_VIDEO
 
     document = observations[DOCUMENT_POST_REF]
-    assert document.content_type is PostContentType.DOCUMENT
+    assert document.content_type is DetailPostContentType.DOCUMENT
     assert document.author.profile_slug == "morgan-lee-"
     assert document.author.relationship_text == "3rd+"
     assert document.visibility_text == "Visibility: Connections only"
@@ -725,7 +734,7 @@ async def test_post_detail_extracts_current_video_document_article_and_poll_vari
     assert document.viewer_reaction is ReactionState.INSIGHTFUL
 
     article = observations[ARTICLE_POST_REF]
-    assert article.content_type is PostContentType.ARTICLE
+    assert article.content_type is DetailPostContentType.ARTICLE
     assert len(article.attachments) == 1
     assert article.attachments[0].label == "Designing Recovery Before Failure"
     assert article.attachments[0].preview_url is not None
@@ -733,7 +742,7 @@ async def test_post_detail_extracts_current_video_document_article_and_poll_vari
     assert article.repost_count_text is None
 
     closed_poll = observations[CLOSED_POLL_POST_REF]
-    assert closed_poll.content_type is PostContentType.POLL
+    assert closed_poll.content_type is DetailPostContentType.POLL
     assert closed_poll.poll is not None
     assert closed_poll.poll.question == "Which reliability topic should we cover next?"
     assert closed_poll.poll.state is PostPollState.CLOSED
@@ -753,7 +762,7 @@ async def test_post_detail_extracts_current_video_document_article_and_poll_vari
     ]
 
     open_poll = observations[OPEN_POLL_POST_REF]
-    assert open_poll.content_type is PostContentType.POLL
+    assert open_poll.content_type is DetailPostContentType.POLL
     assert open_poll.author.author_type is PostAuthorType.COMPANY
     assert open_poll.poll is not None
     assert open_poll.poll.question == "What should we demonstrate live?"
@@ -797,7 +806,7 @@ async def test_post_detail_reads_repost_wrapper_and_full_original_as_two_bounded
 
     assert post.post_ref == REPOST_REF
     assert post.displayed_post_ref == REPOST_ORIGINAL_REF
-    assert post.content_type is PostContentType.REPOST
+    assert post.content_type is DetailPostContentType.REPOST
     assert post.author.name == "Riley Kapoor"
     assert post.text is not None and "worth sharing" in post.text
     assert post.hashtags == ("#resilience",)
@@ -809,7 +818,7 @@ async def test_post_detail_reads_repost_wrapper_and_full_original_as_two_bounded
     assert post.reshared_post.author.verified is True
     assert post.reshared_post.text is not None
     assert "stop on ambiguous state" in post.reshared_post.text
-    assert post.reshared_post.content_type is PostContentType.LINK
+    assert post.reshared_post.content_type is DetailPostContentType.LINK
     assert post.reshared_post.attachments[0].label == "The Bounded Recovery Guide"
     assert post.coverage.pages_visited == 2
     assert post.coverage.text_expanded is True
@@ -837,22 +846,22 @@ async def test_post_detail_classifies_every_current_visible_link_card_family() -
     base = (FIXTURES / "posts/latest/detail-article.html").read_text(encoding="utf-8")
     variants = (
         (
-            PostContentType.ARTICLE,
+            DetailPostContentType.ARTICLE,
             "https://www.linkedin.com/pulse/designing-recovery-avery-shah/",
         ),
         (
-            PostContentType.NEWSLETTER,
+            DetailPostContentType.NEWSLETTER,
             "https://www.linkedin.com/newsletters/reliable-systems-123456789/",
         ),
         (
-            PostContentType.EVENT,
+            DetailPostContentType.EVENT,
             "https://www.linkedin.com/events/reliabilityworkshop731234567890/",
         ),
         (
-            PostContentType.JOB,
+            DetailPostContentType.JOB,
             "https://www.linkedin.com/jobs/view/4100000001/",
         ),
-        (PostContentType.LINK, "https://example.test/recovery-guide"),
+        (DetailPostContentType.LINK, "https://example.test/recovery-guide"),
     )
     original_url = "https://www.linkedin.com/pulse/designing-recovery-avery-shah/"
     async with async_playwright() as playwright:
@@ -915,7 +924,7 @@ async def test_post_detail_preserves_a_single_page_activity_alias_without_invent
 
     assert post.post_ref == POST_REF
     assert post.displayed_post_ref == alias_ref
-    assert post.content_type is PostContentType.IMAGE
+    assert post.content_type is DetailPostContentType.IMAGE
     assert post.reshared_post is None
     assert post.coverage.pages_visited == 1
 
@@ -955,7 +964,7 @@ async def test_post_detail_accepts_role_article_with_legacy_visible_body() -> No
     assert post.post_ref == POST_REF
     assert post.displayed_post_ref == alias_ref
     assert post.text is not None and "recovery checks" in post.text
-    assert post.content_type is PostContentType.IMAGE
+    assert post.content_type is DetailPostContentType.IMAGE
 
 
 @pytest.mark.timeout(20)

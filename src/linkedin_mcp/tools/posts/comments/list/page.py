@@ -8,13 +8,11 @@ from datetime import UTC, datetime
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.tools.posts.comments.list.models.comment_observation import CommentObservation
-from linkedin_mcp.tools.posts.comments.list.models.comment_sort import CommentSort
-from linkedin_mcp.tools.posts.comments.list.models.comment_thread import CommentThread
-from linkedin_mcp.tools.posts.comments.list.models.post_comments_coverage import (
+from linkedin_mcp.tools.posts.comments.list.models import (
+    CommentObservation,
+    CommentSort,
+    CommentThread,
     PostCommentsCoverage,
-)
-from linkedin_mcp.tools.posts.comments.list.models.post_comments_list_input import (
     PostCommentsListInput,
 )
 from linkedin_mcp.tools.posts.surface import (
@@ -282,8 +280,13 @@ class PostCommentsPage:
                     raise ParserDriftError(
                         "A stable visible LinkedIn comment has no unambiguous content."
                     )
+                observed_comment = CommentObservation.model_validate(
+                    comment.model_dump(mode="python")
+                )
                 if comment.comment_ref not in comment_refs:
-                    comments_with_layout.append((comment, await _comment_identity_x(region)))
+                    comments_with_layout.append(
+                        (observed_comment, await _comment_identity_x(region))
+                    )
                     comment_refs.add(comment.comment_ref)
             comments = _bind_flattened_comment_parents(comments_with_layout)
             captured_text = (await page.locator("main").inner_text()).strip()

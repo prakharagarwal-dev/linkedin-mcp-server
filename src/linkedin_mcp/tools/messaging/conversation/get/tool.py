@@ -2,26 +2,36 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable
 from typing import Annotated, Any
 
 from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from linkedin_mcp.errors import InternalServerError, LinkedInMCPError
 from linkedin_mcp.infra.queue import Scheduler, Task
-from linkedin_mcp.tools._shared.identifiers import PROFILE_SLUG_PATTERN
-from linkedin_mcp.tools._shared.tool import (
-    IdentifierArgument,
-    tool_result,
-)
 from linkedin_mcp.tools.messaging.conversation.get.evidence import source_from_conversation
-from linkedin_mcp.tools.messaging.conversation.get.models.conversation_get_input import (
+from linkedin_mcp.tools.messaging.conversation.get.models import (
+    PROFILE_SLUG_PATTERN,
     ConversationGetInput,
-)
-from linkedin_mcp.tools.messaging.conversation.get.models.conversation_get_output import (
     ConversationGetOutput,
 )
 from linkedin_mcp.tools.messaging.conversation.get.page import ConversationGetPage
+
+IdentifierArgument = Annotated[
+    str,
+    Field(min_length=1, max_length=200, pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]*$"),
+]
+
+
+async def tool_result[ResultT](awaitable: Awaitable[ResultT]) -> ResultT:
+    try:
+        return await awaitable
+    except Exception as error:
+        safe = error if isinstance(error, LinkedInMCPError) else InternalServerError()
+        raise ToolError(f"{safe.code.value}: {safe.safe_message}") from error
 
 
 async def execute(
@@ -41,7 +51,6 @@ def register(
     mcp: FastMCP[None],
     scheduler: Scheduler,
     page: ConversationGetPage,
-    annotations: ToolAnnotations,
 ) -> None:
     @mcp.tool(
         name="linkedin.messaging.conversation.get",
@@ -53,7 +62,12 @@ def register(
             "by messaging.search. Returns explicit history completeness and truncation "
             "evidence. Opening a conversation may cause LinkedIn to mark it seen."
         ),
-        annotations=annotations,
+        annotations=ToolAnnotations(
+            readOnlyHint=False,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=True,
+        ),
     )
     async def _get_conversation(
         context_id: IdentifierArgument,

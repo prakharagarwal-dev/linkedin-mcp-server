@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 
-from linkedin_mcp.tools.people.models.person_connection_degree import PersonConnectionDegree
 from linkedin_mcp.ui import LinkedInLocator as Locator
 
 CONNECTION_DEGREE_PATTERN = re.compile(r"\b(1st|2nd|3rd)\b", re.IGNORECASE)
@@ -51,14 +50,14 @@ async def first_text(locator: Locator) -> str | None:
     return value or None
 
 
-def connection_degree(text: str) -> PersonConnectionDegree | None:
+def connection_degree(text: str) -> str | None:
     match = CONNECTION_DEGREE_PATTERN.search(text)
     if match is None:
         if "out of network" in text.casefold():
-            return PersonConnectionDegree.OUT_OF_NETWORK
+            return "out_of_network"
         return None
     return {
-        "1st": PersonConnectionDegree.FIRST,
-        "2nd": PersonConnectionDegree.SECOND,
-        "3rd": PersonConnectionDegree.THIRD_OR_MORE,
+        "1st": "first",
+        "2nd": "second",
+        "3rd": "third_or_more",
     }[match.group(1).casefold()]

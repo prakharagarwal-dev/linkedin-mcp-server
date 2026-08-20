@@ -13,43 +13,52 @@ import linkedin_mcp.tools.people.search.page as people_pages
 import linkedin_mcp.tools.posts.comments.list.page as post_comment_pages
 import linkedin_mcp.tools.posts.search.page as post_search_pages
 from linkedin_mcp.errors import AuthenticationRequiredError, BrowserUnavailableError
-from linkedin_mcp.tools._shared.models import StopReason
-from linkedin_mcp.tools.companies.get.models.company_get_input import CompanyGetInput
+from linkedin_mcp.tools.companies.get.models import CompanyGetInput
 from linkedin_mcp.tools.companies.get.page import CompanyProfilePage
-from linkedin_mcp.tools.companies.search.models.company_search_input import CompanySearchInput
+from linkedin_mcp.tools.companies.search.models import CompanySearchInput
 from linkedin_mcp.tools.companies.search.page import CompanySearchPage
-from linkedin_mcp.tools.connections.list.models.connections_list_input import ConnectionsListInput
+from linkedin_mcp.tools.connections.list.models import (
+    ConnectionsListInput,
+)
+from linkedin_mcp.tools.connections.list.models import (
+    StopReason as ConnectionsStopReason,
+)
 from linkedin_mcp.tools.connections.list.page import ConnectionsListPage
-from linkedin_mcp.tools.invitations.list.models.invitation_direction import InvitationDirection
-from linkedin_mcp.tools.invitations.list.models.invitation_filter import InvitationFilter
-from linkedin_mcp.tools.invitations.list.models.invitation_list_input import InvitationListInput
+from linkedin_mcp.tools.invitations.list.models import (
+    InvitationDirection,
+    InvitationFilter,
+    InvitationListInput,
+)
+from linkedin_mcp.tools.invitations.list.models import (
+    StopReason as InvitationStopReason,
+)
 from linkedin_mcp.tools.invitations.list.page import InvitationListPage
-from linkedin_mcp.tools.jobs.get.models.job_detail_input import JobDetailInput
+from linkedin_mcp.tools.jobs.get.models import JobDetailInput
 from linkedin_mcp.tools.jobs.get.page import JobDetailPage
-from linkedin_mcp.tools.jobs.search.models.job_search_input import JobSearchInput
+from linkedin_mcp.tools.jobs.search.models import JobSearchInput
 from linkedin_mcp.tools.jobs.search.page import JobSearchPage
-from linkedin_mcp.tools.messaging.conversation.get.models.conversation_get_input import (
+from linkedin_mcp.tools.messaging.conversation.get.models import (
     ConversationGetInput,
 )
 from linkedin_mcp.tools.messaging.conversation.get.page import ConversationGetPage
-from linkedin_mcp.tools.messaging.search.models.conversation_search_input import (
+from linkedin_mcp.tools.messaging.search.models import (
     ConversationSearchInput,
 )
 from linkedin_mcp.tools.messaging.search.page import ConversationSearchPage
-from linkedin_mcp.tools.people.get.models.people_get_input import PeopleGetInput
-from linkedin_mcp.tools.people.get.models.person_profile_section_selector import (
+from linkedin_mcp.tools.people.get.models import (
+    PeopleGetInput,
     PersonProfileSectionSelector,
 )
 from linkedin_mcp.tools.people.get.page import PersonProfilePage
-from linkedin_mcp.tools.people.search.models.people_search_input import PeopleSearchInput
+from linkedin_mcp.tools.people.search.models import PeopleSearchInput
 from linkedin_mcp.tools.people.search.page import PeopleSearchPage
-from linkedin_mcp.tools.posts.comments.list.models.post_comments_list_input import (
+from linkedin_mcp.tools.posts.comments.list.models import (
     PostCommentsListInput,
 )
 from linkedin_mcp.tools.posts.comments.list.page import PostCommentsPage
-from linkedin_mcp.tools.posts.get.models.post_get_input import PostGetInput
+from linkedin_mcp.tools.posts.get.models import PostGetInput
 from linkedin_mcp.tools.posts.get.page import PostDetailPage
-from linkedin_mcp.tools.posts.search.models.post_search_input import PostSearchInput
+from linkedin_mcp.tools.posts.search.models import PostSearchInput
 from linkedin_mcp.tools.posts.search.page import PostSearchPage
 from tests.simulator import SimulatorBrowser, standard_scenario
 from tests.simulator.state import SimulatorFault
@@ -294,7 +303,7 @@ async def test_semantic_site_drives_network_discussion_and_company_feed_reads() 
     assert invitation_coverage.overlap_count == 3
     assert invitation_coverage.scroll_rounds == 0
     assert invitation_coverage.neighboring_recommendation_count == 1
-    assert invitation_coverage.stop_reason is StopReason.VISIBLE_PAGE_COMPLETE
+    assert invitation_coverage.stop_reason is InvitationStopReason.VISIBLE_PAGE_COMPLETE
     assert "Focused (4)" in invitation_text
     assert "Other (3)" in invitation_text
     assert [item.primary_entity.slug for item in sent_invitations] == [
@@ -316,7 +325,7 @@ async def test_semantic_site_drives_network_discussion_and_company_feed_reads() 
         "casey-lee",
     ]
     assert connection_coverage.rounds_visited == 3
-    assert connection_coverage.stop_reason is StopReason.VISIBLE_PAGE_COMPLETE
+    assert connection_coverage.stop_reason is ConnectionsStopReason.VISIBLE_PAGE_COMPLETE
     assert "3 connections" in connection_text
     assert conversations[0].participant_name == "Jane Doe"
     assert conversation.messages[0].text == "Can we discuss the role?"

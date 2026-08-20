@@ -2,46 +2,120 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+import asyncio
+import uuid
+from collections.abc import Awaitable
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
+import structlog
 from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from linkedin_mcp.errors import InternalServerError, LinkedInMCPError
 from linkedin_mcp.infra.queue import Scheduler, Task
-from linkedin_mcp.tools._shared.actions import ActionOutput, ActionType, PostCreatePayload
-from linkedin_mcp.tools._shared.tool import (
-    IdentifierArgument,
-    tool_result,
+from linkedin_mcp.tools.posts.create.evidence import source_from_action_execution
+from linkedin_mcp.tools.posts.create.models import (
+    ActionCommand,
+    ActionOutcome,
+    ActionOutput,
+    ActionResult,
+    ActionType,
+    PostAudience,
+    PostCollaboratorInput,
+    PostCommentControl,
+    PostCreateContent,
+    PostCreateInput,
+    PostCreatePayload,
+    PostGroupTarget,
 )
-from linkedin_mcp.tools.action import execute_action
-from linkedin_mcp.tools.posts.create.models.post_audience import PostAudience
-from linkedin_mcp.tools.posts.create.models.post_collaborator_input import PostCollaboratorInput
-from linkedin_mcp.tools.posts.create.models.post_comment_control import PostCommentControl
-from linkedin_mcp.tools.posts.create.models.post_create_content import PostCreateContent
-from linkedin_mcp.tools.posts.create.models.post_create_input import PostCreateInput
-from linkedin_mcp.tools.posts.create.models.post_group_target import PostGroupTarget
 from linkedin_mcp.tools.posts.create.page import PostPublishingPage
 
+logger = structlog.get_logger(__name__)
 
-async def execute(request: PostCreateInput, page: PostPublishingPage) -> ActionOutput:
-    return await execute_action(
-        task_name="linkedin.posts.create",
+
+IdentifierArgument = Annotated[
+    str,
+    Field(min_length=1, max_length=200, pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]*$"),
+]
+
+
+async def tool_result[ResultT](awaitable: Awaitable[ResultT]) -> ResultT:
+    try:
+        return await awaitable
+    except Exception as error:
+        safe = error if isinstance(error, LinkedInMCPError) else InternalServerError()
+        raise ToolError(f"{safe.code.value}: {safe.safe_message}") from error
+
+
+async def execute(
+    request: PostCreateInput,
+    page: PostPublishingPage,
+) -> ActionOutput:
+    execution_id = str(uuid.uuid4())
+    started_at = datetime.now(UTC)
+    inspection = await page.inspect_post(request)
+    payload = PostCreatePayload(
+        content=request.content,
+        audience=request.audience,
+        group_target=request.group_target,
+        comment_control=request.comment_control,
+        brand_partnership=request.brand_partnership,
+        collaborators=request.collaborators,
+        scheduled_at=request.scheduled_at,
+    )
+    command = ActionCommand(
+        action_type=ActionType.POST_CREATE,
+        target=inspection.target,
+        payload=payload,
+    )
+    try:
+        page_result = await page.perform_post(command)
+    except asyncio.CancelledError:
+        raise
+    except LinkedInMCPError:
+        raise
+    except Exception as error:
+        logger.error(
+            "action_execution_interrupted",
+            task_name="linkedin.posts.create",
+            error_type=type(error).__name__,
+        )
+        return ActionOutput(
+            context_id=request.context_id,
+            request_id=request.request_id,
+            result=ActionResult(
+                action_type=ActionType.POST_CREATE,
+                outcome=ActionOutcome.UNCERTAIN,
+                performed=None,
+                final_state="unknown_after_interruption",
+                detail=(
+                    "Execution stopped without a verified visible outcome; "
+                    "operator review is required."
+                ),
+                started_at=started_at,
+                completed_at=datetime.now(UTC),
+            ),
+            sources=(),
+        )
+
+    result = ActionResult(
+        action_type=ActionType.POST_CREATE,
+        outcome=page_result.outcome,
+        performed=page_result.performed,
+        final_state=page_result.final_state,
+        detail=page_result.detail,
+        started_at=started_at,
+        completed_at=datetime.now(UTC),
+    )
+    source = source_from_action_execution(page_result, execution_id=execution_id)
+    return ActionOutput(
         context_id=request.context_id,
         request_id=request.request_id,
-        action_type=ActionType.POST_CREATE,
-        payload=PostCreatePayload(
-            content=request.content,
-            audience=request.audience,
-            group_target=request.group_target,
-            comment_control=request.comment_control,
-            brand_partnership=request.brand_partnership,
-            collaborators=request.collaborators,
-            scheduled_at=request.scheduled_at,
-        ),
-        inspect=lambda: page.inspect_post(request),
-        perform=page.perform_post,
+        result=result,
+        sources=(source,),
     )
 
 
@@ -49,7 +123,6 @@ def register(
     mcp: FastMCP[None],
     scheduler: Scheduler,
     page: PostPublishingPage,
-    annotations: ToolAnnotations,
 ) -> None:
     @mcp.tool(
         name="linkedin.posts.create",
@@ -63,7 +136,12 @@ def register(
             "The content "
             "discriminator is mode, not kind. Company Page publishing is excluded."
         ),
-        annotations=annotations,
+        annotations=ToolAnnotations(
+            readOnlyHint=False,
+            destructiveHint=True,
+            idempotentHint=False,
+            openWorldHint=True,
+        ),
     )
     async def _create_post(
         context_id: IdentifierArgument,

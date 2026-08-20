@@ -1,16 +1,25 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from enum import StrEnum
 
 import pytest
 
 from linkedin_mcp.errors import InvalidCursorError
 from linkedin_mcp.infra.cursor import CursorState, CursorStore, cursor_binding, select_page
-from linkedin_mcp.tools._shared.models import CapabilityName, PaginatedInput
-from linkedin_mcp.tools.connections.list.models.connections_list_input import ConnectionsListInput
-from linkedin_mcp.tools.invitations.list.models.invitation_filter import InvitationFilter
-from linkedin_mcp.tools.invitations.list.models.invitation_list_input import InvitationListInput
-from linkedin_mcp.tools.jobs.search.models.job_search_input import JobSearchInput
+from linkedin_mcp.tools.connections.list.models import ConnectionsListInput
+from linkedin_mcp.tools.invitations.list.models import InvitationFilter, InvitationListInput
+from linkedin_mcp.tools.jobs.search.models import JobSearchInput
+
+
+class CapabilityName(StrEnum):
+    CONNECTIONS_LIST = "linkedin.connections.list"
+    JOBS_SEARCH = "linkedin.jobs.search"
+    PEOPLE_SEARCH = "linkedin.people.search"
+    INVITATIONS_LIST = "linkedin.invitations.list"
+
+
+type PaginatedRequest = ConnectionsListInput | InvitationListInput | JobSearchInput
 
 
 class MutableClock:
@@ -43,7 +52,7 @@ async def _start(
     *,
     account_id: str,
     capability_name: CapabilityName,
-    request: PaginatedInput,
+    request: PaginatedRequest,
 ) -> CursorState:
     arguments = request.model_dump(
         mode="json",

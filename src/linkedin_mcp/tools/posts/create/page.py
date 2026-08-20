@@ -12,41 +12,39 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
-from linkedin_mcp.tools._shared.actions import (
+from linkedin_mcp.tools.posts.create.models import (
     ActionCommand,
     ActionInspection,
     ActionOutcome,
     ActionPageResult,
     ActionTarget,
-    PostCreatePayload,
-)
-from linkedin_mcp.tools.posts.create.models.celebration_post_content import CelebrationPostContent
-from linkedin_mcp.tools.posts.create.models.celebration_type import CelebrationType
-from linkedin_mcp.tools.posts.create.models.document_post_content import DocumentPostContent
-from linkedin_mcp.tools.posts.create.models.event_format import EventFormat
-from linkedin_mcp.tools.posts.create.models.event_post_content import EventPostContent
-from linkedin_mcp.tools.posts.create.models.event_type import EventType
-from linkedin_mcp.tools.posts.create.models.expert_request_category import ExpertRequestCategory
-from linkedin_mcp.tools.posts.create.models.expert_request_post_content import (
+    CelebrationPostContent,
+    CelebrationType,
+    DocumentPostContent,
+    EventFormat,
+    EventPostContent,
+    EventType,
+    ExpertRequestCategory,
     ExpertRequestPostContent,
+    HiringPostContent,
+    ImagePostContent,
+    PollDuration,
+    PollPostContent,
+    PostAudience,
+    PostCommentControl,
+    PostCreateInput,
+    PostCreateMode,
+    PostCreatePayload,
+    PostImageAspectRatio,
+    PostImageEditInput,
+    PostImageFilter,
+    PostImageInput,
+    PostImageTagInput,
+    PostMentionInput,
+    TextPostContent,
+    VideoCaptionMode,
+    VideoPostContent,
 )
-from linkedin_mcp.tools.posts.create.models.hiring_post_content import HiringPostContent
-from linkedin_mcp.tools.posts.create.models.image_post_content import ImagePostContent
-from linkedin_mcp.tools.posts.create.models.poll_duration import PollDuration
-from linkedin_mcp.tools.posts.create.models.poll_post_content import PollPostContent
-from linkedin_mcp.tools.posts.create.models.post_audience import PostAudience
-from linkedin_mcp.tools.posts.create.models.post_comment_control import PostCommentControl
-from linkedin_mcp.tools.posts.create.models.post_create_input import PostCreateInput
-from linkedin_mcp.tools.posts.create.models.post_create_mode import PostCreateMode
-from linkedin_mcp.tools.posts.create.models.post_image_aspect_ratio import PostImageAspectRatio
-from linkedin_mcp.tools.posts.create.models.post_image_edit_input import PostImageEditInput
-from linkedin_mcp.tools.posts.create.models.post_image_filter import PostImageFilter
-from linkedin_mcp.tools.posts.create.models.post_image_input import PostImageInput
-from linkedin_mcp.tools.posts.create.models.post_image_tag_input import PostImageTagInput
-from linkedin_mcp.tools.posts.create.models.text_post_content import TextPostContent
-from linkedin_mcp.tools.posts.create.models.video_caption_mode import VideoCaptionMode
-from linkedin_mcp.tools.posts.create.models.video_post_content import VideoPostContent
-from linkedin_mcp.tools.posts.models.post_mention_input import PostMentionInput
 from linkedin_mcp.ui import LinkedInLocator as Locator
 from linkedin_mcp.ui import LinkedInPage as Page
 from linkedin_mcp.ui import LinkedInPlaywright
@@ -192,8 +190,6 @@ class PostPublishingPage:
             )
 
     async def perform_post(self, command: ActionCommand) -> ActionPageResult:
-        if not isinstance(command.payload, PostCreatePayload):
-            raise InvalidTargetError("The personal-post action payload is invalid.")
         payload = command.payload
         self._validate_schedule(payload.scheduled_at)
         async with self._playwright.page() as page:

@@ -2,25 +2,60 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable
 from typing import Annotated, Any
 
 from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from linkedin_mcp.errors import InternalServerError, LinkedInMCPError
 from linkedin_mcp.infra.cursor import CursorStore
 from linkedin_mcp.infra.queue import Scheduler, Task
-from linkedin_mcp.tools._shared.tool import (
-    CursorArgument,
-    IdentifierArgument,
-    PageSizeArgument,
-    tool_result,
+from linkedin_mcp.tools.companies.search.models import (
+    CompanySearchFilters,
+    CompanySearchInput,
+    CompanySearchOutput,
 )
-from linkedin_mcp.tools.companies.search.models.company_search_filters import CompanySearchFilters
-from linkedin_mcp.tools.companies.search.models.company_search_input import CompanySearchInput
-from linkedin_mcp.tools.companies.search.models.company_search_output import CompanySearchOutput
 from linkedin_mcp.tools.companies.search.page import CompanySearchPage
 from linkedin_mcp.tools.companies.search.pagination import execute
+
+IdentifierArgument = Annotated[
+    str,
+    Field(min_length=1, max_length=200, pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]*$"),
+]
+
+
+PageSizeArgument = Annotated[
+    int,
+    Field(
+        ge=1,
+        le=100,
+        description="Number of unique items to return in this page.",
+    ),
+]
+
+
+CursorArgument = Annotated[
+    str,
+    Field(
+        min_length=32,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9_-]+$",
+        description=(
+            "Opaque continuation cursor returned as pagination.next_cursor by the preceding page."
+        ),
+    ),
+]
+
+
+async def tool_result[ResultT](awaitable: Awaitable[ResultT]) -> ResultT:
+    try:
+        return await awaitable
+    except Exception as error:
+        safe = error if isinstance(error, LinkedInMCPError) else InternalServerError()
+        raise ToolError(f"{safe.code.value}: {safe.safe_message}") from error
 
 
 def register(
@@ -29,7 +64,6 @@ def register(
     page: CompanySearchPage,
     cursor_store: CursorStore,
     account_id: str,
-    annotations: ToolAnnotations,
 ) -> None:
     @mcp.tool(
         name="linkedin.companies.search",
@@ -41,7 +75,12 @@ def register(
             "Exact names are resolved only through visible filter controls; callers may "
             "alternatively provide stable facet IDs. Returns one cursor page."
         ),
-        annotations=annotations,
+        annotations=ToolAnnotations(
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=True,
+        ),
     )
     async def _search_companies(
         context_id: IdentifierArgument,

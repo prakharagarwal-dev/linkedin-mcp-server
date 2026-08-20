@@ -13,19 +13,28 @@ from pydantic import ValidationError
 
 import linkedin_mcp.tools.jobs.search.page as jobs_page_module
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.tools._shared.models import StopReason
 from linkedin_mcp.tools.jobs.get.evidence import source_from_job_detail
-from linkedin_mcp.tools.jobs.get.models.job_apply_method import JobApplyMethod
-from linkedin_mcp.tools.jobs.get.models.job_detail_input import JobDetailInput
+from linkedin_mcp.tools.jobs.get.models import (
+    JobApplyMethod,
+    JobDetailInput,
+)
+from linkedin_mcp.tools.jobs.get.models import (
+    JobWorkplaceType as DetailJobWorkplaceType,
+)
 from linkedin_mcp.tools.jobs.get.page import JobDetailPage
-from linkedin_mcp.tools.jobs.models.job_workplace_type import JobWorkplaceType
-from linkedin_mcp.tools.jobs.search.models.job_benefit import JobBenefit
-from linkedin_mcp.tools.jobs.search.models.job_commitment import JobCommitment
-from linkedin_mcp.tools.jobs.search.models.job_employment_type import JobEmploymentType
-from linkedin_mcp.tools.jobs.search.models.job_experience_level import JobExperienceLevel
-from linkedin_mcp.tools.jobs.search.models.job_search_filters import JobSearchFilters
-from linkedin_mcp.tools.jobs.search.models.job_search_input import JobSearchInput
-from linkedin_mcp.tools.jobs.search.models.job_search_sort import JobSearchSort
+from linkedin_mcp.tools.jobs.search.models import (
+    JobBenefit,
+    JobCommitment,
+    JobEmploymentType,
+    JobExperienceLevel,
+    JobSearchFilters,
+    JobSearchInput,
+    JobSearchSort,
+    StopReason,
+)
+from linkedin_mcp.tools.jobs.search.models import (
+    JobWorkplaceType as SearchJobWorkplaceType,
+)
 from linkedin_mcp.tools.jobs.search.page import JobSearchPage
 from linkedin_mcp.ui import LinkedInLocator, LinkedInPage
 from tests.support.playwright import adapt_browser
@@ -212,20 +221,20 @@ async def test_current_job_search_cards_extract_exact_typed_fields_and_evidence(
     assert jobs[0].title == "Senior Python Engineer"
     assert jobs[0].company_name == "Acme Cloud"
     assert jobs[0].location == "Bengaluru, Karnataka, India"
-    assert jobs[0].workplace_type is JobWorkplaceType.HYBRID
+    assert jobs[0].workplace_type is SearchJobWorkplaceType.HYBRID
     assert jobs[0].listed_at_text == "3 hours ago"
     assert jobs[0].easy_apply is True
     assert jobs[0].verified is True
     assert jobs[0].promoted is True
     assert "12 connections work here" in jobs[0].insights
-    assert jobs[1].workplace_type is JobWorkplaceType.REMOTE
+    assert jobs[1].workplace_type is SearchJobWorkplaceType.REMOTE
     assert jobs[1].easy_apply is False
     assert "₹25K/month - ₹45K/month" in jobs[1].insights
     assert jobs[2].title == "Anonymous Android Engineer"
     assert jobs[2].company_name is None
     assert jobs[2].company_url is None
     assert jobs[2].location == "India"
-    assert jobs[2].workplace_type is JobWorkplaceType.REMOTE
+    assert jobs[2].workplace_type is SearchJobWorkplaceType.REMOTE
     assert jobs[2].promoted is True
     assert all(item.quote in job.visible_text for job in jobs for item in job.evidence)
 
@@ -595,7 +604,7 @@ def test_job_search_url_encodes_every_current_typed_filter_category() -> None:
             sort_by=JobSearchSort.MOST_RECENT,
             location_geo_id="102713980",
             distance_miles=50,
-            workplace_types=(JobWorkplaceType.REMOTE, JobWorkplaceType.HYBRID),
+            workplace_types=(SearchJobWorkplaceType.REMOTE, SearchJobWorkplaceType.HYBRID),
             experience_levels=(
                 JobExperienceLevel.ENTRY_LEVEL,
                 JobExperienceLevel.ASSOCIATE,
@@ -656,7 +665,7 @@ def test_job_search_url_encodes_every_current_enum_choice() -> None:
         request_id="request-all-enums",
         query="engineer",
         filters=JobSearchFilters(
-            workplace_types=tuple(JobWorkplaceType),
+            workplace_types=tuple(SearchJobWorkplaceType),
             experience_levels=tuple(JobExperienceLevel),
             employment_types=tuple(JobEmploymentType),
             benefits=tuple(JobBenefit),
@@ -681,7 +690,9 @@ def test_job_search_filters_reject_invalid_combinations_and_duplicates() -> None
             filters=JobSearchFilters(distance_miles=25),
         )
     with pytest.raises(ValidationError, match="workplace_types cannot contain duplicate"):
-        JobSearchFilters(workplace_types=(JobWorkplaceType.REMOTE, JobWorkplaceType.REMOTE))
+        JobSearchFilters(
+            workplace_types=(SearchJobWorkplaceType.REMOTE, SearchJobWorkplaceType.REMOTE)
+        )
     with pytest.raises(ValidationError, match="company_names cannot contain duplicate"):
         JobSearchFilters(company_names=("OpenAI", " openai "))
     with pytest.raises(ValidationError):
@@ -784,7 +795,7 @@ async def test_current_easy_apply_job_expands_jd_and_retains_hiring_team() -> No
     assert job.title == "Senior Python Engineer"
     assert job.company_name == "Acme Cloud"
     assert job.location == "Bengaluru, Karnataka, India"
-    assert job.workplace_type is JobWorkplaceType.HYBRID
+    assert job.workplace_type is DetailJobWorkplaceType.HYBRID
     assert job.employment_type == "Full-time"
     assert job.listed_at_text == "3 hours ago"
     assert job.applicant_text == "Over 100 applicants"
@@ -828,7 +839,7 @@ async def test_current_external_apply_job_reports_company_site_method() -> None:
 
     assert job.title == "Software Development Engineer"
     assert job.location == "Noida, Uttar Pradesh, India"
-    assert job.workplace_type is JobWorkplaceType.ON_SITE
+    assert job.workplace_type is DetailJobWorkplaceType.ON_SITE
     assert job.applicant_text == "Over 100 people clicked apply"
     assert job.apply_method is JobApplyMethod.EXTERNAL
     assert job.easy_apply is False
@@ -860,7 +871,7 @@ async def test_current_anonymous_job_preserves_missing_company_identity() -> Non
     assert job.company_name is None
     assert job.company_url is None
     assert job.location == "India"
-    assert job.workplace_type is JobWorkplaceType.REMOTE
+    assert job.workplace_type is DetailJobWorkplaceType.REMOTE
     assert job.employment_type == "Full-time"
     assert job.apply_method is JobApplyMethod.EXTERNAL
     assert job.description_text is not None
@@ -916,7 +927,7 @@ async def test_job_detail_uses_semantic_title_and_visible_location_fallback() ->
 
     assert job.title == "Fallback Reliability Engineer"
     assert job.location == "Chennai, Tamil Nadu, India"
-    assert job.workplace_type is JobWorkplaceType.REMOTE
+    assert job.workplace_type is DetailJobWorkplaceType.REMOTE
     assert job.listed_at_text is None
     assert job.apply_method is JobApplyMethod.EXTERNAL
 
@@ -966,7 +977,7 @@ async def test_job_detail_uses_company_adjacent_title_without_document_identity(
 
     assert job.title == "Company Adjacent Engineer"
     assert job.location == "Pune, India"
-    assert job.workplace_type is JobWorkplaceType.HYBRID
+    assert job.workplace_type is DetailJobWorkplaceType.HYBRID
     assert job.employment_type == "Contract"
     assert job.apply_method is JobApplyMethod.UNAVAILABLE
 

@@ -9,12 +9,10 @@ from linkedin_mcp.infra.cursor import (
     cursor_binding,
     select_page,
 )
-from linkedin_mcp.tools._shared.models import CapabilityName, PaginationMetadata
 from linkedin_mcp.tools.posts.comments.list.evidence import source_from_post_comments
-from linkedin_mcp.tools.posts.comments.list.models.post_comments_list_input import (
+from linkedin_mcp.tools.posts.comments.list.models import (
+    PaginationMetadata,
     PostCommentsListInput,
-)
-from linkedin_mcp.tools.posts.comments.list.models.post_comments_list_output import (
     PostCommentsListOutput,
 )
 from linkedin_mcp.tools.posts.comments.list.page import PostCommentsPage
@@ -31,7 +29,7 @@ async def execute(
         mode="json",
         exclude={"context_id", "request_id", "cursor", "page_size"},
     )
-    operation = CapabilityName.POST_COMMENTS_LIST.value
+    operation = "linkedin.posts.comments.list"
     state = await cursor_store.start(
         account_id=account_id,
         operation=operation,

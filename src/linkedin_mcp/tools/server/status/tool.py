@@ -8,20 +8,24 @@ from mcp.types import ToolAnnotations
 from linkedin_mcp import __version__
 from linkedin_mcp.config import Settings
 from linkedin_mcp.infra.queue import Scheduler
-from linkedin_mcp.tools.server.status.models.server_status_output import ServerStatusOutput
+from linkedin_mcp.tools.server.status.models import ServerStatusOutput
 
 
 def register(
     mcp: FastMCP[None],
     settings: Settings,
     scheduler: Scheduler,
-    annotations: ToolAnnotations,
 ) -> None:
     @mcp.tool(
         name="linkedin.server.status",
         title="LinkedIn MCP Server Status",
         description="Return non-secret server configuration and readiness metadata.",
-        annotations=annotations,
+        annotations=ToolAnnotations(
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
     )
     async def _server_status() -> ServerStatusOutput:
         return ServerStatusOutput(

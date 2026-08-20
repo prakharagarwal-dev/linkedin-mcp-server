@@ -13,14 +13,13 @@ from linkedin_mcp.infra.cursor import (
     cursor_binding,
     select_page,
 )
-from linkedin_mcp.tools._shared.models import (
-    CapabilityName,
+from linkedin_mcp.tools.invitations.list.evidence import source_from_invitation_list
+from linkedin_mcp.tools.invitations.list.models import (
+    InvitationListInput,
+    InvitationListOutput,
     PaginationMetadata,
     StopReason,
 )
-from linkedin_mcp.tools.invitations.list.evidence import source_from_invitation_list
-from linkedin_mcp.tools.invitations.list.models.invitation_list_input import InvitationListInput
-from linkedin_mcp.tools.invitations.list.models.invitation_list_output import InvitationListOutput
 from linkedin_mcp.tools.invitations.list.page import InvitationListPage
 
 ProgressReporter = Callable[[int, int, str], Awaitable[None]]
@@ -39,7 +38,7 @@ async def execute(
         exclude={"context_id", "request_id", "cursor", "page_size"},
     )
     arguments["invitation_filter"] = request.resolved_filter.value
-    operation = CapabilityName.INVITATIONS_LIST.value
+    operation = "linkedin.invitations.list"
     state = await cursor_store.start(
         account_id=account_id,
         operation=operation,

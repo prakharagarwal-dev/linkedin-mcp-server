@@ -14,16 +14,14 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
-from linkedin_mcp.tools._shared.models import StopReason
-from linkedin_mcp.tools.messaging.search.models.conversation_category import ConversationCategory
-from linkedin_mcp.tools.messaging.search.models.conversation_filter import ConversationFilter
-from linkedin_mcp.tools.messaging.search.models.conversation_search_coverage import (
+from linkedin_mcp.tools.messaging.search.models import (
+    ConversationCategory,
+    ConversationFilter,
     ConversationSearchCoverage,
-)
-from linkedin_mcp.tools.messaging.search.models.conversation_search_input import (
     ConversationSearchInput,
+    ConversationSummary,
+    StopReason,
 )
-from linkedin_mcp.tools.messaging.search.models.conversation_summary import ConversationSummary
 from linkedin_mcp.ui import LinkedInLocator as Locator
 from linkedin_mcp.ui import LinkedInPage as Page
 from linkedin_mcp.ui import LinkedInPlaywright

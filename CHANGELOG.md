@@ -8,6 +8,10 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Make every public tool leaf own one `models.py` containing all of its input,
+  output, evidence, and action contracts. Localize write execution and safe MCP
+  result projection in each tool, and remove the global `tools/_shared/`,
+  `tools/action.py`, and parent-domain model packages.
 - Replace background authentication coordination with one awaited startup
   flow. `HostManager` prepares Chromium, validates the saved session, performs
   visible login when required, revalidates the reopened profile, and only then

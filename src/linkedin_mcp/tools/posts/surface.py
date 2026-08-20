@@ -5,30 +5,15 @@ from __future__ import annotations
 import re
 from contextlib import suppress
 from dataclasses import dataclass
-from typing import cast
+from enum import StrEnum
+from typing import Annotated, cast
 from urllib.parse import urljoin, urlsplit
 
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
-from pydantic import HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
-from linkedin_mcp.tools.posts.comments.list.models.comment_attachment_observation import (
-    CommentAttachmentObservation,
-)
-from linkedin_mcp.tools.posts.comments.list.models.comment_attachment_type import (
-    CommentAttachmentType,
-)
-from linkedin_mcp.tools.posts.comments.list.models.comment_observation import CommentObservation
-from linkedin_mcp.tools.posts.get.models.post_attachment import PostAttachment
-from linkedin_mcp.tools.posts.get.models.post_author_type import PostAuthorType
-from linkedin_mcp.tools.posts.get.models.post_link import PostLink
-from linkedin_mcp.tools.posts.get.models.post_poll import PostPoll
-from linkedin_mcp.tools.posts.get.models.post_poll_option import PostPollOption
-from linkedin_mcp.tools.posts.get.models.post_poll_state import PostPollState
-from linkedin_mcp.tools.posts.models.post_author import PostAuthor
-from linkedin_mcp.tools.posts.react.models.reaction_state import ReactionState
-from linkedin_mcp.tools.posts.search.models.post_content_type import PostContentType
 from linkedin_mcp.ui import LinkedInLocator as Locator
 from linkedin_mcp.ui import LinkedInPage as Page
 from linkedin_mcp.ui.urls import (
@@ -153,6 +138,132 @@ RESTORE_CLIPBOARD_CAPTURE = """
   delete window.__linkedinMcpCopiedPostLink;
 }
 """
+
+
+class _SurfaceModel(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        str_strip_whitespace=True,
+        validate_default=True,
+    )
+
+
+class PostContentType(StrEnum):
+    TEXT = "text"
+    LINK = "link"
+    ARTICLE = "article"
+    DOCUMENT = "document"
+    IMAGE = "image"
+    VIDEO = "video"
+    LIVE_VIDEO = "live_video"
+    NEWSLETTER = "newsletter"
+    EVENT = "event"
+    JOB = "job"
+    POLL = "poll"
+    REPOST = "repost"
+    CELEBRATION = "celebration"
+    OTHER = "other"
+
+
+class PostAuthorType(StrEnum):
+    MEMBER = "member"
+    COMPANY = "company"
+    UNKNOWN = "unknown"
+
+
+class ReactionState(StrEnum):
+    NONE = "none"
+    LIKE = "like"
+    CELEBRATE = "celebrate"
+    SUPPORT = "support"
+    LOVE = "love"
+    INSIGHTFUL = "insightful"
+    FUNNY = "funny"
+
+
+class PostPollState(StrEnum):
+    OPEN = "open"
+    CLOSED = "closed"
+    UNKNOWN = "unknown"
+
+
+class CommentAttachmentType(StrEnum):
+    PHOTO = "photo"
+    GIF = "gif"
+
+
+class PostAuthor(_SurfaceModel):
+    author_type: PostAuthorType
+    name: Annotated[str, Field(min_length=1, max_length=500)]
+    profile_slug: str | None = None
+    company_slug: str | None = None
+    author_url: HttpUrl | None = None
+    headline: Annotated[str, Field(min_length=1, max_length=1_000)] | None = None
+    relationship_text: Annotated[str, Field(min_length=1, max_length=100)] | None = None
+    follower_count_text: Annotated[str, Field(min_length=1, max_length=500)] | None = None
+    verified: bool = False
+    viewer_is_author: bool = False
+
+
+class PostAttachment(_SurfaceModel):
+    content_type: PostContentType
+    label: Annotated[str, Field(min_length=1, max_length=2_000)] | None = None
+    url: HttpUrl | None = None
+    preview_url: HttpUrl | None = None
+    page_count: Annotated[int, Field(ge=1, le=10_000)] | None = None
+    duration_text: Annotated[str, Field(min_length=1, max_length=500)] | None = None
+    visible_text: Annotated[str, Field(min_length=1)] | None = None
+
+
+class PostLink(_SurfaceModel):
+    label: Annotated[str, Field(min_length=1, max_length=2_000)]
+    url: HttpUrl
+
+
+class PostPollOption(_SurfaceModel):
+    text: Annotated[str, Field(min_length=1, max_length=500)]
+    percentage_text: Annotated[str, Field(min_length=1, max_length=100)] | None = None
+    vote_count_text: Annotated[str, Field(min_length=1, max_length=100)] | None = None
+    selected: bool | None = None
+    visible_text: Annotated[str, Field(min_length=1)]
+
+
+class PostPoll(_SurfaceModel):
+    question: Annotated[str, Field(min_length=1, max_length=500)]
+    options: Annotated[tuple[PostPollOption, ...], Field(min_length=2, max_length=5)]
+    total_votes_text: Annotated[str, Field(min_length=1, max_length=100)] | None = None
+    state: PostPollState = PostPollState.UNKNOWN
+    state_text: Annotated[str, Field(min_length=1, max_length=500)] | None = None
+    viewer_has_voted: bool | None = None
+    visible_text: Annotated[str, Field(min_length=1)]
+
+
+class CommentAttachmentObservation(_SurfaceModel):
+    attachment_type: CommentAttachmentType
+    accessible_label: Annotated[str, Field(min_length=1, max_length=1_000)] | None = None
+    resource_url: HttpUrl | None = None
+    visible_text: Annotated[str, Field(min_length=1)]
+
+
+class CommentObservation(_SurfaceModel):
+    comment_ref: str
+    post_ref: str
+    parent_comment_ref: str | None = None
+    author: PostAuthor
+    text: Annotated[str, Field(min_length=1)] | None = None
+    attachments: Annotated[tuple[CommentAttachmentObservation, ...], Field(max_length=10)] = ()
+    posted_at_text: Annotated[str, Field(min_length=1, max_length=500)] | None = None
+    edited: bool = False
+    reaction_count_text: Annotated[str, Field(min_length=1, max_length=500)] | None = None
+    reply_count_text: Annotated[str, Field(min_length=1, max_length=500)] | None = None
+    visible_text: Annotated[str, Field(min_length=1)]
+
+    @model_validator(mode="after")
+    def require_visible_comment_content(self) -> CommentObservation:
+        if self.text is None and not self.attachments:
+            raise ValueError("A comment observation requires text or a visible attachment")
+        return self
 
 
 @dataclass(frozen=True, slots=True)

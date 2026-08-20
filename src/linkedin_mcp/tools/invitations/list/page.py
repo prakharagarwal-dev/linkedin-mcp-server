@@ -13,24 +13,20 @@ from urllib.parse import parse_qs, unquote, urljoin, urlsplit
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import BrowserUnavailableError, ParserDriftError
-from linkedin_mcp.tools._shared.models import StopReason
-from linkedin_mcp.tools.invitations.list.models.invitation_available_action import (
-    InvitationAvailableAction,
-)
-from linkedin_mcp.tools.invitations.list.models.invitation_direction import InvitationDirection
-from linkedin_mcp.tools.invitations.list.models.invitation_entity import InvitationEntity
-from linkedin_mcp.tools.invitations.list.models.invitation_entity_type import InvitationEntityType
-from linkedin_mcp.tools.invitations.list.models.invitation_evidence import InvitationEvidence
-from linkedin_mcp.tools.invitations.list.models.invitation_filter import (
+from linkedin_mcp.tools.invitations.list.models import (
     CURRENT_RECEIVED_INVITATION_VIEWS,
+    InvitationAvailableAction,
+    InvitationDirection,
+    InvitationEntity,
+    InvitationEntityType,
+    InvitationEvidence,
     InvitationFilter,
-)
-from linkedin_mcp.tools.invitations.list.models.invitation_list_coverage import (
     InvitationListCoverage,
+    InvitationListInput,
+    InvitationSummary,
+    InvitationType,
+    StopReason,
 )
-from linkedin_mcp.tools.invitations.list.models.invitation_list_input import InvitationListInput
-from linkedin_mcp.tools.invitations.list.models.invitation_summary import InvitationSummary
-from linkedin_mcp.tools.invitations.list.models.invitation_type import InvitationType
 from linkedin_mcp.ui import LinkedInLocator as Locator
 from linkedin_mcp.ui import LinkedInPage as Page
 from linkedin_mcp.ui import LinkedInPlaywright

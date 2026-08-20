@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from linkedin_mcp.tools.connections.search.models.connections_search_input import (
+from linkedin_mcp.tools.connections.search.models import (
     ConnectionsSearchInput,
+    PeopleSearchCoverage,
+    PersonSummary,
 )
-from linkedin_mcp.tools.people.search.models.people_search_coverage import PeopleSearchCoverage
-from linkedin_mcp.tools.people.search.models.person_summary import PersonSummary
+from linkedin_mcp.tools.people.search.models import PeopleSearchInput as ProviderSearchInput
 from linkedin_mcp.tools.people.search.page import PeopleSearchPage
 from linkedin_mcp.ui import LinkedInPlaywright
 
@@ -23,7 +24,16 @@ class ConnectionsSearchPage:
         *,
         result_limit: int | None = None,
     ) -> tuple[tuple[PersonSummary, ...], PeopleSearchCoverage, str, str]:
-        return await self._people.collect(
-            request.as_people_search_input(),
+        provider_request = ProviderSearchInput.model_validate(
+            request.as_people_search_input().model_dump(mode="python")
+        )
+        people, coverage, captured_text, source_url = await self._people.collect(
+            provider_request,
             result_limit=result_limit,
+        )
+        return (
+            tuple(PersonSummary.model_validate(person.model_dump()) for person in people),
+            PeopleSearchCoverage.model_validate(coverage.model_dump()),
+            captured_text,
+            source_url,
         )

@@ -13,13 +13,13 @@ from urllib.parse import urljoin
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.tools._shared.models import StopReason
-from linkedin_mcp.tools.connections.list.models.connection_summary import ConnectionSummary
-from linkedin_mcp.tools.connections.list.models.connections_list_coverage import (
+from linkedin_mcp.tools.connections.list.models import (
     ConnectionsListCoverage,
+    ConnectionsListInput,
+    ConnectionsSortBy,
+    ConnectionSummary,
+    StopReason,
 )
-from linkedin_mcp.tools.connections.list.models.connections_list_input import ConnectionsListInput
-from linkedin_mcp.tools.connections.list.models.connections_sort_by import ConnectionsSortBy
 from linkedin_mcp.ui import LinkedInPage as Page
 from linkedin_mcp.ui import LinkedInPlaywright
 from linkedin_mcp.ui.collections import (

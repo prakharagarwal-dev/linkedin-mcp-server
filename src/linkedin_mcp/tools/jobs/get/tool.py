@@ -2,21 +2,32 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable
 from typing import Annotated, Any
 
 from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from linkedin_mcp.errors import InternalServerError, LinkedInMCPError
 from linkedin_mcp.infra.queue import Scheduler, Task
-from linkedin_mcp.tools._shared.tool import (
-    IdentifierArgument,
-    tool_result,
-)
 from linkedin_mcp.tools.jobs.get.evidence import source_from_job_detail
-from linkedin_mcp.tools.jobs.get.models.job_detail_input import JobDetailInput
-from linkedin_mcp.tools.jobs.get.models.job_detail_output import JobDetailOutput
+from linkedin_mcp.tools.jobs.get.models import JobDetailInput, JobDetailOutput
 from linkedin_mcp.tools.jobs.get.page import JobDetailPage
+
+IdentifierArgument = Annotated[
+    str,
+    Field(min_length=1, max_length=200, pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]*$"),
+]
+
+
+async def tool_result[ResultT](awaitable: Awaitable[ResultT]) -> ResultT:
+    try:
+        return await awaitable
+    except Exception as error:
+        safe = error if isinstance(error, LinkedInMCPError) else InternalServerError()
+        raise ToolError(f"{safe.code.value}: {safe.safe_message}") from error
 
 
 async def execute(request: JobDetailInput, page: JobDetailPage) -> JobDetailOutput:
@@ -33,7 +44,6 @@ def register(
     mcp: FastMCP[None],
     scheduler: Scheduler,
     page: JobDetailPage,
-    annotations: ToolAnnotations,
 ) -> None:
     @mcp.tool(
         name="linkedin.jobs.get",
@@ -43,7 +53,12 @@ def register(
             "header metadata, application method, hiring-team identities, and fully expanded "
             "About the job description."
         ),
-        annotations=annotations,
+        annotations=ToolAnnotations(
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=True,
+        ),
     )
     async def _get_job(
         context_id: IdentifierArgument,
