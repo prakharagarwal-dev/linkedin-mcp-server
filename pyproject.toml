@@ -22,11 +22,9 @@ classifiers = [
   "Programming Language :: Python :: 3.14",
 ]
 dependencies = [
-  "anyio>=4.5,<5",
   "mcp>=1.27,<2",
   "platformdirs>=4,<5",
   "playwright>=1.54,<2",
-  "pyrate-limiter>=4.4,<5",
   "pydantic>=2.12,<3",
   "pydantic-settings>=2.10,<3",
   "structlog>=25,<26",
@@ -45,6 +43,7 @@ linkedin-mcp = "linkedin_mcp.cli.main:main"
 
 [dependency-groups]
 dev = [
+  "anyio>=4.5,<5",
   "pyright>=1.1.400,<2",
   "pytest>=8.4,<10",
   "pytest-asyncio>=1,<2",
