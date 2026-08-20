@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from linkedin_mcp.pagination import (
-    PaginationManager,
+from dataclasses import asdict
+
+from linkedin_mcp.infra.cursor import (
+    CursorStore,
+    cursor_binding,
     select_page,
 )
-from linkedin_mcp.tools._shared.models import CapabilityName
+from linkedin_mcp.tools._shared.models import CapabilityName, PaginationMetadata
 from linkedin_mcp.tools.posts.comments.list.evidence import source_from_post_comments
 from linkedin_mcp.tools.posts.comments.list.models.post_comments_list_input import (
     PostCommentsListInput,
@@ -21,23 +24,29 @@ async def execute(
     request: PostCommentsListInput,
     *,
     page: PostCommentsPage,
-    pagination: PaginationManager,
+    cursor_store: CursorStore,
     account_id: str,
 ) -> PostCommentsListOutput:
-    state = await pagination.start(
+    arguments = request.model_dump(
+        mode="json",
+        exclude={"context_id", "request_id", "cursor", "page_size"},
+    )
+    operation = CapabilityName.POST_COMMENTS_LIST.value
+    state = await cursor_store.start(
         account_id=account_id,
-        capability_name=CapabilityName.POST_COMMENTS_LIST,
-        request=request,
+        operation=operation,
+        binding=cursor_binding(operation, arguments),
+        cursor=request.cursor,
     )
     threads, coverage, captured_text, source_url = await page.collect(
         request,
-        result_limit=pagination.traversal_limit(state, request.page_size),
+        result_limit=cursor_store.traversal_limit(state, request.page_size),
     )
     selected = select_page(
         threads,
         key=lambda thread: thread.comment.comment_ref,
         seen_keys=state.seen_keys,
-        page_size=pagination.page_capacity(state, request.page_size),
+        page_size=cursor_store.page_capacity(state, request.page_size),
     )
     provider_has_more = (
         selected.has_lookahead or coverage.top_level_visible > coverage.top_level_returned
@@ -57,13 +66,14 @@ async def execute(
         threads=selected.items,
         coverage=page_coverage,
     )
-    metadata = await pagination.finish(
+    cursor_page = await cursor_store.finish(
         state,
         page_size=request.page_size,
         returned_keys=selected.keys,
         provider_has_more=provider_has_more,
         force_truncated=coverage.truncated and not provider_has_more,
     )
+    metadata = PaginationMetadata.model_validate(asdict(cursor_page))
     return PostCommentsListOutput(
         context_id=request.context_id,
         request_id=request.request_id,

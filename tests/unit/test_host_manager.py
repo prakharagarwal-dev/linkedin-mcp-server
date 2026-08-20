@@ -14,8 +14,7 @@ import linkedin_mcp.host.manager as host
 from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import ConfigurationError
 from linkedin_mcp.host import AccountRuntimeOwner, AccountRuntimeStatus
-from linkedin_mcp.transport.server import create_mcp_server
-from tests.contract.test_mcp_protocol import protocol_container
+from tests.contract.test_mcp_protocol import protocol_server
 
 
 def test_host_endpoint_is_deterministic_and_loopback_only(tmp_path: Path) -> None:
@@ -307,7 +306,8 @@ async def test_runtime_health_and_status_probe_the_real_mcp_transport(
     tmp_path: Path,
     unused_tcp_port: int,
 ) -> None:
-    mcp = create_mcp_server(protocol_container(tmp_path))
+    mcp, scheduler, browser, cursor_store = protocol_server(tmp_path)
+    await scheduler.start()
     server = uvicorn.Server(
         uvicorn.Config(
             mcp.streamable_http_app(),
@@ -319,19 +319,24 @@ async def test_runtime_health_and_status_probe_the_real_mcp_transport(
     endpoint = f"http://127.0.0.1:{unused_tcp_port}/mcp"
     status: dict[str, object] | None = None
 
-    async with anyio.create_task_group() as task_group:
-        task_group.start_soon(server.serve)
-        for _ in range(200):
-            if server.started:
-                break
-            await anyio.sleep(0.01)
-        else:
-            raise AssertionError("Shared runtime fixture did not start")
-        try:
-            assert await host.host_is_healthy(endpoint)
-            status = await host.read_host_status(endpoint)
-        finally:
-            server.should_exit = True
+    try:
+        async with anyio.create_task_group() as task_group:
+            task_group.start_soon(server.serve)
+            for _ in range(200):
+                if server.started:
+                    break
+                await anyio.sleep(0.01)
+            else:
+                raise AssertionError("Shared runtime fixture did not start")
+            try:
+                assert await host.host_is_healthy(endpoint)
+                status = await host.read_host_status(endpoint)
+            finally:
+                server.should_exit = True
+    finally:
+        await scheduler.close()
+        await cursor_store.close()
+        await browser.close()
 
     assert status is not None
     assert status["name"] == "linkedin-mcp-server"
@@ -472,45 +477,82 @@ async def test_run_host_owns_and_closes_its_listener(
         def __init__(self, *_: object, **__: object) -> None:
             events.append("lock-created")
 
+        def acquire(self) -> None:
+            events.append("lock-acquired")
+
         def publish_endpoint(self, endpoint: str) -> None:
             events.append(f"published:{endpoint}")
 
         async def wait_for_stop_request(self) -> None:
             await asyncio.Event().wait()
 
-    class FakeContainer:
-        process_lock: Any = None
+        def release(self) -> None:
+            events.append("lock-released")
 
-        async def start(self) -> None:
-            events.append("started")
+    class FakeBrowser:
+        def __init__(self, _: Settings) -> None:
+            events.append("browser-created")
+
+        def start_session_bootstrap(self) -> None:
+            events.append("browser-started")
 
         async def close(self) -> None:
-            events.append("closed")
+            events.append("browser-closed")
+
+    class FakeScheduler:
+        def __init__(self, *_: object, **__: object) -> None:
+            events.append("scheduler-created")
+
+        async def start(self) -> None:
+            events.append("scheduler-started")
+
+        async def quiesce(self) -> None:
+            events.append("scheduler-quiesced")
+
+        async def close(self) -> None:
+            events.append("scheduler-closed")
+
+    class FakeCursorStore:
+        def __init__(self, **_: object) -> None:
+            events.append("cursor-created")
+
+        async def close(self) -> None:
+            events.append("cursor-closed")
 
     class FakeListener:
         def close(self) -> None:
             events.append("listener-closed")
 
-    container = FakeContainer()
-
-    def fake_container(_: Settings) -> Any:
-        return container
-
     def fake_listener(_: str, __: int) -> Any:
         return FakeListener()
 
+    mcp = object()
+
+    def fake_mcp(_: Settings) -> object:
+        events.append("mcp-created")
+        return mcp
+
+    def fake_attach(*_: object, **__: object) -> None:
+        events.append("tools-attached")
+
     async def fake_serve_http(
-        served_container: Any,
+        served_mcp: object,
+        served_settings: Settings,
         listener: FakeListener,
         wait_for_stop: Any,
     ) -> None:
-        assert served_container is container
+        assert served_mcp is mcp
+        assert served_settings.http_port == 8123
         assert isinstance(listener, FakeListener)
         assert callable(wait_for_stop)
         events.append("served")
 
     monkeypatch.setattr(host, "AccountProcessLock", FakeLock)
-    monkeypatch.setattr(host, "create_production_container", fake_container)
+    monkeypatch.setattr(host, "BrowserManager", FakeBrowser)
+    monkeypatch.setattr(host, "Scheduler", FakeScheduler)
+    monkeypatch.setattr(host, "CursorStore", FakeCursorStore)
+    monkeypatch.setattr(host, "create_mcp_server", fake_mcp)
+    monkeypatch.setattr(host, "attach_tools", fake_attach)
     monkeypatch.setattr(host, "bind_http_listener", fake_listener)
     monkeypatch.setattr(host, "serve_http", fake_serve_http)
 
@@ -522,11 +564,22 @@ async def test_run_host_owns_and_closes_its_listener(
 
     assert events == [
         "lock-created",
-        "started",
+        "browser-created",
+        "scheduler-created",
+        "cursor-created",
+        "mcp-created",
+        "tools-attached",
+        "lock-acquired",
+        "scheduler-started",
+        "browser-started",
         "published:http://127.0.0.1:8123/mcp",
         "served",
         "listener-closed",
-        "closed",
+        "scheduler-quiesced",
+        "scheduler-closed",
+        "cursor-closed",
+        "browser-closed",
+        "lock-released",
     ]
 
 

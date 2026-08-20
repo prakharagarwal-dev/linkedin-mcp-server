@@ -7,8 +7,8 @@ from typing import Any
 from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 
-from linkedin_mcp.container import AppContainer
-from linkedin_mcp.execution import Task
+from linkedin_mcp.infra.cursor import CursorStore
+from linkedin_mcp.infra.queue import Scheduler, Task
 from linkedin_mcp.tools._shared.tool import (
     CursorArgument,
     IdentifierArgument,
@@ -19,12 +19,16 @@ from linkedin_mcp.tools.invitations.list.models.invitation_direction import Invi
 from linkedin_mcp.tools.invitations.list.models.invitation_filter import InvitationFilter
 from linkedin_mcp.tools.invitations.list.models.invitation_list_input import InvitationListInput
 from linkedin_mcp.tools.invitations.list.models.invitation_list_output import InvitationListOutput
+from linkedin_mcp.tools.invitations.list.page import InvitationListPage
 from linkedin_mcp.tools.invitations.list.pagination import execute
 
 
 def register(
     mcp: FastMCP[None],
-    container: AppContainer,
+    scheduler: Scheduler,
+    page: InvitationListPage,
+    cursor_store: CursorStore,
+    account_id: str,
     annotations: ToolAnnotations,
 ) -> None:
     @mcp.tool(
@@ -67,13 +71,13 @@ def register(
             name="linkedin.invitations.list",
             execute=lambda: execute(
                 request,
-                page=container.invitation_list,
-                pagination=container.pagination,
-                account_id=container.settings.account_id,
+                page=page,
+                cursor_store=cursor_store,
+                account_id=account_id,
                 progress=report_progress,
             ),
         )
-        await container.scheduler.schedule(task)
+        await scheduler.schedule(task)
         result = await tool_result(task.result())
         await ctx.report_progress(100, 100, "LinkedIn invitation read complete")
         return result

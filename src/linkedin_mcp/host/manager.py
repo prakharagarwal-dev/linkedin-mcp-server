@@ -14,15 +14,19 @@ from urllib.parse import urlsplit
 
 from linkedin_mcp import __version__
 from linkedin_mcp.config import Settings, runtime_configuration_fingerprint
-from linkedin_mcp.container import create_production_container
 from linkedin_mcp.errors import ConfigurationError
 from linkedin_mcp.host.lock import (
     AccountProcessLock,
     AccountRuntimeStatus,
     inspect_account_runtime,
 )
+from linkedin_mcp.infra.cursor import CursorStore
+from linkedin_mcp.infra.queue import Scheduler, Worker
+from linkedin_mcp.tools import attach_tools
+from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.transport.server import (
     bind_http_listener,
+    create_mcp_server,
     http_server_is_healthy,
     read_http_server_status,
     serve_http,
@@ -160,8 +164,7 @@ async def run_host(settings: Settings) -> None:
 
     endpoint = host_endpoint(settings)
     host = _normalized_loopback_host(settings.http_host)
-    container = create_production_container(settings)
-    container.process_lock = AccountProcessLock(
+    process_lock = AccountProcessLock(
         settings.runtime_lock_path,
         account_id=settings.account_id,
         command=_RUNTIME_OWNER_COMMAND,
@@ -169,20 +172,50 @@ async def run_host(settings: Settings) -> None:
         version=__version__,
         configuration_fingerprint=runtime_configuration_fingerprint(settings),
     )
-    await container.start()
+    browser = BrowserManager(settings)
+    scheduler = Scheduler(Worker(), capacity=settings.queue_capacity)
+    cursor_store = CursorStore(
+        ttl_seconds=settings.pagination_cursor_ttl_seconds,
+        max_active_cursors=settings.pagination_max_active_cursors,
+        max_seen_items_per_cursor=settings.pagination_max_seen_items_per_cursor,
+    )
+    mcp = create_mcp_server(settings)
+    attach_tools(
+        mcp,
+        settings=settings,
+        browser=browser,
+        scheduler=scheduler,
+        cursor_store=cursor_store,
+    )
+    process_lock.acquire()
     try:
+        await scheduler.start()
+        browser.start_session_bootstrap()
         listener = bind_http_listener(host, settings.http_port)
         try:
-            container.process_lock.publish_endpoint(endpoint)
+            process_lock.publish_endpoint(endpoint)
             await serve_http(
-                container,
+                mcp,
+                settings,
                 listener,
-                container.process_lock.wait_for_stop_request,
+                process_lock.wait_for_stop_request,
             )
         finally:
             listener.close()
     finally:
-        await container.close()
+        try:
+            await scheduler.quiesce()
+        finally:
+            try:
+                await scheduler.close()
+            finally:
+                try:
+                    await cursor_store.close()
+                finally:
+                    try:
+                        await browser.close()
+                    finally:
+                        process_lock.release()
 
 
 def validate_host_endpoint(endpoint: str) -> str:

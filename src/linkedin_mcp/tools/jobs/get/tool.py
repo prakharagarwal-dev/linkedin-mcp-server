@@ -8,8 +8,7 @@ from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from linkedin_mcp.container import AppContainer
-from linkedin_mcp.execution import Task
+from linkedin_mcp.infra.queue import Scheduler, Task
 from linkedin_mcp.tools._shared.tool import (
     IdentifierArgument,
     tool_result,
@@ -32,7 +31,8 @@ async def execute(request: JobDetailInput, page: JobDetailPage) -> JobDetailOutp
 
 def register(
     mcp: FastMCP[None],
-    container: AppContainer,
+    scheduler: Scheduler,
+    page: JobDetailPage,
     annotations: ToolAnnotations,
 ) -> None:
     @mcp.tool(
@@ -59,9 +59,9 @@ def register(
         )
         task = Task(
             name="linkedin.jobs.get",
-            execute=lambda: execute(request, container.job_detail),
+            execute=lambda: execute(request, page),
         )
-        await container.scheduler.schedule(task)
+        await scheduler.schedule(task)
         result = await tool_result(task.result())
         await ctx.report_progress(100, 100, "LinkedIn job detail complete")
         return result

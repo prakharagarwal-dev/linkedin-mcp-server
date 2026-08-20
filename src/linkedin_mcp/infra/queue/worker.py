@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from linkedin_mcp.execution.task import Task
+from linkedin_mcp.infra.queue.task import Task
 
 
 class Worker:

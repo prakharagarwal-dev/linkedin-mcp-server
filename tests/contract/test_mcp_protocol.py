@@ -11,15 +11,15 @@ from typing import cast
 import anyio
 import pytest
 from mcp import ClientSession
+from mcp.server.fastmcp import FastMCP
 from mcp.shared.message import SessionMessage
 from pydantic import HttpUrl
 
 from linkedin_mcp import __version__
 from linkedin_mcp.config import Settings
-from linkedin_mcp.container import AppContainer
-from linkedin_mcp.execution import Scheduler, Worker
-from linkedin_mcp.host import AccountProcessLock
-from linkedin_mcp.pagination import PaginationManager
+from linkedin_mcp.infra.cursor import CursorStore
+from linkedin_mcp.infra.queue import Scheduler, Worker
+from linkedin_mcp.tools import attach_tool_implementations
 from linkedin_mcp.tools._shared.actions import (
     ActionCommand,
     ActionInspection,
@@ -695,7 +695,9 @@ class ProtocolNetwork:
         )
 
 
-def protocol_container(root: Path) -> AppContainer:
+def protocol_server(
+    root: Path,
+) -> tuple[FastMCP[None], Scheduler, BrowserManager, CursorStore]:
     settings = Settings(
         auto_login_on_start=False,
         browser_auto_install=False,
@@ -707,20 +709,20 @@ def protocol_container(root: Path) -> AppContainer:
     browser = BrowserManager(settings)
     network = ProtocolNetwork()
     people_search = ProtocolPeopleSearch()
-    pagination = PaginationManager(
+    cursor_store = CursorStore(
         ttl_seconds=settings.pagination_cursor_ttl_seconds,
         max_active_cursors=settings.pagination_max_active_cursors,
         max_seen_items_per_cursor=settings.pagination_max_seen_items_per_cursor,
     )
     worker = Worker()
     scheduler = Scheduler(worker, capacity=settings.queue_capacity)
-    return AppContainer(
+    mcp = create_mcp_server(settings)
+    attach_tool_implementations(
+        mcp,
         settings=settings,
         browser=browser,
         scheduler=scheduler,
-        worker=worker,
-        pagination=pagination,
-        process_lock=AccountProcessLock(settings.runtime_lock_path),
+        cursor_store=cursor_store,
         job_search=cast(JobSearchPage, ProtocolJobSearch()),
         job_detail=cast(JobDetailPage, ProtocolJobDetail()),
         people_search=cast(PeopleSearchPage, people_search),
@@ -743,12 +745,13 @@ def protocol_container(root: Path) -> AppContainer:
         conversation_read=cast(ConversationGetPage, network),
         message_send=cast(MessageSendPage, network),
     )
+    return mcp, scheduler, browser, cursor_store
 
 
 @asynccontextmanager
 async def protocol_session(root: Path) -> AsyncGenerator[ClientSession]:
-    container = protocol_container(root)
-    mcp = create_mcp_server(container)
+    mcp, scheduler, browser, cursor_store = protocol_server(root)
+    await scheduler.start()
     server_to_client_send, server_to_client_receive = anyio.create_memory_object_stream[
         SessionMessage
     ](50)
@@ -764,12 +767,17 @@ async def protocol_session(root: Path) -> AsyncGenerator[ClientSession]:
             raise_exceptions=True,
         )
 
-    async with anyio.create_task_group() as task_group:
-        task_group.start_soon(run_server)
-        async with ClientSession(server_to_client_receive, client_to_server_send) as session:
-            await session.initialize()
-            yield session
-        task_group.cancel_scope.cancel()
+    try:
+        async with anyio.create_task_group() as task_group:
+            task_group.start_soon(run_server)
+            async with ClientSession(server_to_client_receive, client_to_server_send) as session:
+                await session.initialize()
+                yield session
+            task_group.cancel_scope.cancel()
+    finally:
+        await scheduler.close()
+        await cursor_store.close()
+        await browser.close()
 
 
 @pytest.mark.asyncio

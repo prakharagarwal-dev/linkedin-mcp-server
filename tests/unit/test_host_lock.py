@@ -13,8 +13,6 @@ from types import ModuleType
 import pytest
 
 import linkedin_mcp.host.lock as process_lock_module
-from linkedin_mcp.config import Settings
-from linkedin_mcp.container import create_production_container
 from linkedin_mcp.errors import ConfigurationError
 from linkedin_mcp.host import (
     AccountProcessLock,
@@ -23,15 +21,6 @@ from linkedin_mcp.host import (
     inspect_account_runtime,
     stop_account_runtime,
 )
-
-
-@pytest.mark.asyncio
-async def test_production_container_composes_and_closes_without_connecting() -> None:
-    container = create_production_container(Settings())
-
-    assert container.browser.started is False
-
-    await container.close()
 
 
 def test_account_process_lock_rejects_a_second_local_server(tmp_path: Path) -> None:

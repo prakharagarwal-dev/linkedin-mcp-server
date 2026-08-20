@@ -1,4 +1,4 @@
-"""Public MCP capability implementations."""
+"""Public MCP capability implementations and their production wiring."""
 
 from __future__ import annotations
 
@@ -7,11 +7,161 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
 
-    from linkedin_mcp.container import AppContainer
+    from linkedin_mcp.config import Settings
+    from linkedin_mcp.infra.cursor import CursorStore
+    from linkedin_mcp.infra.queue import Scheduler
+    from linkedin_mcp.tools._shared.browser import BrowserManager
+    from linkedin_mcp.tools.companies.get.page import CompanyProfilePage
+    from linkedin_mcp.tools.companies.search.page import CompanySearchPage
+    from linkedin_mcp.tools.connections.list.page import ConnectionsListPage
+    from linkedin_mcp.tools.connections.search.page import ConnectionsSearchPage
+    from linkedin_mcp.tools.invitations.accept.page import AcceptInvitationPage
+    from linkedin_mcp.tools.invitations.ignore.page import IgnoreInvitationPage
+    from linkedin_mcp.tools.invitations.list.page import InvitationListPage
+    from linkedin_mcp.tools.invitations.send.page import SendInvitationPage
+    from linkedin_mcp.tools.jobs.get.page import JobDetailPage
+    from linkedin_mcp.tools.jobs.search.page import JobSearchPage
+    from linkedin_mcp.tools.messaging.conversation.get.page import ConversationGetPage
+    from linkedin_mcp.tools.messaging.search.page import ConversationSearchPage
+    from linkedin_mcp.tools.messaging.send.page import MessageSendPage
+    from linkedin_mcp.tools.people.get.page import PersonProfilePage
+    from linkedin_mcp.tools.people.search.page import PeopleSearchPage
+    from linkedin_mcp.tools.posts.comment.page import PostCommentPage
+    from linkedin_mcp.tools.posts.comments.list.page import PostCommentsPage
+    from linkedin_mcp.tools.posts.create.page import PostPublishingPage
+    from linkedin_mcp.tools.posts.get.page import PostDetailPage
+    from linkedin_mcp.tools.posts.react.page import PostReactionPage
+    from linkedin_mcp.tools.posts.search.page import PostSearchPage
 
 
-def attach_tools(mcp: FastMCP[None], container: AppContainer) -> None:
-    """Attach each capability-owned FastMCP definition."""
+def attach_tools(
+    mcp: FastMCP[None],
+    *,
+    settings: Settings,
+    browser: BrowserManager,
+    scheduler: Scheduler,
+    cursor_store: CursorStore,
+) -> None:
+    """Construct production pages and attach every public MCP tool."""
+
+    from linkedin_mcp.assets import LocalAssetStore
+    from linkedin_mcp.tools.companies.get.page import CompanyProfilePage
+    from linkedin_mcp.tools.companies.search.page import CompanySearchPage
+    from linkedin_mcp.tools.connections.list.page import ConnectionsListPage
+    from linkedin_mcp.tools.connections.search.page import ConnectionsSearchPage
+    from linkedin_mcp.tools.invitations.accept.page import AcceptInvitationPage
+    from linkedin_mcp.tools.invitations.ignore.page import IgnoreInvitationPage
+    from linkedin_mcp.tools.invitations.list.page import InvitationListPage
+    from linkedin_mcp.tools.invitations.send.page import SendInvitationPage
+    from linkedin_mcp.tools.jobs.get.page import JobDetailPage
+    from linkedin_mcp.tools.jobs.search.page import JobSearchPage
+    from linkedin_mcp.tools.messaging.conversation.get.page import ConversationGetPage
+    from linkedin_mcp.tools.messaging.search.page import ConversationSearchPage
+    from linkedin_mcp.tools.messaging.send.page import MessageSendPage
+    from linkedin_mcp.tools.people.get.page import PersonProfilePage
+    from linkedin_mcp.tools.people.search.page import PeopleSearchPage
+    from linkedin_mcp.tools.posts.comment.page import PostCommentPage
+    from linkedin_mcp.tools.posts.comments.list.page import PostCommentsPage
+    from linkedin_mcp.tools.posts.create.page import PostPublishingPage
+    from linkedin_mcp.tools.posts.get.page import PostDetailPage
+    from linkedin_mcp.tools.posts.react.page import PostReactionPage
+    from linkedin_mcp.tools.posts.search.page import PostSearchPage
+
+    assets = LocalAssetStore(settings.asset_root_path)
+    conversation_search = ConversationSearchPage(
+        browser,
+        max_scroll_rounds=settings.messaging_max_scroll_rounds_per_call,
+    )
+    attach_tool_implementations(
+        mcp,
+        settings=settings,
+        browser=browser,
+        scheduler=scheduler,
+        cursor_store=cursor_store,
+        job_search=JobSearchPage(browser, max_pages=settings.job_search_max_pages_per_call),
+        job_detail=JobDetailPage(browser),
+        people_search=PeopleSearchPage(
+            browser,
+            max_pages=settings.people_search_max_pages_per_call,
+        ),
+        connections_search=ConnectionsSearchPage(
+            browser,
+            max_pages=settings.people_search_max_pages_per_call,
+        ),
+        person_profile=PersonProfilePage(
+            browser,
+            max_detail_pages=settings.profile_max_detail_pages_per_call,
+        ),
+        company_search=CompanySearchPage(
+            browser,
+            max_pages=settings.company_search_max_pages_per_call,
+        ),
+        company_profile=CompanyProfilePage(browser),
+        post_search=PostSearchPage(browser, max_pages=settings.post_search_max_pages_per_call),
+        post_detail=PostDetailPage(browser),
+        post_comments=PostCommentsPage(
+            browser,
+            max_expansion_rounds=settings.post_comments_max_expansion_rounds_per_call,
+        ),
+        post_publishing=PostPublishingPage(browser, assets),
+        post_comment=PostCommentPage(browser, assets),
+        post_reaction=PostReactionPage(browser, assets),
+        invitation_list=InvitationListPage(
+            browser,
+            max_scroll_rounds=settings.invitations_max_scroll_rounds_per_call,
+        ),
+        connections_list=ConnectionsListPage(
+            browser,
+            max_scroll_rounds=settings.connections_max_scroll_rounds_per_call,
+        ),
+        invitation_send=SendInvitationPage(browser),
+        invitation_accept=AcceptInvitationPage(browser),
+        invitation_ignore=IgnoreInvitationPage(browser),
+        conversation_search=conversation_search,
+        conversation_read=ConversationGetPage(
+            browser,
+            conversation_search=conversation_search,
+            max_history_rounds=settings.messaging_max_scroll_rounds_per_call,
+        ),
+        message_send=MessageSendPage(
+            browser,
+            assets,
+            conversation_search=conversation_search,
+            max_history_rounds=settings.messaging_max_scroll_rounds_per_call,
+        ),
+    )
+
+
+def attach_tool_implementations(
+    mcp: FastMCP[None],
+    *,
+    settings: Settings,
+    browser: BrowserManager,
+    scheduler: Scheduler,
+    cursor_store: CursorStore,
+    job_search: JobSearchPage,
+    job_detail: JobDetailPage,
+    people_search: PeopleSearchPage,
+    connections_search: ConnectionsSearchPage,
+    person_profile: PersonProfilePage,
+    company_search: CompanySearchPage,
+    company_profile: CompanyProfilePage,
+    post_search: PostSearchPage,
+    post_detail: PostDetailPage,
+    post_comments: PostCommentsPage,
+    post_publishing: PostPublishingPage,
+    post_comment: PostCommentPage,
+    post_reaction: PostReactionPage,
+    invitation_list: InvitationListPage,
+    connections_list: ConnectionsListPage,
+    invitation_send: SendInvitationPage,
+    invitation_accept: AcceptInvitationPage,
+    invitation_ignore: IgnoreInvitationPage,
+    conversation_search: ConversationSearchPage,
+    conversation_read: ConversationGetPage,
+    message_send: MessageSendPage,
+) -> None:
+    """Attach explicitly supplied tool implementations without storing them."""
 
     from linkedin_mcp.tools._shared.tool import tool_annotations
     from linkedin_mcp.tools.companies.get.tool import register as register_companies_get
@@ -41,26 +191,47 @@ def attach_tools(mcp: FastMCP[None], container: AppContainer) -> None:
     from linkedin_mcp.tools.session.status.tool import register as register_session_status
 
     annotations = tool_annotations()
-    register_server_status(mcp, container, annotations.local_read)
-    register_session_status(mcp, container, annotations.local_read)
-    register_jobs_search(mcp, container, annotations.linkedin_read)
-    register_jobs_get(mcp, container, annotations.linkedin_read)
-    register_people_search(mcp, container, annotations.linkedin_read)
-    register_people_get(mcp, container, annotations.linkedin_read)
-    register_companies_search(mcp, container, annotations.linkedin_read)
-    register_companies_get(mcp, container, annotations.linkedin_read)
-    register_posts_search(mcp, container, annotations.linkedin_read)
-    register_posts_get(mcp, container, annotations.linkedin_read)
-    register_posts_comments_list(mcp, container, annotations.linkedin_read)
-    register_posts_create(mcp, container, annotations.linkedin_write)
-    register_posts_comment(mcp, container, annotations.linkedin_write)
-    register_posts_react(mcp, container, annotations.linkedin_write)
-    register_invitations_list(mcp, container, annotations.linkedin_read)
-    register_connections_list(mcp, container, annotations.linkedin_read)
-    register_connections_search(mcp, container, annotations.linkedin_read)
-    register_invitations_send(mcp, container, annotations.linkedin_write)
-    register_invitations_accept(mcp, container, annotations.linkedin_write)
-    register_invitations_ignore(mcp, container, annotations.linkedin_write)
-    register_messaging_search(mcp, container, annotations.linkedin_read)
-    register_messaging_conversation_get(mcp, container, annotations.messaging_read)
-    register_messaging_send(mcp, container, annotations.linkedin_write)
+    account_id = settings.account_id
+    register_server_status(mcp, settings, scheduler, annotations.local_read)
+    register_session_status(mcp, settings, browser, annotations.local_read)
+    register_jobs_search(
+        mcp, scheduler, job_search, cursor_store, account_id, annotations.linkedin_read
+    )
+    register_jobs_get(mcp, scheduler, job_detail, annotations.linkedin_read)
+    register_people_search(
+        mcp, scheduler, people_search, cursor_store, account_id, annotations.linkedin_read
+    )
+    register_people_get(mcp, scheduler, person_profile, annotations.linkedin_read)
+    register_companies_search(
+        mcp, scheduler, company_search, cursor_store, account_id, annotations.linkedin_read
+    )
+    register_companies_get(mcp, scheduler, company_profile, annotations.linkedin_read)
+    register_posts_search(
+        mcp, scheduler, post_search, cursor_store, account_id, annotations.linkedin_read
+    )
+    register_posts_get(mcp, scheduler, post_detail, annotations.linkedin_read)
+    register_posts_comments_list(
+        mcp, scheduler, post_comments, cursor_store, account_id, annotations.linkedin_read
+    )
+    register_posts_create(mcp, scheduler, post_publishing, annotations.linkedin_write)
+    register_posts_comment(mcp, scheduler, post_comment, annotations.linkedin_write)
+    register_posts_react(mcp, scheduler, post_reaction, annotations.linkedin_write)
+    register_invitations_list(
+        mcp, scheduler, invitation_list, cursor_store, account_id, annotations.linkedin_read
+    )
+    register_connections_list(
+        mcp, scheduler, connections_list, cursor_store, account_id, annotations.linkedin_read
+    )
+    register_connections_search(
+        mcp, scheduler, connections_search, cursor_store, account_id, annotations.linkedin_read
+    )
+    register_invitations_send(mcp, scheduler, invitation_send, annotations.linkedin_write)
+    register_invitations_accept(mcp, scheduler, invitation_accept, annotations.linkedin_write)
+    register_invitations_ignore(mcp, scheduler, invitation_ignore, annotations.linkedin_write)
+    register_messaging_search(
+        mcp, scheduler, conversation_search, cursor_store, account_id, annotations.linkedin_read
+    )
+    register_messaging_conversation_get(
+        mcp, scheduler, conversation_read, annotations.messaging_read
+    )
+    register_messaging_send(mcp, scheduler, message_send, annotations.linkedin_write)

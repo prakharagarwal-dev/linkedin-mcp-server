@@ -8,8 +8,8 @@ from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from linkedin_mcp.container import AppContainer
-from linkedin_mcp.execution import Task
+from linkedin_mcp.infra.cursor import CursorStore
+from linkedin_mcp.infra.queue import Scheduler, Task
 from linkedin_mcp.tools._shared.tool import (
     CursorArgument,
     IdentifierArgument,
@@ -19,12 +19,16 @@ from linkedin_mcp.tools._shared.tool import (
 from linkedin_mcp.tools.jobs.search.models.job_search_filters import JobSearchFilters
 from linkedin_mcp.tools.jobs.search.models.job_search_input import JobSearchInput
 from linkedin_mcp.tools.jobs.search.models.job_search_output import JobSearchOutput
+from linkedin_mcp.tools.jobs.search.page import JobSearchPage
 from linkedin_mcp.tools.jobs.search.pagination import execute
 
 
 def register(
     mcp: FastMCP[None],
-    container: AppContainer,
+    scheduler: Scheduler,
+    page: JobSearchPage,
+    cursor_store: CursorStore,
+    account_id: str,
     annotations: ToolAnnotations,
 ) -> None:
     @mcp.tool(
@@ -95,12 +99,12 @@ def register(
             name="linkedin.jobs.search",
             execute=lambda: execute(
                 request,
-                page=container.job_search,
-                pagination=container.pagination,
-                account_id=container.settings.account_id,
+                page=page,
+                cursor_store=cursor_store,
+                account_id=account_id,
             ),
         )
-        await container.scheduler.schedule(task)
+        await scheduler.schedule(task)
         result = await tool_result(task.result())
         await ctx.report_progress(100, 100, "LinkedIn job search complete")
         return result

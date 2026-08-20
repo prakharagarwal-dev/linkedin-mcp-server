@@ -3,9 +3,14 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from mcp.server.fastmcp import FastMCP
+
 from linkedin_mcp.config import Settings
-from linkedin_mcp.container import create_production_container
 from linkedin_mcp.errors import ErrorCode
+from linkedin_mcp.infra.cursor import CursorStore
+from linkedin_mcp.infra.queue import Scheduler, Worker
+from linkedin_mcp.tools import attach_tools
+from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.tools._shared.models import CapabilityName, StrictModel
 from linkedin_mcp.tools.companies.search.models.company_search_filters import CompanySearchFilters
 from linkedin_mcp.tools.connections.search.models.connections_search_filters import (
@@ -202,9 +207,28 @@ EXPECTED_ERROR_CODES = frozenset(
 )
 
 
+def _production_mcp() -> FastMCP[None]:
+    settings = Settings()
+    browser = BrowserManager(settings)
+    scheduler = Scheduler(Worker(), capacity=settings.queue_capacity)
+    cursor_store = CursorStore(
+        ttl_seconds=settings.pagination_cursor_ttl_seconds,
+        max_active_cursors=settings.pagination_max_active_cursors,
+        max_seen_items_per_cursor=settings.pagination_max_seen_items_per_cursor,
+    )
+    mcp = create_mcp_server(settings)
+    attach_tools(
+        mcp,
+        settings=settings,
+        browser=browser,
+        scheduler=scheduler,
+        cursor_store=cursor_store,
+    )
+    return mcp
+
+
 def test_manifest_matches_the_exact_public_tool_surface() -> None:
-    container = create_production_container(Settings())
-    mcp = create_mcp_server(container)
+    mcp = _production_mcp()
     tools = mcp._tool_manager.list_tools()  # pyright: ignore[reportPrivateUsage]
     registered_names = {tool.name for tool in tools}
 
@@ -227,8 +251,7 @@ def test_readme_tools_table_matches_the_exact_public_tool_surface() -> None:
 
 
 def test_public_tools_do_not_expose_browser_queue_or_pacing_controls() -> None:
-    container = create_production_container(Settings())
-    mcp = create_mcp_server(container)
+    mcp = _production_mcp()
     tools = mcp._tool_manager.list_tools()  # pyright: ignore[reportPrivateUsage]
     forbidden_top_level_arguments = {
         "browser",

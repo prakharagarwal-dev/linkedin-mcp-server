@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import socket
-from collections.abc import AsyncGenerator, Awaitable, Callable
-from contextlib import asynccontextmanager
+from collections.abc import Awaitable, Callable
 from typing import cast
 
 import uvicorn
@@ -16,8 +15,7 @@ from starlette.responses import Response
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from linkedin_mcp import __version__
-from linkedin_mcp.container import AppContainer
-from linkedin_mcp.tools import attach_tools
+from linkedin_mcp.config import Settings
 
 
 class _LoopbackMCPApp:
@@ -37,20 +35,8 @@ class _LoopbackMCPApp:
         await self._app(scope, receive, send)
 
 
-def create_mcp_server(
-    container: AppContainer,
-    *,
-    manage_container_lifecycle: bool = True,
-) -> FastMCP[None]:
-    @asynccontextmanager
-    async def lifespan(_: FastMCP[None]) -> AsyncGenerator[None]:
-        if manage_container_lifecycle:
-            await container.start()
-        try:
-            yield None
-        finally:
-            if manage_container_lifecycle:
-                await container.close()
+def create_mcp_server(settings: Settings) -> FastMCP[None]:
+    """Create the transport-facing FastMCP server without application dependencies."""
 
     mcp: FastMCP[None] = FastMCP(
         "linkedin-mcp-server",
@@ -61,15 +47,13 @@ def create_mcp_server(
         ),
         json_response=True,
         stateless_http=False,
-        host=container.settings.http_host,
-        port=container.settings.http_port,
-        log_level=container.settings.log_level,
-        lifespan=lifespan,
+        host=settings.http_host,
+        port=settings.http_port,
+        log_level=settings.log_level,
     )
     # FastMCP does not currently forward a product version to its low-level server.
     mcp._mcp_server.version = __version__  # pyright: ignore[reportPrivateUsage]
 
-    attach_tools(mcp, container)
     return mcp
 
 
@@ -90,19 +74,19 @@ def bind_http_listener(host: str, port: int) -> socket.socket:
 
 
 async def serve_http(
-    container: AppContainer,
+    mcp: FastMCP[None],
+    settings: Settings,
     listener: socket.socket,
     wait_for_stop: Callable[[], Awaitable[None]],
 ) -> None:
     """Serve Streamable HTTP until Uvicorn exits or the host requests shutdown."""
 
-    mcp = create_mcp_server(container, manage_container_lifecycle=False)
     app = _LoopbackMCPApp(mcp.streamable_http_app())
     config = uvicorn.Config(
         app,
-        host=container.settings.http_host,
-        port=container.settings.http_port,
-        log_level=container.settings.log_level.lower(),
+        host=settings.http_host,
+        port=settings.http_port,
+        log_level=settings.log_level.lower(),
         access_log=False,
         timeout_graceful_shutdown=None,
     )

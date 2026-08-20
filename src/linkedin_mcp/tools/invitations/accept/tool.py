@@ -8,8 +8,7 @@ from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from linkedin_mcp.container import AppContainer
-from linkedin_mcp.execution import Task
+from linkedin_mcp.infra.queue import Scheduler, Task
 from linkedin_mcp.tools._shared.actions import (
     ActionInspection,
     ActionOutput,
@@ -48,7 +47,8 @@ async def execute(request: InvitationAcceptInput, page: AcceptInvitationPage) ->
 
 def register(
     mcp: FastMCP[None],
-    container: AppContainer,
+    scheduler: Scheduler,
+    page: AcceptInvitationPage,
     annotations: ToolAnnotations,
 ) -> None:
     @mcp.tool(
@@ -82,10 +82,10 @@ def register(
         )
         task = Task(
             name="linkedin.invitations.accept",
-            execute=lambda: execute(request, container.invitation_accept),
+            execute=lambda: execute(request, page),
             interruptible=False,
         )
-        await container.scheduler.schedule(task)
+        await scheduler.schedule(task)
         result = await tool_result(task.result())
         await ctx.report_progress(100, 100, "Acceptance action reached a terminal outcome")
         return result
