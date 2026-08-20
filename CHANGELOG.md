@@ -8,6 +8,9 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Move the canonical MCPB bundle manifest from `packaging/mcpb/manifest.json`
+  to the repository-root `manifest.json`; remove the obsolete `packaging/`
+  hierarchy and stage releases from the root manifest.
 - Make every public tool leaf own one `models.py` containing all of its input,
   output, evidence, and action contracts. Localize write execution and safe MCP
   result projection in each tool, and remove the global `tools/_shared/`,
