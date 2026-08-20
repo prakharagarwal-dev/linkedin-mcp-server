@@ -20,7 +20,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_LINK_MODE=copy \
     PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
     LINKEDIN_MCP_BROWSER_PROFILE_PATH=/data/linkedin-mcp/profile \
-    LINKEDIN_MCP_ASSET_ROOT_PATH=/data/linkedin-mcp/assets \
     LINKEDIN_MCP_AUTO_LOGIN_ON_START=false \
     LINKEDIN_MCP_RUNTIME_LOCK_PATH=/data/linkedin-mcp/runtime.lock \
     PATH=/app/.venv/bin:$PATH

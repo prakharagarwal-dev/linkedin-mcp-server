@@ -36,7 +36,6 @@ def test_local_paths_default_to_persistent_platform_locations(
     for name in (
         "BROWSER_PROFILE_PATH",
         "BROWSER_CACHE_PATH",
-        "ASSET_ROOT_PATH",
         "RUNTIME_LOCK_PATH",
     ):
         monkeypatch.delenv(f"LINKEDIN_MCP_{name}", raising=False)
@@ -50,7 +49,6 @@ def test_local_paths_default_to_persistent_platform_locations(
         appauthor=False,
         opinion=False,
     )
-    assert settings.asset_root_path == data_path / "assets"
     assert settings.runtime_lock_path == data_path / "runtime.lock"
 
 

@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 from contextlib import suppress
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from urllib.parse import urljoin, urlsplit
 
 from playwright.async_api import Error as PlaywrightError
@@ -13,7 +12,6 @@ from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
-from linkedin_mcp.assets import LocalAssetStore
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
 from linkedin_mcp.tools._shared.actions import (
     ActionCommand,
@@ -159,9 +157,8 @@ async def _unique_visible_or_hidden(locator: Locator, description: str) -> Locat
 class PostPublishingPage:
     """Narrow personal-member composer adapter; it never publishes as a Page."""
 
-    def __init__(self, browser: BrowserManager, assets: LocalAssetStore) -> None:
+    def __init__(self, browser: BrowserManager) -> None:
         self._browser = browser
-        self._assets = assets
 
     async def inspect_post(
         self,
@@ -198,7 +195,6 @@ class PostPublishingPage:
             raise InvalidTargetError("The personal-post action payload is invalid.")
         payload = command.payload
         self._validate_schedule(payload.scheduled_at)
-        paths = await self._assets.resolve_post(payload.content)
         async with self._browser.page() as page:
             try:
                 await self._browser.navigate(page, _HOME_URL)
@@ -217,7 +213,7 @@ class PostPublishingPage:
                         ),
                     )
 
-                await self._compose(page, dialog, payload, paths)
+                await self._compose(page, dialog, payload)
                 dialog = await self._composer_dialog(page)
                 await self._configure_settings(page, dialog, payload)
                 if payload.scheduled_at is not None:
@@ -664,21 +660,20 @@ class PostPublishingPage:
         page: Page,
         dialog: Locator,
         payload: PostCreatePayload,
-        paths: dict[str, Path],
     ) -> None:
         content = payload.content
         if isinstance(content, ImagePostContent):
-            await self._compose_images(page, dialog, content, paths)
+            await self._compose_images(page, dialog, content)
         elif isinstance(content, VideoPostContent):
-            await self._compose_video(page, dialog, content, paths)
+            await self._compose_video(page, dialog, content)
         elif isinstance(content, DocumentPostContent):
-            await self._compose_document(page, dialog, content, paths)
+            await self._compose_document(page, dialog, content)
         elif isinstance(content, PollPostContent):
             await self._compose_poll(page, dialog, content)
         elif isinstance(content, CelebrationPostContent):
-            await self._compose_celebration(page, dialog, content, paths)
+            await self._compose_celebration(page, dialog, content)
         elif isinstance(content, EventPostContent):
-            await self._compose_event(page, dialog, content, paths)
+            await self._compose_event(page, dialog, content)
         elif isinstance(content, HiringPostContent):
             await self._compose_hiring(page, dialog, content)
         elif isinstance(content, ExpertRequestPostContent):
@@ -719,7 +714,6 @@ class PostPublishingPage:
         page: Page,
         dialog: Locator,
         content: ImagePostContent,
-        paths: dict[str, Path],
     ) -> None:
         control = await _unique_visible(
             dialog.get_by_role("button", name=re.compile(r"^add media$", re.I)),
@@ -731,7 +725,7 @@ class PostPublishingPage:
             editor.locator('input[type="file"]'),
             "media file input",
         )
-        await upload.set_input_files([str(paths[image.asset_ref]) for image in content.images])
+        await upload.set_input_files([image.asset_ref for image in content.images])
         selection_controls = editor.get_by_role(
             "button",
             name=re.compile(r"^select .+", re.I),
@@ -1001,7 +995,6 @@ class PostPublishingPage:
         page: Page,
         dialog: Locator,
         content: VideoPostContent,
-        paths: dict[str, Path],
     ) -> None:
         control = await _unique_visible(
             dialog.get_by_role("button", name=re.compile(r"^add media$", re.I)),
@@ -1010,7 +1003,7 @@ class PostPublishingPage:
         await self._browser.click_visible_control(page, control)
         editor = await self._media_editor(page)
         upload = await _unique_visible(editor.locator('input[type="file"]'), "media file input")
-        await upload.set_input_files(str(paths[content.video_asset_ref]))
+        await upload.set_input_files(content.video_asset_ref)
         play = editor.get_by_role("button", name=re.compile(r"^play$", re.I))
         with suppress(PlaywrightTimeoutError):
             await play.first.wait_for(state="visible", timeout=15_000)
@@ -1031,7 +1024,7 @@ class PostPublishingPage:
                 thumbnail_dialog.locator('input[type="file"][aria-label="Add video thumbnail"]'),
                 "video thumbnail file input",
             )
-            await input_control.set_input_files(str(paths[content.thumbnail_asset_ref]))
+            await input_control.set_input_files(content.thumbnail_asset_ref)
             await self._browser.click_visible_control(
                 page,
                 await _unique_visible(
@@ -1083,7 +1076,7 @@ class PostPublishingPage:
                 "caption file input",
             )
             assert content.caption_asset_ref is not None
-            await upload_caption.set_input_files(str(paths[content.caption_asset_ref]))
+            await upload_caption.set_input_files(content.caption_asset_ref)
         await self._browser.click_visible_control(
             page,
             await _unique_visible(
@@ -1103,7 +1096,6 @@ class PostPublishingPage:
         page: Page,
         dialog: Locator,
         content: DocumentPostContent,
-        paths: dict[str, Path],
     ) -> None:
         more = await _unique_visible(
             dialog.get_by_role("button", name=re.compile(r"^more$", re.I)),
@@ -1125,7 +1117,7 @@ class PostPublishingPage:
             "Share a document dialog",
         )
         upload = await _unique_visible(editor.locator('input[type="file"]'), "document file input")
-        await upload.set_input_files(str(paths[content.document_asset_ref]))
+        await upload.set_input_files(content.document_asset_ref)
         title = await _unique_visible(
             editor.get_by_placeholder(
                 re.compile(r"add a descriptive title to your document", re.I)
@@ -1194,7 +1186,6 @@ class PostPublishingPage:
         page: Page,
         dialog: Locator,
         content: CelebrationPostContent,
-        paths: dict[str, Path],
     ) -> None:
         open_control = await _unique_visible(
             dialog.get_by_role(
@@ -1243,7 +1234,7 @@ class PostPublishingPage:
                 editor.locator('input[type="file"][accept*="image"]'),
                 "celebration custom-image input",
             )
-            await upload.set_input_files(str(paths[content.image_asset_ref]))
+            await upload.set_input_files(content.image_asset_ref)
             if content.image_alt_text is not None:
                 await self._add_image_alt_text(page, editor, content.image_alt_text)
                 editor = await _unique_visible(
@@ -1283,7 +1274,6 @@ class PostPublishingPage:
         page: Page,
         dialog: Locator,
         content: EventPostContent,
-        paths: dict[str, Path],
     ) -> None:
         await self._browser.click_visible_control(
             page,
@@ -1309,7 +1299,7 @@ class PostPublishingPage:
                 editor.locator('input[type="file"][accept*="image"]'),
                 "event cover-image input",
             )
-            await cover.set_input_files(str(paths[content.cover_asset_ref]))
+            await cover.set_input_files(content.cover_asset_ref)
             if content.cover_alt_text is not None:
                 await self._set_optional_alt_text(
                     page,

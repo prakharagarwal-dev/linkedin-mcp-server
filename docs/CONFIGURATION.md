@@ -21,7 +21,7 @@ Enable, disable, or restrict tools in the MCP client. If a client makes a tool
 available and invokes it, the server treats that invocation as authorized for
 the configured LinkedIn account. The server still validates typed input,
 canonical targets, LinkedIn authentication, exact visible preconditions,
-attachment path/type/size validation, bounded execution, and visible postconditions.
+capability-specific upload controls, bounded execution, and visible postconditions.
 
 ## Client tool policy
 
@@ -77,7 +77,6 @@ through their own tool-permission interface.
 | `BROWSER_AUTO_INSTALL` | `true` | Install the matching Chromium revision when needed |
 | `BROWSER_INSTALL_TIMEOUT_SECONDS` | `600` | Browser installation time bound |
 | `AUTO_LOGIN_ON_START` | `true` | Validate or recover login after MCP initialization |
-| `ASSET_ROOT_PATH` | per-user application data | Only local files below this directory may be attached |
 | `ALLOWED_HOSTS` | exact LinkedIn hosts | Navigation hostname allowlist |
 | `QUEUE_CAPACITY` | `100` | Maximum waiting process-local capability calls |
 | `MINIMUM_NAVIGATION_INTERVAL_SECONDS` | `2` | Minimum internal delay between navigations |
@@ -156,12 +155,20 @@ Profile-changing and LinkedIn authentication commands hold the same account
 lock as `serve`, preventing a server from starting halfway through them. Give
 separate accounts distinct profile and lock paths.
 
-## Local assets
+## File uploads
 
-Posts, comments, and messages never accept an arbitrary desktop path. Place an
-attachment below `LINKEDIN_MCP_ASSET_ROOT_PATH` and pass its relative
-`asset_ref`. The action resolves that current file directly when it uploads,
-after checking its safe path, supported extension, and LinkedIn size limit.
+Post, comment, and message tools accept the client-supplied file path directly.
+The path may be absolute or relative to the server process working directory;
+there is no configured asset root or server-side filesystem containment check.
+The server process must be able to read the path. Each tool selects only its
+specific visible LinkedIn upload control, and LinkedIn ultimately accepts or
+rejects the file's type and size.
+
+This means an authorized MCP client can ask an upload tool to read any file that
+the server's operating-system user can access and transmit it to LinkedIn. Run
+the server only for trusted clients, limit the process's filesystem permissions,
+and approve file-bearing write calls only when the selected path is intended for
+that LinkedIn action.
 
 ## Transports
 
@@ -205,7 +212,8 @@ executed freshly. Queue state, navigation pacing, and continuation cursors exist
 only in shared-host memory; a host restart clears them. Cursors are opaque,
 single-use, and bound to their account, capability, and semantic filters; they
 remain usable after an MCP client reconnects. The persistent browser profile,
-managed browser cache, and explicitly selected local assets survive.
+and managed browser cache survive. Client-selected upload files remain in their
+original locations and are not copied or retained by the server.
 
 After an uncertain or hard-interrupted action, inspect LinkedIn's visible state
 before invoking the tool again. Never blindly retry an account-changing call.
@@ -218,7 +226,9 @@ docker pull ghcr.io/prakharagarwal-dev/linkedin-mcp-server:latest
 ```
 
 The image includes Chromium, runs as UID/GID `10001`, and stores the browser
-profile and assets below `/data/linkedin-mcp`. Mount that directory only when
-you intend to persist it. Automatic headed login is disabled in the image, so
-create and mount an authenticated profile from an environment that can display
-Chromium.
+profile below `/data/linkedin-mcp`. Mount that directory only when you intend to
+persist it. A host file path is not automatically visible inside the container;
+mount any directory containing intended uploads into the container, preferably
+read-only, and pass the resulting container path to the tool. Automatic headed
+login is disabled in the image, so create and mount an authenticated profile
+from an environment that can display Chromium.

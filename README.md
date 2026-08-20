@@ -416,7 +416,9 @@ violations, or circumvention of access controls.
   permission failures, and configuration errors.
 - It does not implement CAPTCHA bypass, proxy rotation, fingerprint spoofing,
   credential harvesting, stealth plugins, or private LinkedIn endpoints.
-- Never commit or share the persistent browser profile or local assets.
+- Never commit or share the persistent browser profile. File-bearing tools can
+  upload any path readable by the server process, so use trusted MCP clients and
+  approve only files intended for LinkedIn.
 
 See [SECURITY.md](SECURITY.md) and [the security design](docs/SECURITY.md).
 

@@ -44,7 +44,6 @@ def attach_tools(
 ) -> None:
     """Construct production pages and attach every public MCP tool."""
 
-    from linkedin_mcp.assets import LocalAssetStore
     from linkedin_mcp.tools.companies.get.page import CompanyProfilePage
     from linkedin_mcp.tools.companies.search.page import CompanySearchPage
     from linkedin_mcp.tools.connections.list.page import ConnectionsListPage
@@ -67,7 +66,6 @@ def attach_tools(
     from linkedin_mcp.tools.posts.react.page import PostReactionPage
     from linkedin_mcp.tools.posts.search.page import PostSearchPage
 
-    assets = LocalAssetStore(settings.asset_root_path)
     conversation_search = ConversationSearchPage(
         browser,
         max_scroll_rounds=settings.messaging_max_scroll_rounds_per_call,
@@ -103,9 +101,9 @@ def attach_tools(
             browser,
             max_expansion_rounds=settings.post_comments_max_expansion_rounds_per_call,
         ),
-        post_publishing=PostPublishingPage(browser, assets),
-        post_comment=PostCommentPage(browser, assets),
-        post_reaction=PostReactionPage(browser, assets),
+        post_publishing=PostPublishingPage(browser),
+        post_comment=PostCommentPage(browser),
+        post_reaction=PostReactionPage(browser),
         invitation_list=InvitationListPage(
             browser,
             max_scroll_rounds=settings.invitations_max_scroll_rounds_per_call,
@@ -125,7 +123,6 @@ def attach_tools(
         ),
         message_send=MessageSendPage(
             browser,
-            assets,
             conversation_search=conversation_search,
             max_history_rounds=settings.messaging_max_scroll_rounds_per_call,
         ),

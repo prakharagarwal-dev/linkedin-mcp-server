@@ -36,14 +36,12 @@ async def test_two_stdio_clients_elect_and_share_one_surviving_runtime(
     lock_path = tmp_path / "runtime.lock"
     profile_path = tmp_path / "profile"
     cache_path = tmp_path / "browsers"
-    asset_path = tmp_path / "assets"
     environment = {
         **os.environ,
         "LINKEDIN_MCP_AUTO_LOGIN_ON_START": "false",
         "LINKEDIN_MCP_BROWSER_AUTO_INSTALL": "false",
         "LINKEDIN_MCP_BROWSER_PROFILE_PATH": str(profile_path),
         "LINKEDIN_MCP_BROWSER_CACHE_PATH": str(cache_path),
-        "LINKEDIN_MCP_ASSET_ROOT_PATH": str(asset_path),
         "LINKEDIN_MCP_RUNTIME_LOCK_PATH": str(lock_path),
         "LINKEDIN_MCP_HTTP_HOST": "127.0.0.1",
         "LINKEDIN_MCP_HTTP_PORT": str(unused_tcp_port),

@@ -225,15 +225,20 @@ Logs contain operational metadata and safe error categories. They must not
 contain cookies, credentials, browser-profile contents, raw environment
 secrets, local attachment contents, or full private message bodies.
 
-## Local assets
+## File-upload boundary
 
-Post, comment, and message files are constrained to the configured asset root.
-References are validated relative paths; traversal and arbitrary filesystem
-paths are rejected. Immediately before upload, the server resolves the current
-file and validates its supported extension and LinkedIn size limit.
+Post, comment, and message tools pass a client-supplied path directly to
+Playwright. The server deliberately has no asset root, path containment check,
+or central file type and size policy. A trusted MCP client may therefore cause
+an upload tool to read any path available to the server's operating-system user
+and transmit that file to LinkedIn.
 
-The asset directory is user managed and may contain sensitive files. Grant it
-only the minimum filesystem access required by the server process.
+This access exists only on typed file-bearing LinkedIn actions; the server does
+not expose a generic file-read or browser tool. Each tool uses its specific
+visible LinkedIn upload surface, and LinkedIn can reject an unsupported file.
+Treat client tool availability and approval as the authorization boundary,
+grant the server process only the filesystem access it needs, and mount upload
+directories read-only when running in a container.
 
 ## Network serving
 

@@ -11,8 +11,6 @@ from playwright.async_api import Locator, Page, Route, async_playwright
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl, ValidationError
 
-from linkedin_mcp.assets import LocalAssetStore
-from linkedin_mcp.errors import InvalidTargetError
 from linkedin_mcp.tools._shared.actions import (
     ActionCommand,
     ActionOutcome,
@@ -132,7 +130,6 @@ async def test_inspection_waits_through_the_current_visible_composer_loader(
                 BrowserManager,
                 PublishingFixtureBrowser(page, composer_delay_ms=3_500),
             ),
-            LocalAssetStore(tmp_path),
         )
         try:
             capture = await adapter.inspect_post(request)
@@ -167,7 +164,6 @@ async def test_personal_text_post_action_verifies_new_stable_post(
         page = await browser.new_page()
         adapter = PostPublishingPage(
             cast(BrowserManager, PublishingFixtureBrowser(page)),
-            LocalAssetStore(tmp_path),
         )
         try:
             command = await _action_command(adapter, request)
@@ -201,7 +197,6 @@ async def test_pre_submit_timeout_is_a_verified_failure_not_an_uncertain_publish
         fixture_browser = PublishingFixtureBrowser(page)
         adapter = PostPublishingPage(
             cast(BrowserManager, fixture_browser),
-            LocalAssetStore(tmp_path),
         )
         try:
             command = await _action_command(adapter, request)
@@ -230,7 +225,6 @@ async def test_visible_success_alert_verifies_publish_after_post_click_timeout(
         fixture_browser = PublishingFixtureBrowser(page)
         adapter = PostPublishingPage(
             cast(BrowserManager, fixture_browser),
-            LocalAssetStore(tmp_path),
         )
         try:
             command = await _action_command(adapter, request)
@@ -259,7 +253,6 @@ async def test_visible_failure_alert_returns_verified_non_publish(
         fixture_browser = PublishingFixtureBrowser(page)
         adapter = PostPublishingPage(
             cast(BrowserManager, fixture_browser),
-            LocalAssetStore(tmp_path),
         )
         try:
             command = await _action_command(adapter, request)
@@ -282,7 +275,7 @@ async def test_photo_post_uses_direct_asset_and_applies_alt_text_and_exact_membe
         text="Architecture diagram",
         images=(
             PostImageInput(
-                asset_ref="diagram.png",
+                asset_ref=str(tmp_path / "diagram.png"),
                 alt_text="A reliable architecture diagram",
                 tags=(
                     PostImageTagInput(
@@ -319,7 +312,6 @@ async def test_photo_post_uses_direct_asset_and_applies_alt_text_and_exact_membe
         page = await browser.new_page()
         adapter = PostPublishingPage(
             cast(BrowserManager, PublishingFixtureBrowser(page)),
-            LocalAssetStore(tmp_path),
         )
         try:
             command = await _action_command(adapter, request)
@@ -349,10 +341,10 @@ async def test_video_document_and_poll_modes_cover_all_structured_composer_optio
             request_id="action-video-post",
             content=VideoPostContent(
                 text="A fixture video",
-                video_asset_ref="demo.mp4",
-                thumbnail_asset_ref="thumb.png",
+                video_asset_ref=str(tmp_path / "demo.mp4"),
+                thumbnail_asset_ref=str(tmp_path / "thumb.png"),
                 caption_mode=VideoCaptionMode.FILE,
-                caption_asset_ref="captions.srt",
+                caption_asset_ref=str(tmp_path / "captions.srt"),
             ),
         ),
         PostCreateInput(
@@ -360,7 +352,7 @@ async def test_video_document_and_poll_modes_cover_all_structured_composer_optio
             request_id="action-document-post",
             content=DocumentPostContent(
                 text="A fixture document",
-                document_asset_ref="guide.pdf",
+                document_asset_ref=str(tmp_path / "guide.pdf"),
                 document_title="Reliable Systems Guide",
             ),
         ),
@@ -385,7 +377,6 @@ async def test_video_document_and_poll_modes_cover_all_structured_composer_optio
                 page = await browser.new_page()
                 adapter = PostPublishingPage(
                     cast(BrowserManager, PublishingFixtureBrowser(page)),
-                    LocalAssetStore(tmp_path),
                 )
                 command = await _action_command(adapter, request)
                 commands.append(command)
@@ -414,7 +405,7 @@ async def test_celebration_event_hiring_and_expert_modes_follow_current_visible_
                 text="We shipped the reliability project.",
                 celebration_type=CelebrationType.PROJECT_LAUNCH,
                 template_index=None,
-                image_asset_ref="celebration.webp",
+                image_asset_ref=str(tmp_path / "celebration.webp"),
                 image_alt_text="Team celebrating a project launch",
             ),
         ),
@@ -437,7 +428,7 @@ async def test_celebration_event_hiring_and_expert_modes_follow_current_visible_
                         display_name="Alex Ray",
                     ),
                 ),
-                cover_asset_ref="event-cover.png",
+                cover_asset_ref=str(tmp_path / "event-cover.png"),
                 cover_alt_text="Reliable Systems Live cover",
             ),
         ),
@@ -471,7 +462,6 @@ async def test_celebration_event_hiring_and_expert_modes_follow_current_visible_
                 page = await browser.new_page()
                 adapter = PostPublishingPage(
                     cast(BrowserManager, PublishingFixtureBrowser(page)),
-                    LocalAssetStore(tmp_path),
                 )
                 command = await _action_command(adapter, request)
                 commands.append(command)
@@ -525,7 +515,6 @@ async def test_group_brand_partnership_and_collaborators_are_exactly_bound(
                 page = await browser.new_page()
                 adapter = PostPublishingPage(
                     cast(BrowserManager, PublishingFixtureBrowser(page)),
-                    LocalAssetStore(tmp_path),
                 )
                 command = await _action_command(adapter, item)
                 commands.append(command)
@@ -570,7 +559,6 @@ async def test_link_preview_removal_and_scheduling_have_visible_postconditions(
                 page = await browser.new_page()
                 adapter = PostPublishingPage(
                     cast(BrowserManager, PublishingFixtureBrowser(page)),
-                    LocalAssetStore(tmp_path),
                 )
                 results.append(await adapter.perform_post(await _action_command(adapter, request)))
                 await page.close()
@@ -583,76 +571,19 @@ async def test_link_preview_removal_and_scheduling_have_visible_postconditions(
     assert "Post scheduled" in results[1].captured_text
 
 
-async def test_asset_store_uses_current_file_and_rejects_wrong_type(
-    tmp_path: Path,
-) -> None:
-    (tmp_path / "safe.png").write_bytes(b"first")
-    (tmp_path / "notes.txt").write_text("wrong type", encoding="utf-8")
-    store = LocalAssetStore(tmp_path)
-    content = ImagePostContent(
-        text="Safe asset",
-        images=(PostImageInput(asset_ref="safe.png"),),
+def test_upload_contract_accepts_client_selected_paths_outside_the_project() -> None:
+    absolute_path = "/private/client-selected/launch image.any-extension"
+    relative_parent_path = "../../client-selected/brief"
+
+    image = PostImageInput(asset_ref=absolute_path)
+    document = DocumentPostContent(
+        text="Client-selected document",
+        document_asset_ref=relative_parent_path,
+        document_title="Brief",
     )
-    assert (await store.resolve_post(content))["safe.png"] == tmp_path / "safe.png"
 
-    (tmp_path / "safe.png").write_bytes(b"changed")
-    assert (await store.resolve_post(content))["safe.png"] == tmp_path / "safe.png"
-    with pytest.raises(InvalidTargetError, match="file type"):
-        await store.resolve_post(
-            ImagePostContent(
-                text="Wrong type",
-                images=(PostImageInput(asset_ref="notes.txt"),),
-            )
-        )
-
-
-async def test_asset_store_rejects_unsafe_or_unavailable_files(tmp_path: Path) -> None:
-    store = LocalAssetStore(tmp_path)
-
-    def image_content(asset_ref: str) -> ImagePostContent:
-        return ImagePostContent(
-            text="Attachment boundary",
-            images=(PostImageInput(asset_ref=asset_ref),),
-        )
-
-    (tmp_path / "empty.png").touch()
-    with pytest.raises(InvalidTargetError, match="asset size"):
-        await store.resolve_post(image_content("empty.png"))
-
-    with pytest.raises(InvalidTargetError, match="safe relative paths"):
-        await store.resolve_post(image_content("nested/../escape.png"))
-
-    with pytest.raises(InvalidTargetError, match="unavailable"):
-        await store.resolve_post(image_content("missing.png"))
-
-    (tmp_path / "folder.png").mkdir()
-    with pytest.raises(InvalidTargetError, match="regular files"):
-        await store.resolve_post(image_content("folder.png"))
-
-    outside = tmp_path.parent / f"{tmp_path.name}-outside.png"
-    outside.write_bytes(b"outside")
-    (tmp_path / "outside.png").symlink_to(outside)
-    with pytest.raises(InvalidTargetError, match="regular files"):
-        await store.resolve_post(image_content("outside.png"))
-
-
-async def test_asset_store_handles_content_without_optional_local_assets(tmp_path: Path) -> None:
-    video = tmp_path / "video.mp4"
-    video.write_bytes(b"v" * (75 * 1024))
-    store = LocalAssetStore(tmp_path)
-
-    assert await store.resolve_post(VideoPostContent(text="Video", video_asset_ref=video.name)) == {
-        video.name: video
-    }
-    assert (
-        await store.resolve_post(
-            CelebrationPostContent(
-                text="Celebration",
-                celebration_type=CelebrationType.PROJECT_LAUNCH,
-            )
-        )
-        == {}
-    )
+    assert image.asset_ref == absolute_path
+    assert document.document_asset_ref == relative_parent_path
 
 
 def test_post_create_contract_rejects_ambiguous_or_unverifiable_options() -> None:

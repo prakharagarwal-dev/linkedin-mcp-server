@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Literal, cast
 from urllib.parse import urljoin
 
+from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
@@ -574,13 +575,6 @@ class MessageSendPage(ConversationSurface):
         if not isinstance(command.payload, MessageSendPayload):
             raise InvalidTargetError("The message action payload is invalid.")
         payload = command.payload
-        paths: dict[str, Path] = {}
-        if payload.attachment_refs:
-            if self._assets is None:
-                raise InvalidTargetError(
-                    "Message attachments require the configured local asset store."
-                )
-            paths = await self._assets.resolve_message(payload.attachment_refs)
         async with self._browser.page() as page:
             page, root, profile_slug, name, is_group = await self._open(
                 page,
@@ -676,7 +670,7 @@ class MessageSendPage(ConversationSurface):
             if payload.message is not None:
                 await composer.fill(payload.message)
             try:
-                await self._upload_attachments(root, payload, paths)
+                await self._upload_attachments(root, payload)
             except InvalidTargetError as error:
                 return await self._result(
                     page,
@@ -685,6 +679,18 @@ class MessageSendPage(ConversationSurface):
                     False,
                     "message_attachment_unavailable",
                     str(error),
+                )
+            except PlaywrightError:
+                return await self._result(
+                    page,
+                    root,
+                    ActionOutcome.FAILED,
+                    False,
+                    "message_attachment_unavailable",
+                    (
+                        "The client-selected path could not be uploaded through "
+                        "LinkedIn's visible attachment control."
+                    ),
                 )
             send = root.get_by_role(
                 "button",
@@ -943,16 +949,10 @@ class MessageSendPage(ConversationSurface):
         self,
         root: Locator,
         payload: MessageSendPayload,
-        paths: dict[str, Path],
     ) -> None:
         for asset_ref in payload.attachment_refs:
-            path = paths.get(asset_ref)
-            if path is None:
-                raise InvalidTargetError(
-                    f"The requested message attachment {asset_ref!r} was not verified."
-                )
             upload = await self._attachment_input(root, asset_ref)
-            await upload.set_input_files(str(path))
+            await upload.set_input_files(asset_ref)
 
     @staticmethod
     async def _attachment_input(root: Locator, asset_ref: str) -> Locator:

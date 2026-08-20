@@ -71,11 +71,7 @@ Identifier = Annotated[
 ]
 AssetReference = Annotated[
     str,
-    StringConstraints(
-        min_length=1,
-        max_length=500,
-        pattern=r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,499}$",
-    ),
+    StringConstraints(min_length=1),
 ]
 JobId = Annotated[str, StringConstraints(pattern=r"^[0-9]{5,30}$")]
 ProfileSlug = Annotated[
