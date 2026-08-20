@@ -12,11 +12,11 @@ from linkedin_mcp.tools._shared.actions import (
     ActionPageResult,
     InvitationAcceptPayload,
 )
-from linkedin_mcp.tools._shared.urls import canonical_profile_url
 from linkedin_mcp.tools.invitations.accept.models.invitation_accept_input import (
     InvitationAcceptInput,
 )
 from linkedin_mcp.tools.invitations.action_surface import InvitationActionSurface
+from linkedin_mcp.ui.urls import canonical_profile_url
 
 
 def _received_invitation_ref(profile_slug: str) -> str:
@@ -37,11 +37,8 @@ class AcceptInvitationPage(InvitationActionSurface):
         expected_ref = _received_invitation_ref(command.target.profile_slug)
         if command.payload.invitation_ref != expected_ref:
             raise InvalidTargetError("The acceptance payload does not match the target invitation.")
-        async with self._browser.page() as page:
-            await self._browser.navigate(
-                page,
-                canonical_profile_url(command.target.profile_slug),
-            )
+        async with self._playwright.page() as page:
+            await page.goto(canonical_profile_url(command.target.profile_slug))
             main, name = await self._profile_identity(page)
             if name.casefold() != command.target.display_name.casefold():
                 return await self._result(
@@ -70,7 +67,7 @@ class AcceptInvitationPage(InvitationActionSurface):
                     "The exact profile no longer exposes the requested incoming request.",
                 )
             try:
-                await self._browser.click_visible_control(page, accept)
+                await accept.click()
             except Exception:
                 return await self._result(
                     page,
@@ -98,10 +95,7 @@ class AcceptInvitationPage(InvitationActionSurface):
                         ),
                     )
                 await page.wait_for_timeout(250)
-            await self._browser.navigate(
-                page,
-                canonical_profile_url(command.target.profile_slug),
-            )
+            await page.goto(canonical_profile_url(command.target.profile_slug))
             main, visible_name = await self._profile_identity(page)
             current_accept, current_ignore = await self._incoming_request_controls(
                 main,

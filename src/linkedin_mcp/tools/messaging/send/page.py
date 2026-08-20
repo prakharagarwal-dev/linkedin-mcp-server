@@ -12,7 +12,6 @@ from typing import Literal, cast
 from urllib.parse import urljoin
 
 from playwright.async_api import Error as PlaywrightError
-from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
@@ -25,18 +24,6 @@ from linkedin_mcp.tools._shared.actions import (
     ActionTarget,
     MessageSendPayload,
 )
-from linkedin_mcp.tools._shared.collections import (
-    CollectionSettleOutcome,
-    CollectionSettleResult,
-    dispatch_bubbling_wheel,
-    wait_for_collection_interaction,
-)
-from linkedin_mcp.tools._shared.urls import (
-    canonical_conversation_url,
-    canonical_profile_url,
-    conversation_id_from_url,
-    profile_slug_from_url,
-)
 from linkedin_mcp.tools.messaging.conversation.get.models.message_attachment_kind import (
     MessageAttachmentKind,
 )
@@ -47,6 +34,20 @@ from linkedin_mcp.tools.messaging.conversation.get.models.message_direction impo
 from linkedin_mcp.tools.messaging.conversation_surface import ConversationSurface
 from linkedin_mcp.tools.messaging.send.models.message_gif_input import MessageGifInput
 from linkedin_mcp.tools.messaging.send.models.message_send_input import MessageSendInput
+from linkedin_mcp.ui import LinkedInLocator as Locator
+from linkedin_mcp.ui import LinkedInPage as Page
+from linkedin_mcp.ui.collections import (
+    CollectionSettleOutcome,
+    CollectionSettleResult,
+    dispatch_bubbling_wheel,
+    wait_for_collection_interaction,
+)
+from linkedin_mcp.ui.urls import (
+    canonical_conversation_url,
+    canonical_profile_url,
+    conversation_id_from_url,
+    profile_slug_from_url,
+)
 
 _SCROLL_PROGRESS_POLL_ATTEMPTS = 8
 
@@ -506,7 +507,7 @@ class MessageSendPage(ConversationSurface):
         self,
         request: MessageSendInput,
     ) -> ActionInspection:
-        async with self._browser.page() as page:
+        async with self._playwright.page() as page:
             page, root, profile_slug, name, is_group = await self._open(
                 page,
                 profile_slug=request.profile_slug,
@@ -575,7 +576,7 @@ class MessageSendPage(ConversationSurface):
         if not isinstance(command.payload, MessageSendPayload):
             raise InvalidTargetError("The message action payload is invalid.")
         payload = command.payload
-        async with self._browser.page() as page:
+        async with self._playwright.page() as page:
             page, root, profile_slug, name, is_group = await self._open(
                 page,
                 profile_slug=(
@@ -631,7 +632,7 @@ class MessageSendPage(ConversationSurface):
                         payload.reply_to_message_ref,
                         participant_name=name,
                     )
-                    await self._browser.click_visible_control(page, reply)
+                    await reply.click()
                 except (InvalidTargetError, ParserDriftError) as error:
                     return await self._result(
                         page,
@@ -706,7 +707,7 @@ class MessageSendPage(ConversationSurface):
                     "The conversation has no unique visible Send control.",
                 )
             try:
-                await self._browser.click_visible_control(page, send)
+                await send.click()
             except Exception:
                 return await self._result(
                     page,
@@ -803,7 +804,7 @@ class MessageSendPage(ConversationSurface):
         )
         result = await self._gif_result(page, root, payload.gif)
         try:
-            await self._browser.click_visible_control(page, result)
+            await result.click()
         except Exception:
             return await self._result(
                 page,
@@ -1009,7 +1010,7 @@ class MessageSendPage(ConversationSurface):
         )
         if await opener.count() != 1:
             raise InvalidTargetError("The conversation has no unique visible GIF picker control.")
-        await self._browser.click_visible_control(page, opener)
+        await opener.click()
         search = page.get_by_role(
             "textbox",
             name=re.compile(r"(?:search|find).*(?:gifs?|klipy)", re.I),
@@ -1021,7 +1022,7 @@ class MessageSendPage(ConversationSurface):
         await search.fill(gif.search_query)
         for _ in range(24):
             await page.wait_for_timeout(250)
-            await self._browser.assert_safe(page)
+            await page.assert_safe()
             result = await self._visible_gif_result(page, gif.result_title)
             if result is not None:
                 return result

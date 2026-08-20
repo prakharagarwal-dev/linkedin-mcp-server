@@ -44,7 +44,6 @@ class Settings(BaseSettings):
     browser_cache_path: Path = Field(default_factory=_default_browser_cache_path)
     browser_auto_install: bool = True
     browser_install_timeout_seconds: float = Field(default=600, ge=30, le=1_800)
-    auto_login_on_start: bool = True
     allowed_hosts: tuple[str, ...] = ("www.linkedin.com", "linkedin.com")
 
     queue_capacity: int = Field(default=100, ge=1, le=10_000)

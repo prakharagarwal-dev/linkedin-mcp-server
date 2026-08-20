@@ -1,14 +1,14 @@
-"""Generic Playwright runtime and persistent-profile infrastructure."""
+"""Persistent Chromium lifecycle and visible LinkedIn authentication."""
 
-from .bootstrap import BrowserRuntimeBootstrap, BrowserSetupState
+from .bootstrap import BrowserBootstrap, BrowserSetupState
+from .manager import BrowserManager
 from .profile import BrowserProfileManager, BrowserProfileResetResult, BrowserProfileStatus
-from .runtime import BrowserRuntime
 
 __all__ = [
+    "BrowserBootstrap",
+    "BrowserManager",
     "BrowserProfileManager",
     "BrowserProfileResetResult",
     "BrowserProfileStatus",
-    "BrowserRuntime",
-    "BrowserRuntimeBootstrap",
     "BrowserSetupState",
 ]

@@ -7,7 +7,7 @@ from urllib.parse import urlsplit
 from playwright.async_api import Page
 
 from linkedin_mcp.errors import AuthenticationRequiredError, RestrictionDetectedError
-from linkedin_mcp.tools._shared.urls import validate_linkedin_url
+from linkedin_mcp.ui.urls import validate_linkedin_url
 
 _RESTRICTION_PATHS = ("/checkpoint/", "/authwall")
 _LOGIN_PATHS = ("/login", "/uas/login")

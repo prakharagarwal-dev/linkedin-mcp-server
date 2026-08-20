@@ -4,7 +4,6 @@ import json
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import cast
 from urllib.parse import urlsplit
 
 import pytest
@@ -13,7 +12,6 @@ from pydantic import ValidationError
 
 import linkedin_mcp.tools.invitations.list.page as invitation_pages
 from linkedin_mcp.errors import BrowserUnavailableError, ParserDriftError
-from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.tools._shared.models import StopReason
 from linkedin_mcp.tools.invitations.list.models.invitation_available_action import (
     InvitationAvailableAction,
@@ -28,6 +26,7 @@ from linkedin_mcp.tools.invitations.list.models.invitation_list_input import Inv
 from linkedin_mcp.tools.invitations.list.models.invitation_summary import InvitationSummary
 from linkedin_mcp.tools.invitations.list.models.invitation_type import InvitationType
 from linkedin_mcp.tools.invitations.list.page import InvitationListPage
+from tests.support.playwright import adapt_browser
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin" / "invitations" / "latest"
 _COUNT_LABELS = {
@@ -120,7 +119,7 @@ async def _collect(
 ) -> tuple[tuple[InvitationSummary, ...], InvitationListCoverage, str, str]:
     fixture_browser = InvitationFixtureBrowser(page, {path: html})
     adapter = InvitationListPage(
-        cast(BrowserManager, fixture_browser),
+        adapt_browser(fixture_browser),
         max_scroll_rounds=max_scroll_rounds,
     )
     return await adapter.collect(request, result_limit=result_limit)

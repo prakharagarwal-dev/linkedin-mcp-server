@@ -5,10 +5,11 @@ from __future__ import annotations
 import re
 from urllib.parse import urlsplit
 
-from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
 from linkedin_mcp.errors import ParserDriftError
+from linkedin_mcp.ui import LinkedInLocator as Locator
+from linkedin_mcp.ui import LinkedInPage as Page
 
 VISIBLE_COUNT = r"\d[\d,.]*[KMB]?\+?"
 

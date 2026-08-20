@@ -14,8 +14,11 @@ from mcp.client.stdio import StdioServerParameters, stdio_client
 from mcp.client.streamable_http import streamable_http_client
 
 from linkedin_mcp import __version__
-from linkedin_mcp.host import inspect_account_runtime, stop_account_runtime
+from linkedin_mcp.config import Settings, runtime_configuration_fingerprint
+from linkedin_mcp.host import AccountProcessLock, inspect_account_runtime
 from linkedin_mcp.host.manager import host_is_healthy
+from linkedin_mcp.transport.server import bind_http_listener, serve_http
+from tests.contract.test_mcp_protocol import protocol_server
 
 ROOT = Path(__file__).parents[2]
 
@@ -29,7 +32,7 @@ class _ClientObservation(TypedDict):
 
 @pytest.mark.asyncio
 @pytest.mark.timeout(90)
-async def test_two_stdio_clients_elect_and_share_one_surviving_runtime(
+async def test_two_stdio_clients_share_one_surviving_runtime(
     tmp_path: Path,
     unused_tcp_port: int,
 ) -> None:
@@ -38,7 +41,6 @@ async def test_two_stdio_clients_elect_and_share_one_surviving_runtime(
     cache_path = tmp_path / "browsers"
     environment = {
         **os.environ,
-        "LINKEDIN_MCP_AUTO_LOGIN_ON_START": "false",
         "LINKEDIN_MCP_BROWSER_AUTO_INSTALL": "false",
         "LINKEDIN_MCP_BROWSER_PROFILE_PATH": str(profile_path),
         "LINKEDIN_MCP_BROWSER_CACHE_PATH": str(cache_path),
@@ -46,7 +48,45 @@ async def test_two_stdio_clients_elect_and_share_one_surviving_runtime(
         "LINKEDIN_MCP_HTTP_HOST": "127.0.0.1",
         "LINKEDIN_MCP_HTTP_PORT": str(unused_tcp_port),
         "LINKEDIN_MCP_LOG_LEVEL": "CRITICAL",
+        "LINKEDIN_MCP_MINIMUM_NAVIGATION_INTERVAL_SECONDS": "0",
     }
+    runtime_settings = Settings(
+        browser_auto_install=False,
+        browser_profile_path=profile_path,
+        browser_cache_path=cache_path,
+        minimum_navigation_interval_seconds=0,
+        runtime_lock_path=lock_path,
+        transport="streamable-http",
+        http_host="127.0.0.1",
+        http_port=unused_tcp_port,
+        log_level="CRITICAL",
+    )
+    mcp, scheduler, playwright, cursor_store = protocol_server(tmp_path)
+    process_lock = AccountProcessLock(
+        lock_path,
+        account_id=runtime_settings.account_id,
+        command="shared-runtime",
+        transport="shared-loopback",
+        version=__version__,
+        configuration_fingerprint=runtime_configuration_fingerprint(runtime_settings),
+    )
+    process_lock.acquire()
+    await scheduler.start()
+    listener = bind_http_listener("127.0.0.1", unused_tcp_port)
+    endpoint = f"http://127.0.0.1:{unused_tcp_port}/mcp"
+    process_lock.publish_endpoint(endpoint)
+    stop_host = asyncio.Event()
+
+    async def wait_for_stop() -> None:
+        await stop_host.wait()
+
+    host_task = asyncio.create_task(serve_http(mcp, runtime_settings, listener, wait_for_stop))
+    for _ in range(200):
+        if await host_is_healthy(endpoint):
+            break
+        await asyncio.sleep(0.01)
+    else:
+        raise AssertionError("Offline shared host did not become healthy")
     parameters = StdioServerParameters(
         command=sys.executable,
         args=["-m", "linkedin_mcp", "serve", "--transport", "stdio"],
@@ -88,7 +128,6 @@ async def test_two_stdio_clients_elect_and_share_one_surviving_runtime(
 
     clients = [asyncio.create_task(run_client()) for _ in range(2)]
     owner_pid: int | None = None
-    endpoint: str | None = None
     try:
         observations = [
             await asyncio.wait_for(ready.get(), timeout=30),
@@ -111,8 +150,7 @@ async def test_two_stdio_clients_elect_and_share_one_surviving_runtime(
         assert ownership.owner.configuration_fingerprint is not None
         assert ownership.owner.endpoint == f"http://127.0.0.1:{unused_tcp_port}/mcp"
         owner_pid = ownership.owner.pid
-        endpoint = ownership.owner.endpoint
-        assert endpoint is not None
+        assert ownership.owner.endpoint == endpoint
 
         async with (
             streamable_http_client(endpoint) as (read_stream, write_stream, _),
@@ -139,11 +177,12 @@ async def test_two_stdio_clients_elect_and_share_one_surviving_runtime(
             if not client.done():
                 client.cancel()
         await asyncio.gather(*clients, return_exceptions=True)
-        if inspect_account_runtime(lock_path).running:
-            await asyncio.to_thread(
-                stop_account_runtime,
-                lock_path,
-                timeout_seconds=10,
-            )
+        stop_host.set()
+        await host_task
+        listener.close()
+        await scheduler.close()
+        await cursor_store.close()
+        await playwright.close()
+        process_lock.release()
 
     assert inspect_account_runtime(lock_path).running is False

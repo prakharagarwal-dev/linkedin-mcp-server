@@ -8,6 +8,19 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Replace background authentication coordination with one awaited startup
+  flow. `HostManager` prepares Chromium, validates the saved session, performs
+  visible login when required, revalidates the reopened profile, and only then
+  starts its single queue worker and publishes the transport. Remove
+  `AUTO_LOGIN_ON_START`, `BrowserRuntime`, and the browser operation lock.
+- Add a tool-facing `LinkedInPlaywright` layer that wraps official Playwright
+  pages and locators with navigation pacing, exact-host validation, safety
+  checks, and task-page cleanup. Move browser login/logout and context ownership
+  into `browser/`, and remove obsolete UI helpers from `tools/_shared`.
+- Make `HostManager` the process composition root for stdio attachment,
+  Streamable HTTP serving, queue/tools/cursor wiring, browser/login lifecycle,
+  and reverse-order shutdown. The root `linkedin_mcp.__main__` now also launches
+  private shared-host processes; `host/__main__.py` is removed.
 - Remove the central asset store and `ASSET_ROOT_PATH` configuration. Typed
   upload tools now pass client-selected paths directly to Playwright, including
   absolute paths and paths outside the project; capability-specific visible UI

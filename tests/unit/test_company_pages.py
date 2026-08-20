@@ -12,7 +12,6 @@ from playwright.async_api import Locator, Page, async_playwright
 from pydantic import ValidationError
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.tools._shared.models import StopReason
 from linkedin_mcp.tools.companies.get.evidence import sources_from_company_profile
 from linkedin_mcp.tools.companies.get.models.company_get_input import CompanyGetInput
@@ -25,6 +24,8 @@ from linkedin_mcp.tools.companies.search.models.company_search_filters import Co
 from linkedin_mcp.tools.companies.search.models.company_search_input import CompanySearchInput
 from linkedin_mcp.tools.companies.search.models.company_size import CompanySize
 from linkedin_mcp.tools.companies.search.page import CompanySearchPage
+from linkedin_mcp.ui import LinkedInPlaywright
+from tests.support.playwright import adapt_browser
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 COMPANY_FIXTURES = FIXTURES / "companies" / "latest"
@@ -112,7 +113,7 @@ def test_company_contracts_reject_unbounded_search_and_invalid_filters() -> None
         )
 
     with pytest.raises(ValueError, match="page bound"):
-        CompanySearchPage(cast(BrowserManager, object()), max_pages=0)
+        CompanySearchPage(cast(LinkedInPlaywright, object()), max_pages=0)
 
 
 def test_company_search_url_encodes_every_visible_filter() -> None:
@@ -173,7 +174,7 @@ async def test_company_search_resolves_visible_names_and_extracts_results() -> N
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         fixture_browser = CompanyFixtureBrowser(page)
-        collector = CompanySearchPage(cast(BrowserManager, fixture_browser), max_pages=2)
+        collector = CompanySearchPage(adapt_browser(fixture_browser), max_pages=2)
         request = CompanySearchInput(
             context_id="context-1",
             request_id="company-named-filters",
@@ -214,7 +215,7 @@ async def test_company_search_name_resolution_fails_closed() -> None:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         fixture_browser = CompanyFixtureBrowser(page)
-        collector = CompanySearchPage(cast(BrowserManager, fixture_browser), max_pages=1)
+        collector = CompanySearchPage(adapt_browser(fixture_browser), max_pages=1)
         try:
             with pytest.raises(ParserDriftError, match="use industry_ids instead"):
                 await collector.collect(
@@ -246,7 +247,7 @@ async def test_company_search_reports_private_page_stop_reasons(
         page = await browser.new_page()
         fixture_browser = CompanyFixtureBrowser(page)
         collector = CompanySearchPage(
-            cast(BrowserManager, fixture_browser),
+            adapt_browser(fixture_browser),
             max_pages=max_pages,
         )
         try:
@@ -293,10 +294,7 @@ async def test_company_search_waits_for_async_initial_results() -> None:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         collector = CompanySearchPage(
-            cast(
-                BrowserManager,
-                CompanyFixtureBrowser(page, search_html=html),
-            ),
+            adapt_browser(CompanyFixtureBrowser(page, search_html=html)),
             max_pages=1,
         )
         try:
@@ -325,10 +323,7 @@ async def test_company_search_only_completes_empty_on_visible_end_state() -> Non
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         collector = CompanySearchPage(
-            cast(
-                BrowserManager,
-                CompanyFixtureBrowser(page, search_html=html),
-            ),
+            adapt_browser(CompanyFixtureBrowser(page, search_html=html)),
             max_pages=1,
         )
         try:
@@ -352,7 +347,7 @@ async def test_company_profile_reads_exact_overview_and_about_with_evidence() ->
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         fixture_browser = CompanyFixtureBrowser(page)
-        reader = CompanyProfilePage(cast(BrowserManager, fixture_browser))
+        reader = CompanyProfilePage(adapt_browser(fixture_browser))
         request = CompanyGetInput(
             context_id="context-1",
             request_id="company-about-read",
@@ -417,7 +412,7 @@ async def test_company_profile_deduplicates_headings_for_one_visible_about_secti
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
-        reader = CompanyProfilePage(cast(BrowserManager, DuplicateAboutHeadingBrowser(page)))
+        reader = CompanyProfilePage(adapt_browser(DuplicateAboutHeadingBrowser(page)))
         try:
             company, captures = await reader.read(
                 CompanyGetInput(
@@ -458,7 +453,7 @@ async def test_company_profile_fails_closed_when_about_identity_changes() -> Non
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         fixture_browser = MismatchedAboutBrowser(page)
-        reader = CompanyProfilePage(cast(BrowserManager, fixture_browser))
+        reader = CompanyProfilePage(adapt_browser(fixture_browser))
         try:
             with pytest.raises(ParserDriftError, match="conflicts with the overview identity"):
                 await reader.read(
@@ -494,7 +489,7 @@ async def test_company_profile_decodes_visible_linkedin_website_redirect() -> No
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
-        reader = CompanyProfilePage(cast(BrowserManager, RedirectedWebsiteBrowser(page)))
+        reader = CompanyProfilePage(adapt_browser(RedirectedWebsiteBrowser(page)))
         try:
             company, _ = await reader.read(
                 CompanyGetInput(
@@ -522,7 +517,7 @@ async def test_company_profile_evidence_requires_capture_and_exact_source_quote(
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         fixture_browser = CompanyFixtureBrowser(page)
-        reader = CompanyProfilePage(cast(BrowserManager, fixture_browser))
+        reader = CompanyProfilePage(adapt_browser(fixture_browser))
         try:
             company, captures = await reader.read(
                 CompanyGetInput(

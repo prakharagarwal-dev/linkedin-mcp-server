@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from playwright.async_api import async_playwright
 
-from linkedin_mcp.browser.bootstrap import BrowserRuntimeBootstrap
+from linkedin_mcp.browser.bootstrap import BrowserBootstrap
 from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import BrowserUnavailableError, ConfigurationError
 
@@ -38,10 +38,10 @@ class BrowserProfileManager:
     def __init__(
         self,
         settings: Settings,
-        browser_bootstrap: BrowserRuntimeBootstrap | None = None,
+        browser_bootstrap: BrowserBootstrap | None = None,
     ) -> None:
         self._settings = settings
-        self._browser_bootstrap = browser_bootstrap or BrowserRuntimeBootstrap(settings)
+        self._browser_bootstrap = browser_bootstrap or BrowserBootstrap(settings)
 
     @property
     def path(self) -> Path:
@@ -99,10 +99,6 @@ class BrowserProfileManager:
         if not self.inspect().initialized:
             raise BrowserUnavailableError("Chromium did not initialize the configured profile.")
         return True
-
-    async def ensure_created(self) -> None:
-        if not self.inspect().initialized:
-            await self.create()
 
     async def reset(self) -> BrowserProfileResetResult:
         """Archive the exact profile path and initialize a clean replacement."""

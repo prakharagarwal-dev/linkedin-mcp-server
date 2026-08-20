@@ -10,24 +10,11 @@ from datetime import UTC, datetime
 from typing import ClassVar, Literal, cast
 from urllib.parse import urljoin
 
-from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
-from linkedin_mcp.tools._shared.browser import BrowserManager
-from linkedin_mcp.tools._shared.collections import (
-    CollectionSettleOutcome,
-    CollectionSettleResult,
-    dispatch_bubbling_wheel,
-    wait_for_collection_interaction,
-)
 from linkedin_mcp.tools._shared.models import StopReason
-from linkedin_mcp.tools._shared.urls import (
-    canonical_profile_url,
-    conversation_id_from_url,
-    profile_slug_from_url,
-)
 from linkedin_mcp.tools.messaging.search.models.conversation_category import ConversationCategory
 from linkedin_mcp.tools.messaging.search.models.conversation_filter import ConversationFilter
 from linkedin_mcp.tools.messaging.search.models.conversation_search_coverage import (
@@ -37,6 +24,20 @@ from linkedin_mcp.tools.messaging.search.models.conversation_search_input import
     ConversationSearchInput,
 )
 from linkedin_mcp.tools.messaging.search.models.conversation_summary import ConversationSummary
+from linkedin_mcp.ui import LinkedInLocator as Locator
+from linkedin_mcp.ui import LinkedInPage as Page
+from linkedin_mcp.ui import LinkedInPlaywright
+from linkedin_mcp.ui.collections import (
+    CollectionSettleOutcome,
+    CollectionSettleResult,
+    dispatch_bubbling_wheel,
+    wait_for_collection_interaction,
+)
+from linkedin_mcp.ui.urls import (
+    canonical_profile_url,
+    conversation_id_from_url,
+    profile_slug_from_url,
+)
 
 _MESSAGING_URL = "https://www.linkedin.com/messaging/"
 
@@ -290,12 +291,12 @@ class ConversationSearchPage:
 
     def __init__(
         self,
-        browser: BrowserManager,
+        playwright: LinkedInPlaywright,
         *,
         max_scroll_rounds: int,
         reference_index: ConversationReferenceIndex | None = None,
     ) -> None:
-        self._browser = browser
+        self._playwright = playwright
         self._max_scroll_rounds = max_scroll_rounds
         self._reference_index = reference_index or ConversationReferenceIndex()
 
@@ -317,8 +318,8 @@ class ConversationSearchPage:
         stop_reason = StopReason.SAFETY_BOUND
         rounds_visited = 0
         end_confirmations = 0
-        async with self._browser.page() as page:
-            await self._browser.navigate(page, _MESSAGING_URL)
+        async with self._playwright.page() as page:
+            await page.goto(_MESSAGING_URL)
             await page.locator("main").first.wait_for(state="visible")
             await self._apply_category(page, request.resolved_category)
             if request.filter is not None:
@@ -406,7 +407,7 @@ class ConversationSearchPage:
         await textbox.fill(query)
         await textbox.press("Enter")
         await page.wait_for_timeout(750)
-        await self._browser.assert_safe(page)
+        await page.assert_safe()
 
     async def _apply_category(
         self,
@@ -433,7 +434,7 @@ class ConversationSearchPage:
             ).strip()
             if label.fullmatch(current_name):
                 return
-            await self._browser.click_visible_control(page, opener)
+            await opener.click()
             option = await self._unique_named_control(
                 page,
                 label,
@@ -443,9 +444,9 @@ class ConversationSearchPage:
             raise ParserDriftError(
                 f"LinkedIn Messaging has no unique visible {category.value} category."
             )
-        await self._browser.click_visible_control(page, option)
+        await option.click()
         await page.wait_for_timeout(500)
-        await self._browser.assert_safe(page)
+        await page.assert_safe()
 
     async def _apply_filter(
         self,
@@ -463,9 +464,9 @@ class ConversationSearchPage:
             or await option.get_attribute("aria-checked") == "true"
         ):
             return
-        await self._browser.click_visible_control(page, option)
+        await option.click()
         await page.wait_for_timeout(500)
-        await self._browser.assert_safe(page)
+        await page.assert_safe()
         if (
             await option.get_attribute("aria-pressed") != "true"
             and await option.get_attribute("aria-checked") != "true"
@@ -485,7 +486,7 @@ class ConversationSearchPage:
                 "The process-local conversation reference is unavailable; search messages "
                 "again before opening it."
             )
-        await self._browser.navigate(page, _MESSAGING_URL)
+        await page.goto(_MESSAGING_URL)
         await page.locator("main").first.wait_for(state="visible")
         await self._apply_category(page, lookup.category)
         if lookup.filter is not None:
@@ -530,7 +531,7 @@ class ConversationSearchPage:
                     '[class*="msg-conversations-container__convo-item-link"]'
                 )
                 control = clickable.first if await clickable.count() == 1 else card
-                await self._browser.click_visible_control(page, control)
+                await control.click()
                 try:
                     await page.wait_for_url(
                         lambda value: conversation_id_from_url(str(value)) is not None,
@@ -540,7 +541,7 @@ class ConversationSearchPage:
                     raise ParserDriftError(
                         "The exact visible search result did not open a supported thread URL."
                     ) from error
-                await self._browser.assert_safe(page)
+                await page.assert_safe()
                 return exact[0], card
             if len(exact) > 1 or len(matching_cards) > 1:
                 raise InvalidTargetError(

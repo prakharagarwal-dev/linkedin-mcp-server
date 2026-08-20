@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -23,17 +22,15 @@ from linkedin_mcp.errors import (
     ParserDriftError,
     RestrictionDetectedError,
 )
-from linkedin_mcp.tools._shared.safety import assert_safe_linkedin_page
-from linkedin_mcp.tools._shared.urls import validate_linkedin_url
-from linkedin_mcp.tools.session.status.models.session_authentication_state import (
-    SessionAuthenticationState,
-)
+from linkedin_mcp.ui import AuthenticationState
+from linkedin_mcp.ui.safety import assert_safe_linkedin_page
+from linkedin_mcp.ui.urls import validate_linkedin_url
 from tests.simulator.scenario import SimulatorScenario
 from tests.simulator.state import SimulatorFault
 
 
 class SimulatorBrowser:
-    """Narrow BrowserManager-compatible adapter for offline page-object tests."""
+    """Offline raw-page provider adapted to LinkedInPlaywright in tests."""
 
     def __init__(self, scenario: SimulatorScenario) -> None:
         self.scenario = scenario
@@ -41,7 +38,6 @@ class SimulatorBrowser:
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
         self._context: BrowserContext | None = None
-        self._operation_lock = asyncio.Lock()
 
     @property
     def started(self) -> bool:
@@ -60,24 +56,17 @@ class SimulatorBrowser:
         return BrowserSetupState.READY
 
     @property
-    def authentication_state(self) -> SessionAuthenticationState:
+    def authentication_state(self) -> AuthenticationState:
         if self.scenario.state.authenticated:
-            return SessionAuthenticationState.AUTHENTICATED
-        return SessionAuthenticationState.ATTENTION_REQUIRED
+            return AuthenticationState.AUTHENTICATED
+        return AuthenticationState.ATTENTION_REQUIRED
 
     @property
     def authentication_status_message(self) -> str | None:
         return self.pause_reason
 
-    @property
-    def login_browser_open(self) -> bool:
-        return False
-
     def profile_present(self) -> bool:
         return True
-
-    def start_session_bootstrap(self) -> None:
-        return
 
     async def start(self) -> None:
         if self.started:
@@ -91,12 +80,11 @@ class SimulatorBrowser:
     async def page(self) -> AsyncGenerator[Page]:
         if self._context is None:
             raise RuntimeError("The simulator browser must be started before use.")
-        async with self._operation_lock:
-            page = await self._context.new_page()
-            try:
-                yield page
-            finally:
-                await page.close()
+        page = await self._context.new_page()
+        try:
+            yield page
+        finally:
+            await page.close()
 
     async def navigate(self, page: Page, url: str) -> None:
         target = validate_linkedin_url(url, ("www.linkedin.com", "linkedin.com"))

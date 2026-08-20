@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import cast
-
 import pytest
 
 import linkedin_mcp.tools.companies.get.page as company_get_pages
@@ -15,7 +13,6 @@ import linkedin_mcp.tools.people.search.page as people_pages
 import linkedin_mcp.tools.posts.comments.list.page as post_comment_pages
 import linkedin_mcp.tools.posts.search.page as post_search_pages
 from linkedin_mcp.errors import AuthenticationRequiredError, BrowserUnavailableError
-from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.tools._shared.models import StopReason
 from linkedin_mcp.tools.companies.get.models.company_get_input import CompanyGetInput
 from linkedin_mcp.tools.companies.get.page import CompanyProfilePage
@@ -56,6 +53,7 @@ from linkedin_mcp.tools.posts.search.models.post_search_input import PostSearchI
 from linkedin_mcp.tools.posts.search.page import PostSearchPage
 from tests.simulator import SimulatorBrowser, standard_scenario
 from tests.simulator.state import SimulatorFault
+from tests.support.playwright import adapt_browser
 
 
 @pytest.fixture(autouse=True)
@@ -82,9 +80,9 @@ async def test_semantic_site_drives_real_read_page_objects_across_domains() -> N
     scenario = standard_scenario()
     browser = SimulatorBrowser(scenario)
     await browser.start()
-    page_browser = cast(BrowserManager, browser)
+    page_playwright = adapt_browser(browser)
     try:
-        jobs, _, _, _ = await JobSearchPage(page_browser, max_pages=1).collect(
+        jobs, _, _, _ = await JobSearchPage(page_playwright, max_pages=1).collect(
             JobSearchInput(
                 context_id="simulator",
                 request_id="jobs-search",
@@ -92,7 +90,7 @@ async def test_semantic_site_drives_real_read_page_objects_across_domains() -> N
                 page_size=1,
             )
         )
-        job = await JobDetailPage(page_browser).read(
+        job = await JobDetailPage(page_playwright).read(
             JobDetailInput(
                 context_id="simulator",
                 request_id="job-get",
@@ -100,7 +98,7 @@ async def test_semantic_site_drives_real_read_page_objects_across_domains() -> N
             )
         )
 
-        people, _, _, _ = await PeopleSearchPage(page_browser, max_pages=1).collect(
+        people, _, _, _ = await PeopleSearchPage(page_playwright, max_pages=1).collect(
             PeopleSearchInput(
                 context_id="simulator",
                 request_id="people-search",
@@ -108,7 +106,7 @@ async def test_semantic_site_drives_real_read_page_objects_across_domains() -> N
                 page_size=1,
             )
         )
-        person, _ = await PersonProfilePage(page_browser, max_detail_pages=3).read(
+        person, _ = await PersonProfilePage(page_playwright, max_detail_pages=3).read(
             PeopleGetInput(
                 context_id="simulator",
                 request_id="people-get",
@@ -117,7 +115,7 @@ async def test_semantic_site_drives_real_read_page_objects_across_domains() -> N
             )
         )
 
-        companies, _, _, _ = await CompanySearchPage(page_browser, max_pages=1).collect(
+        companies, _, _, _ = await CompanySearchPage(page_playwright, max_pages=1).collect(
             CompanySearchInput(
                 context_id="simulator",
                 request_id="companies-search",
@@ -125,7 +123,7 @@ async def test_semantic_site_drives_real_read_page_objects_across_domains() -> N
                 page_size=1,
             )
         )
-        company, company_captures = await CompanyProfilePage(page_browser).read(
+        company, company_captures = await CompanyProfilePage(page_playwright).read(
             CompanyGetInput(
                 context_id="simulator",
                 request_id="companies-get",
@@ -133,7 +131,7 @@ async def test_semantic_site_drives_real_read_page_objects_across_domains() -> N
             )
         )
 
-        posts, _, _, _ = await PostSearchPage(page_browser, max_pages=1).collect(
+        posts, _, _, _ = await PostSearchPage(page_playwright, max_pages=1).collect(
             PostSearchInput(
                 context_id="simulator",
                 request_id="posts-search",
@@ -141,7 +139,7 @@ async def test_semantic_site_drives_real_read_page_objects_across_domains() -> N
                 page_size=1,
             )
         )
-        post = await PostDetailPage(page_browser).read(
+        post = await PostDetailPage(page_playwright).read(
             PostGetInput(
                 context_id="simulator",
                 request_id="posts-get",
@@ -184,10 +182,10 @@ async def test_semantic_site_drives_network_discussion_and_company_feed_reads() 
     scenario = standard_scenario()
     browser = SimulatorBrowser(scenario)
     await browser.start()
-    page_browser = cast(BrowserManager, browser)
+    page_playwright = adapt_browser(browser)
     try:
         invitations, invitation_coverage, invitation_text, _ = await InvitationListPage(
-            page_browser,
+            page_playwright,
             max_scroll_rounds=13,
         ).collect(
             InvitationListInput(
@@ -197,7 +195,7 @@ async def test_semantic_site_drives_network_discussion_and_company_feed_reads() 
             )
         )
         sent_invitations, sent_coverage, _, _ = await InvitationListPage(
-            page_browser,
+            page_playwright,
             max_scroll_rounds=5,
         ).collect(
             InvitationListInput(
@@ -215,7 +213,7 @@ async def test_semantic_site_drives_network_discussion_and_company_feed_reads() 
             InvitationFilter.SAME_SCHOOL,
         ):
             filtered, filtered_coverage, _, _ = await InvitationListPage(
-                page_browser,
+                page_playwright,
                 max_scroll_rounds=2,
             ).collect(
                 InvitationListInput(
@@ -230,7 +228,7 @@ async def test_semantic_site_drives_network_discussion_and_company_feed_reads() 
                 item.primary_entity.slug or item.primary_entity.display_name for item in filtered
             )
         connections, connection_coverage, connection_text, _ = await ConnectionsListPage(
-            page_browser,
+            page_playwright,
             max_scroll_rounds=8,
         ).collect(
             ConnectionsListInput(
@@ -240,7 +238,7 @@ async def test_semantic_site_drives_network_discussion_and_company_feed_reads() 
             )
         )
         conversations, _, _, _ = await ConversationSearchPage(
-            page_browser,
+            page_playwright,
             max_scroll_rounds=1,
         ).collect(
             ConversationSearchInput(
@@ -250,7 +248,7 @@ async def test_semantic_site_drives_network_discussion_and_company_feed_reads() 
                 page_size=1,
             )
         )
-        conversation = await ConversationGetPage(page_browser).read(
+        conversation = await ConversationGetPage(page_playwright).read(
             ConversationGetInput(
                 context_id="simulator",
                 request_id="conversation",
@@ -259,7 +257,7 @@ async def test_semantic_site_drives_network_discussion_and_company_feed_reads() 
             )
         )
         threads, _, _, _ = await PostCommentsPage(
-            page_browser,
+            page_playwright,
             max_expansion_rounds=1,
         ).collect(
             PostCommentsListInput(

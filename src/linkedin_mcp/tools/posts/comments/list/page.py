@@ -5,19 +5,9 @@ from __future__ import annotations
 import re
 from datetime import UTC, datetime
 
-from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.tools._shared.browser import BrowserManager
-from linkedin_mcp.tools._shared.collections import (
-    visible_locator_signature,
-    wait_for_collection_change,
-)
-from linkedin_mcp.tools._shared.urls import (
-    canonical_post_url,
-    post_reference_from_comment_ref,
-)
 from linkedin_mcp.tools.posts.comments.list.models.comment_observation import CommentObservation
 from linkedin_mcp.tools.posts.comments.list.models.comment_sort import CommentSort
 from linkedin_mcp.tools.posts.comments.list.models.comment_thread import CommentThread
@@ -36,6 +26,17 @@ from linkedin_mcp.tools.posts.surface import (
     discussion_post_reference,
     internal_comment_from_region,
     prepare_visible_content,
+)
+from linkedin_mcp.ui import LinkedInLocator as Locator
+from linkedin_mcp.ui import LinkedInPage as Page
+from linkedin_mcp.ui import LinkedInPlaywright
+from linkedin_mcp.ui.collections import (
+    visible_locator_signature,
+    wait_for_collection_change,
+)
+from linkedin_mcp.ui.urls import (
+    canonical_post_url,
+    post_reference_from_comment_ref,
 )
 
 _COLLECTION_POLL_ATTEMPTS = 8
@@ -136,10 +137,10 @@ async def _visible_comment_regions(page: Page) -> tuple[Locator, ...]:
 
 
 class PostCommentsPage:
-    def __init__(self, browser: BrowserManager, *, max_expansion_rounds: int) -> None:
+    def __init__(self, playwright: LinkedInPlaywright, *, max_expansion_rounds: int) -> None:
         if max_expansion_rounds < 0:
             raise ValueError("Comment expansion bound cannot be negative.")
-        self._browser = browser
+        self._playwright = playwright
         self._max_expansion_rounds = max_expansion_rounds
 
     async def collect(
@@ -158,8 +159,8 @@ class PostCommentsPage:
             raise ValueError("Post-comment result limit must be positive.")
         target = canonical_post_url(request.post_ref)
         expansion_rounds = 0
-        async with self._browser.page() as page:
-            await self._browser.navigate(page, target)
+        async with self._playwright.page() as page:
+            await page.goto(target)
             await _expand_visible_content(page)
             post_region, displayed_post_ref = await detail_region_for_post(
                 page,
@@ -181,7 +182,7 @@ class PostCommentsPage:
                         "LinkedIn discussion has no unique visible Comment control."
                     )
                 if visible_controls:
-                    await self._browser.click_visible_control(page, visible_controls[0])
+                    await visible_controls[0].click()
                     for _ in range(20):
                         visible_regions = await _visible_comment_regions(page)
                         if visible_regions:

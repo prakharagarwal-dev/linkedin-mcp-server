@@ -9,22 +9,11 @@ from datetime import UTC, datetime
 from typing import cast
 from urllib.parse import parse_qs, urlencode, urljoin, urlsplit
 
-from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.tools._shared.browser import BrowserManager
-from linkedin_mcp.tools._shared.collections import (
-    CollectionSettleOutcome,
-    visible_locator_signature,
-    wait_for_collection_initial_state,
-)
 from linkedin_mcp.tools._shared.models import StopReason
-from linkedin_mcp.tools._shared.urls import (
-    canonical_company_url,
-    company_slug_from_url,
-)
 from linkedin_mcp.tools.companies.search.models.company_search_coverage import CompanySearchCoverage
 from linkedin_mcp.tools.companies.search.models.company_search_filters import CompanySearchFilters
 from linkedin_mcp.tools.companies.search.models.company_search_input import CompanySearchInput
@@ -39,6 +28,18 @@ from linkedin_mcp.tools.companies.surface import (
     expand_and_scroll,
     first_visible_text,
     unique_lines,
+)
+from linkedin_mcp.ui import LinkedInLocator as Locator
+from linkedin_mcp.ui import LinkedInPage as Page
+from linkedin_mcp.ui import LinkedInPlaywright
+from linkedin_mcp.ui.collections import (
+    CollectionSettleOutcome,
+    visible_locator_signature,
+    wait_for_collection_initial_state,
+)
+from linkedin_mcp.ui.urls import (
+    canonical_company_url,
+    company_slug_from_url,
 )
 
 _COMPANY_SEARCH_URL = "https://www.linkedin.com/search/results/companies/"
@@ -416,7 +417,7 @@ def _validate_resolved_company_facets(
 
 
 async def _resolve_named_company_facets(
-    browser: BrowserManager,
+    playwright: LinkedInPlaywright,
     page: Page,
     filters: CompanySearchFilters,
 ) -> _ResolvedCompanyFacets:
@@ -437,7 +438,7 @@ async def _resolve_named_company_facets(
     ]
     if len(visible_controls) != 1:
         raise ParserDriftError("LinkedIn Company search has no unique visible All filters control.")
-    await browser.click_visible_control(page, visible_controls[0])
+    await visible_controls[0].click()
 
     panel = await _company_filter_panel(page)
     await _select_company_facet_names(
@@ -462,7 +463,7 @@ async def _resolve_named_company_facets(
         raise ParserDriftError(
             "LinkedIn's visible Show results control was unavailable for Company search."
         ) from error
-    submitted_url = await browser.navigate_via_visible_control(page, show_results.first)
+    submitted_url = await show_results.first.click_and_wait_for_navigation()
     resolved = _ResolvedCompanyFacets(
         location_ids=_company_query_array_values(
             submitted_url,
@@ -555,10 +556,10 @@ async def _extract_company_results(page: Page) -> tuple[CompanySummary, ...]:
 
 
 class CompanySearchPage:
-    def __init__(self, browser: BrowserManager, *, max_pages: int) -> None:
+    def __init__(self, playwright: LinkedInPlaywright, *, max_pages: int) -> None:
         if max_pages < 1:
             raise ValueError("Company search page bound must be positive.")
-        self._browser = browser
+        self._playwright = playwright
         self._max_pages = max_pages
 
     @staticmethod
@@ -588,14 +589,11 @@ class CompanySearchPage:
         resolved = _ResolvedCompanyFacets()
         pages_visited = 0
         stop_reason = StopReason.SAFETY_BOUND
-        async with self._browser.page() as page:
+        async with self._playwright.page() as page:
             if request.filters.location_names or request.filters.industry_names:
-                await self._browser.navigate(
-                    page,
-                    self.build_url(request, page_index=1),
-                )
+                await page.goto(self.build_url(request, page_index=1))
                 resolved = await _resolve_named_company_facets(
-                    self._browser,
+                    self._playwright,
                     page,
                     request.filters,
                 )
@@ -606,7 +604,7 @@ class CompanySearchPage:
                     page_index=page_index,
                     resolved=resolved,
                 )
-                await self._browser.navigate(page, target)
+                await page.goto(target)
                 await expand_and_scroll(page)
                 rendered_state = await _wait_for_company_search_state(page)
                 visible_text = (await page.locator("main").inner_text()).strip()

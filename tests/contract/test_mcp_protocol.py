@@ -35,7 +35,6 @@ from linkedin_mcp.tools._shared.actions import (
     ReactionSetPayload,
     ReactionState,
 )
-from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.tools._shared.models import (
     EvidenceField,
     StopReason,
@@ -156,6 +155,8 @@ from linkedin_mcp.tools.posts.search.models.post_search_input import PostSearchI
 from linkedin_mcp.tools.posts.search.models.post_summary import PostSummary
 from linkedin_mcp.tools.posts.search.page import PostSearchPage
 from linkedin_mcp.transport.server import create_mcp_server
+from linkedin_mcp.ui import LinkedInPlaywright
+from tests.support.playwright import empty_playwright
 
 ROOT = Path(__file__).parents[2]
 
@@ -697,15 +698,14 @@ class ProtocolNetwork:
 
 def protocol_server(
     root: Path,
-) -> tuple[FastMCP[None], Scheduler, BrowserManager, CursorStore]:
+) -> tuple[FastMCP[None], Scheduler, LinkedInPlaywright, CursorStore]:
     settings = Settings(
-        auto_login_on_start=False,
         browser_auto_install=False,
         browser_profile_path=root / "profile",
         minimum_navigation_interval_seconds=0,
         runtime_lock_path=root / "runtime.lock",
     )
-    browser = BrowserManager(settings)
+    playwright = empty_playwright(settings)
     network = ProtocolNetwork()
     people_search = ProtocolPeopleSearch()
     cursor_store = CursorStore(
@@ -719,7 +719,7 @@ def protocol_server(
     attach_tool_implementations(
         mcp,
         settings=settings,
-        browser=browser,
+        playwright=playwright,
         scheduler=scheduler,
         cursor_store=cursor_store,
         job_search=cast(JobSearchPage, ProtocolJobSearch()),
@@ -744,7 +744,7 @@ def protocol_server(
         conversation_read=cast(ConversationGetPage, network),
         message_send=cast(MessageSendPage, network),
     )
-    return mcp, scheduler, browser, cursor_store
+    return mcp, scheduler, playwright, cursor_store
 
 
 @asynccontextmanager

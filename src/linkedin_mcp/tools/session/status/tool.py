@@ -6,14 +6,14 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
 from linkedin_mcp.config import Settings
-from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.tools.session.status.models.session_status_output import SessionStatusOutput
+from linkedin_mcp.ui import LinkedInPlaywright
 
 
 def register(
     mcp: FastMCP[None],
     settings: Settings,
-    browser: BrowserManager,
+    playwright: LinkedInPlaywright,
     annotations: ToolAnnotations,
 ) -> None:
     @mcp.tool(
@@ -25,15 +25,13 @@ def register(
     async def _session_status() -> SessionStatusOutput:
         return SessionStatusOutput(
             account_id=settings.account_id,
-            profile_present=browser.profile_present(),
-            browser_setup_state=browser.browser_setup_state,
-            browser_started=browser.started,
-            authentication_state=browser.authentication_state,
-            automatic_login_enabled=settings.auto_login_on_start,
-            login_browser_open=browser.login_browser_open,
-            paused=browser.paused,
-            pause_reason=browser.pause_reason,
-            status_message=browser.authentication_status_message,
+            profile_present=playwright.profile_present(),
+            browser_setup_state=playwright.browser_setup_state,
+            browser_started=playwright.started,
+            authentication_state=playwright.authentication_state,
+            paused=playwright.paused,
+            pause_reason=playwright.pause_reason,
+            status_message=playwright.authentication_status_message,
         )
 
     del _session_status

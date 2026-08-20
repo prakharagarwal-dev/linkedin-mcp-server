@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import cast
 
 import pytest
 from playwright.async_api import Locator, Page, Route, async_playwright
@@ -19,13 +18,13 @@ from linkedin_mcp.tools._shared.actions import (
     ReactionSetPayload,
     ReactionState,
 )
-from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.tools.posts.comment.models.comment_gif_attachment import CommentGifAttachment
 from linkedin_mcp.tools.posts.comment.models.comment_photo_attachment import CommentPhotoAttachment
 from linkedin_mcp.tools.posts.comment.models.post_comment_input import PostCommentInput
 from linkedin_mcp.tools.posts.comment.page import PostCommentPage
 from linkedin_mcp.tools.posts.react.models.post_reaction_input import PostReactionInput
 from linkedin_mcp.tools.posts.react.page import PostReactionPage
+from tests.support.playwright import adapt_browser
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 ENGAGEMENT_HTML = (FIXTURES / "posts/latest/engagement.html").read_text(encoding="utf-8")
@@ -189,7 +188,7 @@ async def test_top_level_comment_preserves_text_link_emoji_mention_and_target(
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         adapter = PostCommentPage(
-            cast(BrowserManager, EngagementFixtureBrowser(page)),
+            adapt_browser(EngagementFixtureBrowser(page)),
         )
         try:
             command = await _comment_command(adapter, request)
@@ -233,7 +232,7 @@ async def test_comment_requires_stable_reference_despite_visible_delta_and_clear
             ),
         )
         adapter = PostCommentPage(
-            cast(BrowserManager, fixture_browser),
+            adapt_browser(fixture_browser),
         )
         try:
             result = await adapter.perform_comment(await _comment_command(adapter, request))
@@ -269,7 +268,7 @@ async def test_comment_verifies_stable_reference_with_visible_expansion_affordan
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         adapter = PostCommentPage(
-            cast(BrowserManager, EngagementFixtureBrowser(page, html=html)),
+            adapt_browser(EngagementFixtureBrowser(page, html=html)),
         )
         try:
             result = await adapter.perform_comment(await _comment_command(adapter, request))
@@ -300,7 +299,7 @@ async def test_comment_submit_ignores_visible_comment_count_control(tmp_path: Pa
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         adapter = PostCommentPage(
-            cast(BrowserManager, EngagementFixtureBrowser(page, html=html)),
+            adapt_browser(EngagementFixtureBrowser(page, html=html)),
         )
         try:
             result = await adapter.perform_comment(await _comment_command(adapter, request))
@@ -334,7 +333,7 @@ async def test_comment_waits_for_async_composer_after_count_control(tmp_path: Pa
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         adapter = PostCommentPage(
-            cast(BrowserManager, EngagementFixtureBrowser(page, html=html)),
+            adapt_browser(EngagementFixtureBrowser(page, html=html)),
         )
         try:
             result = await adapter.perform_comment(await _comment_command(adapter, request))
@@ -371,7 +370,7 @@ async def test_comment_waits_for_async_named_active_member_link(tmp_path: Path) 
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         adapter = PostCommentPage(
-            cast(BrowserManager, EngagementFixtureBrowser(page, html=html)),
+            adapt_browser(EngagementFixtureBrowser(page, html=html)),
         )
         try:
             command = await _comment_command(adapter, request)
@@ -402,7 +401,7 @@ async def test_comment_verifies_native_ugc_discussion_alias_for_activity_url(
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         adapter = PostCommentPage(
-            cast(BrowserManager, EngagementFixtureBrowser(page, html=html)),
+            adapt_browser(EngagementFixtureBrowser(page, html=html)),
         )
         try:
             result = await adapter.perform_comment(await _comment_command(adapter, request))
@@ -440,7 +439,7 @@ async def test_comment_accepts_single_rendered_post_alias_for_requested_activity
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         adapter = PostCommentPage(
-            cast(BrowserManager, EngagementFixtureBrowser(page, html=html)),
+            adapt_browser(EngagementFixtureBrowser(page, html=html)),
         )
         try:
             result = await adapter.perform_comment(await _comment_command(adapter, request))
@@ -469,7 +468,7 @@ async def test_reaction_accepts_single_rendered_post_alias_for_requested_activit
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         adapter = PostReactionPage(
-            cast(BrowserManager, EngagementFixtureBrowser(page, html=html)),
+            adapt_browser(EngagementFixtureBrowser(page, html=html)),
         )
         try:
             result = await adapter.perform_reaction(await _reaction_command(adapter, request))
@@ -506,7 +505,7 @@ async def test_comment_photo_and_gif_are_exact_and_verifiable(
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         adapter = PostCommentPage(
-            cast(BrowserManager, EngagementFixtureBrowser(page)),
+            adapt_browser(EngagementFixtureBrowser(page)),
         )
         try:
             command = await _comment_command(adapter, request)
@@ -546,7 +545,7 @@ async def test_post_supports_every_visible_linkedin_reaction(
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         adapter = PostReactionPage(
-            cast(BrowserManager, EngagementFixtureBrowser(page)),
+            adapt_browser(EngagementFixtureBrowser(page)),
         )
         try:
             command = await _reaction_command(adapter, request)
@@ -575,10 +574,7 @@ async def test_current_portaled_reaction_control_is_inspected_and_verified(
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         adapter = PostReactionPage(
-            cast(
-                BrowserManager,
-                EngagementFixtureBrowser(page, html=CURRENT_REACTION_HTML),
-            ),
+            adapt_browser(EngagementFixtureBrowser(page, html=CURRENT_REACTION_HTML)),
         )
         try:
             command = await _reaction_command(adapter, request)
@@ -628,7 +624,7 @@ async def test_react_label_and_pressed_state_are_inspected_and_verified(
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         adapter = PostReactionPage(
-            cast(BrowserManager, EngagementFixtureBrowser(page, html=html)),
+            adapt_browser(EngagementFixtureBrowser(page, html=html)),
         )
         try:
             command = await _reaction_command(adapter, request)
@@ -671,7 +667,7 @@ async def test_post_reaction_removal_noop_and_change(
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         adapter = PostReactionPage(
-            cast(BrowserManager, EngagementFixtureBrowser(page, html=initially_liked)),
+            adapt_browser(EngagementFixtureBrowser(page, html=initially_liked)),
         )
         try:
             command = await _reaction_command(adapter, request)
@@ -711,10 +707,7 @@ async def test_reaction_refuses_state_drift_after_inspection(tmp_path: Path) -> 
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         adapter = PostReactionPage(
-            cast(
-                BrowserManager,
-                EngagementFixtureBrowser(page, second_html=changed),
-            ),
+            adapt_browser(EngagementFixtureBrowser(page, second_html=changed)),
         )
         try:
             result = await adapter.perform_reaction(await _reaction_command(adapter, request))
@@ -745,10 +738,7 @@ async def test_reaction_reports_missing_preclick_control_as_not_changed(
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         adapter = PostReactionPage(
-            cast(
-                BrowserManager,
-                EngagementFixtureBrowser(page, second_html=missing_control),
-            ),
+            adapt_browser(EngagementFixtureBrowser(page, second_html=missing_control)),
         )
         try:
             result = await adapter.perform_reaction(await _reaction_command(adapter, request))
@@ -777,10 +767,7 @@ async def test_comment_refuses_actor_or_content_target_drift(tmp_path: Path) -> 
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         adapter = PostCommentPage(
-            cast(
-                BrowserManager,
-                EngagementFixtureBrowser(page, second_html=changed),
-            ),
+            adapt_browser(EngagementFixtureBrowser(page, second_html=changed)),
         )
         try:
             result = await adapter.perform_comment(await _comment_command(adapter, request))
@@ -805,10 +792,7 @@ async def test_interrupted_final_comment_click_is_uncertain(tmp_path: Path) -> N
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         adapter = PostCommentPage(
-            cast(
-                BrowserManager,
-                EngagementFixtureBrowser(page, fail_final_click=True),
-            ),
+            adapt_browser(EngagementFixtureBrowser(page, fail_final_click=True)),
         )
         try:
             result = await adapter.perform_comment(await _comment_command(adapter, request))
@@ -832,7 +816,7 @@ async def test_comment_upload_accepts_an_absolute_client_path(tmp_path: Path) ->
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         adapter = PostCommentPage(
-            cast(BrowserManager, EngagementFixtureBrowser(page)),
+            adapt_browser(EngagementFixtureBrowser(page)),
         )
         try:
             command = await _comment_command(adapter, request)

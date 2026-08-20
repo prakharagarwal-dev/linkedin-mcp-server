@@ -21,7 +21,6 @@ from linkedin_mcp.tools._shared.actions import (
     MessageGifInput,
     MessageSendPayload,
 )
-from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.tools.messaging.conversation.get.evidence import source_from_conversation
 from linkedin_mcp.tools.messaging.conversation.get.models.conversation_get_input import (
     ConversationGetInput,
@@ -40,6 +39,8 @@ from linkedin_mcp.tools.messaging.search.page import ConversationSearchPage
 from linkedin_mcp.tools.messaging.send.models.message_file_input import MessageFileInput
 from linkedin_mcp.tools.messaging.send.models.message_send_input import MessageSendInput
 from linkedin_mcp.tools.messaging.send.page import MessageSendPage
+from linkedin_mcp.ui import LinkedInLocator, LinkedInPage, LinkedInPlaywright
+from tests.support.playwright import adapt_browser
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 MESSAGING_FIXTURES = FIXTURES / "messaging" / "latest"
@@ -335,18 +336,20 @@ async def test_inbox_and_conversation_fixtures_extract_both_message_directions()
             await page.set_content(
                 (MESSAGING_FIXTURES / "current.html").read_text(encoding="utf-8")
             )
-            summaries = await ConversationSearchPage.extract_visible_conversations(page)
+            summaries = await ConversationSearchPage.extract_visible_conversations(
+                cast(LinkedInPage, page)
+            )
             await page.locator("#thread").evaluate("element => element.classList.remove('hidden')")
             conversation_root = page.get_by_role(
                 "region",
                 name="Conversation with Jane Doe",
             )
             observation = await ConversationGetPage(
-                cast(BrowserManager, object()),
+                cast(LinkedInPlaywright, object()),
                 max_history_rounds=1,
             )._extract(  # pyright: ignore[reportPrivateUsage]
-                page,
-                conversation_root,
+                cast(LinkedInPage, page),
+                cast(LinkedInLocator, conversation_root),
                 conversation_ref=None,
                 profile_slug="jane-doe",
                 participant_name="Jane Doe",
@@ -406,11 +409,14 @@ async def test_current_thread_sender_names_resolve_outgoing_grouped_messages() -
         try:
             await page.set_content(html)
             observation = await ConversationGetPage(
-                cast(BrowserManager, object()),
+                cast(LinkedInPlaywright, object()),
                 max_history_rounds=1,
             )._extract(  # pyright: ignore[reportPrivateUsage]
-                page,
-                page.get_by_role("region", name="Conversation with Jane Doe"),
+                cast(LinkedInPage, page),
+                cast(
+                    LinkedInLocator,
+                    page.get_by_role("region", name="Conversation with Jane Doe"),
+                ),
                 conversation_ref=None,
                 profile_slug="jane-doe",
                 participant_name="Jane Doe",
@@ -436,11 +442,14 @@ async def test_conversation_history_collects_virtualized_older_messages() -> Non
         try:
             await page.set_content(html)
             observation = await ConversationGetPage(
-                cast(BrowserManager, object()),
+                cast(LinkedInPlaywright, object()),
                 max_history_rounds=8,
             )._extract(  # pyright: ignore[reportPrivateUsage]
-                page,
-                page.get_by_role("region", name="Conversation with Jane Doe"),
+                cast(LinkedInPage, page),
+                cast(
+                    LinkedInLocator,
+                    page.get_by_role("region", name="Conversation with Jane Doe"),
+                ),
                 conversation_ref=None,
                 profile_slug="jane-doe",
                 participant_name="Jane Doe",
@@ -471,7 +480,7 @@ async def test_inbox_collection_retains_search_contract_and_visible_source() -> 
         page = await browser.new_page()
         fixture_browser = MessagingFixtureBrowser(page, html)
         adapter = ConversationSearchPage(
-            cast(BrowserManager, fixture_browser),
+            adapt_browser(fixture_browser),
             max_scroll_rounds=2,
         )
         try:
@@ -500,7 +509,7 @@ async def test_inbox_collection_applies_visible_unread_filter_and_server_check()
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         adapter = ConversationSearchPage(
-            cast(BrowserManager, MessagingFixtureBrowser(page, html)),
+            adapt_browser(MessagingFixtureBrowser(page, html)),
             max_scroll_rounds=2,
         )
         try:
@@ -532,7 +541,7 @@ async def test_inbox_collection_retries_idle_wheel_delivery_before_terminal() ->
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         adapter = ConversationSearchPage(
-            cast(BrowserManager, MessagingFixtureBrowser(page, html)),
+            adapt_browser(MessagingFixtureBrowser(page, html)),
             max_scroll_rounds=5,
         )
         try:
@@ -566,7 +575,7 @@ async def test_inbox_collection_applies_all_desktop_categories_and_filters() -> 
                 page = await browser.new_page()
                 try:
                     adapter = ConversationSearchPage(
-                        cast(BrowserManager, MessagingFixtureBrowser(page, html)),
+                        adapt_browser(MessagingFixtureBrowser(page, html)),
                         max_scroll_rounds=1,
                     )
                     conversations, coverage, _, _ = await adapter.collect(
@@ -586,7 +595,7 @@ async def test_inbox_collection_applies_all_desktop_categories_and_filters() -> 
                 page = await browser.new_page()
                 try:
                     adapter = ConversationSearchPage(
-                        cast(BrowserManager, MessagingFixtureBrowser(page, html)),
+                        adapt_browser(MessagingFixtureBrowser(page, html)),
                         max_scroll_rounds=1,
                     )
                     conversations, coverage, _, _ = await adapter.collect(
@@ -612,10 +621,7 @@ async def test_current_linkless_inbox_cards_are_readable_by_visible_reference() 
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
-        fixture_browser = cast(
-            BrowserManager,
-            MessagingFixtureBrowser(page, html),
-        )
+        fixture_browser = adapt_browser(MessagingFixtureBrowser(page, html))
         search = ConversationSearchPage(
             fixture_browser,
             max_scroll_rounds=1,
@@ -679,10 +685,7 @@ async def test_missing_visible_conversation_reference_fails_closed() -> None:
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
-        fixture_browser = cast(
-            BrowserManager,
-            MessagingFixtureBrowser(page, html),
-        )
+        fixture_browser = adapt_browser(MessagingFixtureBrowser(page, html))
         adapter = ConversationGetPage(
             fixture_browser,
             conversation_search=ConversationSearchPage(
@@ -728,7 +731,9 @@ async def test_malformed_conversation_cards_are_ignored_without_identity_guessin
 
     monkeypatch.setattr(messaging_pages, "_raw_conversation_cards", malformed_cards)
 
-    conversations = await ConversationSearchPage.extract_visible_conversations(cast(Page, object()))
+    conversations = await ConversationSearchPage.extract_visible_conversations(
+        cast(LinkedInPage, object())
+    )
 
     assert len(conversations) == 1
     assert conversations[0].participant_name == "Fallback Person"
@@ -744,7 +749,7 @@ async def test_conversation_read_is_direct_by_visible_conversation_id() -> None:
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
-        adapter = ConversationGetPage(cast(BrowserManager, MessagingFixtureBrowser(page, html)))
+        adapter = ConversationGetPage(adapt_browser(MessagingFixtureBrowser(page, html)))
         try:
             observation = await adapter.read(
                 ConversationGetInput(
@@ -767,7 +772,7 @@ async def test_message_action_verifies_a_new_exact_outgoing_bubble() -> None:
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
-        adapter = MessageSendPage(cast(BrowserManager, MessagingFixtureBrowser(page, html)))
+        adapter = MessageSendPage(adapt_browser(MessagingFixtureBrowser(page, html)))
         try:
             capture = await adapter.inspect_message(
                 MessageSendInput(
@@ -805,7 +810,7 @@ async def test_message_reply_is_bound_to_the_exact_history_message_and_postcondi
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
-        fixture_browser = cast(BrowserManager, MessagingFixtureBrowser(page, html))
+        fixture_browser = adapt_browser(MessagingFixtureBrowser(page, html))
         reader = ConversationGetPage(
             fixture_browser,
             max_history_rounds=1,
@@ -867,7 +872,7 @@ async def test_message_reply_never_claims_success_for_a_plain_outgoing_bubble() 
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
-        fixture_browser = cast(BrowserManager, MessagingFixtureBrowser(page, html))
+        fixture_browser = adapt_browser(MessagingFixtureBrowser(page, html))
         reader = ConversationGetPage(
             fixture_browser,
             max_history_rounds=1,
@@ -927,7 +932,7 @@ async def test_message_reply_fails_closed_for_a_visible_nonreplyable_message() -
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
-        fixture_browser = cast(BrowserManager, MessagingFixtureBrowser(page, html))
+        fixture_browser = adapt_browser(MessagingFixtureBrowser(page, html))
         reader = ConversationGetPage(
             fixture_browser,
             max_history_rounds=1,
@@ -973,7 +978,7 @@ async def test_message_action_accepts_exact_thread_when_profile_link_is_absent()
         page = await browser.new_page()
         try:
             result = await MessageSendPage(
-                cast(BrowserManager, MessagingFixtureBrowser(page, html))
+                adapt_browser(MessagingFixtureBrowser(page, html))
             ).perform_message(_message_command())
         finally:
             await browser.close()
@@ -1010,15 +1015,14 @@ async def test_message_action_revalidates_exact_profile_after_stale_compose_over
         page = await browser.new_page()
         try:
             result = await MessageSendPage(
-                cast(
-                    BrowserManager,
+                adapt_browser(
                     RoutedMessagingFixtureBrowser(
                         page,
                         {
                             "/messaging/thread/": thread_html,
                             "/in/jane-doe/": profile_html,
                         },
-                    ),
+                    )
                 )
             ).perform_message(_message_command())
         finally:
@@ -1038,7 +1042,7 @@ async def test_profile_message_does_not_fallback_when_exact_overlay_disappears()
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
-        adapter = MessageSendPage(cast(BrowserManager, MessagingFixtureBrowser(page, html)))
+        adapter = MessageSendPage(adapt_browser(MessagingFixtureBrowser(page, html)))
         try:
             capture = await adapter.inspect_message(
                 MessageSendInput(
@@ -1081,7 +1085,7 @@ async def test_message_read_and_direct_file_send_cover_visible_attachments(
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
-        fixture_browser = cast(BrowserManager, MessagingFixtureBrowser(page, html))
+        fixture_browser = adapt_browser(MessagingFixtureBrowser(page, html))
         reader = ConversationGetPage(
             fixture_browser,
             max_history_rounds=1,
@@ -1094,8 +1098,11 @@ async def test_message_read_and_direct_file_send_cover_visible_attachments(
             await page.set_content(html)
             await page.locator("#thread").evaluate("element => element.classList.remove('hidden')")
             observation = await reader._extract(  # pyright: ignore[reportPrivateUsage]
-                page,
-                page.get_by_role("region", name="Conversation with Jane Doe"),
+                cast(LinkedInPage, page),
+                cast(
+                    LinkedInLocator,
+                    page.get_by_role("region", name="Conversation with Jane Doe"),
+                ),
                 conversation_ref=None,
                 profile_slug="jane-doe",
                 participant_name="Jane Doe",
@@ -1144,7 +1151,7 @@ async def test_image_send_verifies_with_duplicate_dom_wrappers_and_generic_previ
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         adapter = MessageSendPage(
-            cast(BrowserManager, MessagingFixtureBrowser(page, html)),
+            adapt_browser(MessagingFixtureBrowser(page, html)),
         )
         try:
             capture = await adapter.inspect_message(request)
@@ -1183,7 +1190,7 @@ async def test_message_gif_is_verified_as_one_immediate_send() -> None:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         try:
-            adapter = MessageSendPage(cast(BrowserManager, MessagingFixtureBrowser(page, html)))
+            adapter = MessageSendPage(adapt_browser(MessagingFixtureBrowser(page, html)))
             capture = await adapter.inspect_message(request)
             command = ActionCommand(
                 action_type=ActionType.MESSAGE_SEND,
@@ -1192,7 +1199,7 @@ async def test_message_gif_is_verified_as_one_immediate_send() -> None:
             )
             result = await adapter.perform_message(command)
             uncertain = await MessageSendPage(
-                cast(BrowserManager, FailingGifClickBrowser(page, html))
+                adapt_browser(FailingGifClickBrowser(page, html))
             ).perform_message(command)
         finally:
             await browser.close()
@@ -1257,7 +1264,7 @@ async def test_message_inspection_rejects_groups_missing_identity_and_inmail() -
                 (missing_identity_html, "unambiguous visible profile"),
                 (inmail_html, "Paid InMail"),
             ):
-                adapter = MessageSendPage(cast(BrowserManager, MessagingFixtureBrowser(page, html)))
+                adapter = MessageSendPage(adapt_browser(MessagingFixtureBrowser(page, html)))
                 with pytest.raises(InvalidTargetError, match=message):
                     await adapter.inspect_message(
                         MessageSendInput(
@@ -1277,7 +1284,7 @@ async def test_profile_target_uses_exact_visible_message_button_and_same_overlay
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
-        adapter = MessageSendPage(cast(BrowserManager, MessagingFixtureBrowser(page, html)))
+        adapter = MessageSendPage(adapt_browser(MessagingFixtureBrowser(page, html)))
         try:
             capture = await adapter.inspect_message(
                 MessageSendInput(
@@ -1312,7 +1319,7 @@ async def test_profile_target_accepts_same_window_exact_thread_after_message_cli
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
-        adapter = MessageSendPage(cast(BrowserManager, MessagingFixtureBrowser(page, html)))
+        adapter = MessageSendPage(adapt_browser(MessagingFixtureBrowser(page, html)))
         try:
             capture = await adapter.inspect_message(
                 MessageSendInput(
@@ -1347,10 +1354,7 @@ async def test_profile_target_follows_exact_message_href_in_current_page() -> No
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         adapter = MessageSendPage(
-            cast(
-                BrowserManager,
-                PopupMessagingFixtureBrowser(page, profile_html, thread_html),
-            )
+            adapt_browser(PopupMessagingFixtureBrowser(page, profile_html, thread_html))
         )
         try:
             capture = await adapter.inspect_message(
@@ -1405,7 +1409,7 @@ async def test_profile_compose_rejects_multiple_visible_recipient_pills() -> Non
             await page.route(url, fulfill, times=1)
             await page.goto(url)
             overlays = await MessageSendPage._profile_message_overlays(  # pyright: ignore[reportPrivateUsage]
-                page,
+                cast(LinkedInPage, page),
                 profile_name="Jane Doe",
             )
         finally:
@@ -1427,10 +1431,7 @@ async def test_profile_target_leaves_named_blank_page_unchanged() -> None:
         named_page = await browser.new_page()
         await named_page.evaluate("window.name = 'messaging-window'")
         adapter = MessageSendPage(
-            cast(
-                BrowserManager,
-                PopupMessagingFixtureBrowser(page, profile_html, thread_html),
-            )
+            adapt_browser(PopupMessagingFixtureBrowser(page, profile_html, thread_html))
         )
         try:
             capture = await adapter.inspect_message(
@@ -1464,7 +1465,7 @@ async def test_profile_target_accepts_a_visible_message_link_action() -> None:
         page = await browser.new_page()
         try:
             capture = await MessageSendPage(
-                cast(BrowserManager, MessagingFixtureBrowser(page, html))
+                adapt_browser(MessagingFixtureBrowser(page, html))
             ).inspect_message(
                 MessageSendInput(
                     context_id="messaging-context",
@@ -1501,12 +1502,12 @@ async def test_profile_page_fallback_selects_visual_nearest_message_action() -> 
         try:
             await page.set_content(html)
             candidates = await MessageSendPage._visible_profile_message_controls(  # pyright: ignore[reportPrivateUsage]
-                page.locator("main"),
+                cast(LinkedInLocator, page.locator("main")),
                 profile_name="Jane Doe",
             )
             selected = await MessageSendPage._nearest_profile_message_control(  # pyright: ignore[reportPrivateUsage]
                 candidates,
-                anchor=page.locator("#profile-introduction"),
+                anchor=cast(LinkedInLocator, page.locator("#profile-introduction")),
             )
             assert selected is not None
             selected_id = await selected.get_attribute("id")
@@ -1539,9 +1540,7 @@ async def test_profile_message_fails_closed_for_ambiguous_button_or_existing_dra
             ):
                 page = await browser.new_page()
                 try:
-                    adapter = MessageSendPage(
-                        cast(BrowserManager, MessagingFixtureBrowser(page, html))
-                    )
+                    adapter = MessageSendPage(adapt_browser(MessagingFixtureBrowser(page, html)))
                     with pytest.raises(InvalidTargetError, match=error):
                         await adapter.inspect_message(
                             MessageSendInput(
@@ -1570,7 +1569,7 @@ async def test_profile_target_rejects_nonconnection() -> None:
         page = await browser.new_page()
         try:
             adapter = MessageSendPage(
-                cast(BrowserManager, MessagingFixtureBrowser(page, nonconnection_html))
+                adapt_browser(MessagingFixtureBrowser(page, nonconnection_html))
             )
             with pytest.raises(InvalidTargetError, match="first-degree"):
                 await adapter.inspect_message(
@@ -1619,7 +1618,7 @@ async def test_profile_message_rejects_missing_or_conflicting_identity_evidence(
         page = await browser.new_page()
         try:
             missing_adapter = MessageSendPage(
-                cast(BrowserManager, MessagingFixtureBrowser(page, missing_heading))
+                adapt_browser(MessagingFixtureBrowser(page, missing_heading))
             )
             with pytest.raises(ParserDriftError, match="member heading"):
                 await missing_adapter.inspect_message(
@@ -1643,7 +1642,7 @@ async def test_profile_message_rejects_missing_or_conflicting_identity_evidence(
                     "did not open one exact-recipient",
                 ),
             ):
-                adapter = MessageSendPage(cast(BrowserManager, MessagingFixtureBrowser(page, html)))
+                adapter = MessageSendPage(adapt_browser(MessagingFixtureBrowser(page, html)))
                 with pytest.raises(exception, match=error):
                     await adapter.inspect_message(
                         MessageSendInput(
@@ -1707,7 +1706,7 @@ async def test_message_action_fails_closed_for_changed_target_limits_and_control
         try:
             for html, command, expected_state, expected_outcome, expected_detail in cases:
                 result = await MessageSendPage(
-                    cast(BrowserManager, MessagingFixtureBrowser(page, html))
+                    adapt_browser(MessagingFixtureBrowser(page, html))
                 ).perform_message(command)
                 assert result.final_state == expected_state
                 assert result.outcome is expected_outcome
@@ -1715,7 +1714,7 @@ async def test_message_action_fails_closed_for_changed_target_limits_and_control
                     assert expected_detail in result.detail
 
             uncertain = await MessageSendPage(
-                cast(BrowserManager, FailingMessageClickBrowser(page, base))
+                adapt_browser(FailingMessageClickBrowser(page, base))
             ).perform_message(_message_command())
         finally:
             await browser.close()
@@ -1753,7 +1752,7 @@ async def test_composer_fallbacks_and_message_extraction_remain_bounded() -> Non
             await page.set_content(html)
             root = page.locator("main")
             composer = await MessageSendPage._composer(  # pyright: ignore[reportPrivateUsage]
-                root
+                cast(LinkedInLocator, root)
             )
             await composer.fill("draft")
             assert (
@@ -1763,11 +1762,11 @@ async def test_composer_fallbacks_and_message_extraction_remain_bounded() -> Non
                 == "draft"
             )
             observation = await ConversationGetPage(
-                cast(BrowserManager, object()),
+                cast(LinkedInPlaywright, object()),
                 max_history_rounds=1,
             )._extract(  # pyright: ignore[reportPrivateUsage]
-                page,
-                root,
+                cast(LinkedInPage, page),
+                cast(LinkedInLocator, root),
                 conversation_ref=None,
                 profile_slug=None,
                 participant_name="Jane Doe",
@@ -1778,14 +1777,14 @@ async def test_composer_fallbacks_and_message_extraction_remain_bounded() -> Non
             await page.set_content("<html><body><main>Empty conversation</main></body></html>")
             with pytest.raises(InvalidTargetError, match="composer"):
                 await MessageSendPage._composer(  # pyright: ignore[reportPrivateUsage]
-                    page.locator("main")
+                    cast(LinkedInLocator, page.locator("main"))
                 )
             await page.set_content(
                 "<html><body><main><textarea></textarea><textarea></textarea></main></body></html>"
             )
             with pytest.raises(InvalidTargetError, match="unique"):
                 await MessageSendPage._composer(  # pyright: ignore[reportPrivateUsage]
-                    page.locator("main")
+                    cast(LinkedInLocator, page.locator("main"))
                 )
         finally:
             await browser.close()
@@ -1812,7 +1811,7 @@ async def test_message_action_payload_type_is_enforced_before_browser_access() -
     )
 
     with pytest.raises(InvalidTargetError, match="message action payload"):
-        await MessageSendPage(cast(BrowserManager, object())).perform_message(wrong)
+        await MessageSendPage(cast(LinkedInPlaywright, object())).perform_message(wrong)
 
 
 @pytest.mark.timeout(20)
@@ -1824,11 +1823,11 @@ async def test_missing_visible_messaging_containers_fail_closed() -> None:
             await page.set_content("<html><body><main></main></body></html>")
             with pytest.raises(ParserDriftError, match="no visible text"):
                 await messaging_pages._visible_text(  # pyright: ignore[reportPrivateUsage]
-                    page.locator("main")
+                    cast(LinkedInLocator, page.locator("main"))
                 )
             with pytest.raises(ParserDriftError, match="no visible container"):
                 await messaging_pages._visible_text(  # pyright: ignore[reportPrivateUsage]
-                    page.locator("section")
+                    cast(LinkedInLocator, page.locator("section"))
                 )
         finally:
             await browser.close()

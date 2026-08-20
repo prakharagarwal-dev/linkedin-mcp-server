@@ -7,18 +7,11 @@ from datetime import UTC, datetime
 from urllib.parse import urljoin
 
 from playwright.async_api import Error as PlaywrightError
-from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.tools._shared.models import EvidenceField
-from linkedin_mcp.tools._shared.urls import (
-    canonical_job_url,
-    canonical_profile_url,
-    profile_slug_from_url,
-)
 from linkedin_mcp.tools.jobs.get.models.job_apply_method import JobApplyMethod
 from linkedin_mcp.tools.jobs.get.models.job_detail_input import JobDetailInput
 from linkedin_mcp.tools.jobs.get.models.job_detail_observation import JobDetailObservation
@@ -34,6 +27,14 @@ from linkedin_mcp.tools.jobs.surface import (
 )
 from linkedin_mcp.tools.jobs.surface import (
     lines as visible_text_lines,
+)
+from linkedin_mcp.ui import LinkedInLocator as Locator
+from linkedin_mcp.ui import LinkedInPage as Page
+from linkedin_mcp.ui import LinkedInPlaywright
+from linkedin_mcp.ui.urls import (
+    canonical_job_url,
+    canonical_profile_url,
+    profile_slug_from_url,
 )
 
 _EMPLOYMENT_TYPES = (
@@ -278,12 +279,12 @@ async def _visible_description(description_box: Locator) -> str:
 
 
 class JobDetailPage:
-    def __init__(self, browser: BrowserManager) -> None:
-        self._browser = browser
+    def __init__(self, playwright: LinkedInPlaywright) -> None:
+        self._playwright = playwright
 
     async def read(self, request: JobDetailInput) -> JobDetailObservation:
-        async with self._browser.page() as page:
-            await self._browser.navigate(page, canonical_job_url(request.job_id))
+        async with self._playwright.page() as page:
+            await page.goto(canonical_job_url(request.job_id))
             await self._wait_until_ready(page, request.job_id)
             await self._expand_description(page)
             return await self.extract_visible_job(page, request.job_id)
@@ -326,7 +327,7 @@ class JobDetailPage:
         spans = expand_button.locator("span")
         click_target = spans.last if await spans.count() > 0 else expand_button
         try:
-            await self._browser.click_visible_control(page, click_target)
+            await click_target.click()
         except PlaywrightError as error:
             raise ParserDriftError(
                 "LinkedIn job detail exposed its description expansion control "

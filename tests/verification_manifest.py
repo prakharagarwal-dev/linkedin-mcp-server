@@ -37,7 +37,6 @@ MOCK_VERIFICATION: dict[str, ToolVerification] = {
         "read",
         _OPERATIONAL,
         "tests/contract/test_mcp_protocol.py",
-        "tests/unit/test_auth_coordinator.py",
     ),
     "linkedin.jobs.search": _entry(
         "jobs",

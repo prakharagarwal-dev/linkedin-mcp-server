@@ -23,14 +23,20 @@ your network, publish and engage with posts, and read or send messages.
 
 ## ⚡ Quickstart
 
-### 1. Connect Claude Code
+### 1. Create the dedicated browser profile
+
+```bash
+uvx --from linkedin-mcp-local linkedin-mcp profile create
+```
+
+### 2. Connect Claude Code
 
 ```bash
 claude mcp add --scope user --transport stdio linkedin-mcp -- \
   uvx --from linkedin-mcp-local linkedin-mcp serve --transport stdio
 ```
 
-### 2. Sign in to LinkedIn
+### 3. Sign in to LinkedIn
 
 Restart Claude Code. A dedicated browser window opens automatically—sign in to
 LinkedIn and complete any required verification.
@@ -45,7 +51,7 @@ offline suite on Windows, macOS, Linux x86-64, and Linux ARM64. Browser and OS
 version requirements follow the official
 [Playwright Python system requirements](https://playwright.dev/python/docs/intro#system-requirements).
 
-### 3. Try your first request
+### 4. Try your first request
 
 ```text
 Find remote software engineering jobs in India posted on LinkedIn this week.
@@ -80,7 +86,7 @@ Find remote software engineering jobs in India posted on LinkedIn this week.
 |  | Read conversations | `linkedin.messaging.conversation.get` | ![LinkedIn UI compatibility][status-linkedin-messaging-conversation-get]<br>![Compatibility check date][status-checked-on] | Read message history, replies, edits, reactions, and attachments. |
 |  | Send messages | `linkedin.messaging.send` | ![LinkedIn UI compatibility][status-linkedin-messaging-send]<br>![Compatibility check date][status-checked-on] | Send or reply in one-to-one conversations with text, links, emoji, files, images, and GIFs. |
 | **Server** | Check runtime | `linkedin.server.status` | ![LinkedIn UI compatibility][status-linkedin-server-status]<br>![Compatibility check date][status-checked-on] | Inspect the shared runtime, queue, and active browser operation. |
-|  | Check LinkedIn session | `linkedin.session.status` | ![LinkedIn UI compatibility][status-linkedin-session-status]<br>![Compatibility check date][status-checked-on] | Inspect browser-profile, authentication, login, and pause state. |
+|  | Check LinkedIn session | `linkedin.session.status` | ![LinkedIn UI compatibility][status-linkedin-session-status]<br>![Compatibility check date][status-checked-on] | Inspect browser-profile, saved-session, and pause state. |
 
 `NOT CHECKED` tools remain covered by the offline simulator on every pull request.
 
@@ -111,6 +117,24 @@ See the [capability matrix](docs/CAPABILITY_MATRIX.md) for exact filters,
 supported formats, inputs, outputs, limits, and unsupported features.
 
 ## 📦 Installation
+
+Before connecting an MCP client for the first time, create the dedicated
+profile. Running `login` up front is recommended because it verifies that the
+session survives a clean browser restart (`setup` only preinstalls Chromium and
+is optional when automatic installation is enabled):
+
+```bash
+uvx --from linkedin-mcp-local linkedin-mcp setup
+uvx --from linkedin-mcp-local linkedin-mcp profile create
+uvx --from linkedin-mcp-local linkedin-mcp login
+```
+
+Every server start synchronously validates the saved session before accepting
+tools. If login is missing or expired on a local desktop, the host opens the
+visible headed login flow, waits for completion, reopens the profile, validates
+it again, and only then publishes the MCP endpoint. This is startup work, not a
+background task. Container deployments should mount an already authenticated
+profile because they normally cannot display that window.
 
 <details open>
 <summary>Claude Code</summary>
@@ -379,7 +403,10 @@ Send <message> on LinkedIn to <profile URL>.
  [Tool-owned execution + page object]
                |
                v
-[Browser manager: fresh page per call] <--> [Persistent auth profile]
+ [Paced LinkedInPlaywright facade]
+               |
+               v
+[BrowserManager: one context] <--> [Persistent auth profile]
                |
         visible web UI only
                v

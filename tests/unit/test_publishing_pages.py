@@ -4,7 +4,6 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import cast
 
 import pytest
 from playwright.async_api import Locator, Page, Route, async_playwright
@@ -26,7 +25,6 @@ from linkedin_mcp.tools._shared.actions import (
     PostGroupTarget,
     PostMentionInput,
 )
-from linkedin_mcp.tools._shared.browser import BrowserManager
 from linkedin_mcp.tools.posts.create.models.celebration_post_content import CelebrationPostContent
 from linkedin_mcp.tools.posts.create.models.celebration_type import CelebrationType
 from linkedin_mcp.tools.posts.create.models.document_post_content import DocumentPostContent
@@ -47,6 +45,7 @@ from linkedin_mcp.tools.posts.create.models.text_post_content import TextPostCon
 from linkedin_mcp.tools.posts.create.models.video_caption_mode import VideoCaptionMode
 from linkedin_mcp.tools.posts.create.models.video_post_content import VideoPostContent
 from linkedin_mcp.tools.posts.create.page import PostPublishingPage
+from tests.support.playwright import adapt_browser
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 COMPOSER_HTML = (FIXTURES / "posts/latest/composer.html").read_text(encoding="utf-8")
@@ -126,10 +125,7 @@ async def test_inspection_waits_through_the_current_visible_composer_loader(
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         adapter = PostPublishingPage(
-            cast(
-                BrowserManager,
-                PublishingFixtureBrowser(page, composer_delay_ms=3_500),
-            ),
+            adapt_browser(PublishingFixtureBrowser(page, composer_delay_ms=3_500)),
         )
         try:
             capture = await adapter.inspect_post(request)
@@ -163,7 +159,7 @@ async def test_personal_text_post_action_verifies_new_stable_post(
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         adapter = PostPublishingPage(
-            cast(BrowserManager, PublishingFixtureBrowser(page)),
+            adapt_browser(PublishingFixtureBrowser(page)),
         )
         try:
             command = await _action_command(adapter, request)
@@ -196,7 +192,7 @@ async def test_pre_submit_timeout_is_a_verified_failure_not_an_uncertain_publish
         page = await browser.new_page()
         fixture_browser = PublishingFixtureBrowser(page)
         adapter = PostPublishingPage(
-            cast(BrowserManager, fixture_browser),
+            adapt_browser(fixture_browser),
         )
         try:
             command = await _action_command(adapter, request)
@@ -224,7 +220,7 @@ async def test_visible_success_alert_verifies_publish_after_post_click_timeout(
         page = await browser.new_page()
         fixture_browser = PublishingFixtureBrowser(page)
         adapter = PostPublishingPage(
-            cast(BrowserManager, fixture_browser),
+            adapt_browser(fixture_browser),
         )
         try:
             command = await _action_command(adapter, request)
@@ -252,7 +248,7 @@ async def test_visible_failure_alert_returns_verified_non_publish(
         page = await browser.new_page()
         fixture_browser = PublishingFixtureBrowser(page)
         adapter = PostPublishingPage(
-            cast(BrowserManager, fixture_browser),
+            adapt_browser(fixture_browser),
         )
         try:
             command = await _action_command(adapter, request)
@@ -311,7 +307,7 @@ async def test_photo_post_uses_direct_asset_and_applies_alt_text_and_exact_membe
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         adapter = PostPublishingPage(
-            cast(BrowserManager, PublishingFixtureBrowser(page)),
+            adapt_browser(PublishingFixtureBrowser(page)),
         )
         try:
             command = await _action_command(adapter, request)
@@ -376,7 +372,7 @@ async def test_video_document_and_poll_modes_cover_all_structured_composer_optio
             for request in requests:
                 page = await browser.new_page()
                 adapter = PostPublishingPage(
-                    cast(BrowserManager, PublishingFixtureBrowser(page)),
+                    adapt_browser(PublishingFixtureBrowser(page)),
                 )
                 command = await _action_command(adapter, request)
                 commands.append(command)
@@ -461,7 +457,7 @@ async def test_celebration_event_hiring_and_expert_modes_follow_current_visible_
             for request in requests:
                 page = await browser.new_page()
                 adapter = PostPublishingPage(
-                    cast(BrowserManager, PublishingFixtureBrowser(page)),
+                    adapt_browser(PublishingFixtureBrowser(page)),
                 )
                 command = await _action_command(adapter, request)
                 commands.append(command)
@@ -514,7 +510,7 @@ async def test_group_brand_partnership_and_collaborators_are_exactly_bound(
             for item in (request, collaborative):
                 page = await browser.new_page()
                 adapter = PostPublishingPage(
-                    cast(BrowserManager, PublishingFixtureBrowser(page)),
+                    adapt_browser(PublishingFixtureBrowser(page)),
                 )
                 command = await _action_command(adapter, item)
                 commands.append(command)
@@ -558,7 +554,7 @@ async def test_link_preview_removal_and_scheduling_have_visible_postconditions(
             for request in (immediate, scheduled):
                 page = await browser.new_page()
                 adapter = PostPublishingPage(
-                    cast(BrowserManager, PublishingFixtureBrowser(page)),
+                    adapt_browser(PublishingFixtureBrowser(page)),
                 )
                 results.append(await adapter.perform_post(await _action_command(adapter, request)))
                 await page.close()

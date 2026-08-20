@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import re
 
-from playwright.async_api import Locator
-
 from linkedin_mcp.tools.jobs.models.job_workplace_type import JobWorkplaceType
+from linkedin_mcp.ui import LinkedInLocator as Locator
 
 LISTED_PATTERN = re.compile(
     r"\b(?:reposted\s+)?(?:\d+\s+)?(?:minute|hour|day|week|month)s?\s+ago\b|\breposted\b",
