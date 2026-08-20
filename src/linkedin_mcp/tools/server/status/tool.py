@@ -25,7 +25,6 @@ def register(
         return ServerStatusOutput(
             version=__version__,
             transport=container.settings.transport,
-            connected_clients=container.clients.connected_count,
             queue_depth=container.scheduler.queue_depth,
             active_browser_operation=container.scheduler.active,
             active_task=container.scheduler.active_task,

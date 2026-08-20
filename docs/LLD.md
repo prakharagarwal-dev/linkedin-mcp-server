@@ -168,10 +168,10 @@ visible terminal state cannot be proven. The server never retries it.
 ## Dependency direction
 
 ```text
-mcp/ and tools/*/tool.py
-            │
-            ├──> execution/Task, Scheduler, Worker
-            └──> tool-owned models, page, evidence, optional pagination
+host/ ──> transport/server.py ──> tools/*/tool.py
+                                      │
+                                      ├──> execution/Task, Scheduler, Worker
+                                      └──> tool-owned models, page, evidence, optional pagination
                                       │
                                       ▼
                             shared LinkedIn UI helpers
@@ -181,6 +181,8 @@ mcp/ and tools/*/tool.py
                                       │
                                       ▼
                                   Playwright
+
+transport/stdio.py ──> shared host endpoint
 ```
 
 Lower layers never import MCP tool definitions. Page objects never retain a

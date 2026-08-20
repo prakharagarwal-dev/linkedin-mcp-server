@@ -1,4 +1,4 @@
-"""Cross-platform singleton ownership for one local LinkedIn account runtime."""
+"""Cross-platform ownership for the shared host and exclusive profile operations."""
 
 from __future__ import annotations
 
@@ -9,15 +9,17 @@ import json
 import os
 import signal
 import time
-from collections.abc import Callable
-from contextlib import suppress
+from collections.abc import Awaitable, Callable, Generator
+from contextlib import contextmanager, suppress
 from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from importlib import import_module
 from pathlib import Path
+from types import FrameType
 from typing import BinaryIO, cast
 from uuid import uuid4
 
+from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import ConfigurationError
 
 _LOCK_BYTES = 1
@@ -187,6 +189,99 @@ class AccountProcessLock:
         handle.write(payload)
         handle.flush()
         os.fsync(handle.fileno())
+
+
+@contextmanager
+def claim_account_runtime(
+    settings: Settings,
+    *,
+    command: str,
+) -> Generator[AccountProcessLock, None, None]:
+    """Claim exclusive access to the configured account profile."""
+
+    lock = AccountProcessLock(
+        settings.runtime_lock_path,
+        account_id=settings.account_id,
+        command=command,
+    )
+    lock.acquire()
+    try:
+        yield lock
+    finally:
+        lock.release()
+
+
+async def run_owned_operation[ResultT](
+    settings: Settings,
+    *,
+    command: str,
+    operation: Callable[[], Awaitable[ResultT]],
+) -> ResultT:
+    """Run one profile operation while excluding the shared MCP host."""
+
+    with claim_account_runtime(settings, command=command) as process_lock:
+        operation_task = asyncio.ensure_future(operation())
+        stop_task = asyncio.create_task(_wait_for_owned_operation_stop(process_lock))
+        try:
+            done, _ = await asyncio.wait(
+                (operation_task, stop_task),
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            if operation_task in done:
+                return await operation_task
+
+            reason = await stop_task
+            if operation_task.done():
+                return await operation_task
+            operation_task.cancel()
+            await asyncio.gather(operation_task, return_exceptions=True)
+            raise RuntimeError(f"The {command} operation was interrupted by {reason}.")
+        finally:
+            if not operation_task.done():
+                operation_task.cancel()
+            if not stop_task.done():
+                stop_task.cancel()
+            await asyncio.gather(operation_task, stop_task, return_exceptions=True)
+
+
+async def _wait_for_stop_signal() -> signal.Signals:
+    """Wait for a console stop signal using APIs available on every supported OS."""
+
+    loop = asyncio.get_running_loop()
+    received: asyncio.Future[signal.Signals] = loop.create_future()
+
+    def receive(signum: int, _: FrameType | None) -> None:
+        if not received.done():
+            received.set_result(signal.Signals(signum))
+
+    watched = (signal.SIGINT, signal.SIGTERM)
+    previous = {watched_signal: signal.getsignal(watched_signal) for watched_signal in watched}
+    try:
+        for watched_signal in watched:
+            signal.signal(watched_signal, receive)
+        return await received
+    finally:
+        for watched_signal, handler in previous.items():
+            signal.signal(watched_signal, handler)
+
+
+async def _wait_for_owned_operation_stop(process_lock: AccountProcessLock) -> str:
+    request_task = asyncio.create_task(process_lock.wait_for_stop_request())
+    signal_task = asyncio.create_task(_wait_for_stop_signal())
+    try:
+        done, _ = await asyncio.wait(
+            (request_task, signal_task),
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        if signal_task in done:
+            return (await signal_task).name
+        await request_task
+        return "a graceful stop request"
+    finally:
+        for task in (request_task, signal_task):
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(request_task, signal_task, return_exceptions=True)
 
 
 def inspect_account_runtime(path: Path) -> AccountRuntimeStatus:

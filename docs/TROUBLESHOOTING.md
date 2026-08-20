@@ -141,10 +141,10 @@ Collection tools return pagination and completeness metadata. Continue with
 `pagination.next_cursor` when present. A `truncated` or parser-drift result is
 an honest incomplete result, not a successful end of the LinkedIn collection.
 
-Cursors are runtime-local, single-use, client-session-bound, and filter-bound.
-They expire before reservation, but a valid cursor reserved for a queued call
-survives that queue wait. Continue from the same MCP client session; start a
-new scan after reconnecting, runtime restart, cursor expiry, or filter change.
+Cursors are host-local, single-use, and bound to their account, capability, and
+semantic filters. A valid cursor remains usable after an MCP client reconnects.
+Start a new scan after host restart, cursor expiry, consumption, or filter
+change.
 
 ## A write result is uncertain
 

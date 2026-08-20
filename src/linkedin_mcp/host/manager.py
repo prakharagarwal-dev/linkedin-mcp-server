@@ -1,37 +1,35 @@
-"""Discovery, election, and lifecycle for the shared local MCP runtime."""
+"""Discovery, startup, and lifecycle for the shared local MCP host."""
 
 from __future__ import annotations
 
 import asyncio
 import os
-import socket
 import subprocess
 import sys
 import time
 from contextlib import suppress
 from pathlib import Path
-from typing import BinaryIO, Protocol, TextIO, cast
+from typing import BinaryIO, Protocol, TextIO
 from urllib.parse import urlsplit
-
-import uvicorn
-from mcp import ClientSession, types
-from mcp.client.streamable_http import streamable_http_client
-from starlette.responses import Response
-from starlette.types import ASGIApp, Receive, Scope, Send
 
 from linkedin_mcp import __version__
 from linkedin_mcp.config import Settings, runtime_configuration_fingerprint
 from linkedin_mcp.container import create_production_container
 from linkedin_mcp.errors import ConfigurationError
-from linkedin_mcp.mcp.server import create_mcp_server
-from linkedin_mcp.runtime.ownership import (
+from linkedin_mcp.host.lock import (
     AccountProcessLock,
     AccountRuntimeStatus,
     inspect_account_runtime,
 )
+from linkedin_mcp.transport.server import (
+    bind_http_listener,
+    http_server_is_healthy,
+    read_http_server_status,
+    serve_http,
+)
 
 _RUNTIME_OWNER_COMMAND = "shared-runtime"
-_RUNTIME_MODULE = "linkedin_mcp.runtime"
+_RUNTIME_MODULE = "linkedin_mcp.host"
 _RUNTIME_TRANSPORT = "shared-loopback"
 # The OS lock becomes visible before its holder can fsync owner metadata.
 _LOCK_OWNER_PUBLICATION_GRACE_SECONDS = 5.0
@@ -60,11 +58,11 @@ _WINDOWS_BROKER_SCRIPT = "; ".join(
 )
 
 
-class _RuntimeStarter(Protocol):
+class _HostStarter(Protocol):
     def poll(self) -> int | None: ...
 
 
-class _BrokeredRuntimeStarter:
+class _BrokeredHostStarter:
     """Report only broker failures while the elected runtime publishes its own PID."""
 
     def __init__(self, broker: subprocess.Popen[bytes]) -> None:
@@ -75,50 +73,33 @@ class _BrokeredRuntimeStarter:
         return return_code if return_code not in {None, 0} else None
 
 
-class _LoopbackMCPApp:
-    """Expose request/response MCP without the optional standalone SSE stream."""
-
-    def __init__(self, app: ASGIApp) -> None:
-        self._app = app
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] == "http" and scope["method"] == "GET":
-            await Response(status_code=405, headers={"Allow": "POST, DELETE"})(
-                scope,
-                receive,
-                send,
-            )
-            return
-        await self._app(scope, receive, send)
-
-
-def shared_runtime_endpoint(settings: Settings) -> str:
+def host_endpoint(settings: Settings) -> str:
     host = _normalized_loopback_host(settings.http_host)
     rendered_host = f"[{host}]" if ":" in host else host
     return f"http://{rendered_host}:{settings.http_port}/mcp"
 
 
-async def ensure_shared_runtime(settings: Settings) -> str:
+async def ensure_host(settings: Settings) -> str:
     """Return a healthy endpoint, starting one elected background owner if needed."""
 
     status = inspect_account_runtime(settings.runtime_lock_path)
     if status.running and status.owner is None:
-        return await wait_for_shared_runtime(settings)
+        return await wait_for_host(settings)
     _validate_running_owner(status, settings)
     endpoint = await _healthy_endpoint(status)
     if endpoint is not None:
         return endpoint
     if status.running:
-        return await wait_for_shared_runtime(settings)
+        return await wait_for_host(settings)
 
-    starter = _spawn_shared_runtime(settings)
-    return await wait_for_shared_runtime(settings, starter=starter)
+    starter = _spawn_host(settings)
+    return await wait_for_host(settings, starter=starter)
 
 
-async def wait_for_shared_runtime(
+async def wait_for_host(
     settings: Settings,
     *,
-    starter: _RuntimeStarter | None = None,
+    starter: _HostStarter | None = None,
 ) -> str:
     deadline = time.monotonic() + settings.runtime_start_timeout_seconds
     last_owner_command: str | None = None
@@ -142,7 +123,7 @@ async def wait_for_shared_runtime(
         if starter is not None and starter.poll() is not None and not status.running:
             raise ConfigurationError(
                 "The shared LinkedIn MCP runtime failed during startup. See "
-                f"{_runtime_log_path(settings)} for the safe local diagnostic log."
+                f"{_host_log_path(settings)} for the safe local diagnostic log."
             )
         await asyncio.sleep(0.1)
     suffix = f" The current owner command is {last_owner_command!r}." if last_owner_command else ""
@@ -152,27 +133,15 @@ async def wait_for_shared_runtime(
     )
 
 
-async def runtime_is_healthy(endpoint: str, *, timeout_seconds: float = 2.0) -> bool:
+async def host_is_healthy(endpoint: str, *, timeout_seconds: float = 2.0) -> bool:
     try:
-        validated = validate_shared_runtime_endpoint(endpoint)
-        async with asyncio.timeout(timeout_seconds):
-            async with streamable_http_client(validated) as (read_stream, write_stream, _):
-                async with ClientSession(
-                    read_stream,
-                    write_stream,
-                    client_info=types.Implementation(
-                        name="linkedin-mcp-runtime-probe",
-                        version=__version__,
-                    ),
-                ) as session:
-                    await session.initialize()
-                    await session.send_ping()
-        return True
-    except Exception:
+        validated = validate_host_endpoint(endpoint)
+    except ConfigurationError:
         return False
+    return await http_server_is_healthy(validated, timeout_seconds=timeout_seconds)
 
 
-async def read_shared_runtime_status(
+async def read_host_status(
     endpoint: str,
     *,
     timeout_seconds: float = 2.0,
@@ -180,30 +149,16 @@ async def read_shared_runtime_status(
     """Read the runtime's safe local status without entering the browser queue."""
 
     try:
-        validated = validate_shared_runtime_endpoint(endpoint)
-        async with asyncio.timeout(timeout_seconds):
-            async with streamable_http_client(validated) as (read_stream, write_stream, _):
-                async with ClientSession(
-                    read_stream,
-                    write_stream,
-                    client_info=types.Implementation(
-                        name="linkedin-mcp-status",
-                        version=__version__,
-                    ),
-                ) as session:
-                    await session.initialize()
-                    result = await session.call_tool("linkedin.server.status", {})
-        if result.isError or result.structuredContent is None:
-            return None
-        return cast(dict[str, object], result.structuredContent)
-    except Exception:
+        validated = validate_host_endpoint(endpoint)
+    except ConfigurationError:
         return None
+    return await read_http_server_status(validated, timeout_seconds=timeout_seconds)
 
 
-async def run_shared_runtime(settings: Settings) -> None:
+async def run_host(settings: Settings) -> None:
     """Own the profile lock and serve stateful MCP sessions on loopback."""
 
-    endpoint = shared_runtime_endpoint(settings)
+    endpoint = host_endpoint(settings)
     host = _normalized_loopback_host(settings.http_host)
     container = create_production_container(settings)
     container.process_lock = AccountProcessLock(
@@ -214,30 +169,23 @@ async def run_shared_runtime(settings: Settings) -> None:
         version=__version__,
         configuration_fingerprint=runtime_configuration_fingerprint(settings),
     )
-    listener: socket.socket | None = None
     await container.start()
     try:
-        listener = _bind_listener(host, settings.http_port)
-        mcp = create_mcp_server(container, manage_container_lifecycle=False)
-        app = _LoopbackMCPApp(mcp.streamable_http_app())
-        config = uvicorn.Config(
-            app,
-            host=host,
-            port=settings.http_port,
-            log_level=settings.log_level.lower(),
-            access_log=False,
-            timeout_graceful_shutdown=None,
-        )
-        server = uvicorn.Server(config)
-        container.process_lock.publish_endpoint(endpoint)
-        await _serve_until_stopped(server, container.process_lock, listener)
-    finally:
-        if listener is not None:
+        listener = bind_http_listener(host, settings.http_port)
+        try:
+            container.process_lock.publish_endpoint(endpoint)
+            await serve_http(
+                container,
+                listener,
+                container.process_lock.wait_for_stop_request,
+            )
+        finally:
             listener.close()
+    finally:
         await container.close()
 
 
-def validate_shared_runtime_endpoint(endpoint: str) -> str:
+def validate_host_endpoint(endpoint: str) -> str:
     try:
         parsed = urlsplit(endpoint)
         port = parsed.port
@@ -261,12 +209,12 @@ async def _healthy_endpoint(status: AccountRuntimeStatus) -> str | None:
     owner = status.owner
     if not status.running or owner is None or owner.endpoint is None:
         return None
-    endpoint = validate_shared_runtime_endpoint(owner.endpoint)
-    return endpoint if await runtime_is_healthy(endpoint) else None
+    endpoint = validate_host_endpoint(owner.endpoint)
+    return endpoint if await host_is_healthy(endpoint) else None
 
 
-def _spawn_shared_runtime(settings: Settings) -> _RuntimeStarter:
-    log_path = _runtime_log_path(settings)
+def _spawn_host(settings: Settings) -> _HostStarter:
+    log_path = _host_log_path(settings)
     log_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     with suppress(OSError):
         log_path.parent.chmod(0o700)
@@ -275,7 +223,7 @@ def _spawn_shared_runtime(settings: Settings) -> _RuntimeStarter:
         if os.name != "nt":
             os.fchmod(log.fileno(), 0o600)
         if os.name == "nt":
-            process: _RuntimeStarter = _spawn_windows_shared_runtime(log)
+            process: _HostStarter = _spawn_windows_host(log)
         else:
             process = subprocess.Popen(
                 [sys.executable, "-m", _RUNTIME_MODULE],
@@ -290,7 +238,7 @@ def _spawn_shared_runtime(settings: Settings) -> _RuntimeStarter:
     return process
 
 
-def _spawn_windows_shared_runtime(log: BinaryIO) -> _BrokeredRuntimeStarter:
+def _spawn_windows_host(log: BinaryIO) -> _BrokeredHostStarter:
     """Ask local Windows CIM to create the runtime outside the caller's Job Object."""
 
     environment = os.environ.copy()
@@ -328,17 +276,17 @@ def _spawn_windows_shared_runtime(log: BinaryIO) -> _BrokeredRuntimeStarter:
         raise ConfigurationError(
             "The shared LinkedIn MCP runtime could not start through local Windows CIM."
         ) from error
-    return _BrokeredRuntimeStarter(broker)
+    return _BrokeredHostStarter(broker)
 
 
-def brokered_runtime_output_required() -> bool:
+def brokered_host_output_required() -> bool:
     return os.environ.get(_WINDOWS_BROKERED_RUNTIME_ENV) == "1"
 
 
-def redirect_brokered_runtime_output(settings: Settings) -> TextIO:
+def redirect_brokered_host_output(settings: Settings) -> TextIO:
     """Give the detached Windows runtime safe Python output streams for diagnostics."""
 
-    log_path = _runtime_log_path(settings)
+    log_path = _host_log_path(settings)
     log_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     log = log_path.open("a", encoding="utf-8", buffering=1)
     sys.stdout = log
@@ -346,33 +294,8 @@ def redirect_brokered_runtime_output(settings: Settings) -> TextIO:
     return log
 
 
-def _runtime_log_path(settings: Settings) -> Path:
+def _host_log_path(settings: Settings) -> Path:
     return settings.runtime_lock_path.with_name("runtime.log")
-
-
-async def _serve_until_stopped(
-    server: uvicorn.Server,
-    process_lock: AccountProcessLock,
-    listener: socket.socket,
-) -> None:
-    """Serve until Uvicorn exits or the exact elected owner receives a stop request."""
-
-    server_task = asyncio.create_task(server.serve(sockets=[listener]))
-    stop_task = asyncio.create_task(process_lock.wait_for_stop_request())
-    try:
-        done, _ = await asyncio.wait(
-            (server_task, stop_task),
-            return_when=asyncio.FIRST_COMPLETED,
-        )
-        if stop_task in done:
-            await stop_task
-            server.should_exit = True
-        await server_task
-    finally:
-        for task in (server_task, stop_task):
-            if not task.done():
-                task.cancel()
-        await asyncio.gather(server_task, stop_task, return_exceptions=True)
 
 
 def _normalized_loopback_host(host: str) -> str:
@@ -414,17 +337,3 @@ def _validate_running_owner(status: AccountRuntimeStatus, settings: Settings) ->
             "pacing, or transport settings. Make client configurations match, or run "
             "`linkedin-mcp stop` and restart with the intended settings."
         )
-
-
-def _bind_listener(host: str, port: int) -> socket.socket:
-    family = socket.AF_INET6 if ":" in host else socket.AF_INET
-    listener = socket.socket(family, socket.SOCK_STREAM)
-    try:
-        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        listener.bind((host, port))
-        listener.listen(socket.SOMAXCONN)
-        listener.setblocking(False)
-        return listener
-    except BaseException:
-        listener.close()
-        raise

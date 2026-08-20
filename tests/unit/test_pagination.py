@@ -116,7 +116,7 @@ async def test_cursor_continuation_is_single_use_and_preserves_scan_identity() -
 
 
 @pytest.mark.asyncio
-async def test_cursor_is_bound_to_client_account_capability_and_semantic_filters() -> None:
+async def test_cursor_is_bound_to_account_capability_and_semantic_filters() -> None:
     manager = _manager()
     request = JobSearchInput(
         context_id="pagination",
@@ -127,7 +127,6 @@ async def test_cursor_is_bound_to_client_account_capability_and_semantic_filters
     )
     state = await manager.start(
         account_id="personal",
-        client_id="client-a",
         capability_name=CapabilityName.JOBS_SEARCH,
         request=request,
     )
@@ -148,36 +147,25 @@ async def test_cursor_is_bound_to_client_account_capability_and_semantic_filters
 
     with pytest.raises(InvalidCursorError, match="does not match"):
         await manager.start(
-            account_id="personal",
-            client_id="client-b",
-            capability_name=CapabilityName.JOBS_SEARCH,
-            request=continuation,
-        )
-    with pytest.raises(InvalidCursorError, match="does not match"):
-        await manager.start(
             account_id="other-account",
-            client_id="client-a",
             capability_name=CapabilityName.JOBS_SEARCH,
             request=continuation,
         )
     with pytest.raises(InvalidCursorError, match="does not match"):
         await manager.start(
             account_id="personal",
-            client_id="client-a",
             capability_name=CapabilityName.PEOPLE_SEARCH,
             request=continuation,
         )
     with pytest.raises(InvalidCursorError, match="does not match"):
         await manager.start(
             account_id="personal",
-            client_id="client-a",
             capability_name=CapabilityName.JOBS_SEARCH,
             request=continuation.model_copy(update={"query": "rust"}),
         )
 
     valid = await manager.start(
         account_id="personal",
-        client_id="client-a",
         capability_name=CapabilityName.JOBS_SEARCH,
         request=continuation,
     )

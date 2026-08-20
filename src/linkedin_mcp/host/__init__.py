@@ -1,6 +1,6 @@
-"""Local process ownership and shared-runtime hosting."""
+"""Shared host process lifecycle and account ownership."""
 
-from .ownership import (
+from .lock import (
     AccountProcessLock,
     AccountRuntimeOwner,
     AccountRuntimeStatus,

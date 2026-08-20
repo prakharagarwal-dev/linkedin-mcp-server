@@ -202,9 +202,10 @@ does not implement HTTP authentication.
 
 The server does not retain call results or evidence. Every tool invocation is
 executed freshly. Queue state, navigation pacing, and continuation cursors exist
-only in shared-runtime memory; a runtime restart clears them. Cursors belong to
-the MCP session that created them. The persistent browser profile, managed
-browser cache, and explicitly selected local assets survive.
+only in shared-host memory; a host restart clears them. Cursors are opaque,
+single-use, and bound to their account, capability, and semantic filters; they
+remain usable after an MCP client reconnects. The persistent browser profile,
+managed browser cache, and explicitly selected local assets survive.
 
 After an uncertain or hard-interrupted action, inspect LinkedIn's visible state
 before invoking the tool again. Never blindly retry an account-changing call.

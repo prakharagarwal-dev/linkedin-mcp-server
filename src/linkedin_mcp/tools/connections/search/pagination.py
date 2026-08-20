@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.mcp.context import current_client_id
 from linkedin_mcp.pagination import (
     PaginationManager,
     select_page,
@@ -32,7 +31,6 @@ async def execute(
 ) -> ConnectionsSearchOutput:
     state = await pagination.start(
         account_id=account_id,
-        client_id=current_client_id(),
         capability_name=CapabilityName.CONNECTIONS_SEARCH,
         request=request,
     )

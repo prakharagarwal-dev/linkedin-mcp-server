@@ -8,6 +8,11 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Keep MCP protocol wiring in `transport`, and move shared-process lifecycle,
+  account locking, and the private launcher into `host`. Remove redundant
+  application-level MCP session identities and bind opaque pagination cursors
+  only to their account, capability, and semantic filters so reconnecting
+  clients can continue them.
 - Replace the capability executor, operation mixins, provider protocols, and
   per-client fair scheduler with a small `Task` → FIFO `Scheduler` → `Worker`
   pipeline. Each tool now owns its execution and optional pagination flow next

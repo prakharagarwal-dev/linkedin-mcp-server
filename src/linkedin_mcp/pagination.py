@@ -16,13 +16,11 @@ from linkedin_mcp.tools._shared.models import CapabilityName, PaginatedInput, Pa
 from linkedin_mcp.tools.invitations.list.models.invitation_list_input import InvitationListInput
 
 Clock = Callable[[], datetime]
-DEFAULT_CLIENT_ID = "direct-local-client"
 
 
 @dataclass(slots=True)
 class _CursorState:
     account_id: str
-    client_id: str
     capability_name: CapabilityName
     binding: str
     scan_id: str
@@ -35,7 +33,6 @@ class PaginationState:
     """Cursor state needed by one serialized collection task."""
 
     account_id: str
-    client_id: str
     capability_name: CapabilityName
     binding: str
     scan_id: str
@@ -127,7 +124,6 @@ class PaginationManager:
         self,
         *,
         account_id: str,
-        client_id: str = DEFAULT_CLIENT_ID,
         capability_name: CapabilityName,
         request: PaginatedInput,
     ) -> PaginationState:
@@ -138,7 +134,6 @@ class PaginationManager:
             if request.cursor is None:
                 return PaginationState(
                     account_id=account_id,
-                    client_id=client_id,
                     capability_name=capability_name,
                     binding=binding,
                     scan_id=str(uuid.uuid4()),
@@ -157,17 +152,14 @@ class PaginationManager:
                 raise InvalidCursorError("The pagination cursor has expired.")
             if (
                 state.account_id != account_id
-                or state.client_id != client_id
                 or state.capability_name is not capability_name
                 or state.binding != binding
             ):
                 raise InvalidCursorError(
-                    "The pagination cursor does not match this client, account, capability, "
-                    "or filter set."
+                    "The pagination cursor does not match this account, capability, or filter set."
                 )
             return PaginationState(
                 account_id=account_id,
-                client_id=client_id,
                 capability_name=capability_name,
                 binding=binding,
                 scan_id=state.scan_id,
@@ -210,7 +202,6 @@ class PaginationManager:
                 current = self._states.get(state.prior_cursor)
                 if current is None or (
                     current.account_id != state.account_id
-                    or current.client_id != state.client_id
                     or current.capability_name is not state.capability_name
                     or current.binding != state.binding
                     or current.scan_id != state.scan_id
@@ -232,7 +223,6 @@ class PaginationManager:
                 expires_at = self._clock() + self._ttl
                 self._states[next_cursor] = _CursorState(
                     account_id=state.account_id,
-                    client_id=state.client_id,
                     capability_name=state.capability_name,
                     binding=state.binding,
                     scan_id=state.scan_id,

@@ -4,7 +4,7 @@ import argparse
 import asyncio
 
 from linkedin_mcp.config import Settings
-from linkedin_mcp.runtime.owned_operation import run_owned_operation
+from linkedin_mcp.host.lock import run_owned_operation
 from linkedin_mcp.tools._shared.browser import login_interactively
 
 

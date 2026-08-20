@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from linkedin_mcp.mcp.context import current_client_id
 from linkedin_mcp.pagination import (
     PaginationManager,
     select_page,
@@ -26,7 +25,6 @@ async def execute(
 ) -> JobSearchOutput:
     state = await pagination.start(
         account_id=account_id,
-        client_id=current_client_id(),
         capability_name=CapabilityName.JOBS_SEARCH,
         request=request,
     )

@@ -7,7 +7,6 @@ from collections.abc import (
     Callable,
 )
 
-from linkedin_mcp.mcp.context import current_client_id
 from linkedin_mcp.pagination import (
     PaginationManager,
     select_page,
@@ -34,7 +33,6 @@ async def execute(
 ) -> InvitationListOutput:
     state = await pagination.start(
         account_id=account_id,
-        client_id=current_client_id(),
         capability_name=CapabilityName.INVITATIONS_LIST,
         request=request,
     )

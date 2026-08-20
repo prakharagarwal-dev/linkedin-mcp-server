@@ -14,8 +14,8 @@ from mcp.client.stdio import StdioServerParameters, stdio_client
 from mcp.client.streamable_http import streamable_http_client
 
 from linkedin_mcp import __version__
-from linkedin_mcp.runtime import inspect_account_runtime, stop_account_runtime
-from linkedin_mcp.runtime.shared import runtime_is_healthy
+from linkedin_mcp.host import inspect_account_runtime, stop_account_runtime
+from linkedin_mcp.host.manager import host_is_healthy
 
 ROOT = Path(__file__).parents[2]
 
@@ -124,7 +124,7 @@ async def test_two_stdio_clients_elect_and_share_one_surviving_runtime(
             direct_status = await direct_session.call_tool("linkedin.server.status", {})
             assert direct_status.isError is False
             assert direct_status.structuredContent is not None
-            assert direct_status.structuredContent["connected_clients"] >= 3
+            assert direct_status.structuredContent["accepting_calls"] is True
 
         release.set()
         await asyncio.wait_for(asyncio.gather(*clients), timeout=20)
@@ -134,7 +134,7 @@ async def test_two_stdio_clients_elect_and_share_one_surviving_runtime(
         assert after_disconnect.owner is not None
         assert after_disconnect.owner.pid == owner_pid
         for _ in range(12):
-            assert await runtime_is_healthy(endpoint, timeout_seconds=3)
+            assert await host_is_healthy(endpoint, timeout_seconds=3)
     finally:
         release.set()
         for client in clients:
