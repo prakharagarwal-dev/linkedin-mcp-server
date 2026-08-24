@@ -27,7 +27,7 @@ class _Evaluator(Protocol):
     def evaluate(self, expression: str, arg: object | None = None) -> Awaitable[Any]: ...
 
 
-class Paced:
+class Pacer:
     """Apply one configured delay before selected Playwright interactions."""
 
     def __init__(

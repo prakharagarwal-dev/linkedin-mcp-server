@@ -28,7 +28,7 @@ from linkedin_mcp.errors import (
     ParserDriftError,
     RestrictionDetectedError,
 )
-from linkedin_mcp.infra.playwright import Paced
+from linkedin_mcp.ui import Pacer
 
 
 def _live_settings(tmp_path: Path, *, profile_name: str = "profile") -> Settings:
@@ -68,7 +68,7 @@ async def _live_facade(settings: Settings) -> AsyncGenerator[BrowserManager]:
 
         manager = BrowserManager.for_testing(
             settings,
-            Paced(settings.browser_action_delay_seconds),
+            Pacer(settings.browser_action_delay_seconds),
             page_factory=page_factory,
             assert_access=lambda page: assert_linkedin_access(page, settings.allowed_hosts),
         )
@@ -444,7 +444,7 @@ async def test_start_synchronously_validates_and_reuses_the_saved_profile(
 
     validated: list[object] = []
 
-    async def validate(context_to_validate: object, _: Settings, __: Paced) -> None:
+    async def validate(context_to_validate: object, _: Settings, __: Pacer) -> None:
         validated.append(context_to_validate)
 
     monkeypatch.setattr(manager_module, "async_playwright", cast(Any, fake_async_playwright))
@@ -452,7 +452,7 @@ async def test_start_synchronously_validates_and_reuses_the_saved_profile(
 
     manager = BrowserManager(
         settings,
-        Paced(0),
+        Pacer(0),
         browser_profile=cast(BrowserProfileManager, FakeBrowserProfileManager(settings)),
     )
     started_context = await manager.start()
@@ -473,7 +473,7 @@ async def test_start_synchronously_validates_and_reuses_the_saved_profile(
 async def test_start_requires_an_explicitly_created_profile(tmp_path: Path) -> None:
     manager = BrowserManager(
         _live_settings(tmp_path, profile_name="missing"),
-        Paced(0),
+        Pacer(0),
     )
 
     with pytest.raises(ConfigurationError, match="profile create"):
@@ -501,7 +501,7 @@ async def test_start_awaits_visible_login_then_reopens_and_revalidates(
 
     validations = 0
 
-    async def validate(_: object, __: Settings, ___: Paced) -> None:
+    async def validate(_: object, __: Settings, ___: Pacer) -> None:
         nonlocal validations
         validations += 1
         if validations == 1:
@@ -509,13 +509,13 @@ async def test_start_awaits_visible_login_then_reopens_and_revalidates(
 
     login_calls: list[Settings] = []
 
-    async def login(settings_to_login: Settings, _: Paced, __: object) -> None:
+    async def login(settings_to_login: Settings, _: Pacer, __: object) -> None:
         login_calls.append(settings_to_login)
 
     monkeypatch.setattr(manager_module, "async_playwright", cast(Any, fake_async_playwright))
     monkeypatch.setattr(manager_module, "validate_saved_session", validate)
     monkeypatch.setattr(manager_module, "login_interactively", login)
-    manager = BrowserManager(settings, Paced(0))
+    manager = BrowserManager(settings, Pacer(0))
 
     context = await manager.start()
 
@@ -550,11 +550,11 @@ async def test_browser_manager_navigates_and_pauses_on_a_checkpoint(
                         body="<html><body><main>Visible jobs</main></body></html>",
                     ),
                 )
-                await manager.paced.goto(
+                await Pacer(0).goto(
                     page,
                     "https://www.linkedin.com/jobs/search/?keywords=python",
                 )
-                await manager.paced.goto(
+                await Pacer(0).goto(
                     page,
                     "https://www.linkedin.com/checkpoint/challenge/",
                 )
@@ -601,7 +601,7 @@ async def test_browser_manager_validates_visible_control_navigation(
                 </a>
                 """
             )
-            target = await manager.paced.click_and_wait_for_navigation(
+            target = await Pacer(0).click_and_wait_for_navigation(
                 page,
                 page.get_by_role("link", name="Show results"),
             )
@@ -633,7 +633,7 @@ async def test_browser_manager_pauses_on_expired_login_and_restriction_text(
                         body="<html><body>Sign in</body></html>",
                     ),
                 )
-                await manager.paced.goto(page, "https://www.linkedin.com/login")
+                await Pacer(0).goto(page, "https://www.linkedin.com/login")
         assert manager.paused is True
 
         manager._mark_authenticated()  # pyright: ignore[reportPrivateUsage]
@@ -647,7 +647,7 @@ async def test_browser_manager_pauses_on_expired_login_and_restriction_text(
                         body="<html><body>Please verify your identity</body></html>",
                     ),
                 )
-                await manager.paced.goto(page, "https://www.linkedin.com/jobs/search/")
+                await Pacer(0).goto(page, "https://www.linkedin.com/jobs/search/")
         assert manager.paused is True
 
 
@@ -667,7 +667,7 @@ async def test_browser_manager_reuses_one_context_with_a_fresh_page_per_task(
                     body="<html><body><main>Feed</main></body></html>",
                 ),
             )
-            await manager.paced.goto(first_page, "https://www.linkedin.com/feed/")
+            await Pacer(0).goto(first_page, "https://www.linkedin.com/feed/")
             first_page_reference = first_page
             popup_reference = await first_page.context.new_page()
 
@@ -685,7 +685,7 @@ async def test_browser_manager_reuses_one_context_with_a_fresh_page_per_task(
                     body="<html><body><main>Feed</main></body></html>",
                 ),
             )
-            await manager.paced.goto(second_page, "https://www.linkedin.com/feed/")
+            await Pacer(0).goto(second_page, "https://www.linkedin.com/feed/")
 
 
 @pytest.mark.asyncio
@@ -736,7 +736,7 @@ async def test_interactive_login_uses_and_preserves_the_local_profile(
     monkeypatch.setattr(login_module, "async_playwright", cast(Any, fake_async_playwright))
     monkeypatch.setattr(login_module.asyncio, "sleep", no_sleep)
 
-    await login_interactively(settings, Paced(0))
+    await login_interactively(settings, Pacer(0))
 
     assert login_page.visited_urls == ["https://www.linkedin.com/login"]
     assert verification_page.visited_urls == ["https://www.linkedin.com/feed/"]
@@ -777,7 +777,7 @@ async def test_interactive_login_rejects_a_transient_session_cookie(
     monkeypatch.setattr(login_module.asyncio, "sleep", no_sleep)
 
     with pytest.raises(AuthenticationRequiredError, match="not saved persistently"):
-        await login_interactively(settings, Paced(0))
+        await login_interactively(settings, Pacer(0))
 
     assert playwright.chromium.launches == [
         (str(settings.browser_profile_path), False),
@@ -816,7 +816,7 @@ async def test_interactive_login_rejects_a_session_lost_during_clean_reopen(
     monkeypatch.setattr(login_module.asyncio, "sleep", no_sleep)
 
     with pytest.raises(AuthenticationRequiredError, match="clean browser restart"):
-        await login_interactively(settings, Paced(0))
+        await login_interactively(settings, Pacer(0))
 
     assert playwright.chromium.launches == [
         (str(settings.browser_profile_path), False),
@@ -832,7 +832,7 @@ async def test_interactive_login_requires_an_explicitly_created_profile(tmp_path
     settings = _live_settings(tmp_path, profile_name="missing-for-login")
 
     with pytest.raises(ConfigurationError, match="profile create"):
-        await login_interactively(settings, Paced(0))
+        await login_interactively(settings, Pacer(0))
 
 
 @pytest.mark.asyncio
@@ -873,7 +873,7 @@ async def test_interactive_logout_uses_visible_controls_and_survives_clean_reope
     monkeypatch.setattr(logout_module, "assert_linkedin_access", safe_page)
     monkeypatch.setattr(logout_module.asyncio, "sleep", no_sleep)
 
-    assert await logout_interactively(settings, Paced(0)) is True
+    assert await logout_interactively(settings, Pacer(0)) is True
     assert account_menu.clicked is True
     assert sign_out.clicked is True
     assert playwright.chromium.launches == [
@@ -903,7 +903,7 @@ async def test_interactive_logout_is_idempotent_when_already_logged_out(
         cast(Any, lambda: FakeLogoutStarter(playwright)),
     )
 
-    assert await logout_interactively(settings, Paced(0)) is False
+    assert await logout_interactively(settings, Pacer(0)) is False
     assert len(playwright.chromium.launches) == 1
     assert context.closed is True
     assert playwright.stopped is True
@@ -931,7 +931,7 @@ async def test_interactive_logout_fails_closed_when_visible_account_menu_is_miss
     monkeypatch.setattr(logout_module, "assert_linkedin_access", safe_page)
 
     with pytest.raises(ParserDriftError, match="account menu"):
-        await logout_interactively(settings, Paced(0))
+        await logout_interactively(settings, Pacer(0))
 
     assert context.closed is True
     assert playwright.stopped is True
@@ -976,7 +976,7 @@ async def test_interactive_logout_rejects_session_that_survives_clean_reopen(
     monkeypatch.setattr(logout_module.asyncio, "sleep", no_sleep)
 
     with pytest.raises(BrowserUnavailableError, match="clean browser restart"):
-        await logout_interactively(settings, Paced(0))
+        await logout_interactively(settings, Pacer(0))
 
     assert verification_context.closed is True
     assert playwright.stopped is True

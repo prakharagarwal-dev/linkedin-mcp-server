@@ -6,7 +6,7 @@ from typing import cast
 import pytest
 from playwright.async_api import Locator
 
-from linkedin_mcp.infra.playwright import Paced
+from linkedin_mcp.ui import Pacer
 
 
 class _Control:
@@ -19,7 +19,7 @@ class _Control:
 
 @pytest.mark.asyncio
 async def test_paced_waits_before_each_playwright_action() -> None:
-    paced = Paced(delay_seconds=0.02)
+    paced = Pacer(delay_seconds=0.02)
     control = _Control()
     started_at = time.monotonic()
 
@@ -35,7 +35,7 @@ async def test_paced_waits_before_each_playwright_action() -> None:
 
 @pytest.mark.asyncio
 async def test_paced_can_be_disabled_for_offline_execution() -> None:
-    paced = Paced(delay_seconds=0)
+    paced = Pacer(delay_seconds=0)
     control = _Control()
 
     await paced.click(cast(Locator, control))
@@ -45,4 +45,4 @@ async def test_paced_can_be_disabled_for_offline_execution() -> None:
 
 def test_paced_rejects_a_negative_delay() -> None:
     with pytest.raises(ValueError, match="cannot be negative"):
-        Paced(delay_seconds=-0.1)
+        Pacer(delay_seconds=-0.1)

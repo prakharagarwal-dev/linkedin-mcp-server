@@ -15,7 +15,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from linkedin_mcp.errors import InternalServerError, LinkedInMCPError
-from linkedin_mcp.infra.queue import Scheduler, Task
+from linkedin_mcp.operations import OperationManager
 from linkedin_mcp.tools.posts.comment.evidence import source_from_action_execution
 from linkedin_mcp.tools.posts.comment.models import (
     ActionCommand,
@@ -115,7 +115,7 @@ async def execute(
 
 def register(
     mcp: FastMCP[None],
-    scheduler: Scheduler,
+    operations: OperationManager,
     page: PostCommentPage,
 ) -> None:
     @mcp.tool(
@@ -154,13 +154,12 @@ def register(
             mentions=mentions,
             attachment=attachment,
         )
-        task = Task(
-            name="linkedin.posts.comment",
-            execute=lambda: execute(request, page),
-            interruptible=False,
+        result = await tool_result(
+            operations.run_write(
+                "linkedin.posts.comment",
+                lambda: execute(request, page),
+            )
         )
-        await scheduler.schedule(task)
-        result = await tool_result(task.result())
         await ctx.report_progress(100, 100, "Comment action reached a terminal outcome")
         return result
 

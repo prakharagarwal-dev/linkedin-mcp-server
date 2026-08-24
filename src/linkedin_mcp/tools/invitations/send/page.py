@@ -9,7 +9,6 @@ from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import Locator, Page
 from pydantic import HttpUrl
 
-from linkedin_mcp.browser.urls import canonical_profile_url
 from linkedin_mcp.errors import InvalidTargetError, LinkedInMCPError, ParserDriftError
 from linkedin_mcp.tools.invitations.action_surface import InvitationActionSurface
 from linkedin_mcp.tools.invitations.send.models import (
@@ -20,6 +19,7 @@ from linkedin_mcp.tools.invitations.send.models import (
     ActionTarget,
     InvitationSendInput,
 )
+from linkedin_mcp.tools.people.urls import canonical_profile_url
 
 
 async def _visible_text(page: Page) -> str:
@@ -76,7 +76,7 @@ class SendInvitationPage(InvitationActionSurface):
         self,
         request: InvitationSendInput,
     ) -> ActionInspection:
-        async with self._browser.page() as page:
+        async with self._ui.page() as page:
             await self._paced.goto(page, canonical_profile_url(request.profile_slug))
             main, name = await self._profile_identity(page)
             state, connect = await self._wait_for_connect_control(page, main, name)
@@ -177,7 +177,7 @@ class SendInvitationPage(InvitationActionSurface):
             ) from error
 
     async def perform_send(self, command: ActionCommand) -> ActionPageResult:
-        async with self._browser.page() as page:
+        async with self._ui.page() as page:
             await self._paced.goto(page, canonical_profile_url(command.target.profile_slug))
             main, name = await self._profile_identity(page)
             if name.casefold() != command.target.display_name.casefold():

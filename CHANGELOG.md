@@ -8,50 +8,37 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- Move the canonical MCPB bundle manifest from `packaging/mcpb/manifest.json`
-  to the repository-root `manifest.json`; remove the obsolete `packaging/`
-  hierarchy and stage releases from the root manifest.
+- Run Streamable HTTP directly through FastMCP and remove the stdio bridge,
+  custom transport/health layer, shared host, runtime lock, background launcher,
+  and `status`/`stop` commands. The root `main.py` now owns app composition and
+  FastMCP's lifespan owns browser startup, login validation, and shutdown.
+- Move job, profile, company, post/comment, and conversation URL helpers from
+  `browser/` to their owning tool families. Keep browser host enforcement inside
+  its access check and remove the mixed-responsibility `browser/urls.py` module.
+- Stop producing MCPB bundles after making Streamable HTTP the only supported
+  transport; remove the bundle manifest and its release/registry workflow.
 - Make every public tool leaf own one `models.py` containing all of its input,
   output, evidence, and action contracts. Localize write execution and safe MCP
   result projection in each tool, and remove the global `tools/_shared/`,
   `tools/action.py`, and parent-domain model packages.
-- Replace background authentication coordination with one awaited startup
-  flow. `HostManager` prepares Chromium, validates the saved session, performs
-  visible login when required, revalidates the reopened profile, and only then
-  starts its single queue worker and publishes the transport. Remove
-  `AUTO_LOGIN_ON_START`, `BrowserRuntime`, and the browser operation lock.
-- Replace the `LinkedInPlaywright` page/locator facade with raw official
-  Playwright objects plus a host-provided `Paced` action wrapper. Move task-page
-  ownership, popup cleanup, authentication/access state, URL validation, and
-  login/logout into `browser/`; keep only pacing and collection settling in
-  `infra/playwright/`; and remove the top-level `ui/` package.
-- Make `HostManager` the process composition root for stdio attachment,
-  Streamable HTTP serving, queue/tools/cursor wiring, browser/login lifecycle,
-  and reverse-order shutdown. The root `linkedin_mcp.__main__` now also launches
-  private shared-host processes; `host/__main__.py` is removed.
+- Replace background authentication coordination with one awaited FastMCP
+  lifespan. `BrowserManager` prepares Chromium, validates the saved session,
+  performs visible login when required, revalidates the reopened profile, and
+  only then allows the HTTP server to accept tool requests.
+- Replace the former Playwright facade with raw official `Page`/`Locator`
+  objects plus `UIManager` and `Pacer`. Browser lifecycle, popup cleanup,
+  authentication, login, logout, and access state remain in `browser/`; paced
+  interactions and bounded UI settling live in `ui/`.
 - Remove the central asset store and `ASSET_ROOT_PATH` configuration. Typed
   upload tools now pass client-selected paths directly to Playwright, including
   absolute paths and paths outside the project; capability-specific visible UI
   handling remains inside each tool and LinkedIn decides whether a file type or
   size is accepted.
-- Remove the central `AppContainer`. The host now owns process lifecycle
-  directly, transport accepts an already configured FastMCP server, and each
-  tool receives only its scheduler, concrete page, and optional cursor store at
-  registration. Move task execution to `infra/queue/` and generic continuation
-  state to `infra/cursor/store.py` without infrastructure importing tool
-  contracts.
-- Rename the narrowly scoped `execution` package to `queue`; its existing
-  `Task` → FIFO `Scheduler` → single `Worker` behavior is unchanged.
-- Keep MCP protocol wiring in `transport`, and move shared-process lifecycle,
-  account locking, and the private launcher into `host`. Remove redundant
-  application-level MCP session identities and bind opaque pagination cursors
-  only to their account, capability, and semantic filters so reconnecting
-  clients can continue them.
-- Replace the capability executor, operation mixins, provider protocols, and
-  per-client fair scheduler with a small `Task` → FIFO `Scheduler` → `Worker`
-  pipeline. Each tool now owns its execution and optional pagination flow next
-  to its page, evidence, and models; cursor state no longer uses queue-time
-  leases.
+- Remove `AppContainer`, `HostManager`, `Task`, `Scheduler`, `Worker`, and the
+  `infra/` package. `ToolManager` registers tools, `OperationManager` serializes
+  complete LinkedIn operations with one app-scoped `asyncio.Lock`, and
+  `CursorManager` keeps only bounded continuation identities. `Settings`
+  remains the sole configuration object.
 - Remove the duplicate capability registry and custom
   `linkedin.capabilities.list` tool. FastMCP's standard MCP `tools/list`
   response is now the single source of truth for tool discovery, schemas, and
@@ -60,27 +47,23 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   duplicate-call coalescing, replay flags, and captured-source MCP resource.
   Every tool invocation now executes freshly and returns its result with source
   metadata directly.
-- Support native Windows runtime ownership, CIM-brokered startup that survives
-  client-owned Job Objects, console handling, and graceful instance-bound
-  shutdown alongside POSIX platforms. Run the full
-  offline suite in CI on macOS, Windows, and Linux ARM64 in addition to the
-  Linux x86-64 Python-version matrix, with explicit UTF-8 fixture decoding and
-  distinct evidence identities for every account-changing invocation. Reject
-  the unused optional GET event stream so repeated Windows client sessions
-  clean up without blocking the shared runtime.
+- Run the full offline suite in CI on macOS, Windows, and Linux ARM64 in
+  addition to the Linux x86-64 Python-version matrix, with explicit UTF-8
+  fixture decoding and distinct evidence identities for every account-changing
+  invocation.
 - Run the offline Pytest suite across four work-stealing workers and shorten
   polling delays only for deterministic semantic-site fixtures, without
   changing production browser timing or collection verification rounds; keep
   timing-sensitive fixtures deterministic under load and run every CI matrix
   job with its declared Python interpreter.
-- Extend the supported Python runtime range through 3.14 across PyPI, MCPB,
-  CI, and contributor metadata.
-- Standardize package, bundle, installer, catalog, and marketplace copy on the
+- Extend the supported Python runtime range through 3.14 across PyPI, CI, and
+  contributor metadata.
+- Standardize package, installer, catalog, and marketplace copy on the
   README's outcome-focused product description, retaining only the Official MCP
   Registry's schema-required 100-character variant.
-- Publish checksum-pinned MCPB release assets alongside the immutable OCI image
-  in future Official MCP Registry versions, and add a maintained distribution
-  ledger for package, registry, catalog, and review status.
+- Publish the immutable OCI image as a Streamable HTTP package in the Official
+  MCP Registry and keep a maintained distribution ledger for package, registry,
+  catalog, and review status.
 - Replace the fourteen public prepare/execute tools with seven direct atomic
   action tools: `linkedin.posts.create`, `linkedin.posts.comment`,
   `linkedin.posts.react`, `linkedin.invitations.send`,
@@ -98,8 +81,8 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   available through read-only post discussions, but setting reactions on
   comments is no longer exposed.
 - Consolidate accumulated action lifecycle tests into current atomic protocol,
-  worker, tool-execution, simulator, and workflow coverage while retaining the latest
-  semantic page fixtures and safety cases.
+  operation-lock, tool-execution, simulator, and workflow coverage while
+  retaining the latest semantic page fixtures and safety cases.
 - Remove deprecated pagination, title-keyword, and image-tag aliases, unused
   dependencies and helpers, stale publishing-status documentation, and legacy
   runtime-lock parsing. Reorganize fixtures and documentation around the
@@ -107,9 +90,6 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
-- Let concurrent clients wait through the bounded interval between a shared
-  runtime acquiring its account lock and publishing owner metadata, preventing
-  a second client from abandoning a valid Windows startup election.
 - Wait for a real active-member display name when LinkedIn's profile rail is
   still rendering instead of accepting a briefly visible numeric metrics link
   as the acting identity.

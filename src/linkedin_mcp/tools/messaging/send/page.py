@@ -16,20 +16,7 @@ from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
-from linkedin_mcp.browser.urls import (
-    canonical_conversation_url,
-    canonical_profile_url,
-    conversation_id_from_url,
-    profile_slug_from_url,
-)
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
-from linkedin_mcp.infra.playwright import Paced
-from linkedin_mcp.infra.playwright.collections import (
-    CollectionSettleOutcome,
-    CollectionSettleResult,
-    dispatch_bubbling_wheel,
-    wait_for_collection_interaction,
-)
 from linkedin_mcp.tools.messaging.conversation_surface import (
     ConversationSurface,
     MessageAttachmentKind,
@@ -46,6 +33,18 @@ from linkedin_mcp.tools.messaging.send.models import (
     MessageSendInput,
     MessageSendPayload,
 )
+from linkedin_mcp.tools.messaging.urls import (
+    canonical_conversation_url,
+    conversation_id_from_url,
+)
+from linkedin_mcp.tools.people.urls import canonical_profile_url, profile_slug_from_url
+from linkedin_mcp.ui.collections import (
+    CollectionSettleOutcome,
+    CollectionSettleResult,
+    dispatch_bubbling_wheel,
+    wait_for_collection_interaction,
+)
+from linkedin_mcp.ui.pacer import Pacer
 
 _SCROLL_PROGRESS_POLL_ATTEMPTS = 8
 
@@ -312,7 +311,7 @@ def _history_has_explicit_start(visible_text: str) -> bool:
 
 
 async def _settle_history_scroll(
-    paced: Paced,
+    paced: Pacer,
     page: Page,
     root: Locator,
 ) -> CollectionSettleResult:
@@ -508,7 +507,7 @@ class MessageSendPage(ConversationSurface):
         self,
         request: MessageSendInput,
     ) -> ActionInspection:
-        async with self._browser.page() as page:
+        async with self._ui.page() as page:
             page, root, profile_slug, name, is_group = await self._open(
                 page,
                 profile_slug=request.profile_slug,
@@ -575,7 +574,7 @@ class MessageSendPage(ConversationSurface):
 
     async def perform_message(self, command: ActionCommand) -> ActionPageResult:
         payload = command.payload
-        async with self._browser.page() as page:
+        async with self._ui.page() as page:
             page, root, profile_slug, name, is_group = await self._open(
                 page,
                 profile_slug=(

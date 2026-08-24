@@ -7,7 +7,6 @@ import sys
 
 from linkedin_mcp.browser import BrowserProfileManager
 from linkedin_mcp.config import Settings
-from linkedin_mcp.host.lock import run_owned_operation
 
 
 def configure(command: argparse.ArgumentParser) -> None:
@@ -36,11 +35,7 @@ def confirm(settings: Settings) -> None:
 async def execute(settings: Settings, *, confirmed: bool) -> None:
     if not confirmed:
         confirm(settings)
-    result = await run_owned_operation(
-        settings,
-        command="profile-reset",
-        operation=lambda: BrowserProfileManager(settings).reset(),
-    )
+    result = await BrowserProfileManager(settings).reset()
     print(
         json.dumps(
             {

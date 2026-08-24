@@ -20,7 +20,7 @@ from linkedin_mcp.errors import (
     LinkedInMCPError,
     ParserDriftError,
 )
-from linkedin_mcp.infra.playwright import Paced
+from linkedin_mcp.ui import Pacer
 
 logger = structlog.get_logger(__name__)
 
@@ -30,7 +30,7 @@ _LOGOUT_VERIFICATION_MESSAGE = "LinkedIn logout did not survive a clean browser 
 
 async def logout_interactively(
     settings: Settings,
-    paced: Paced,
+    paced: Pacer,
     browser_bootstrap: BrowserBootstrap | None = None,
 ) -> bool:
     """Use LinkedIn's visible sign-out control and verify the persistent session ended."""

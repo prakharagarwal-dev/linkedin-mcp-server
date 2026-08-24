@@ -9,11 +9,6 @@ from urllib.parse import parse_qs, urljoin, urlsplit
 from playwright.async_api import Locator, Page
 from pydantic import HttpUrl
 
-from linkedin_mcp.browser import BrowserManager
-from linkedin_mcp.browser.urls import (
-    canonical_company_url,
-    company_slug_from_url,
-)
 from linkedin_mcp.errors import ParserDriftError
 from linkedin_mcp.tools.companies.get.models import (
     CompanyGetInput,
@@ -33,6 +28,11 @@ from linkedin_mcp.tools.companies.surface import (
     first_visible_text,
     unique_lines,
 )
+from linkedin_mcp.tools.companies.urls import (
+    canonical_company_url,
+    company_slug_from_url,
+)
+from linkedin_mcp.ui.manager import UIManager
 
 _EXPLICIT_ASSOCIATED_MEMBER_PATTERN = re.compile(
     rf"\b{VISIBLE_COUNT}\s+associated\s+members?\b",
@@ -221,16 +221,16 @@ def _evidence_source_url(
 
 
 class CompanyProfilePage:
-    def __init__(self, browser: BrowserManager) -> None:
-        self._browser = browser
-        self._paced = browser.paced
+    def __init__(self, ui: UIManager) -> None:
+        self._ui = ui
+        self._paced = ui
 
     async def read(
         self,
         request: CompanyGetInput,
     ) -> tuple[CompanyProfileObservation, tuple[CompanyProfilePageCapture, ...]]:
         captures: list[CompanyProfilePageCapture] = []
-        async with self._browser.page() as page:
+        async with self._ui.page() as page:
             await self._paced.goto(page, canonical_company_url(request.company_slug))
             await expand_and_scroll(self._paced, page)
             overview_main = page.locator("main")

@@ -11,7 +11,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from linkedin_mcp.errors import InternalServerError, LinkedInMCPError
-from linkedin_mcp.infra.queue import Scheduler, Task
+from linkedin_mcp.operations import OperationManager
 from linkedin_mcp.tools.messaging.conversation.get.evidence import source_from_conversation
 from linkedin_mcp.tools.messaging.conversation.get.models import (
     PROFILE_SLUG_PATTERN,
@@ -49,7 +49,7 @@ async def execute(
 
 def register(
     mcp: FastMCP[None],
-    scheduler: Scheduler,
+    operations: OperationManager,
     page: ConversationGetPage,
 ) -> None:
     @mcp.tool(
@@ -105,12 +105,12 @@ def register(
             conversation_ref=conversation_ref,
             max_messages=max_messages,
         )
-        task = Task(
-            name="linkedin.messaging.conversation.get",
-            execute=lambda: execute(request, page),
+        result = await tool_result(
+            operations.run(
+                "linkedin.messaging.conversation.get",
+                lambda: execute(request, page),
+            )
         )
-        await scheduler.schedule(task)
-        result = await tool_result(task.result())
         await ctx.report_progress(100, 100, "LinkedIn conversation read complete")
         return result
 

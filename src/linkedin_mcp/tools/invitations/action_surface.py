@@ -8,9 +8,9 @@ from urllib.parse import parse_qs, urljoin, urlsplit
 from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
-from linkedin_mcp.browser import BrowserManager
-from linkedin_mcp.browser.urls import profile_slug_from_url
 from linkedin_mcp.errors import ParserDriftError
+from linkedin_mcp.tools.people.urls import profile_slug_from_url
+from linkedin_mcp.ui.manager import UIManager
 
 _PROFILE_ACTION_SETTLE_ATTEMPTS = 24
 
@@ -48,9 +48,9 @@ async def _optional_unique_visible(
 class InvitationActionSurface:
     """Shared visible-surface mechanics for InvitationActionSurface."""
 
-    def __init__(self, browser: BrowserManager) -> None:
-        self._browser = browser
-        self._paced = browser.paced
+    def __init__(self, ui: UIManager) -> None:
+        self._ui = ui
+        self._paced = ui
 
     async def _connect_control(
         self,

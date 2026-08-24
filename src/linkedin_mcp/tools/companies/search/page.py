@@ -13,18 +13,7 @@ from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
-from linkedin_mcp.browser import BrowserManager
-from linkedin_mcp.browser.urls import (
-    canonical_company_url,
-    company_slug_from_url,
-)
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.infra.playwright import Paced
-from linkedin_mcp.infra.playwright.collections import (
-    CollectionSettleOutcome,
-    visible_locator_signature,
-    wait_for_collection_initial_state,
-)
 from linkedin_mcp.tools.companies.search.models import (
     CompanySearchCoverage,
     CompanySearchFilters,
@@ -43,6 +32,17 @@ from linkedin_mcp.tools.companies.surface import (
     first_visible_text,
     unique_lines,
 )
+from linkedin_mcp.tools.companies.urls import (
+    canonical_company_url,
+    company_slug_from_url,
+)
+from linkedin_mcp.ui.collections import (
+    CollectionSettleOutcome,
+    visible_locator_signature,
+    wait_for_collection_initial_state,
+)
+from linkedin_mcp.ui.manager import UIManager
+from linkedin_mcp.ui.pacer import Pacer
 
 _COMPANY_SEARCH_URL = "https://www.linkedin.com/search/results/companies/"
 
@@ -295,7 +295,7 @@ async def _exact_company_typeahead_option(
 
 
 async def _select_company_facet_names(
-    paced: Paced,
+    paced: Pacer,
     page: Page,
     panel: Locator,
     requested_names: tuple[str, ...],
@@ -420,7 +420,7 @@ def _validate_resolved_company_facets(
 
 
 async def _resolve_named_company_facets(
-    browser: BrowserManager,
+    ui: UIManager,
     page: Page,
     filters: CompanySearchFilters,
 ) -> _ResolvedCompanyFacets:
@@ -441,18 +441,18 @@ async def _resolve_named_company_facets(
     ]
     if len(visible_controls) != 1:
         raise ParserDriftError("LinkedIn Company search has no unique visible All filters control.")
-    await browser.paced.click(visible_controls[0])
+    await ui.click(visible_controls[0])
 
     panel = await _company_filter_panel(page)
     await _select_company_facet_names(
-        browser.paced,
+        ui,
         page,
         panel,
         filters.location_names,
         _LOCATION_TYPEAHEAD,
     )
     await _select_company_facet_names(
-        browser.paced,
+        ui,
         page,
         panel,
         filters.industry_names,
@@ -468,7 +468,7 @@ async def _resolve_named_company_facets(
         raise ParserDriftError(
             "LinkedIn's visible Show results control was unavailable for Company search."
         ) from error
-    submitted_url = await browser.paced.click_and_wait_for_navigation(
+    submitted_url = await ui.click_and_wait_for_navigation(
         page,
         show_results.first,
     )
@@ -564,11 +564,11 @@ async def _extract_company_results(page: Page) -> tuple[CompanySummary, ...]:
 
 
 class CompanySearchPage:
-    def __init__(self, browser: BrowserManager, *, max_pages: int) -> None:
+    def __init__(self, ui: UIManager, *, max_pages: int) -> None:
         if max_pages < 1:
             raise ValueError("Company search page bound must be positive.")
-        self._browser = browser
-        self._paced = browser.paced
+        self._ui = ui
+        self._paced = ui
         self._max_pages = max_pages
 
     @staticmethod
@@ -598,11 +598,11 @@ class CompanySearchPage:
         resolved = _ResolvedCompanyFacets()
         pages_visited = 0
         stop_reason = StopReason.SAFETY_BOUND
-        async with self._browser.page() as page:
+        async with self._ui.page() as page:
             if request.filters.location_names or request.filters.industry_names:
                 await self._paced.goto(page, self.build_url(request, page_index=1))
                 resolved = await _resolve_named_company_facets(
-                    self._browser,
+                    self._ui,
                     page,
                     request.filters,
                 )

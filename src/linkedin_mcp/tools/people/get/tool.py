@@ -11,7 +11,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from linkedin_mcp.errors import InternalServerError, LinkedInMCPError
-from linkedin_mcp.infra.queue import Scheduler, Task
+from linkedin_mcp.operations import OperationManager
 from linkedin_mcp.tools.people.get.evidence import sources_from_person_profile
 from linkedin_mcp.tools.people.get.models import (
     PROFILE_SLUG_PATTERN,
@@ -47,7 +47,7 @@ async def execute(request: PeopleGetInput, page: PersonProfilePage) -> PeopleGet
 
 def register(
     mcp: FastMCP[None],
-    scheduler: Scheduler,
+    operations: OperationManager,
     page: PersonProfilePage,
 ) -> None:
     @mcp.tool(
@@ -98,12 +98,12 @@ def register(
             profile_slug=profile_slug,
             sections=sections,
         )
-        task = Task(
-            name="linkedin.people.get",
-            execute=lambda: execute(request, page),
+        result = await tool_result(
+            operations.run(
+                "linkedin.people.get",
+                lambda: execute(request, page),
+            )
         )
-        await scheduler.schedule(task)
-        result = await tool_result(task.result())
         await ctx.report_progress(100, 100, "LinkedIn member profile complete")
         return result
 

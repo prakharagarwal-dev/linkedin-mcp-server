@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
-from linkedin_mcp.infra.cursor import (
-    CursorStore,
+from linkedin_mcp.cursors import (
+    CursorManager,
     cursor_binding,
     select_page,
 )
@@ -22,7 +22,7 @@ async def execute(
     request: PostCommentsListInput,
     *,
     page: PostCommentsPage,
-    cursor_store: CursorStore,
+    cursors: CursorManager,
     account_id: str,
 ) -> PostCommentsListOutput:
     arguments = request.model_dump(
@@ -30,7 +30,7 @@ async def execute(
         exclude={"context_id", "request_id", "cursor", "page_size"},
     )
     operation = "linkedin.posts.comments.list"
-    state = await cursor_store.start(
+    state = cursors.start(
         account_id=account_id,
         operation=operation,
         binding=cursor_binding(operation, arguments),
@@ -38,13 +38,13 @@ async def execute(
     )
     threads, coverage, captured_text, source_url = await page.collect(
         request,
-        result_limit=cursor_store.traversal_limit(state, request.page_size),
+        result_limit=cursors.traversal_limit(state, request.page_size),
     )
     selected = select_page(
         threads,
         key=lambda thread: thread.comment.comment_ref,
         seen_keys=state.seen_keys,
-        page_size=cursor_store.page_capacity(state, request.page_size),
+        page_size=cursors.page_capacity(state, request.page_size),
     )
     provider_has_more = (
         selected.has_lookahead or coverage.top_level_visible > coverage.top_level_returned
@@ -64,7 +64,7 @@ async def execute(
         threads=selected.items,
         coverage=page_coverage,
     )
-    cursor_page = await cursor_store.finish(
+    cursor_page = cursors.finish(
         state,
         page_size=request.page_size,
         returned_keys=selected.keys,

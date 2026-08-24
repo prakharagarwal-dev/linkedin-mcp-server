@@ -12,14 +12,7 @@ from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
-from linkedin_mcp.browser import BrowserManager
-from linkedin_mcp.browser.urls import (
-    canonical_job_url,
-    job_id_from_url,
-)
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.infra.playwright import Paced
-from linkedin_mcp.infra.playwright.collections import CollectionSettleOutcome
 from linkedin_mcp.tools.jobs.search.models import (
     EvidenceField,
     JobBenefit,
@@ -45,6 +38,13 @@ from linkedin_mcp.tools.jobs.surface import (
 from linkedin_mcp.tools.jobs.surface import (
     lines as visible_text_lines,
 )
+from linkedin_mcp.tools.jobs.urls import (
+    canonical_job_url,
+    job_id_from_url,
+)
+from linkedin_mcp.ui.collections import CollectionSettleOutcome
+from linkedin_mcp.ui.manager import UIManager
+from linkedin_mcp.ui.pacer import Pacer
 
 _WORKPLACE_SUFFIX_PATTERN = re.compile(
     r"^(?P<location>.+?)\s+\((?P<workplace>Remote|Hybrid|On-site)\)$",
@@ -361,7 +361,7 @@ def _typeahead_option_label(option_text: str, option_kind: str) -> str:
 
 
 async def _resolve_typeahead_name(
-    paced: Paced,
+    paced: Pacer,
     page: Page,
     dialog: Locator,
     requested_name: str,
@@ -448,7 +448,7 @@ async def _resolve_visible_names(
 
 
 async def _resolve_typeahead_names(
-    paced: Paced,
+    paced: Pacer,
     page: Page,
     dialog: Locator,
     requested_names: tuple[str, ...],
@@ -475,7 +475,7 @@ async def _resolve_typeahead_names(
 
 
 async def _resolve_named_facets(
-    paced: Paced,
+    paced: Pacer,
     page: Page,
     filters: JobSearchFilters,
 ) -> _ResolvedJobSearchFacets:
@@ -531,11 +531,11 @@ async def _resolve_named_facets(
 
 
 class JobSearchPage:
-    def __init__(self, browser: BrowserManager, *, max_pages: int) -> None:
+    def __init__(self, ui: UIManager, *, max_pages: int) -> None:
         if max_pages < 1:
             raise ValueError("Job search must allow at least one internal page.")
-        self._browser = browser
-        self._paced = browser.paced
+        self._ui = ui
+        self._paced = ui
         self._max_pages = max_pages
 
     @staticmethod
@@ -575,7 +575,7 @@ class JobSearchPage:
         advertised_result_count: int | None = None
         advertised_result_count_is_lower_bound = False
         resolved_facets = _ResolvedJobSearchFacets()
-        async with self._browser.page() as page:
+        async with self._ui.page() as page:
             if _has_named_facets(request.filters):
                 await self._paced.goto(page, self.build_url(request))
                 await _wait_for_job_search_state(page)
@@ -672,7 +672,7 @@ class JobSearchPage:
 
     @staticmethod
     async def extract_visible_jobs(
-        paced: Paced,
+        paced: Pacer,
         page: Page,
     ) -> tuple[JobSummary, ...]:
         shells = page.locator("main li[data-occludable-job-id]")

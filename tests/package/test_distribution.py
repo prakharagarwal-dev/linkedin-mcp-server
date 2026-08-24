@@ -48,7 +48,6 @@ PUBLIC_REPOSITORY_FILES = {
     "SECURITY.md",
     "docs/DISTRIBUTION.md",
     "docs/PUBLISHING.md",
-    "manifest.json",
     "server.json",
 }
 
@@ -73,7 +72,7 @@ def test_build_configuration_packages_only_the_standalone_server() -> None:
     )
     assert wheel["packages"] == ["src/linkedin_mcp"]
     assert dependencies.isdisjoint(FORBIDDEN_RUNTIME_DEPENDENCIES)
-    assert project["scripts"] == {"linkedin-mcp": "linkedin_mcp.cli.main:main"}
+    assert project["scripts"] == {"linkedin-mcp": "linkedin_mcp.cli.manager:run_cli"}
 
     production_sources = "\n".join(
         path.read_text(encoding="utf-8")
@@ -133,33 +132,36 @@ def test_source_layout_keeps_infrastructure_and_linkedin_features_separate() -> 
             assert "Capability-owned exports from" not in page_source
             assert "._shared.pages" not in page_source
 
-    server_source = (package / "transport" / "server.py").read_text(encoding="utf-8")
-    assert "attach_tools" not in server_source
-    assert "@mcp.tool" not in server_source
-
-    infra_package = package / "infra"
-    queue_package = infra_package / "queue"
-    assert {path.name for path in queue_package.glob("*.py")} == {
+    assert {path.name for path in (package / "operations").glob("*.py")} == {
         "__init__.py",
-        "scheduler.py",
-        "task.py",
-        "worker.py",
+        "manager.py",
     }
+    operation_source = (package / "operations" / "manager.py").read_text(encoding="utf-8")
+    assert "asyncio.Lock()" in operation_source
+    assert "asyncio.Queue" not in operation_source
+    assert "Scheduler" not in operation_source
+    assert "Worker" not in operation_source
+    assert "Task" not in operation_source
+
+    assert {path.name for path in (package / "cursors").glob("*.py")} == {
+        "__init__.py",
+        "manager.py",
+    }
+    assert not (package / "infra").exists()
     assert not (package / "execution").exists()
     assert not (package / "queue").exists()
     assert not (package / "container.py").exists()
     assert not (package / "pagination.py").exists()
-    assert (infra_package / "cursor" / "store.py").is_file()
     assert not (package / "assets.py").exists()
 
     domain_modules = {
-        "jobs": {"__init__.py", "surface.py"},
-        "people": {"__init__.py", "surface.py"},
-        "companies": {"__init__.py", "surface.py"},
-        "posts": {"__init__.py", "engagement_surface.py", "surface.py"},
+        "jobs": {"__init__.py", "surface.py", "urls.py"},
+        "people": {"__init__.py", "surface.py", "urls.py"},
+        "companies": {"__init__.py", "surface.py", "urls.py"},
+        "posts": {"__init__.py", "engagement_surface.py", "surface.py", "urls.py"},
         "invitations": {"__init__.py", "action_surface.py"},
         "connections": {"__init__.py"},
-        "messaging": {"__init__.py", "conversation_surface.py"},
+        "messaging": {"__init__.py", "conversation_surface.py", "urls.py"},
     }
     for domain, expected_modules in domain_modules.items():
         assert {path.name for path in (tools / domain).glob("*.py")} == expected_modules
@@ -189,16 +191,15 @@ def test_source_layout_keeps_infrastructure_and_linkedin_features_separate() -> 
         "logout.py",
         "manager.py",
         "profile.py",
-        "urls.py",
     }
     browser_sources = "\n".join(path.read_text(encoding="utf-8") for path in browser.glob("*.py"))
     assert "linkedin_mcp.linkedin" not in browser_sources
 
-    assert not (package / "ui").exists()
-    playwright_infra = infra_package / "playwright"
-    assert {path.name for path in playwright_infra.glob("*.py")} == {
+    ui = package / "ui"
+    assert {path.name for path in ui.glob("*.py")} == {
         "__init__.py",
         "collections.py",
+        "manager.py",
         "pacer.py",
     }
     for retired_shared_helper in (
@@ -219,8 +220,6 @@ def test_source_layout_keeps_infrastructure_and_linkedin_features_separate() -> 
         "login",
         "logout",
         "doctor",
-        "status",
-        "stop",
     ):
         assert (commands / f"{command}.py").is_file()
     for profile_command in ("create", "status", "reset"):
@@ -228,25 +227,22 @@ def test_source_layout_keeps_infrastructure_and_linkedin_features_separate() -> 
     for retired_cli_module in ("common.py", "types.py", "internal_runtime.py"):
         assert not (cli / retired_cli_module).exists()
 
-    transport = package / "transport"
-    assert {path.name for path in transport.glob("*.py")} == {
-        "__init__.py",
-        "server.py",
-        "stdio.py",
-    }
-    host = package / "host"
-    assert {path.name for path in host.glob("*.py")} == {
-        "__init__.py",
-        "lock.py",
-        "manager.py",
-    }
+    assert not (commands / "status.py").exists()
+    assert not (commands / "stop.py").exists()
+    assert not (package / "transport").exists()
+    assert not (package / "host").exists()
     assert not (package / "mcp").exists()
     assert not (package / "runtime").exists()
+    assert not (package / "__main__.py").exists()
 
-    main_source = (cli / "main.py").read_text(encoding="utf-8")
-    assert "BrowserProfileManager" not in main_source
-    assert "run_host" not in main_source
-    assert "_runtime" not in main_source
+    main_source = (package / "main.py").read_text(encoding="utf-8")
+    assert 'mcp.run(transport="streamable-http")' in main_source
+    assert "FastMCP(" in main_source
+    assert "ToolManager(" in main_source
+
+    cli_source = (cli / "manager.py").read_text(encoding="utf-8")
+    assert "class CLIManager" in cli_source
+    assert "ConfigManager" not in production_sources
 
 
 def test_public_repository_metadata_is_complete() -> None:
@@ -261,11 +257,9 @@ def test_public_repository_metadata_is_complete() -> None:
 def test_supported_runtime_versions_and_platforms_are_consistent() -> None:
     configuration = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     project = configuration["project"]
-    bundle = json.loads((ROOT / "manifest.json").read_text(encoding="utf-8"))
     workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 
     assert project["requires-python"] == ">=3.12,<3.15"
-    assert bundle["compatibility"]["runtimes"]["python"] == ">=3.12 <3.15"
     assert {
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3.13",
@@ -294,67 +288,68 @@ def test_release_workflow_has_a_non_mutating_pypi_retry_target() -> None:
     assert "          - all\n          - pypi\n" in workflow
     assert workflow.count(all_surfaces_gate) == 2
     assert all_surfaces_gate not in pypi_job
-    assert "packaging/mcpb" not in workflow
-    assert "jq -r .version manifest.json" in workflow
-    assert "cp manifest.json .release/mcpb/manifest.json" in workflow
+    assert "manifest.json" not in workflow
+    assert "MCPB" not in workflow
+    assert ".mcpb" not in workflow
 
 
-def test_registry_workflow_publishes_immutable_oci_and_mcpb_packages() -> None:
+def test_registry_workflow_publishes_one_streamable_http_oci_package() -> None:
     workflow = (ROOT / ".github" / "workflows" / "publish-registries.yml").read_text(
         encoding="utf-8"
     )
 
-    assert 'MCPB_FILENAME="linkedin-mcp-server-$VERSION.mcpb"' in workflow
-    assert 'RELEASE_TAG="v$VERSION"' in workflow
-    assert "gh release download" in workflow
-    assert 'registryType: "mcpb"' in workflow
-    assert "fileSha256: $sha256" in workflow
-    assert '.registryType == "oci" and .identifier == $image' in workflow
-    assert '.registryType == "mcpb" and' in workflow
-    assert ".fileSha256 == $mcpb_sha256" in workflow
+    assert '.registryType == "oci" and' in workflow
+    assert ".identifier == $image and" in workflow
+    assert '.transport.type == "streamable-http"' in workflow
+    assert "MCPB" not in workflow
+    assert "mcpb" not in workflow
 
 
-def test_registry_and_bundle_metadata_share_the_release_identity() -> None:
+def test_registry_metadata_matches_the_release_identity() -> None:
     registry = json.loads((ROOT / "server.json").read_text(encoding="utf-8"))
-    bundle = json.loads((ROOT / "manifest.json").read_text(encoding="utf-8"))
     configuration = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     project = configuration["project"]
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
 
     assert registry["name"] == "io.github.prakharagarwal-dev/linkedin-mcp-server"
-    assert registry["version"] == project["version"] == bundle["version"]
+    assert registry["version"] == project["version"]
     assert project["description"] == PUBLIC_DESCRIPTION
     assert registry["description"] == REGISTRY_DESCRIPTION
     assert len(registry["description"]) <= 100
-    assert bundle["description"] == PUBLIC_DESCRIPTION
-    assert bundle["long_description"] == PUBLIC_DESCRIPTION
     assert PUBLIC_DESCRIPTION in readme.replace("\n", " ")
     assert f'org.opencontainers.image.description="{PUBLIC_DESCRIPTION}"' in dockerfile
     assert registry["packages"] == [
         {
             "registryType": "oci",
             "identifier": (f"ghcr.io/prakharagarwal-dev/linkedin-mcp-server:{project['version']}"),
-            "transport": {"type": "stdio"},
-            "packageArguments": [
-                {"type": "positional", "value": "serve"},
-                {"type": "positional", "value": "--transport"},
-                {"type": "positional", "value": "stdio"},
+            "transport": {
+                "type": "streamable-http",
+                "url": "http://127.0.0.1:8000/mcp",
+            },
+            "runtimeHint": "docker",
+            "runtimeArguments": [
+                {
+                    "type": "named",
+                    "name": "--publish",
+                    "value": "127.0.0.1:8000:8000",
+                }
             ],
+            "packageArguments": [{"type": "positional", "value": "serve"}],
         }
     ]
-    assert bundle["manifest_version"] == "0.4"
-    assert bundle["name"] == "linkedin-mcp-server"
-    assert bundle["server"]["type"] == "uv"
-    assert "live_enabled" not in bundle["user_config"]
-    assert "auto_login_on_start" not in bundle["user_config"]
-    assert "LINKEDIN_MCP_AUTO_LOGIN_ON_START" not in json.dumps(bundle)
-    assert "LINKEDIN_MCP_LIVE_ENABLED" not in json.dumps(registry)
-    assert "LINKEDIN_MCP_LIVE_ENABLED" not in json.dumps(bundle)
-    assert bundle["privacy_policies"] == [
-        "https://github.com/prakharagarwal-dev/linkedin-mcp-server/blob/main/PRIVACY.md",
-        "https://www.linkedin.com/legal/privacy-policy",
+    assert registry["icons"] == [
+        {
+            "src": (
+                "https://raw.githubusercontent.com/prakharagarwal-dev/"
+                "linkedin-mcp-server/main/assets/icon.png"
+            ),
+            "mimeType": "image/png",
+            "sizes": ["400x400"],
+        }
     ]
+    assert "LINKEDIN_MCP_LIVE_ENABLED" not in json.dumps(registry)
+    assert not (ROOT / "manifest.json").exists()
     privacy = (ROOT / "PRIVACY.md").read_text(encoding="utf-8")
     assert re.search(r"^## (?:\S+\s+)?Privacy Policy\s*$", readme, re.MULTILINE)
     assert all(
@@ -428,12 +423,16 @@ def test_wheel_excludes_tests_profiles_secrets_and_other_repositories(tmp_path: 
     with zipfile.ZipFile(wheels[0]) as archive:
         names = tuple(archive.namelist())
         lowered = tuple(name.casefold() for name in names)
-        assert "linkedin_mcp/transport/server.py" in names
-        assert "linkedin_mcp/host/manager.py" in names
+        assert "linkedin_mcp/main.py" in names
+        assert "linkedin_mcp/operations/manager.py" in names
+        assert "linkedin_mcp/cursors/manager.py" in names
+        assert "linkedin_mcp/ui/manager.py" in names
+        assert "linkedin_mcp/tools/manager.py" in names
         assert "linkedin_mcp/tools/jobs/search/tool.py" in names
         assert "linkedin_mcp/tools/jobs/search/pagination.py" in names
-        assert "linkedin_mcp/infra/queue/task.py" in names
-        assert "linkedin_mcp/infra/cursor/store.py" in names
+        assert not any(name.startswith("linkedin_mcp/host/") for name in names)
+        assert not any(name.startswith("linkedin_mcp/transport/") for name in names)
+        assert not any(name.startswith("linkedin_mcp/infra/") for name in names)
         assert any(name.endswith(".dist-info/entry_points.txt") for name in names)
         assert not any(name.startswith("tests/") for name in names)
         assert not any("simulator" in name for name in lowered)
@@ -467,7 +466,7 @@ def test_wheel_excludes_tests_profiles_secrets_and_other_repositories(tmp_path: 
             name for name in names if name.endswith(".dist-info/entry_points.txt")
         )
         entry_points = archive.read(entry_points_name).decode()
-        assert "linkedin-mcp = linkedin_mcp.cli.main:main" in entry_points
+        assert "linkedin-mcp = linkedin_mcp.cli.manager:run_cli" in entry_points
 
     imported = subprocess.run(
         [

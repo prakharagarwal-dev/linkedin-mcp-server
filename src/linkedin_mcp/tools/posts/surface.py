@@ -7,24 +7,22 @@ from contextlib import suppress
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Annotated, cast
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
-from linkedin_mcp.browser.urls import (
-    canonical_company_url,
+from linkedin_mcp.errors import ParserDriftError
+from linkedin_mcp.tools.companies.urls import canonical_company_url, company_slug_from_url
+from linkedin_mcp.tools.people.urls import profile_slug_from_url
+from linkedin_mcp.tools.posts.urls import (
     comment_reference_from_value,
-    company_slug_from_url,
     post_reference_from_comment_ref,
     post_reference_from_value,
-    profile_slug_from_url,
-    validate_linkedin_url,
 )
-from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
-from linkedin_mcp.infra.playwright import Paced
+from linkedin_mcp.ui.pacer import Pacer
 
 COUNT_PATTERNS = {
     "reaction": re.compile(
@@ -318,7 +316,7 @@ async def prepare_visible_content(page: Page) -> None:
         raise ParserDriftError("LinkedIn content surface has no visible main region.") from error
 
 
-async def post_reference_for_region(paced: Paced, region: Locator) -> str | None:
+async def post_reference_for_region(paced: Pacer, region: Locator) -> str | None:
     for attribute in ("data-post-urn", "data-urn", "data-id", "data-activity-urn"):
         value = await region.get_attribute(attribute)
         if value and (reference := post_reference_from_value(value)):
@@ -401,11 +399,21 @@ async def post_reference_for_region(paced: Paced, region: Locator) -> str | None
         # selected card as unsupported instead of inventing an identity.
         return None
     try:
-        copied_url = validate_linkedin_url(copied_value, ("www.linkedin.com",))
-    except InvalidTargetError as error:
+        copied_port = parsed_copy.port
+    except ValueError as error:
         raise ParserDriftError(
             "LinkedIn Copy link to post returned an untrusted target."
         ) from error
+    copied_host = (parsed_copy.hostname or "").casefold().rstrip(".")
+    if (
+        parsed_copy.scheme != "https"
+        or copied_host != "www.linkedin.com"
+        or parsed_copy.username is not None
+        or parsed_copy.password is not None
+        or copied_port not in {None, 443}
+    ):
+        raise ParserDriftError("LinkedIn Copy link to post returned an untrusted target.")
+    copied_url = urlunsplit(("https", copied_host, parsed_copy.path, parsed_copy.query, ""))
     reference = post_reference_from_value(copied_url)
     if reference is None:
         # LinkedIn content search can interleave addressable posts with
@@ -481,7 +489,7 @@ def first_count(lines: list[str], kind: str) -> str | None:
     )
 
 
-async def regions_for_post(paced: Paced, page: Page, post_ref: str) -> list[Locator]:
+async def regions_for_post(paced: Pacer, page: Page, post_ref: str) -> list[Locator]:
     candidates = page.locator("main").locator(POST_REGION_SELECTOR)
     matches: list[Locator] = []
     for index in range(min(await candidates.count(), 500)):
@@ -515,7 +523,7 @@ def https_url(value: str | None) -> HttpUrl | None:
     return HttpUrl(absolute)
 
 
-async def detail_post_regions(paced: Paced, page: Page) -> list[tuple[Locator, str]]:
+async def detail_post_regions(paced: Pacer, page: Page) -> list[tuple[Locator, str]]:
     menus = await bounded_visible_locators(
         page.locator("main").get_by_role(
             "button",
@@ -538,7 +546,7 @@ async def detail_post_regions(paced: Paced, page: Page) -> list[tuple[Locator, s
 
 
 async def detail_region_for_post(
-    paced: Paced,
+    paced: Pacer,
     page: Page,
     requested_post_ref: str,
 ) -> tuple[Locator, str]:
@@ -1588,7 +1596,7 @@ async def post_author_from_region(region: Locator) -> PostAuthor:
     return (await post_header_fields(region)).author
 
 
-async def region_for_post(paced: Paced, page: Page, post_ref: str) -> Locator:
+async def region_for_post(paced: Pacer, page: Page, post_ref: str) -> Locator:
     """Resolve the sole visible detail region for a requested post reference.
 
     LinkedIn can keep an activity URL in the address bar while rendering that

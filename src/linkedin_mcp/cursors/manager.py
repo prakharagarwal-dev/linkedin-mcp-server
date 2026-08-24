@@ -1,8 +1,7 @@
-"""Bounded process-local cursor storage for collection scans."""
+"""Manage bounded, opaque pagination state in process memory."""
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import json
 import secrets
@@ -28,7 +27,7 @@ class _StoredCursor:
 
 @dataclass(frozen=True, slots=True)
 class CursorState:
-    """Cursor state needed by one serialized collection task."""
+    """Cursor state needed by one serialized collection operation."""
 
     account_id: str
     operation: str
@@ -102,8 +101,8 @@ class CursorPage:
     truncated: bool
 
 
-class CursorStore:
-    """Issue single-use cursors backed only by bounded in-process memory."""
+class CursorManager:
+    """Issue single-use cursors without retaining result or evidence payloads."""
 
     def __init__(
         self,
@@ -118,9 +117,8 @@ class CursorStore:
         self._max_seen_items = max_seen_items_per_cursor
         self._clock = clock or (lambda: datetime.now(UTC))
         self._states: dict[str, _StoredCursor] = {}
-        self._lock = asyncio.Lock()
 
-    async def start(
+    def start(
         self,
         *,
         account_id: str,
@@ -128,62 +126,51 @@ class CursorStore:
         binding: str,
         cursor: str | None,
     ) -> CursorState:
-        async with self._lock:
-            now = self._clock()
-            self._prune_expired(now)
-            if cursor is None:
-                return CursorState(
-                    account_id=account_id,
-                    operation=operation,
-                    binding=binding,
-                    scan_id=str(uuid.uuid4()),
-                    seen_keys=frozenset(),
-                    prior_cursor=None,
-                )
-
-            state = self._states.get(cursor)
-            if state is None:
-                raise InvalidCursorError(
-                    "The pagination cursor is invalid, expired, consumed, or belongs to another "
-                    "server process."
-                )
-            if state.expires_at <= now:
-                self._states.pop(cursor, None)
-                raise InvalidCursorError("The pagination cursor has expired.")
-            if (
-                state.account_id != account_id
-                or state.operation != operation
-                or state.binding != binding
-            ):
-                raise InvalidCursorError(
-                    "The pagination cursor does not match this account, capability, or filter set."
-                )
+        now = self._clock()
+        self._prune_expired(now)
+        if cursor is None:
             return CursorState(
                 account_id=account_id,
                 operation=operation,
                 binding=binding,
-                scan_id=state.scan_id,
-                seen_keys=frozenset(state.seen_keys),
-                prior_cursor=cursor,
+                scan_id=str(uuid.uuid4()),
+                seen_keys=frozenset(),
+                prior_cursor=None,
             )
 
-    def traversal_limit(self, state: CursorState, page_size: int) -> int:
-        """Request a prefix containing prior identities plus one unseen lookahead."""
-
-        return min(
-            self._max_seen_items + 1,
-            state.cumulative_count + page_size + 1,
+        state = self._states.get(cursor)
+        if state is None:
+            raise InvalidCursorError(
+                "The pagination cursor is invalid, expired, consumed, or belongs to another "
+                "server process."
+            )
+        if state.expires_at <= now:
+            self._states.pop(cursor, None)
+            raise InvalidCursorError("The pagination cursor has expired.")
+        if (
+            state.account_id != account_id
+            or state.operation != operation
+            or state.binding != binding
+        ):
+            raise InvalidCursorError(
+                "The pagination cursor does not match this account, capability, or filter set."
+            )
+        return CursorState(
+            account_id=account_id,
+            operation=operation,
+            binding=binding,
+            scan_id=state.scan_id,
+            seen_keys=frozenset(state.seen_keys),
+            prior_cursor=cursor,
         )
+
+    def traversal_limit(self, state: CursorState, page_size: int) -> int:
+        return min(self._max_seen_items + 1, state.cumulative_count + page_size + 1)
 
     def page_capacity(self, state: CursorState, page_size: int) -> int:
-        """Keep a returned page inside the configured per-scan identity bound."""
+        return max(0, min(page_size, self._max_seen_items - state.cumulative_count))
 
-        return max(
-            0,
-            min(page_size, self._max_seen_items - state.cumulative_count),
-        )
-
-    async def finish(
+    def finish(
         self,
         state: CursorState,
         *,
@@ -197,52 +184,47 @@ class CursorStore:
         if any(item_key in state.seen_keys for item_key in returned_keys):
             raise ValueError("A pagination page cannot repeat an earlier stable identity.")
 
-        async with self._lock:
-            if state.prior_cursor is not None:
-                current = self._states.get(state.prior_cursor)
-                if current is None or (
-                    current.account_id != state.account_id
-                    or current.operation != state.operation
-                    or current.binding != state.binding
-                    or current.scan_id != state.scan_id
-                    or frozenset(current.seen_keys) != state.seen_keys
-                ):
-                    raise InvalidCursorError("The pagination cursor is no longer valid.")
-                self._states.pop(state.prior_cursor, None)
+        if state.prior_cursor is not None:
+            current = self._states.get(state.prior_cursor)
+            if current is None or (
+                current.account_id != state.account_id
+                or current.operation != state.operation
+                or current.binding != state.binding
+                or current.scan_id != state.scan_id
+                or frozenset(current.seen_keys) != state.seen_keys
+            ):
+                raise InvalidCursorError("The pagination cursor is no longer valid.")
+            self._states.pop(state.prior_cursor, None)
 
-            combined = (*sorted(state.seen_keys), *returned_keys)
-            capacity_reached = provider_has_more and len(combined) >= self._max_seen_items
-            stalled = provider_has_more and not returned_keys
-            truncated = force_truncated or capacity_reached or stalled
-            has_more = provider_has_more and not truncated
-            next_cursor: str | None = None
-            expires_at: datetime | None = None
-            if has_more:
-                self._make_room()
-                next_cursor = self._new_token()
-                expires_at = self._clock() + self._ttl
-                self._states[next_cursor] = _StoredCursor(
-                    account_id=state.account_id,
-                    operation=state.operation,
-                    binding=state.binding,
-                    scan_id=state.scan_id,
-                    seen_keys=combined,
-                    expires_at=expires_at,
-                )
-            return CursorPage(
+        combined = (*sorted(state.seen_keys), *returned_keys)
+        capacity_reached = provider_has_more and len(combined) >= self._max_seen_items
+        stalled = provider_has_more and not returned_keys
+        truncated = force_truncated or capacity_reached or stalled
+        has_more = provider_has_more and not truncated
+        next_cursor: str | None = None
+        expires_at: datetime | None = None
+        if has_more:
+            self._make_room()
+            next_cursor = self._new_token()
+            expires_at = self._clock() + self._ttl
+            self._states[next_cursor] = _StoredCursor(
+                account_id=state.account_id,
+                operation=state.operation,
+                binding=state.binding,
                 scan_id=state.scan_id,
-                page_size=page_size,
-                returned_count=len(returned_keys),
-                cumulative_count=len(combined),
-                has_more=has_more,
-                next_cursor=next_cursor,
-                cursor_expires_at=expires_at,
-                truncated=truncated,
+                seen_keys=combined,
+                expires_at=expires_at,
             )
-
-    async def close(self) -> None:
-        async with self._lock:
-            self._states.clear()
+        return CursorPage(
+            scan_id=state.scan_id,
+            page_size=page_size,
+            returned_count=len(returned_keys),
+            cumulative_count=len(combined),
+            has_more=has_more,
+            next_cursor=next_cursor,
+            cursor_expires_at=expires_at,
+            truncated=truncated,
+        )
 
     def _prune_expired(self, now: datetime) -> None:
         for token, state in tuple(self._states.items()):

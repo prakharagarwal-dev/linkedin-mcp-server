@@ -20,7 +20,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_LINK_MODE=copy \
     PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
     LINKEDIN_MCP_BROWSER_PROFILE_PATH=/data/linkedin-mcp/profile \
-    LINKEDIN_MCP_RUNTIME_LOCK_PATH=/data/linkedin-mcp/runtime.lock \
+    LINKEDIN_MCP_HTTP_HOST=0.0.0.0 \
     PATH=/app/.venv/bin:$PATH
 
 RUN python -m pip install --no-cache-dir "uv==${UV_VERSION}"
@@ -42,6 +42,7 @@ RUN groupadd --system --gid 10001 linkedin-mcp \
 USER linkedin-mcp
 
 VOLUME ["/data/linkedin-mcp"]
+EXPOSE 8000
 
 ENTRYPOINT ["linkedin-mcp"]
-CMD ["serve", "--transport", "stdio"]
+CMD ["serve"]

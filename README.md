@@ -29,20 +29,23 @@ your network, publish and engage with posts, and read or send messages.
 uvx --from linkedin-mcp-local linkedin-mcp profile create
 ```
 
-### 2. Connect Claude Code
+### 2. Start the server
 
 ```bash
-claude mcp add --scope user --transport stdio linkedin-mcp -- \
-  uvx --from linkedin-mcp-local linkedin-mcp serve --transport stdio
+uvx --from linkedin-mcp-local linkedin-mcp serve
 ```
 
-### 3. Sign in to LinkedIn
+If the saved session is missing, a dedicated browser window opens before the
+server starts accepting requests. Sign in and complete any required
+verification. Your session is saved locally and reused automatically.
 
-Restart Claude Code. A dedicated browser window opens automatically—sign in to
-LinkedIn and complete any required verification.
+### 3. Connect an MCP client
 
-> [!NOTE]
-> Your session is saved locally and reused automatically.
+Configure a Streamable HTTP connection to:
+
+```text
+http://127.0.0.1:8000/mcp
+```
 
 ### Supported platforms
 
@@ -85,7 +88,7 @@ Find remote software engineering jobs in India posted on LinkedIn this week.
 | **Messaging** | Search messages | `linkedin.messaging.search` | ![LinkedIn UI compatibility][status-linkedin-messaging-search]<br>![Compatibility check date][status-checked-on] | Search by recipient or message text using inbox categories and filters. |
 |  | Read conversations | `linkedin.messaging.conversation.get` | ![LinkedIn UI compatibility][status-linkedin-messaging-conversation-get]<br>![Compatibility check date][status-checked-on] | Read message history, replies, edits, reactions, and attachments. |
 |  | Send messages | `linkedin.messaging.send` | ![LinkedIn UI compatibility][status-linkedin-messaging-send]<br>![Compatibility check date][status-checked-on] | Send or reply in one-to-one conversations with text, links, emoji, files, images, and GIFs. |
-| **Server** | Check runtime | `linkedin.server.status` | ![LinkedIn UI compatibility][status-linkedin-server-status]<br>![Compatibility check date][status-checked-on] | Inspect the shared runtime, queue, and active browser operation. |
+| **Server** | Check runtime | `linkedin.server.status` | ![LinkedIn UI compatibility][status-linkedin-server-status]<br>![Compatibility check date][status-checked-on] | Inspect the process-local lock and active browser operation. |
 |  | Check LinkedIn session | `linkedin.session.status` | ![LinkedIn UI compatibility][status-linkedin-session-status]<br>![Compatibility check date][status-checked-on] | Inspect browser-profile, saved-session, and pause state. |
 
 `NOT CHECKED` tools remain covered by the offline simulator on every pull request.
@@ -130,7 +133,7 @@ uvx --from linkedin-mcp-local linkedin-mcp login
 ```
 
 Every server start synchronously validates the saved session before accepting
-tools. If login is missing or expired on a local desktop, the host opens the
+tools. If login is missing or expired on a local desktop, the server opens the
 visible headed login flow, waits for completion, reopens the profile, validates
 it again, and only then publishes the MCP endpoint. This is startup work, not a
 background task. Container deployments should mount an already authenticated
@@ -139,55 +142,40 @@ profile because they normally cannot display that window.
 <details open>
 <summary>Claude Code</summary>
 
-```bash
-claude mcp add --scope user --transport stdio linkedin-mcp -- \
-  uvx --from linkedin-mcp-local linkedin-mcp serve --transport stdio
-```
-
-Check it with `claude mcp list`. See the
-[Claude Code MCP documentation](https://code.claude.com/docs/en/mcp).
+Add a remote Streamable HTTP server named `linkedin-mcp` with URL
+`http://127.0.0.1:8000/mcp`. See the [Claude Code MCP
+documentation](https://code.claude.com/docs/en/mcp).
 
 </details>
 
 <details>
 <summary>Claude Desktop</summary>
 
-[![Download for Claude Desktop](https://img.shields.io/badge/Claude_Desktop-Download_.mcpb-D97757?style=flat-square)](https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases/latest)
-
-Download the `.mcpb` file, then open **Settings → Extensions → Advanced
-settings → Install Extension**.
-See [Claude Desktop's extension documentation](https://support.claude.com/en/articles/10949351-getting-started-with-local-mcp-servers-on-claude-desktop).
+This release does not ship an MCPB/stdio adapter. Use a client version that can
+connect directly to a Streamable HTTP URL.
 
 </details>
 
 <details>
 <summary>Codex and ChatGPT Desktop</summary>
 
-```bash
-codex mcp add linkedin-mcp -- \
-  uvx --from linkedin-mcp-local linkedin-mcp serve --transport stdio
-```
-
-Check it with `codex mcp list`. Codex CLI, the Codex IDE extension, and ChatGPT
-Desktop share this local configuration. Restart the client after adding it. See
-the [Codex MCP documentation](https://learn.chatgpt.com/docs/extend/mcp).
+Add a Streamable HTTP server named `linkedin-mcp` with URL
+`http://127.0.0.1:8000/mcp`, then restart the client. See the [Codex MCP
+documentation](https://learn.chatgpt.com/docs/extend/mcp).
 
 </details>
 
 <details>
 <summary>VS Code and GitHub Copilot</summary>
 
-[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect?url=vscode%3Amcp%2Finstall%3F%257B%2522name%2522%253A%2522linkedin-mcp%2522%252C%2522command%2522%253A%2522uvx%2522%252C%2522args%2522%253A%255B%2522--from%2522%252C%2522linkedin-mcp-local%2522%252C%2522linkedin-mcp%2522%252C%2522serve%2522%252C%2522--transport%2522%252C%2522stdio%2522%255D%257D)
-[![Install in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install_Server-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect?url=vscode-insiders%3Amcp%2Finstall%3F%257B%2522name%2522%253A%2522linkedin-mcp%2522%252C%2522command%2522%253A%2522uvx%2522%252C%2522args%2522%253A%255B%2522--from%2522%252C%2522linkedin-mcp-local%2522%252C%2522linkedin-mcp%2522%252C%2522serve%2522%252C%2522--transport%2522%252C%2522stdio%2522%255D%257D)
-
-Or add this to `.vscode/mcp.json`:
+Add this to `.vscode/mcp.json`:
 
 ```json
 {
   "servers": {
     "linkedin-mcp": {
-      "command": "uvx",
-      "args": ["--from", "linkedin-mcp-local", "linkedin-mcp", "serve", "--transport", "stdio"]
+      "type": "http",
+      "url": "http://127.0.0.1:8000/mcp"
     }
   }
 }
@@ -200,11 +188,8 @@ See the [VS Code MCP documentation](https://code.visualstudio.com/docs/agent-cus
 <details>
 <summary>Cursor</summary>
 
-[![Install in Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en/install-mcp?name=LinkedIn%20MCP&config=eyJjb21tYW5kIjoidXZ4IC0tZnJvbSBsaW5rZWRpbi1tY3AtbG9jYWwgbGlua2VkaW4tbWNwIHNlcnZlIC0tdHJhbnNwb3J0IHN0ZGlvIn0%3D)
-
-For manual setup, open **Cursor Settings → MCP →
-Add new MCP server**, set the command to `uvx`, and set the arguments to
-`--from linkedin-mcp-local linkedin-mcp serve --transport stdio`.
+Open **Cursor Settings → MCP → Add new MCP server** and configure the
+Streamable HTTP URL `http://127.0.0.1:8000/mcp`.
 See the [Cursor MCP documentation](https://docs.cursor.com/en/tools/mcp).
 
 </details>
@@ -212,10 +197,8 @@ See the [Cursor MCP documentation](https://docs.cursor.com/en/tools/mcp).
 <details>
 <summary>Gemini CLI</summary>
 
-In `~/.gemini/settings.json`, add a local server named `linkedin-mcp` under
-`mcpServers` with command `uvx` and arguments
-`--from linkedin-mcp-local linkedin-mcp serve --transport stdio`, then run
-`gemini mcp list`.
+In `~/.gemini/settings.json`, add a remote server named `linkedin-mcp` under
+`mcpServers` with URL `http://127.0.0.1:8000/mcp`, then run `gemini mcp list`.
 See the [Gemini CLI MCP documentation](https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md).
 
 </details>
@@ -223,9 +206,8 @@ See the [Gemini CLI MCP documentation](https://github.com/google-gemini/gemini-c
 <details>
 <summary>Windsurf</summary>
 
-Open **Settings → AI → Manage MCP Servers**, or add a local server named
-`linkedin-mcp` to `~/.codeium/windsurf/mcp_config.json` with command `uvx` and
-arguments `--from linkedin-mcp-local linkedin-mcp serve --transport stdio`.
+Open **Settings → AI → Manage MCP Servers** and add a Streamable HTTP server
+named `linkedin-mcp` with URL `http://127.0.0.1:8000/mcp`.
 See the [Windsurf MCP documentation](https://docs.windsurf.com/windsurf/cascade/mcp).
 
 </details>
@@ -233,9 +215,8 @@ See the [Windsurf MCP documentation](https://docs.windsurf.com/windsurf/cascade/
 <details>
 <summary>Cline</summary>
 
-Open **MCP Servers → Configure**, then add a local server named `linkedin-mcp`
-with command `uvx` and arguments
-`--from linkedin-mcp-local linkedin-mcp serve --transport stdio`.
+Open **MCP Servers → Configure**, then add a Streamable HTTP server named
+`linkedin-mcp` with URL `http://127.0.0.1:8000/mcp`.
 See the [Cline MCP documentation](https://docs.cline.bot/mcp/mcp-overview).
 
 </details>
@@ -243,9 +224,8 @@ See the [Cline MCP documentation](https://docs.cline.bot/mcp/mcp-overview).
 <details>
 <summary>Roo Code</summary>
 
-Open Roo Code's MCP settings and add a local server named `linkedin-mcp` to the
-global file or `.roo/mcp.json`, using command `uvx` and arguments
-`--from linkedin-mcp-local linkedin-mcp serve --transport stdio`.
+Open Roo Code's MCP settings and add a Streamable HTTP server named
+`linkedin-mcp` with URL `http://127.0.0.1:8000/mcp`.
 See the [Roo Code MCP documentation](https://docs.roocode.com/features/mcp/using-mcp-in-roo).
 
 </details>
@@ -253,45 +233,25 @@ See the [Roo Code MCP documentation](https://docs.roocode.com/features/mcp/using
 <details>
 <summary>Zed</summary>
 
-Add this to Zed settings:
-
-```json
-{
-  "context_servers": {
-    "linkedin-mcp": {
-      "command": "uvx",
-      "args": ["--from", "linkedin-mcp-local", "linkedin-mcp", "serve", "--transport", "stdio"]
-    }
-  }
-}
-```
-
-See the [Zed MCP documentation](https://zed.dev/docs/ai/mcp).
+Add a remote context server named `linkedin-mcp` with URL
+`http://127.0.0.1:8000/mcp`. See the [Zed MCP
+documentation](https://zed.dev/docs/ai/mcp).
 
 </details>
 
 <details>
 <summary>Goose</summary>
 
-[![Install in Goose](https://block.github.io/goose/img/extension-install-dark.svg)](https://block.github.io/goose/extension?cmd=uvx&arg=--from&arg=linkedin-mcp-local&arg=linkedin-mcp&arg=serve&arg=--transport&arg=stdio&id=linkedin-mcp&name=LinkedIn%20MCP&description=A%20LinkedIn%20MCP%20server%20to%20find%20jobs%2C%20search%20people%2C%20research%20companies%2C%20manage%20your%20network%2C%20publish%20and%20engage%20with%20posts%2C%20and%20read%20or%20send%20messages.)
-
-Or add a custom stdio extension with command `uvx` and arguments
-`--from linkedin-mcp-local linkedin-mcp serve --transport stdio`, or start one
-CLI session with:
-
-```bash
-goose session --with-extension \
-  "uvx --from linkedin-mcp-local linkedin-mcp serve --transport stdio"
-```
-
-See the [Goose documentation](https://block.github.io/goose/).
+Add a remote MCP extension named `linkedin-mcp` with URL
+`http://127.0.0.1:8000/mcp`. See the [Goose
+documentation](https://block.github.io/goose/).
 
 </details>
 
 <details>
 <summary>OpenCode</summary>
 
-For OpenCode v2, add this to `opencode.json`:
+Add this to `opencode.json`:
 
 ```json
 {
@@ -299,8 +259,8 @@ For OpenCode v2, add this to `opencode.json`:
   "mcp": {
     "servers": {
       "linkedin-mcp": {
-        "type": "local",
-        "command": ["uvx", "--from", "linkedin-mcp-local", "linkedin-mcp", "serve", "--transport", "stdio"]
+        "type": "remote",
+        "url": "http://127.0.0.1:8000/mcp"
       }
     }
   }
@@ -315,8 +275,7 @@ See the [OpenCode MCP documentation](https://opencode.ai/v2/docs/mcp-servers).
 <summary>JetBrains AI Assistant</summary>
 
 Open **Settings → Tools → AI Assistant → Model Context Protocol (MCP)**, click
-**Add**, set the command to `uvx`, and set the arguments to
-`--from linkedin-mcp-local linkedin-mcp serve --transport stdio`.
+**Add**, and configure `http://127.0.0.1:8000/mcp` as a Streamable HTTP server.
 See the [JetBrains MCP documentation](https://www.jetbrains.com/help/ai-assistant/mcp.html).
 
 </details>
@@ -324,9 +283,8 @@ See the [JetBrains MCP documentation](https://www.jetbrains.com/help/ai-assistan
 <details>
 <summary>Continue</summary>
 
-Create `.continue/mcpServers/linkedin-mcp.json` with a local server named
-`linkedin-mcp`, command `uvx`, and arguments
-`--from linkedin-mcp-local linkedin-mcp serve --transport stdio`.
+Create a remote MCP server named `linkedin-mcp` with URL
+`http://127.0.0.1:8000/mcp`.
 See the [Continue MCP documentation](https://docs.continue.dev/customize/deep-dives/mcp).
 
 </details>
@@ -335,8 +293,8 @@ See the [Continue MCP documentation](https://docs.continue.dev/customize/deep-di
 <summary>Warp</summary>
 
 Open **Settings → AI → Manage MCP Servers → Add**, name the server
-`linkedin-mcp`, set the command to `uvx`, and set the arguments to
-`--from linkedin-mcp-local linkedin-mcp serve --transport stdio`.
+`linkedin-mcp`, and configure `http://127.0.0.1:8000/mcp` as its Streamable HTTP
+URL.
 See the [Warp MCP documentation](https://docs.warp.dev/agent-platform/capabilities/mcp).
 
 </details>
@@ -388,22 +346,22 @@ Send <message> on LinkedIn to <profile URL>.
 ```text
 [Claude | Codex | Cursor | ...]
                |
-       stdio / loopback HTTP
+        Streamable HTTP /mcp
                v
       [Typed MCP boundary]
                |
                v
-        [Task + FIFO queue]
+       [OperationManager]
                |
-      one operation at a time
+        one asyncio.Lock
                v
-[Scheduler -> Worker] ---> [Process-local cursors]
-               |
-               v
- [Tool-owned execution + raw Page/Locator]
+[ToolManager-registered tool] ---> [CursorManager]
                |
                v
- [infra.playwright.Paced actions]
+ [Tool-owned page/evidence/models]
+               |
+               v
+       [UIManager + Pacer]
                |
                v
 [BrowserManager: pages + one context] <--> [Persistent auth profile]
@@ -414,11 +372,11 @@ Send <message> on LinkedIn to <profile URL>.
 ```
 
 Everything runs locally. There is no hosted backend, telemetry, database,
-external queue, LangGraph runtime, or credential service. Browser cookies live
-only in the local Playwright profile. The first client starts one shared local
-runtime; later clients attach to it. A bounded FIFO queue feeds one worker, so
-browser calls run one at a time. Calls execute freshly; only queue, browser
-status, and cursor coordination live in runtime memory.
+queue, scheduler, worker pool, LangGraph runtime, or credential service.
+Browser cookies live only in the local Playwright profile. FastMCP serves one
+Streamable HTTP endpoint, and one process-local lock ensures browser operations
+run one at a time. Calls execute freshly; only lock status, browser status, and
+cursor coordination live in memory.
 Read the full [architecture](docs/ARCHITECTURE.md) and [privacy policy](PRIVACY.md).
 
 ## 🔒 Privacy Policy

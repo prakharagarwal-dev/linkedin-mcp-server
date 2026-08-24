@@ -9,7 +9,7 @@ from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.infra.playwright import Paced
+from linkedin_mcp.ui.pacer import Pacer
 
 VISIBLE_COUNT = r"\d[\d,.]*[KMB]?\+?"
 
@@ -60,7 +60,7 @@ async def first_visible_text(locator: Locator) -> str | None:
     return None
 
 
-async def expand_and_scroll(paced: Paced, page: Page) -> None:
+async def expand_and_scroll(paced: Pacer, page: Page) -> None:
     main = page.locator("main")
     try:
         await main.wait_for(state="visible", timeout=10_000)

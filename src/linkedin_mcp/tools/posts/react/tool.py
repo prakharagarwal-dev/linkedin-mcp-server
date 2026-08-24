@@ -15,7 +15,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from linkedin_mcp.errors import InternalServerError, LinkedInMCPError
-from linkedin_mcp.infra.queue import Scheduler, Task
+from linkedin_mcp.operations import OperationManager
 from linkedin_mcp.tools.posts.react.evidence import source_from_action_execution
 from linkedin_mcp.tools.posts.react.models import (
     ActionCommand,
@@ -120,7 +120,7 @@ async def execute(
 
 def register(
     mcp: FastMCP[None],
-    scheduler: Scheduler,
+    operations: OperationManager,
     page: PostReactionPage,
 ) -> None:
     @mcp.tool(
@@ -155,13 +155,12 @@ def register(
             post_ref=post_ref,
             desired_reaction=desired_reaction,
         )
-        task = Task(
-            name="linkedin.posts.react",
-            execute=lambda: execute(request, page),
-            interruptible=False,
+        result = await tool_result(
+            operations.run_write(
+                "linkedin.posts.react",
+                lambda: execute(request, page),
+            )
         )
-        await scheduler.schedule(task)
-        result = await tool_result(task.result())
         await ctx.report_progress(100, 100, "Reaction action reached a terminal outcome")
         return result
 

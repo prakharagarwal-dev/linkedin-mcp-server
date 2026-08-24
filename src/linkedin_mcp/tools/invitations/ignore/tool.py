@@ -15,7 +15,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from linkedin_mcp.errors import InternalServerError, LinkedInMCPError
-from linkedin_mcp.infra.queue import Scheduler, Task
+from linkedin_mcp.operations import OperationManager
 from linkedin_mcp.tools.invitations.ignore.evidence import source_from_action_execution
 from linkedin_mcp.tools.invitations.ignore.models import (
     PROFILE_SLUG_PATTERN,
@@ -117,7 +117,7 @@ async def execute(
 
 def register(
     mcp: FastMCP[None],
-    scheduler: Scheduler,
+    operations: OperationManager,
     page: IgnoreInvitationPage,
 ) -> None:
     @mcp.tool(
@@ -154,13 +154,12 @@ def register(
             request_id=request_id,
             profile_slug=profile_slug,
         )
-        task = Task(
-            name="linkedin.invitations.ignore",
-            execute=lambda: execute(request, page),
-            interruptible=False,
+        result = await tool_result(
+            operations.run_write(
+                "linkedin.invitations.ignore",
+                lambda: execute(request, page),
+            )
         )
-        await scheduler.schedule(task)
-        result = await tool_result(task.result())
         await ctx.report_progress(100, 100, "Ignore action reached a terminal outcome")
         return result
 

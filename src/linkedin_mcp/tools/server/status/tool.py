@@ -6,15 +6,13 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
 from linkedin_mcp import __version__
-from linkedin_mcp.config import Settings
-from linkedin_mcp.infra.queue import Scheduler
+from linkedin_mcp.operations import OperationManager
 from linkedin_mcp.tools.server.status.models import ServerStatusOutput
 
 
 def register(
     mcp: FastMCP[None],
-    settings: Settings,
-    scheduler: Scheduler,
+    operations: OperationManager,
 ) -> None:
     @mcp.tool(
         name="linkedin.server.status",
@@ -30,11 +28,9 @@ def register(
     async def _server_status() -> ServerStatusOutput:
         return ServerStatusOutput(
             version=__version__,
-            transport=settings.transport,
-            queue_depth=scheduler.queue_depth,
-            active_browser_operation=scheduler.active,
-            active_task=scheduler.active_task,
-            accepting_calls=scheduler.accepting,
+            waiting_operations=operations.waiting_operations,
+            active_browser_operation=operations.active,
+            active_operation=operations.active_operation,
         )
 
     del _server_status

@@ -27,7 +27,6 @@ concurrency:
 
 env:
   RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
-  MCP_SERVER_NAME: io.github.prakharagarwal-dev/linkedin-mcp-server
 
 jobs:
   build:
@@ -59,53 +58,11 @@ jobs:
           VERSION="$(uv version --short)"
           test "$RELEASE_TAG" = "v$VERSION"
           test "$(jq -r .version server.json)" = "$VERSION"
-          test "$(jq -r .version manifest.json)" = "$VERSION"
 
       - name: Build and check Python distributions
         run: |
           uv build
           uvx --from twine twine check dist/*.whl dist/*.tar.gz
-
-      - name: Stage and validate MCPB bundle
-        run: |
-          mkdir -p .release/mcpb
-          cp manifest.json .release/mcpb/manifest.json
-          cp pyproject.toml uv.lock README.md PRIVACY.md LICENSE .release/mcpb/
-          git archive HEAD src | tar -x -C .release/mcpb
-          cp assets/icon.png .release/mcpb/icon.png
-          npx --yes @anthropic-ai/mcpb@2.1.2 validate .release/mcpb/manifest.json
-          python - <<'PY'
-          import os
-          import subprocess
-          import time
-          from pathlib import Path
-          from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
-
-          root = Path(".release/mcpb")
-          version = os.environ["RELEASE_TAG"].removeprefix("v")
-          output = Path("dist") / f"linkedin-mcp-server-{version}.mcpb"
-          epoch = int(
-              subprocess.check_output(
-                  ["git", "show", "-s", "--format=%ct", "HEAD"],
-                  text=True,
-              ).strip()
-          )
-          timestamp = time.gmtime(epoch)[:6]
-
-          with ZipFile(output, "w") as bundle:
-              for path in sorted(item for item in root.rglob("*") if item.is_file()):
-                  info = ZipInfo(path.relative_to(root).as_posix(), date_time=timestamp)
-                  info.create_system = 3
-                  info.external_attr = 0o100644 << 16
-                  bundle.writestr(
-                      info,
-                      path.read_bytes(),
-                      compress_type=ZIP_DEFLATED,
-                      compresslevel=9,
-                  )
-          PY
-          npx --yes @anthropic-ai/mcpb@2.1.2 info \
-            "dist/linkedin-mcp-server-${RELEASE_TAG#v}.mcpb"
 
       - name: Attest release artifacts
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
@@ -121,13 +78,6 @@ jobs:
             dist/*.tar.gz
           if-no-files-found: error
 
-      - name: Upload MCPB bundle
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: mcpb-bundle
-          path: dist/*.mcpb
-          if-no-files-found: error
-
   github-release:
     name: Attach verified release artifacts
     if: ${{ github.event_name == 'release' || inputs.target == 'all' }}
@@ -141,12 +91,6 @@ jobs:
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           name: python-distributions
-          path: release-assets
-
-      - name: Download MCPB bundle
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
-        with:
-          name: mcpb-bundle
           path: release-assets
 
       - name: Create checksums and attach assets

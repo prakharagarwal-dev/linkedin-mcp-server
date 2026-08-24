@@ -3,8 +3,8 @@
 import argparse
 import asyncio
 
+from linkedin_mcp.browser import BrowserManager
 from linkedin_mcp.config import Settings
-from linkedin_mcp.host.manager import HostManager
 
 
 def configure(command: argparse.ArgumentParser) -> None:
@@ -12,7 +12,11 @@ def configure(command: argparse.ArgumentParser) -> None:
 
 
 async def execute(settings: Settings) -> None:
-    await HostManager(settings).login()
+    browser = BrowserManager(settings)
+    try:
+        await browser.login()
+    finally:
+        await browser.close()
 
 
 def handle(_: argparse.Namespace, settings: Settings) -> None:

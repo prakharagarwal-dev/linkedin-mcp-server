@@ -1,6 +1,6 @@
 # Distribution and registry coverage
 
-Last verified: 2026-08-15
+Last verified: 2026-08-25
 
 Use this exact description on every public surface that accepts it:
 
@@ -17,7 +17,7 @@ value required for a valid record.
 | --- | --- | --- |
 | PyPI | Live | [`linkedin-mcp-local`](https://pypi.org/project/linkedin-mcp-local/) |
 | GitHub Container Registry | Live | [`linkedin-mcp-server`](https://github.com/prakharagarwal-dev/linkedin-mcp-server/pkgs/container/linkedin-mcp-server) |
-| GitHub Releases | Live | [Versioned MCPB bundles and checksums](https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases) |
+| GitHub Releases | Live | [Versioned Python distributions and checksums](https://github.com/prakharagarwal-dev/linkedin-mcp-server/releases) |
 
 ## Registries and catalogs
 
@@ -35,10 +35,9 @@ value required for a valid record.
 | mcpservers.org | Submitted | Free submission accepted for review on 2026-08-15 |
 | PulseMCP | Awaiting automatic ingestion | New submissions are paused; PulseMCP directs publishers to the Official MCP Registry and says it will ingest those records |
 
-The Official MCP Registry record currently exposes the immutable OCI package.
-The registry publishing workflow now adds the matching MCPB release URL and
-SHA-256 checksum when it publishes the next version; previously published
-registry versions cannot be amended.
+The Official MCP Registry record exposes one immutable OCI package. Its
+metadata starts the container and connects to its Streamable HTTP `/mcp`
+endpoint. MCPB and stdio packages are no longer produced.
 
 Official Registry consumers, including GitHub MCP discovery and Visual Studio
 Code, receive the server through that upstream record rather than a separate
@@ -50,11 +49,11 @@ submission.
 | --- | --- |
 | MCP.so | Its current submission flow requires a paid listing; no purchase is authorized for registry coverage |
 | Cursor Marketplace | Publication requires accepting publisher terms and packaging a Cursor plugin; legal acceptance remains an owner action |
-| Claude Desktop extension directory | Its interest form requires accepting directory terms, and its current selection criteria prioritize MIT-licensed Node.js bundles rather than this Apache-licensed Python bundle |
+| Claude Desktop extension directory | This release is Streamable HTTP only and does not ship the MCPB package required by that directory path |
 | Claude Rules | Its free listing requires creating or connecting an account through GitHub or Google OAuth |
 | FindMCP | Its public form and a direct valid submission both fail at `/api/submit` with HTTP 500 |
 | MCP Servers Directory | Its submission endpoint currently returns an empty response or HTTP 502 |
-| MCPub | It accepts hosted MCP endpoints; this server is a local stdio package, not a hosted remote service |
+| MCPub | It accepts publicly hosted MCP endpoints; this project distributes a local package and does not operate a public service |
 | MCP House | Its showcase is for servers built with the TypeScript `mcp-framework` project |
 
 This ledger covers maintained package registries, MCP registries, and curated

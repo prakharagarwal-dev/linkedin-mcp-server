@@ -2,22 +2,23 @@ from __future__ import annotations
 
 import pytest
 
-from linkedin_mcp.browser.urls import (
+from linkedin_mcp.errors import InvalidTargetError
+from linkedin_mcp.tools.companies.urls import (
     canonical_company_url,
-    canonical_conversation_url,
-    canonical_job_url,
-    canonical_post_url,
-    canonical_profile_url,
-    comment_reference_from_value,
     company_slug_from_url,
+)
+from linkedin_mcp.tools.jobs.urls import canonical_job_url, job_id_from_url
+from linkedin_mcp.tools.messaging.urls import (
+    canonical_conversation_url,
     conversation_id_from_url,
-    job_id_from_url,
+)
+from linkedin_mcp.tools.people.urls import canonical_profile_url, profile_slug_from_url
+from linkedin_mcp.tools.posts.urls import (
+    canonical_post_url,
+    comment_reference_from_value,
     post_reference_from_comment_ref,
     post_reference_from_value,
-    profile_slug_from_url,
-    validate_linkedin_url,
 )
-from linkedin_mcp.errors import InvalidTargetError
 
 
 def test_job_ids_are_extracted_from_supported_urls() -> None:
@@ -28,14 +29,6 @@ def test_job_ids_are_extracted_from_supported_urls() -> None:
         )
         == "987654321"
     )
-
-
-def test_linkedin_url_policy_requires_exact_host() -> None:
-    with pytest.raises(InvalidTargetError):
-        validate_linkedin_url(
-            "https://www.linkedin.com.attacker.example/jobs/view/123456/",
-            ("www.linkedin.com",),
-        )
 
 
 def test_canonical_job_url_rejects_non_numeric_ids() -> None:

@@ -8,9 +8,6 @@ from pydantic import BaseModel
 
 from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import ErrorCode
-from linkedin_mcp.infra.cursor import CursorStore
-from linkedin_mcp.infra.queue import Scheduler, Worker
-from linkedin_mcp.tools import attach_tools
 from linkedin_mcp.tools.companies.search.models import CompanySearchFilters
 from linkedin_mcp.tools.connections.search.models import (
     ConnectionsSearchFilters,
@@ -23,8 +20,8 @@ from linkedin_mcp.tools.people.search.models import PeopleSearchFilters
 from linkedin_mcp.tools.posts.create.models import PostCreateMode
 from linkedin_mcp.tools.posts.react.models import ReactionState
 from linkedin_mcp.tools.posts.search.models import PostSearchFilters
-from linkedin_mcp.transport.server import create_mcp_server
 from tests.simulator import standard_scenario
+from tests.support.mcp import create_mcp_fixture
 from tests.support.playwright import empty_browser
 from tests.verification_manifest import MOCK_VERIFICATION, missing_test_files
 
@@ -210,21 +207,9 @@ EXPECTED_ERROR_CODES = frozenset(
 def _production_mcp() -> FastMCP[None]:
     settings = Settings()
     browser = empty_browser(settings)
-    scheduler = Scheduler(Worker(), capacity=settings.queue_capacity)
-    cursor_store = CursorStore(
-        ttl_seconds=settings.pagination_cursor_ttl_seconds,
-        max_active_cursors=settings.pagination_max_active_cursors,
-        max_seen_items_per_cursor=settings.pagination_max_seen_items_per_cursor,
-    )
-    mcp = create_mcp_server(settings)
-    attach_tools(
-        mcp,
-        settings=settings,
-        browser=browser,
-        scheduler=scheduler,
-        cursor_store=cursor_store,
-    )
-    return mcp
+    fixture = create_mcp_fixture(settings, browser)
+    fixture.tools.register_all()
+    return fixture.mcp
 
 
 def test_manifest_matches_the_exact_public_tool_surface() -> None:

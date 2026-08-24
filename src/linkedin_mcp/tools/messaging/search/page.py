@@ -14,20 +14,7 @@ from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
-from linkedin_mcp.browser import BrowserManager
-from linkedin_mcp.browser.urls import (
-    canonical_profile_url,
-    conversation_id_from_url,
-    profile_slug_from_url,
-)
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
-from linkedin_mcp.infra.playwright import Paced
-from linkedin_mcp.infra.playwright.collections import (
-    CollectionSettleOutcome,
-    CollectionSettleResult,
-    dispatch_bubbling_wheel,
-    wait_for_collection_interaction,
-)
 from linkedin_mcp.tools.messaging.search.models import (
     ConversationCategory,
     ConversationFilter,
@@ -36,6 +23,16 @@ from linkedin_mcp.tools.messaging.search.models import (
     ConversationSummary,
     StopReason,
 )
+from linkedin_mcp.tools.messaging.urls import conversation_id_from_url
+from linkedin_mcp.tools.people.urls import canonical_profile_url, profile_slug_from_url
+from linkedin_mcp.ui.collections import (
+    CollectionSettleOutcome,
+    CollectionSettleResult,
+    dispatch_bubbling_wheel,
+    wait_for_collection_interaction,
+)
+from linkedin_mcp.ui.manager import UIManager
+from linkedin_mcp.ui.pacer import Pacer
 
 _MESSAGING_URL = "https://www.linkedin.com/messaging/"
 
@@ -160,7 +157,7 @@ def _conversation_search_has_explicit_end(visible_text: str) -> bool:
 
 
 async def _settle_conversation_scroll(
-    paced: Paced,
+    paced: Pacer,
     page: Page,
 ) -> CollectionSettleResult:
     baseline = await _visible_conversation_signature(page)
@@ -292,13 +289,13 @@ class ConversationSearchPage:
 
     def __init__(
         self,
-        browser: BrowserManager,
+        ui: UIManager,
         *,
         max_scroll_rounds: int,
         reference_index: ConversationReferenceIndex | None = None,
     ) -> None:
-        self._browser = browser
-        self._paced = browser.paced
+        self._ui = ui
+        self._paced = ui
         self._max_scroll_rounds = max_scroll_rounds
         self._reference_index = reference_index or ConversationReferenceIndex()
 
@@ -320,7 +317,7 @@ class ConversationSearchPage:
         stop_reason = StopReason.SAFETY_BOUND
         rounds_visited = 0
         end_confirmations = 0
-        async with self._browser.page() as page:
+        async with self._ui.page() as page:
             await self._paced.goto(page, _MESSAGING_URL)
             await page.locator("main").first.wait_for(state="visible")
             await self._apply_category(page, request.resolved_category)

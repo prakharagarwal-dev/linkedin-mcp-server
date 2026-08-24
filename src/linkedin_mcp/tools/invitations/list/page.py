@@ -13,9 +13,7 @@ from urllib.parse import parse_qs, unquote, urljoin, urlsplit
 from playwright.async_api import Locator, Page
 from pydantic import HttpUrl
 
-from linkedin_mcp.browser import BrowserManager
 from linkedin_mcp.errors import BrowserUnavailableError, ParserDriftError
-from linkedin_mcp.infra.playwright.collections import wait_for_collection_change
 from linkedin_mcp.tools.invitations.list.models import (
     CURRENT_RECEIVED_INVITATION_VIEWS,
     InvitationAvailableAction,
@@ -30,6 +28,8 @@ from linkedin_mcp.tools.invitations.list.models import (
     InvitationType,
     StopReason,
 )
+from linkedin_mcp.ui.collections import wait_for_collection_change
+from linkedin_mcp.ui.manager import UIManager
 
 InvitationProgressReporter = Callable[[int, int, str], Awaitable[None]]
 
@@ -1262,7 +1262,7 @@ async def _implicit_sent_empty_inventory(page: Page) -> _VisibleInventory:
 
 async def _select_visible_view(
     page: Page,
-    browser: BrowserManager,
+    ui: UIManager,
     direction: InvitationDirection,
     invitation_filter: InvitationFilter,
 ) -> _VisibleInventory:
@@ -1289,14 +1289,14 @@ async def _select_visible_view(
             name=_BUCKET_PICKER_PATTERN,
             description="Focused/Other selector",
         )
-        await browser.paced.click(picker)
+        await ui.click(picker)
         option = await _unique_visible_role_control(
             page,
             role="menuitem",
             name=_CONTROL_NAME_PATTERNS[invitation_filter],
             description=f"{invitation_filter.value} menu option",
         )
-        await browser.paced.click(option)
+        await ui.click(option)
     elif invitation_filter in _CATEGORY_FILTERS:
         try:
             control = await _unique_visible_role_control(
@@ -1310,7 +1310,7 @@ async def _select_visible_view(
             # Returning through the visible Focused picker restores them.
             await _select_visible_view(
                 page,
-                browser,
+                ui,
                 direction,
                 InvitationFilter.FOCUSED,
             )
@@ -1327,7 +1327,7 @@ async def _select_visible_view(
                     f"{invitation_filter.value} filter control."
                 ) from None
             control = category_controls[0]
-        await browser.paced.click(control)
+        await ui.click(control)
     elif invitation_filter is InvitationFilter.PEOPLE:
         controls: list[Locator] = []
         for role in ("link", "radio", "button"):
@@ -1344,7 +1344,7 @@ async def _select_visible_view(
             raise ParserDriftError(
                 "LinkedIn Invitations has no unique current People filter control."
             )
-        await browser.paced.click(controls[0])
+        await ui.click(controls[0])
     else:
         raise ValueError("The synthetic All filter cannot be selected directly.")
     inventory = await _wait_for_inventory(page, invitation_filter)
@@ -1380,14 +1380,14 @@ class InvitationListPage:
 
     def __init__(
         self,
-        browser: BrowserManager,
+        ui: UIManager,
         *,
         max_scroll_rounds: int,
     ) -> None:
         if max_scroll_rounds < 1:
             raise ValueError("Invitation collection requires a positive scroll bound.")
-        self._browser = browser
-        self._paced = browser.paced
+        self._ui = ui
+        self._paced = ui
         self._max_scroll_rounds = max_scroll_rounds
 
     async def collect(
@@ -1441,7 +1441,7 @@ class InvitationListPage:
         observed_view_memberships = 0
         completed_views = 0
         stop_reason = StopReason.VISIBLE_PAGE_COMPLETE
-        async with self._browser.page() as page:
+        async with self._ui.page() as page:
             await self._paced.goto(page, navigation_url)
             mains = page.locator("main")
             if await mains.count() != 1:
@@ -1451,7 +1451,7 @@ class InvitationListPage:
             for invitation_filter in views:
                 inventories[invitation_filter] = await _select_visible_view(
                     page,
-                    self._browser,
+                    self._ui,
                     request.direction,
                     invitation_filter,
                 )
@@ -1468,7 +1468,7 @@ class InvitationListPage:
             for view_index, invitation_filter in enumerate(views):
                 inventory = await _select_visible_view(
                     page,
-                    self._browser,
+                    self._ui,
                     request.direction,
                     invitation_filter,
                 )
@@ -1523,7 +1523,7 @@ class InvitationListPage:
             for invitation_filter, expected in inventories.items():
                 current = await _select_visible_view(
                     page,
-                    self._browser,
+                    self._ui,
                     request.direction,
                     invitation_filter,
                 )

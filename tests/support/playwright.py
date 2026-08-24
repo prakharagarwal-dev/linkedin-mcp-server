@@ -18,11 +18,12 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from linkedin_mcp.browser import BrowserManager
 from linkedin_mcp.browser.manager import AccessHook, PageFactory
 from linkedin_mcp.config import Settings
-from linkedin_mcp.infra.playwright.pacer import (
+from linkedin_mcp.ui.manager import UIManager
+from linkedin_mcp.ui.pacer import (
     ClickHook,
     NavigateHook,
     NavigationClickHook,
-    Paced,
+    Pacer,
 )
 
 
@@ -32,11 +33,10 @@ def test_settings(root: Path | None = None) -> Settings:
         browser_auto_install=False,
         browser_profile_path=base / "profile",
         browser_action_delay_seconds=0,
-        runtime_lock_path=base / "runtime.lock",
     )
 
 
-def adapt_browser(provider: object, *, settings: Settings | None = None) -> BrowserManager:
+def adapt_browser(provider: object, *, settings: Settings | None = None) -> UIManager:
     """Adapt an offline raw-page provider to the production dependencies."""
 
     effective_settings = settings or test_settings()
@@ -60,17 +60,18 @@ def adapt_browser(provider: object, *, settings: Settings | None = None) -> Brow
         effective_settings,
     )
     assert_access = cast(AccessHook | None, _optional_hook(provider, "assert_safe"))
-    paced = Paced(
+    browser = BrowserManager.for_testing(
+        effective_settings,
+        Pacer(0),
+        page_factory=page_factory,
+        assert_access=assert_access,
+    )
+    return UIManager(
+        browser,
         effective_settings.browser_action_delay_seconds,
         navigate_hook=navigate,
         click_hook=click,
         navigation_click_hook=navigate_via_click,
-    )
-    return BrowserManager.for_testing(
-        effective_settings,
-        paced,
-        page_factory=page_factory,
-        assert_access=assert_access,
     )
 
 
@@ -79,9 +80,13 @@ def empty_browser(settings: Settings) -> BrowserManager:
 
     return BrowserManager.for_testing(
         settings,
-        Paced(0),
+        Pacer(0),
         page_factory=_unavailable_page,
     )
+
+
+def empty_ui(settings: Settings) -> UIManager:
+    return UIManager(empty_browser(settings), 0)
 
 
 @asynccontextmanager

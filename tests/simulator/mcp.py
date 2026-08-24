@@ -19,8 +19,7 @@ async def simulator_session(
     root: Path,
     state: SimulatorState,
 ) -> AsyncGenerator[ClientSession]:
-    mcp, scheduler, browser, cursor_store = create_simulator_server(root, state)
-    await scheduler.start()
+    mcp, _, browser, _ = create_simulator_server(root, state)
     server_to_client_send, server_to_client_receive = anyio.create_memory_object_stream[
         SessionMessage
     ](50)
@@ -44,6 +43,4 @@ async def simulator_session(
                 yield session
             task_group.cancel_scope.cancel()
     finally:
-        await scheduler.close()
-        await cursor_store.close()
         await browser.close()

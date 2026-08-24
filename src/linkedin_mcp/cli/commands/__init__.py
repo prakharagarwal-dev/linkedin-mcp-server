@@ -2,7 +2,7 @@
 
 import argparse
 
-from linkedin_mcp.cli.commands import doctor, login, logout, profile, serve, setup, status, stop
+from linkedin_mcp.cli.commands import doctor, login, logout, profile, serve, setup
 
 
 def register(root: argparse.ArgumentParser) -> None:
@@ -37,17 +37,5 @@ def register(root: argparse.ArgumentParser) -> None:
         commands.add_parser(
             "doctor",
             help="Check non-secret local runtime readiness",
-        )
-    )
-    status.configure(
-        commands.add_parser(
-            "status",
-            help="Show local LinkedIn MCP runtime ownership",
-        )
-    )
-    stop.configure(
-        commands.add_parser(
-            "stop",
-            help="Gracefully stop the owning local MCP runtime",
         )
     )

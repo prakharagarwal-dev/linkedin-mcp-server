@@ -15,7 +15,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from linkedin_mcp.errors import InternalServerError, LinkedInMCPError
-from linkedin_mcp.infra.queue import Scheduler, Task
+from linkedin_mcp.operations import OperationManager
 from linkedin_mcp.tools.messaging.send.evidence import source_from_action_execution
 from linkedin_mcp.tools.messaging.send.models import (
     PROFILE_SLUG_PATTERN,
@@ -116,7 +116,7 @@ async def execute(
 
 def register(
     mcp: FastMCP[None],
-    scheduler: Scheduler,
+    operations: OperationManager,
     page: MessageSendPage,
 ) -> None:
     @mcp.tool(
@@ -182,13 +182,12 @@ def register(
             gif=gif,
             reply_to_message_ref=reply_to_message_ref,
         )
-        task = Task(
-            name="linkedin.messaging.send",
-            execute=lambda: execute(request, page),
-            interruptible=False,
+        result = await tool_result(
+            operations.run_write(
+                "linkedin.messaging.send",
+                lambda: execute(request, page),
+            )
         )
-        await scheduler.schedule(task)
-        result = await tool_result(task.result())
         await ctx.report_progress(100, 100, "Message action reached a terminal outcome")
         return result
 

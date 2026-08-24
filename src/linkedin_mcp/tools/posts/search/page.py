@@ -14,17 +14,7 @@ from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
-from linkedin_mcp.browser import BrowserManager
-from linkedin_mcp.browser.urls import (
-    canonical_post_url,
-)
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.infra.playwright import Paced
-from linkedin_mcp.infra.playwright.collections import (
-    CollectionSettleOutcome,
-    visible_locator_signature,
-    wait_for_collection_initial_state,
-)
 from linkedin_mcp.tools.posts.search.models import (
     PostAuthor as SearchPostAuthor,
 )
@@ -61,6 +51,16 @@ from linkedin_mcp.tools.posts.surface import (
 from linkedin_mcp.tools.posts.surface import (
     PostContentType as SurfacePostContentType,
 )
+from linkedin_mcp.tools.posts.urls import (
+    canonical_post_url,
+)
+from linkedin_mcp.ui.collections import (
+    CollectionSettleOutcome,
+    visible_locator_signature,
+    wait_for_collection_initial_state,
+)
+from linkedin_mcp.ui.manager import UIManager
+from linkedin_mcp.ui.pacer import Pacer
 
 _CONTENT_SEARCH_URL = "https://www.linkedin.com/search/results/content/"
 
@@ -213,7 +213,7 @@ async def _wait_for_post_search_state(page: Page) -> CollectionSettleOutcome:
     return result.outcome
 
 
-async def _expand_search_post_body(paced: Paced, page: Page, region: Locator) -> None:
+async def _expand_search_post_body(paced: Pacer, page: Page, region: Locator) -> None:
     source_url = page.url
     bodies = await post_body_boxes(region)
     if len(bodies) > 2:
@@ -433,7 +433,7 @@ async def _exact_post_option(
 
 
 async def _select_post_facet_names(
-    paced: Paced,
+    paced: Pacer,
     page: Page,
     panel: Locator,
     requested_names: tuple[str, ...],
@@ -524,7 +524,7 @@ def _validate_resolved_post_facets(
 
 
 async def _resolve_post_facets(
-    browser: BrowserManager,
+    ui: UIManager,
     page: Page,
     filters: PostSearchFilters,
 ) -> _ResolvedPostFacets:
@@ -545,7 +545,7 @@ async def _resolve_post_facets(
     ]
     if len(visible) != 1:
         raise ParserDriftError("LinkedIn post search has no unique visible All filters control.")
-    await browser.paced.click(visible[0])
+    await ui.click(visible[0])
     panel: Locator | None = None
     for _ in range(50):
         panel = await _post_filter_panel(page)
@@ -556,7 +556,7 @@ async def _resolve_post_facets(
         raise ParserDriftError("LinkedIn's visible Posts All-filters panel was unavailable.")
     for spec in _POST_FACETS:
         names = cast(tuple[str, ...], getattr(filters, spec.names_field))
-        await _select_post_facet_names(browser.paced, page, panel, names, spec)
+        await _select_post_facet_names(ui, page, panel, names, spec)
     show_results = panel.get_by_role(
         "link",
         name=re.compile(r"^show results$", re.IGNORECASE),
@@ -567,7 +567,7 @@ async def _resolve_post_facets(
         raise ParserDriftError(
             "LinkedIn's visible Show results control was unavailable for Posts search."
         ) from error
-    submitted_url = await browser.paced.click_and_wait_for_navigation(
+    submitted_url = await ui.click_and_wait_for_navigation(
         page,
         show_results.first,
     )
@@ -609,7 +609,7 @@ async def _post_text(region: Locator, *, author: SurfacePostAuthor) -> str | Non
 
 
 async def _post_summary_from_region(
-    paced: Paced,
+    paced: Pacer,
     region: Locator,
     *,
     known_reference: str | None = None,
@@ -647,7 +647,7 @@ async def _post_summary_from_region(
 
 
 async def _visible_posts(
-    paced: Paced,
+    paced: Pacer,
     page: Page,
     *,
     result_limit: int,
@@ -714,11 +714,11 @@ async def _visible_posts(
 
 
 class PostSearchPage:
-    def __init__(self, browser: BrowserManager, *, max_pages: int) -> None:
+    def __init__(self, ui: UIManager, *, max_pages: int) -> None:
         if max_pages < 1:
             raise ValueError("Post search page bound must be positive.")
-        self._browser = browser
-        self._paced = browser.paced
+        self._ui = ui
+        self._paced = ui
         self._max_pages = max_pages
 
     @staticmethod
@@ -740,11 +740,11 @@ class PostSearchPage:
         pages_visited = 0
         unsupported_result_count = 0
         stop_reason = StopReason.SAFETY_BOUND
-        async with self._browser.page() as page:
+        async with self._ui.page() as page:
             if _requires_post_facet_resolution(request.filters):
                 await self._paced.goto(page, _build_post_search_url(request, page_index=1))
                 resolved = await _resolve_post_facets(
-                    self._browser,
+                    self._ui,
                     page,
                     request.filters,
                 )

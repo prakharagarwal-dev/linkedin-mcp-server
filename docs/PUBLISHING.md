@@ -1,6 +1,6 @@
 # Publishing
 
-This project has three intentionally different identifiers:
+## Release identities
 
 | Surface | Identifier |
 | --- | --- |
@@ -11,45 +11,40 @@ This project has three intentionally different identifiers:
 | Executable | `linkedin-mcp` |
 | Container | `ghcr.io/prakharagarwal-dev/linkedin-mcp-server` |
 
-The PyPI name differs because `linkedin-mcp-server` is owned by an unrelated
+The PyPI name differs because `linkedin-mcp-server` belongs to an unrelated
 project. Do not rename the executable, import package, MCP identity, or GitHub
-repository to match the distribution.
+repository to match it.
 
-## Product description
-
-Use this exact outcome-focused description in package metadata, marketplace
-submissions, catalogs, release copy, and repository profiles:
+Use this exact public description where the field permits it:
 
 > A LinkedIn MCP server to find jobs, search people, research companies, manage
 > your network, publish and engage with posts, and read or send messages.
 
-Do not replace it with implementation, architecture, safety, or tool-count
-positioning. The only exception is the Official MCP Registry `description`,
-whose schema enforces a 100-character maximum; `server.json` keeps the tested
-compact variant required by that schema.
+`server.json` uses a tested compact description because the Official MCP
+Registry limits that field to 100 characters.
 
-## Release contract
+## Release checklist
 
-1. Update the version in `pyproject.toml`, `server.json`, `manifest.json`,
-   `Dockerfile`, `CITATION.cff`, and
-   `src/linkedin_mcp/__init__.py`, then regenerate `uv.lock`.
-2. Move the release notes from `Unreleased` to the matching version in
-   `CHANGELOG.md`.
-3. Run the complete offline verification gate documented in `README.md`.
+1. Update the version in `pyproject.toml`, `server.json`, `Dockerfile`,
+   `CITATION.cff`, and `src/linkedin_mcp/__init__.py`, then regenerate `uv.lock`.
+2. Move the notes under `Unreleased` to the matching version in `CHANGELOG.md`.
+3. Run the full verification gate from [TESTING.md](TESTING.md).
 4. Merge the focused release pull request into `main`.
 5. Publish a GitHub release from an annotated `vX.Y.Z` tag.
 
-Publishing the GitHub release triggers `.github/workflows/publish.yml` and
-`.github/workflows/publish-registries.yml`. The release workflow builds and
-validates the wheel, source distribution, and MCPB bundle; attaches them and
-their checksums to the release; publishes the Python distributions to PyPI
-using Trusted Publishing; and publishes the versioned container to GitHub
-Container Registry. The registry workflow waits for the public OCI image and
-MCPB release asset, calculates the MCPB checksum, adds that immutable download
-to its working copy of `server.json`, validates the complete record, and
-publishes it with GitHub OIDC. Official Registry versions are immutable, so the
-MCPB package appears in the first version published after this workflow change;
-an already-published record cannot be amended in place.
+Publishing a release triggers two workflows:
+
+- `.github/workflows/publish.yml` builds and attests the wheel and source
+  distribution, attaches them and checksums to the GitHub release, publishes
+  PyPI through Trusted Publishing, and publishes an attested multi-platform
+  container with an SBOM to GHCR.
+- `.github/workflows/publish-registries.yml` waits for the immutable OCI image,
+  validates `server.json`, publishes it to the Official MCP Registry with
+  GitHub OIDC, and verifies the published version.
+
+The project no longer builds or publishes MCPB or stdio packages.
+
+## PyPI trust
 
 The `pypi` GitHub environment and PyPI Trusted Publisher must remain scoped to:
 
@@ -63,26 +58,27 @@ No long-lived PyPI token belongs in GitHub secrets.
 
 ## Registry metadata
 
-`server.json` is the canonical source for Official MCP Registry metadata.
-Validate it with the current official `mcp-publisher validate` command. Its
-committed package entry points to the exact versioned GHCR image, whose
-Dockerfile carries the matching `io.modelcontextprotocol.server.name`
-ownership label. At publication time the registry workflow adds the matching
-GitHub Release MCPB URL and computed SHA-256 checksum without rewriting the
-tagged source file. Registry publication is intentionally independent from
-PyPI, so a PyPI account or outage cannot block Official Registry, GitHub
-Registry, or downstream catalog discovery. The hidden `mcp-name` marker
-remains in the packaged README so the PyPI distribution can also prove
-registry ownership in a future metadata version.
+`server.json` is the canonical Official MCP Registry record. Its one package
+points to the exact versioned GHCR image and declares:
 
-The root `manifest.json` is the canonical desktop-bundle manifest. The release
-workflow stages the runtime-only project files and icon before packing the
-`.mcpb` artifact; generated bundles are release artifacts and are not committed.
+- Docker as the runtime;
+- host-loopback publication of container port 8000;
+- `serve` as the image argument; and
+- `http://127.0.0.1:8000/mcp` as the Streamable HTTP endpoint.
 
-Third-party catalogs should point to the canonical GitHub repository, PyPI
-project, Official MCP Registry entry, GitHub release, or GHCR package. A
-catalog listing must not imply official LinkedIn affiliation or claim a hosted
-remote service.
+Validate the file with the pinned `mcp-publisher validate` command used by the
+workflow. The Dockerfile carries the matching
+`io.modelcontextprotocol.server.name` ownership label. The hidden `mcp-name`
+marker remains in the packaged README so the PyPI distribution can support
+registry ownership checks.
 
-The maintained coverage ledger, submission links, and follow-up state are in
-[`DISTRIBUTION.md`](DISTRIBUTION.md).
+`assets/icon.png` is used by the registry record through its canonical HTTPS
+URL. There is no bundle manifest.
+
+Registry publication is independent from PyPI, so a PyPI outage cannot block
+the Official Registry, GHCR, or downstream catalog discovery. Third-party
+catalogs should point to the canonical repository, PyPI project, Official MCP
+Registry entry, GitHub release, or GHCR package and must not imply official
+LinkedIn affiliation or a maintainer-operated hosted service.
+
+See [DISTRIBUTION.md](DISTRIBUTION.md) for the maintained catalog ledger.

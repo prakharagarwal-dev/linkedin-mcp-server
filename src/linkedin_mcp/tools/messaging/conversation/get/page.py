@@ -10,18 +10,7 @@ from typing import cast
 from playwright.async_api import Locator, Page
 from pydantic import HttpUrl
 
-from linkedin_mcp.browser.urls import (
-    canonical_profile_url,
-    conversation_id_from_url,
-)
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.infra.playwright import Paced
-from linkedin_mcp.infra.playwright.collections import (
-    CollectionSettleOutcome,
-    CollectionSettleResult,
-    dispatch_bubbling_wheel,
-    wait_for_collection_interaction,
-)
 from linkedin_mcp.tools.messaging.conversation.get.models import (
     ConversationCoverage,
     ConversationGetInput,
@@ -35,6 +24,15 @@ from linkedin_mcp.tools.messaging.conversation_surface import (
 from linkedin_mcp.tools.messaging.conversation_surface import (
     MessageObservation as SurfaceMessageObservation,
 )
+from linkedin_mcp.tools.messaging.urls import conversation_id_from_url
+from linkedin_mcp.tools.people.urls import canonical_profile_url
+from linkedin_mcp.ui.collections import (
+    CollectionSettleOutcome,
+    CollectionSettleResult,
+    dispatch_bubbling_wheel,
+    wait_for_collection_interaction,
+)
+from linkedin_mcp.ui.pacer import Pacer
 
 _SCROLL_PROGRESS_POLL_ATTEMPTS = 8
 
@@ -283,7 +281,7 @@ def _history_has_explicit_start(visible_text: str) -> bool:
 
 
 async def _settle_history_scroll(
-    paced: Paced,
+    paced: Pacer,
     page: Page,
     root: Locator,
 ) -> CollectionSettleResult:
@@ -340,7 +338,7 @@ async def _settle_history_scroll(
 
 class ConversationGetPage(ConversationSurface):
     async def read(self, request: ConversationGetInput) -> ConversationObservation:
-        async with self._browser.page() as page:
+        async with self._ui.page() as page:
             page, root, profile_slug, name, is_group = await self._open(
                 page,
                 profile_slug=request.profile_slug,

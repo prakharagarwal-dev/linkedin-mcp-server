@@ -8,13 +8,13 @@ from urllib.parse import urljoin
 from playwright.async_api import Locator, Page
 from pydantic import HttpUrl
 
-from linkedin_mcp.browser import BrowserManager
-from linkedin_mcp.browser.urls import profile_slug_from_url
 from linkedin_mcp.errors import ParserDriftError
+from linkedin_mcp.tools.people.urls import profile_slug_from_url
 from linkedin_mcp.tools.posts.surface import (
     post_author_from_region,
     region_for_post,
 )
+from linkedin_mcp.ui.manager import UIManager
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,9 +29,9 @@ class VisiblePostTarget:
 class PostEngagementSurface:
     """Shared visible-surface mechanics for PostEngagementSurface."""
 
-    def __init__(self, browser: BrowserManager) -> None:
-        self._browser = browser
-        self._paced = browser.paced
+    def __init__(self, ui: UIManager) -> None:
+        self._ui = ui
+        self._paced = ui
 
     async def _resolve_target(
         self,

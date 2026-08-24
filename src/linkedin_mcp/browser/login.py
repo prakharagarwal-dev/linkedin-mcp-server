@@ -12,7 +12,6 @@ from playwright.async_api import BrowserContext, Cookie, Page, Playwright, async
 from linkedin_mcp.browser.access import assert_linkedin_access
 from linkedin_mcp.browser.bootstrap import BrowserBootstrap
 from linkedin_mcp.browser.profile import BrowserProfileManager
-from linkedin_mcp.browser.urls import validate_linkedin_url
 from linkedin_mcp.config import Settings
 from linkedin_mcp.errors import (
     AuthenticationRequiredError,
@@ -20,7 +19,7 @@ from linkedin_mcp.errors import (
     LinkedInMCPError,
     RestrictionDetectedError,
 )
-from linkedin_mcp.infra.playwright import Paced
+from linkedin_mcp.ui import Pacer
 
 logger = structlog.get_logger(__name__)
 
@@ -49,14 +48,13 @@ def persistent_linkedin_session(cookies: list[Cookie]) -> bool:
 async def validate_saved_session(
     context: BrowserContext,
     settings: Settings,
-    paced: Paced,
+    paced: Pacer,
 ) -> None:
     """Prove that the persistent context has a currently usable LinkedIn session."""
 
     page = await context.new_page()
     try:
-        target = validate_linkedin_url(SESSION_VALIDATION_URL, settings.allowed_hosts)
-        await paced.goto(page, target, wait_until="domcontentloaded")
+        await paced.goto(page, SESSION_VALIDATION_URL, wait_until="domcontentloaded")
         try:
             await assert_linkedin_access(page, settings.allowed_hosts)
         except RestrictionDetectedError as error:
@@ -80,7 +78,7 @@ async def validate_saved_session(
 
 async def login_interactively(
     settings: Settings,
-    paced: Paced,
+    paced: Pacer,
     browser_bootstrap: BrowserBootstrap | None = None,
 ) -> None:
     """Open a headed profile and prove its session survives a clean reopen."""
@@ -116,7 +114,6 @@ async def login_interactively(
                 )
             is_login_surface = any(path.startswith(marker) for marker in _LOGIN_PATHS)
             if has_session_cookie and not is_login_surface:
-                validate_linkedin_url(page.url, settings.allowed_hosts)
                 await assert_linkedin_access(page, settings.allowed_hosts)
                 if not persistent_linkedin_session(cookies):
                     raise AuthenticationRequiredError(_DURABLE_LOGIN_REQUIRED_MESSAGE)
@@ -152,7 +149,7 @@ async def login_interactively(
             await playwright.stop()
 
 
-async def _enable_persistent_login(page: Page, paced: Paced) -> None:
+async def _enable_persistent_login(page: Page, paced: Pacer) -> None:
     remember_me = page.get_by_role(
         "checkbox",
         name="Keep me signed in",

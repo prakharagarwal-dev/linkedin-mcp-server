@@ -22,10 +22,9 @@ class StrictModel(BaseModel):
 class ServerStatusOutput(StrictModel):
     name: Literal["linkedin-mcp-server"] = "linkedin-mcp-server"
     version: str
-    transport: Literal["stdio", "streamable-http"]
+    transport: Literal["streamable-http"] = "streamable-http"
     operation_state: Literal["process_local"] = "process_local"
-    runtime_model: Literal["shared_local"] = "shared_local"
-    queue_depth: Annotated[int, Field(ge=0)] = 0
+    runtime_model: Literal["single_process"] = "single_process"
+    waiting_operations: Annotated[int, Field(ge=0)] = 0
     active_browser_operation: bool = False
-    active_task: str | None = None
-    accepting_calls: bool = True
+    active_operation: str | None = None
