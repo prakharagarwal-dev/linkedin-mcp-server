@@ -6,10 +6,10 @@ import asyncio
 import uuid
 from collections.abc import Awaitable
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import Annotated
 
 import structlog
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
@@ -140,12 +140,10 @@ def register(
             str,
             Field(pattern=r"^(?:activity|share|ugc-post):[0-9]{5,30}$"),
         ],
-        ctx: Context[Any, Any, Any],
         text: Annotated[str, Field(min_length=1, max_length=3_000)] | None = None,
         mentions: Annotated[tuple[PostMentionInput, ...], Field(max_length=20)] = (),
         attachment: CommentAttachment | None = None,
     ) -> ActionOutput:
-        await ctx.report_progress(0, 100, "Publishing LinkedIn comment")
         request = PostCommentInput(
             context_id=context_id,
             request_id=request_id,
@@ -160,7 +158,6 @@ def register(
                 lambda: execute(request, page),
             )
         )
-        await ctx.report_progress(100, 100, "Comment action reached a terminal outcome")
         return result
 
     del _comment_on_post

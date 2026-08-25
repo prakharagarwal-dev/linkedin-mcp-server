@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import (
-    Awaitable,
-    Callable,
-)
 from dataclasses import asdict
 
 from linkedin_mcp.cursors import (
@@ -22,8 +18,6 @@ from linkedin_mcp.tools.invitations.list.models import (
 )
 from linkedin_mcp.tools.invitations.list.page import InvitationListPage
 
-ProgressReporter = Callable[[int, int, str], Awaitable[None]]
-
 
 async def execute(
     request: InvitationListInput,
@@ -31,7 +25,6 @@ async def execute(
     page: InvitationListPage,
     cursors: CursorManager,
     account_id: str,
-    progress: ProgressReporter | None = None,
 ) -> InvitationListOutput:
     arguments = request.model_dump(
         mode="json",
@@ -48,7 +41,6 @@ async def execute(
     invitations, coverage, captured_text, source_url = await page.collect(
         request,
         result_limit=cursors.traversal_limit(state, request.page_size),
-        progress=progress,
     )
     selected = select_page(
         invitations,

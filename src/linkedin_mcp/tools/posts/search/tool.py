@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable
-from typing import Annotated, Any
+from typing import Annotated
 
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
@@ -86,7 +86,6 @@ def register(
     async def _search_posts(
         context_id: IdentifierArgument,
         request_id: IdentifierArgument,
-        ctx: Context[Any, Any, Any],
         query: (
             Annotated[
                 str,
@@ -102,7 +101,6 @@ def register(
         page_size: PageSizeArgument = 25,
         cursor: CursorArgument | None = None,
     ) -> PostSearchOutput:
-        await ctx.report_progress(0, 100, "Queued LinkedIn post search")
         request = PostSearchInput(
             context_id=context_id,
             request_id=request_id,
@@ -122,7 +120,6 @@ def register(
                 ),
             )
         )
-        await ctx.report_progress(100, 100, "LinkedIn post search complete")
         return result
 
     del _search_posts

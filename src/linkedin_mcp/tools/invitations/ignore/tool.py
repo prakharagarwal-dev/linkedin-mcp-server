@@ -6,10 +6,10 @@ import asyncio
 import uuid
 from collections.abc import Awaitable
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import Annotated
 
 import structlog
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
@@ -146,9 +146,7 @@ def register(
                 pattern=PROFILE_SLUG_PATTERN,
             ),
         ],
-        ctx: Context[Any, Any, Any],
     ) -> ActionOutput:
-        await ctx.report_progress(0, 100, "Ignoring LinkedIn connection invitation")
         request = InvitationIgnoreInput(
             context_id=context_id,
             request_id=request_id,
@@ -160,7 +158,6 @@ def register(
                 lambda: execute(request, page),
             )
         )
-        await ctx.report_progress(100, 100, "Ignore action reached a terminal outcome")
         return result
 
     del _ignore_invitation

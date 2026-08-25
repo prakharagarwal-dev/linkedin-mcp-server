@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import re
-from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Literal, cast
@@ -30,8 +29,6 @@ from linkedin_mcp.tools.invitations.list.models import (
 )
 from linkedin_mcp.ui.collections import wait_for_collection_change
 from linkedin_mcp.ui.manager import UIManager
-
-InvitationProgressReporter = Callable[[int, int, str], Awaitable[None]]
 
 _RECEIVED_ROOT_URL = "https://www.linkedin.com/mynetwork/invitation-manager/received/"
 _SENT_ROOT_URL = "https://www.linkedin.com/mynetwork/invitation-manager/sent/"
@@ -1395,7 +1392,6 @@ class InvitationListPage:
         request: InvitationListInput,
         *,
         result_limit: int | None = None,
-        progress: InvitationProgressReporter | None = None,
     ) -> tuple[tuple[InvitationSummary, ...], InvitationListCoverage, str, str]:
         limit = request.page_size if result_limit is None else result_limit
         if limit < 1:
@@ -1408,7 +1404,6 @@ class InvitationListPage:
                     navigation_url=navigation_url,
                     attempt_index=attempt_index,
                     result_limit=limit,
-                    progress=progress,
                 )
             except _CollectionChanged:
                 if attempt_index == 0:
@@ -1425,7 +1420,6 @@ class InvitationListPage:
         navigation_url: str,
         attempt_index: int,
         result_limit: int,
-        progress: InvitationProgressReporter | None,
     ) -> tuple[tuple[InvitationSummary, ...], InvitationListCoverage, str, str]:
         selected = request.resolved_filter
         views = (
@@ -1457,14 +1451,6 @@ class InvitationListPage:
                 )
                 view_source_urls[invitation_filter] = page.url
             view_membership_count = sum(inventory.count for inventory in inventories.values())
-            if progress is not None:
-                await progress(
-                    0,
-                    view_membership_count,
-                    (f"Selected invitation views advertise {view_membership_count} memberships"),
-                )
-
-            progress_offset = 0
             for view_index, invitation_filter in enumerate(views):
                 inventory = await _select_visible_view(
                     page,
@@ -1495,9 +1481,6 @@ class InvitationListPage:
                     source_url=page.url,
                     prior_invitation_refs=frozenset(captured),
                     result_limit=result_limit,
-                    progress=progress,
-                    progress_offset=progress_offset,
-                    progress_total=view_membership_count,
                     max_scroll_rounds=self._max_scroll_rounds - scroll_rounds,
                 )
                 for invitation_ref, item in view_items.items():
@@ -1511,7 +1494,6 @@ class InvitationListPage:
                 recommendations.update(view_recommendations)
                 observed_view_memberships += len(view_items)
                 scroll_rounds += view_rounds
-                progress_offset += expected.count
                 if view_stop_reason is not StopReason.VISIBLE_PAGE_COMPLETE:
                     stop_reason = view_stop_reason
                     break
@@ -1599,9 +1581,6 @@ class InvitationListPage:
         source_url: str,
         prior_invitation_refs: frozenset[str],
         result_limit: int,
-        progress: InvitationProgressReporter | None,
-        progress_offset: int,
-        progress_total: int,
         max_scroll_rounds: int,
     ) -> tuple[dict[str, _CapturedInvitation], set[str], int, StopReason]:
         parsed: dict[str, _CapturedInvitation] = {}
@@ -1644,12 +1623,6 @@ class InvitationListPage:
             if len(parsed) > inventory.count:
                 raise ParserDriftError(
                     "Parsed invitations exceed LinkedIn's advertised selected-view count."
-                )
-            if progress is not None:
-                await progress(
-                    progress_offset + len(parsed),
-                    progress_total,
-                    (f"Parsed {progress_offset + len(parsed)} of {progress_total} invitations"),
                 )
             observed_refs = prior_invitation_refs.union(parsed)
             if len(observed_refs) >= result_limit:

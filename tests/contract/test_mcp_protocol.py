@@ -646,9 +646,8 @@ class ProtocolNetwork:
         request: InvitationListInput | ConnectionsListInput | ConversationSearchInput,
         *,
         result_limit: int | None = None,
-        progress: object | None = None,
     ) -> tuple[tuple[object, ...], object, str, str]:
-        del result_limit, progress
+        del result_limit
         captured_at = datetime.now(UTC)
         if isinstance(request, InvitationListInput):
             entity = InvitationEntity(

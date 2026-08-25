@@ -915,9 +915,7 @@ class FakeInvitationList:
         request: InvitationListInput,
         *,
         result_limit: int | None = None,
-        progress: object | None = None,
     ) -> tuple[tuple[InvitationSummary, ...], InvitationListCoverage, str, str]:
-        del progress
         self.calls += 1
         limit = request.page_size if result_limit is None else result_limit
         now = datetime.now(UTC)
@@ -1002,9 +1000,7 @@ class PaginatedFakeInvitationList(FakeInvitationList):
         request: InvitationListInput,
         *,
         result_limit: int | None = None,
-        progress: object | None = None,
     ) -> tuple[tuple[InvitationSummary, ...], InvitationListCoverage, str, str]:
-        del progress
         self.calls += 1
         limit = request.page_size if result_limit is None else result_limit
         self.result_limits.append(limit)
@@ -1095,9 +1091,7 @@ class ImplicitEmptyInvitationList(FakeInvitationList):
         request: InvitationListInput,
         *,
         result_limit: int | None = None,
-        progress: object | None = None,
     ) -> tuple[tuple[InvitationSummary, ...], InvitationListCoverage, str, str]:
-        del progress
         self.calls += 1
         assert request.direction is InvitationDirection.SENT
         assert request.resolved_filter is InvitationFilter.PEOPLE

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable
-from typing import Annotated, Any
+from typing import Annotated
 
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
@@ -87,18 +87,11 @@ def register(
     async def _list_invitations(
         context_id: IdentifierArgument,
         request_id: IdentifierArgument,
-        ctx: Context[Any, Any, Any],
         direction: InvitationDirection = InvitationDirection.RECEIVED,
         invitation_filter: InvitationFilter | None = None,
         page_size: PageSizeArgument = 25,
         cursor: CursorArgument | None = None,
     ) -> InvitationListOutput:
-        await ctx.report_progress(0, 100, "Queued LinkedIn invitation read")
-
-        async def report_progress(current: int, total: int, message: str) -> None:
-            ratio = 1.0 if total == 0 else min(1.0, current / total)
-            await ctx.report_progress(5 + round(90 * ratio), 100, message)
-
         request = InvitationListInput(
             context_id=context_id,
             request_id=request_id,
@@ -115,11 +108,9 @@ def register(
                     page=page,
                     cursors=cursors,
                     account_id=account_id,
-                    progress=report_progress,
                 ),
             )
         )
-        await ctx.report_progress(100, 100, "LinkedIn invitation read complete")
         return result
 
     del _list_invitations

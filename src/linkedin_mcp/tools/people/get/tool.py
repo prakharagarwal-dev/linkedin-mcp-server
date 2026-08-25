@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable
-from typing import Annotated, Any
+from typing import Annotated
 
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
@@ -78,7 +78,6 @@ def register(
                 description="Public LinkedIn profile slug from linkedin.com/in/{profile_slug}.",
             ),
         ],
-        ctx: Context[Any, Any, Any],
         sections: Annotated[
             tuple[PersonProfileSectionSelector, ...],
             Field(
@@ -91,7 +90,6 @@ def register(
             ),
         ] = (PersonProfileSectionSelector.ALL,),
     ) -> PeopleGetOutput:
-        await ctx.report_progress(0, 100, "Validating LinkedIn member target")
         request = PeopleGetInput(
             context_id=context_id,
             request_id=request_id,
@@ -104,7 +102,6 @@ def register(
                 lambda: execute(request, page),
             )
         )
-        await ctx.report_progress(100, 100, "LinkedIn member profile complete")
         return result
 
     del _get_person

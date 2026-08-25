@@ -6,10 +6,10 @@ import asyncio
 import uuid
 from collections.abc import Awaitable
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import Annotated
 
 import structlog
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
@@ -147,7 +147,6 @@ def register(
         context_id: IdentifierArgument,
         request_id: IdentifierArgument,
         content: PostCreateContent,
-        ctx: Context[Any, Any, Any],
         audience: PostAudience = PostAudience.ANYONE,
         group_target: PostGroupTarget | None = None,
         comment_control: PostCommentControl = PostCommentControl.ANYONE,
@@ -158,7 +157,6 @@ def register(
         ] = (),
         scheduled_at: datetime | None = None,
     ) -> ActionOutput:
-        await ctx.report_progress(0, 100, "Creating personal LinkedIn post")
         request = PostCreateInput(
             context_id=context_id,
             request_id=request_id,
@@ -176,7 +174,6 @@ def register(
                 lambda: execute(request, page),
             )
         )
-        await ctx.report_progress(100, 100, "Personal-post action reached a terminal outcome")
         return result
 
     del _create_post

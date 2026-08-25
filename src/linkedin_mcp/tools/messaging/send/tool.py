@@ -6,10 +6,10 @@ import asyncio
 import uuid
 from collections.abc import Awaitable
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import Annotated
 
 import structlog
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
@@ -141,7 +141,6 @@ def register(
     async def _send_message(
         context_id: IdentifierArgument,
         request_id: IdentifierArgument,
-        ctx: Context[Any, Any, Any],
         message: Annotated[str, Field(min_length=1, max_length=8_000)] | None = None,
         attachments: Annotated[tuple[MessageFileInput, ...], Field(max_length=20)] = (),
         gif: MessageGifInput | None = None,
@@ -170,7 +169,6 @@ def register(
             Annotated[str, Field(pattern=r"^conversation:[0-9a-f]{24}$")] | None
         ) = None,
     ) -> ActionOutput:
-        await ctx.report_progress(0, 100, "Sending LinkedIn message")
         request = MessageSendInput(
             context_id=context_id,
             request_id=request_id,
@@ -188,7 +186,6 @@ def register(
                 lambda: execute(request, page),
             )
         )
-        await ctx.report_progress(100, 100, "Message action reached a terminal outcome")
         return result
 
     del _send_message

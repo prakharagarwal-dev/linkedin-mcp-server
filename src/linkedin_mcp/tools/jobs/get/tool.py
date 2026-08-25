@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable
-from typing import Annotated, Any
+from typing import Annotated
 
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
@@ -64,9 +64,7 @@ def register(
         context_id: IdentifierArgument,
         request_id: IdentifierArgument,
         job_id: Annotated[str, Field(pattern=r"^[0-9]{5,30}$")],
-        ctx: Context[Any, Any, Any],
     ) -> JobDetailOutput:
-        await ctx.report_progress(0, 100, "Validating LinkedIn job target")
         request = JobDetailInput(
             context_id=context_id,
             request_id=request_id,
@@ -78,7 +76,6 @@ def register(
                 lambda: execute(request, page),
             )
         )
-        await ctx.report_progress(100, 100, "LinkedIn job detail complete")
         return result
 
     del _get_job

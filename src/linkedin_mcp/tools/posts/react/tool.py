@@ -6,10 +6,10 @@ import asyncio
 import uuid
 from collections.abc import Awaitable
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import Annotated
 
 import structlog
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
@@ -146,9 +146,7 @@ def register(
             Field(pattern=r"^(?:activity|share|ugc-post):[0-9]{5,30}$"),
         ],
         desired_reaction: ReactionState,
-        ctx: Context[Any, Any, Any],
     ) -> ActionOutput:
-        await ctx.report_progress(0, 100, "Applying LinkedIn post reaction")
         request = PostReactionInput(
             context_id=context_id,
             request_id=request_id,
@@ -161,7 +159,6 @@ def register(
                 lambda: execute(request, page),
             )
         )
-        await ctx.report_progress(100, 100, "Reaction action reached a terminal outcome")
         return result
 
     del _react_to_post

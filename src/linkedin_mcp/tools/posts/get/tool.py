@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable
-from typing import Annotated, Any
+from typing import Annotated
 
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
@@ -73,9 +73,7 @@ def register(
                 description="Stable post reference returned by LinkedIn post search.",
             ),
         ],
-        ctx: Context[Any, Any, Any],
     ) -> PostGetOutput:
-        await ctx.report_progress(0, 100, "Validating LinkedIn post target")
         request = PostGetInput(
             context_id=context_id,
             request_id=request_id,
@@ -87,7 +85,6 @@ def register(
                 lambda: execute(request, page),
             )
         )
-        await ctx.report_progress(100, 100, "LinkedIn post detail complete")
         return result
 
     del _get_post

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable
-from typing import Annotated, Any
+from typing import Annotated
 
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
@@ -87,13 +87,11 @@ def register(
             str,
             Field(pattern=r"^(?:activity|share|ugc-post):[0-9]{5,30}$"),
         ],
-        ctx: Context[Any, Any, Any],
         sort_by: CommentSort = CommentSort.MOST_RELEVANT,
         page_size: PageSizeArgument = 25,
         cursor: CursorArgument | None = None,
         max_replies_per_comment: Annotated[int, Field(ge=0, le=100)] = 25,
     ) -> PostCommentsListOutput:
-        await ctx.report_progress(0, 100, "Opening visible LinkedIn post discussion")
         request = PostCommentsListInput(
             context_id=context_id,
             request_id=request_id,
@@ -114,7 +112,6 @@ def register(
                 ),
             )
         )
-        await ctx.report_progress(100, 100, "LinkedIn post discussion complete")
         return result
 
     del _list_post_comments

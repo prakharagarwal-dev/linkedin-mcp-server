@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable
-from typing import Annotated, Any
+from typing import Annotated
 
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
@@ -72,7 +72,6 @@ def register(
     async def _get_conversation(
         context_id: IdentifierArgument,
         request_id: IdentifierArgument,
-        ctx: Context[Any, Any, Any],
         profile_slug: (
             Annotated[
                 str,
@@ -96,7 +95,6 @@ def register(
         ) = None,
         max_messages: Annotated[int, Field(ge=1, le=100)] = 50,
     ) -> ConversationGetOutput:
-        await ctx.report_progress(0, 100, "Opening visible LinkedIn conversation")
         request = ConversationGetInput(
             context_id=context_id,
             request_id=request_id,
@@ -111,7 +109,6 @@ def register(
                 lambda: execute(request, page),
             )
         )
-        await ctx.report_progress(100, 100, "LinkedIn conversation read complete")
         return result
 
     del _get_conversation
