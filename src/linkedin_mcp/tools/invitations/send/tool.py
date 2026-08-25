@@ -6,16 +6,16 @@ import asyncio
 import uuid
 from collections.abc import Awaitable
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import Annotated
 
 import structlog
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from linkedin_mcp.errors import InternalServerError, LinkedInMCPError
-from linkedin_mcp.infra.queue import Scheduler, Task
+from linkedin_mcp.operations import OperationManager
 from linkedin_mcp.tools.invitations.send.evidence import source_from_action_execution
 from linkedin_mcp.tools.invitations.send.models import (
     PROFILE_SLUG_PATTERN,
@@ -109,7 +109,7 @@ async def execute(
 
 def register(
     mcp: FastMCP[None],
-    scheduler: Scheduler,
+    operations: OperationManager,
     page: SendInvitationPage,
 ) -> None:
     @mcp.tool(
@@ -138,24 +138,20 @@ def register(
                 pattern=PROFILE_SLUG_PATTERN,
             ),
         ],
-        ctx: Context[Any, Any, Any],
         note: Annotated[str, Field(min_length=1, max_length=200)] | None = None,
     ) -> ActionOutput:
-        await ctx.report_progress(0, 100, "Sending LinkedIn connection invitation")
         request = InvitationSendInput(
             context_id=context_id,
             request_id=request_id,
             profile_slug=profile_slug,
             note=note,
         )
-        task = Task(
-            name="linkedin.invitations.send",
-            execute=lambda: execute(request, page),
-            interruptible=False,
+        result = await tool_result(
+            operations.run_write(
+                "linkedin.invitations.send",
+                lambda: execute(request, page),
+            )
         )
-        await scheduler.schedule(task)
-        result = await tool_result(task.result())
-        await ctx.report_progress(100, 100, "Invitation action reached a terminal outcome")
         return result
 
     del _send_invitation

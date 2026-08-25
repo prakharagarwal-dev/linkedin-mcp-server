@@ -6,16 +6,16 @@ import asyncio
 import uuid
 from collections.abc import Awaitable
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import Annotated
 
 import structlog
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from linkedin_mcp.errors import InternalServerError, LinkedInMCPError
-from linkedin_mcp.infra.queue import Scheduler, Task
+from linkedin_mcp.operations import OperationManager
 from linkedin_mcp.tools.messaging.send.evidence import source_from_action_execution
 from linkedin_mcp.tools.messaging.send.models import (
     PROFILE_SLUG_PATTERN,
@@ -116,7 +116,7 @@ async def execute(
 
 def register(
     mcp: FastMCP[None],
-    scheduler: Scheduler,
+    operations: OperationManager,
     page: MessageSendPage,
 ) -> None:
     @mcp.tool(
@@ -141,7 +141,6 @@ def register(
     async def _send_message(
         context_id: IdentifierArgument,
         request_id: IdentifierArgument,
-        ctx: Context[Any, Any, Any],
         message: Annotated[str, Field(min_length=1, max_length=8_000)] | None = None,
         attachments: Annotated[tuple[MessageFileInput, ...], Field(max_length=20)] = (),
         gif: MessageGifInput | None = None,
@@ -170,7 +169,6 @@ def register(
             Annotated[str, Field(pattern=r"^conversation:[0-9a-f]{24}$")] | None
         ) = None,
     ) -> ActionOutput:
-        await ctx.report_progress(0, 100, "Sending LinkedIn message")
         request = MessageSendInput(
             context_id=context_id,
             request_id=request_id,
@@ -182,14 +180,12 @@ def register(
             gif=gif,
             reply_to_message_ref=reply_to_message_ref,
         )
-        task = Task(
-            name="linkedin.messaging.send",
-            execute=lambda: execute(request, page),
-            interruptible=False,
+        result = await tool_result(
+            operations.run_write(
+                "linkedin.messaging.send",
+                lambda: execute(request, page),
+            )
         )
-        await scheduler.schedule(task)
-        result = await tool_result(task.result())
-        await ctx.report_progress(100, 100, "Message action reached a terminal outcome")
         return result
 
     del _send_message

@@ -10,7 +10,6 @@ from linkedin_mcp.browser import (
     BrowserSetupState,
 )
 from linkedin_mcp.config import Settings
-from linkedin_mcp.host import inspect_account_runtime
 
 
 def configure(command: argparse.ArgumentParser) -> None:
@@ -21,7 +20,6 @@ async def execute(settings: Settings) -> int:
     bootstrap = BrowserBootstrap(settings)
     browser_state = bootstrap.inspect_state()
     profile = BrowserProfileManager(settings).inspect()
-    runtime = inspect_account_runtime(settings.runtime_lock_path)
     report: dict[str, object] = {
         "automatic_browser_install": settings.browser_auto_install,
         "browser_setup": browser_state.value,
@@ -30,10 +28,7 @@ async def execute(settings: Settings) -> int:
         "profile_initialized": profile.initialized,
         "profile_path": str(profile.path),
         "profile_present": profile.initialized,
-        "runtime_command": runtime.owner.command if runtime.owner else None,
-        "runtime_owner_pid": runtime.owner.pid if runtime.owner else None,
-        "runtime_running": runtime.running,
-        "transport": settings.transport,
+        "transport": "streamable-http",
     }
     ready = browser_state in {
         BrowserSetupState.DISABLED,

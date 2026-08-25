@@ -6,16 +6,16 @@ import asyncio
 import uuid
 from collections.abc import Awaitable
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import Annotated
 
 import structlog
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from linkedin_mcp.errors import InternalServerError, LinkedInMCPError
-from linkedin_mcp.infra.queue import Scheduler, Task
+from linkedin_mcp.operations import OperationManager
 from linkedin_mcp.tools.posts.react.evidence import source_from_action_execution
 from linkedin_mcp.tools.posts.react.models import (
     ActionCommand,
@@ -120,7 +120,7 @@ async def execute(
 
 def register(
     mcp: FastMCP[None],
-    scheduler: Scheduler,
+    operations: OperationManager,
     page: PostReactionPage,
 ) -> None:
     @mcp.tool(
@@ -146,23 +146,19 @@ def register(
             Field(pattern=r"^(?:activity|share|ugc-post):[0-9]{5,30}$"),
         ],
         desired_reaction: ReactionState,
-        ctx: Context[Any, Any, Any],
     ) -> ActionOutput:
-        await ctx.report_progress(0, 100, "Applying LinkedIn post reaction")
         request = PostReactionInput(
             context_id=context_id,
             request_id=request_id,
             post_ref=post_ref,
             desired_reaction=desired_reaction,
         )
-        task = Task(
-            name="linkedin.posts.react",
-            execute=lambda: execute(request, page),
-            interruptible=False,
+        result = await tool_result(
+            operations.run_write(
+                "linkedin.posts.react",
+                lambda: execute(request, page),
+            )
         )
-        await scheduler.schedule(task)
-        result = await tool_result(task.result())
-        await ctx.report_progress(100, 100, "Reaction action reached a terminal outcome")
         return result
 
     del _react_to_post

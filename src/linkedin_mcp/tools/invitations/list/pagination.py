@@ -2,14 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import (
-    Awaitable,
-    Callable,
-)
 from dataclasses import asdict
 
-from linkedin_mcp.infra.cursor import (
-    CursorStore,
+from linkedin_mcp.cursors import (
+    CursorManager,
     cursor_binding,
     select_page,
 )
@@ -22,16 +18,13 @@ from linkedin_mcp.tools.invitations.list.models import (
 )
 from linkedin_mcp.tools.invitations.list.page import InvitationListPage
 
-ProgressReporter = Callable[[int, int, str], Awaitable[None]]
-
 
 async def execute(
     request: InvitationListInput,
     *,
     page: InvitationListPage,
-    cursor_store: CursorStore,
+    cursors: CursorManager,
     account_id: str,
-    progress: ProgressReporter | None = None,
 ) -> InvitationListOutput:
     arguments = request.model_dump(
         mode="json",
@@ -39,7 +32,7 @@ async def execute(
     )
     arguments["invitation_filter"] = request.resolved_filter.value
     operation = "linkedin.invitations.list"
-    state = await cursor_store.start(
+    state = cursors.start(
         account_id=account_id,
         operation=operation,
         binding=cursor_binding(operation, arguments),
@@ -47,14 +40,13 @@ async def execute(
     )
     invitations, coverage, captured_text, source_url = await page.collect(
         request,
-        result_limit=cursor_store.traversal_limit(state, request.page_size),
-        progress=progress,
+        result_limit=cursors.traversal_limit(state, request.page_size),
     )
     selected = select_page(
         invitations,
         key=lambda invitation: invitation.invitation_ref,
         seen_keys=state.seen_keys,
-        page_size=cursor_store.page_capacity(state, request.page_size),
+        page_size=cursors.page_capacity(state, request.page_size),
     )
     provider_has_more = selected.has_lookahead or coverage.stop_reason in {
         StopReason.RESULT_LIMIT,
@@ -80,7 +72,7 @@ async def execute(
         invitations=selected.items,
         coverage=page_coverage,
     )
-    cursor_page = await cursor_store.finish(
+    cursor_page = cursors.finish(
         state,
         page_size=request.page_size,
         returned_keys=selected.keys,

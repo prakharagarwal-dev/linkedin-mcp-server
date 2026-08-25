@@ -13,16 +13,7 @@ from urllib.parse import urljoin
 from playwright.async_api import Page
 from pydantic import HttpUrl
 
-from linkedin_mcp.browser import BrowserManager
-from linkedin_mcp.browser.urls import canonical_profile_url, profile_slug_from_url
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.infra.playwright import Paced
-from linkedin_mcp.infra.playwright.collections import (
-    CollectionSettleOutcome,
-    CollectionSettleResult,
-    dispatch_bubbling_wheel,
-    wait_for_collection_interaction,
-)
 from linkedin_mcp.tools.connections.list.models import (
     ConnectionsListCoverage,
     ConnectionsListInput,
@@ -30,6 +21,15 @@ from linkedin_mcp.tools.connections.list.models import (
     ConnectionSummary,
     StopReason,
 )
+from linkedin_mcp.tools.people.urls import canonical_profile_url, profile_slug_from_url
+from linkedin_mcp.ui.collections import (
+    CollectionSettleOutcome,
+    CollectionSettleResult,
+    dispatch_bubbling_wheel,
+    wait_for_collection_interaction,
+)
+from linkedin_mcp.ui.manager import UIManager
+from linkedin_mcp.ui.pacer import Pacer
 
 _CONNECTIONS_URL = "https://www.linkedin.com/mynetwork/invite-connect/connections/"
 
@@ -506,7 +506,7 @@ class _MemberListTerminalTracker:
 
 
 async def _settle_scroll(
-    paced: Paced,
+    paced: Pacer,
     page: Page,
     *,
     allow_explicit_end: bool = True,
@@ -547,9 +547,9 @@ class ConnectionsListPage:
         ConnectionsSortBy.LAST_NAME: re.compile(r"^last name$", re.I),
     }
 
-    def __init__(self, browser: BrowserManager, *, max_scroll_rounds: int) -> None:
-        self._browser = browser
-        self._paced = browser.paced
+    def __init__(self, ui: UIManager, *, max_scroll_rounds: int) -> None:
+        self._ui = ui
+        self._paced = ui
         self._max_scroll_rounds = max_scroll_rounds
 
     async def collect(
@@ -566,7 +566,7 @@ class ConnectionsListPage:
         stop_reason = StopReason.SAFETY_BOUND
         rounds_visited = 0
         terminal_tracker = _MemberListTerminalTracker()
-        async with self._browser.page() as page:
+        async with self._ui.page() as page:
             await self._paced.goto(page, _CONNECTIONS_URL)
             await page.locator("main").first.wait_for(state="visible")
             if request.sort_by is not ConnectionsSortBy.RECENTLY_ADDED:

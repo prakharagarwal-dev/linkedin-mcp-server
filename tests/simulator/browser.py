@@ -18,7 +18,6 @@ from playwright.async_api import (
 from linkedin_mcp.browser import AuthenticationState
 from linkedin_mcp.browser.access import assert_linkedin_access
 from linkedin_mcp.browser.bootstrap import BrowserSetupState
-from linkedin_mcp.browser.urls import validate_linkedin_url
 from linkedin_mcp.errors import (
     AuthenticationRequiredError,
     BrowserUnavailableError,
@@ -87,19 +86,17 @@ class SimulatorBrowser:
             await page.close()
 
     async def navigate(self, page: Page, url: str) -> None:
-        target = validate_linkedin_url(url, ("www.linkedin.com", "linkedin.com"))
-        self._raise_planned_fault(self.scenario.surface_for_url(target))
+        self._raise_planned_fault(self.scenario.surface_for_url(url))
         self._raise_planned_fault("navigate")
-        self.navigations.append(target)
-        await page.goto(target, wait_until="domcontentloaded")
+        self.navigations.append(url)
+        await page.goto(url, wait_until="domcontentloaded")
         await self.assert_safe(page)
 
     async def navigate_via_visible_control(self, page: Page, control: Locator) -> str:
         await control.click()
         await page.wait_for_load_state("domcontentloaded")
-        target = validate_linkedin_url(page.url, ("www.linkedin.com", "linkedin.com"))
         await self.assert_safe(page)
-        return target
+        return page.url
 
     async def click_visible_control(self, page: Page, control: Locator) -> None:
         self._raise_planned_fault("click")

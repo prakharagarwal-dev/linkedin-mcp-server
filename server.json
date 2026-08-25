@@ -3,6 +3,13 @@
   "name": "io.github.prakharagarwal-dev/linkedin-mcp-server",
   "title": "LinkedIn MCP Server",
   "description": "Find LinkedIn jobs and people, research companies, manage network, posts, and messages with MCP.",
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/prakharagarwal-dev/linkedin-mcp-server/main/assets/icon.png",
+      "mimeType": "image/png",
+      "sizes": ["400x400"]
+    }
+  ],
   "repository": {
     "url": "https://github.com/prakharagarwal-dev/linkedin-mcp-server",
     "source": "github"
@@ -14,20 +21,21 @@
       "registryType": "oci",
       "identifier": "ghcr.io/prakharagarwal-dev/linkedin-mcp-server:0.16.0",
       "transport": {
-        "type": "stdio"
+        "type": "streamable-http",
+        "url": "http://127.0.0.1:8000/mcp"
       },
+      "runtimeHint": "docker",
+      "runtimeArguments": [
+        {
+          "type": "named",
+          "name": "--publish",
+          "value": "127.0.0.1:8000:8000"
+        }
+      ],
       "packageArguments": [
         {
           "type": "positional",
           "value": "serve"
-        },
-        {
-          "type": "positional",
-          "value": "--transport"
-        },
-        {
-          "type": "positional",
-          "value": "stdio"
         }
       ]
     }

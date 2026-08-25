@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable
-from typing import Annotated, Any
+from typing import Annotated
 
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from linkedin_mcp.cursors import CursorManager
 from linkedin_mcp.errors import InternalServerError, LinkedInMCPError
-from linkedin_mcp.infra.cursor import CursorStore
-from linkedin_mcp.infra.queue import Scheduler, Task
+from linkedin_mcp.operations import OperationManager
 from linkedin_mcp.tools.connections.list.models import (
     ConnectionsListInput,
     ConnectionsListOutput,
@@ -60,9 +60,9 @@ async def tool_result[ResultT](awaitable: Awaitable[ResultT]) -> ResultT:
 
 def register(
     mcp: FastMCP[None],
-    scheduler: Scheduler,
+    operations: OperationManager,
     page: ConnectionsListPage,
-    cursor_store: CursorStore,
+    cursors: CursorManager,
     account_id: str,
 ) -> None:
     @mcp.tool(
@@ -82,12 +82,10 @@ def register(
     async def _list_connections(
         context_id: IdentifierArgument,
         request_id: IdentifierArgument,
-        ctx: Context[Any, Any, Any],
         sort_by: ConnectionsSortBy = ConnectionsSortBy.RECENTLY_ADDED,
         page_size: PageSizeArgument = 25,
         cursor: CursorArgument | None = None,
     ) -> ConnectionsListOutput:
-        await ctx.report_progress(0, 100, "Queued LinkedIn connections read")
         request = ConnectionsListInput(
             context_id=context_id,
             request_id=request_id,
@@ -95,18 +93,17 @@ def register(
             page_size=page_size,
             cursor=cursor,
         )
-        task = Task(
-            name="linkedin.connections.list",
-            execute=lambda: execute(
-                request,
-                page=page,
-                cursor_store=cursor_store,
-                account_id=account_id,
-            ),
+        result = await tool_result(
+            operations.run(
+                "linkedin.connections.list",
+                lambda: execute(
+                    request,
+                    page=page,
+                    cursors=cursors,
+                    account_id=account_id,
+                ),
+            )
         )
-        await scheduler.schedule(task)
-        result = await tool_result(task.result())
-        await ctx.report_progress(100, 100, "LinkedIn connections read complete")
         return result
 
     del _list_connections

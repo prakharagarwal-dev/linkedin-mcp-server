@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable
-from typing import Annotated, Any
+from typing import Annotated
 
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from linkedin_mcp.errors import InternalServerError, LinkedInMCPError
-from linkedin_mcp.infra.queue import Scheduler, Task
+from linkedin_mcp.operations import OperationManager
 from linkedin_mcp.tools.jobs.get.evidence import source_from_job_detail
 from linkedin_mcp.tools.jobs.get.models import JobDetailInput, JobDetailOutput
 from linkedin_mcp.tools.jobs.get.page import JobDetailPage
@@ -42,7 +42,7 @@ async def execute(request: JobDetailInput, page: JobDetailPage) -> JobDetailOutp
 
 def register(
     mcp: FastMCP[None],
-    scheduler: Scheduler,
+    operations: OperationManager,
     page: JobDetailPage,
 ) -> None:
     @mcp.tool(
@@ -64,21 +64,18 @@ def register(
         context_id: IdentifierArgument,
         request_id: IdentifierArgument,
         job_id: Annotated[str, Field(pattern=r"^[0-9]{5,30}$")],
-        ctx: Context[Any, Any, Any],
     ) -> JobDetailOutput:
-        await ctx.report_progress(0, 100, "Validating LinkedIn job target")
         request = JobDetailInput(
             context_id=context_id,
             request_id=request_id,
             job_id=job_id,
         )
-        task = Task(
-            name="linkedin.jobs.get",
-            execute=lambda: execute(request, page),
+        result = await tool_result(
+            operations.run(
+                "linkedin.jobs.get",
+                lambda: execute(request, page),
+            )
         )
-        await scheduler.schedule(task)
-        result = await tool_result(task.result())
-        await ctx.report_progress(100, 100, "LinkedIn job detail complete")
         return result
 
     del _get_job

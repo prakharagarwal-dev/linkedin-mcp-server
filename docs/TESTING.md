@@ -12,8 +12,8 @@ not mean the current LinkedIn site was contacted during CI.
 
 | Layer | What it verifies |
 | --- | --- |
-| `tests/unit/` | Models, identifiers, configuration, browser lifecycle, host restrictions, pacing, FIFO scheduling, tasks, cursors, tool execution, and Playwright page objects |
-| `tests/contract/` | Tool discovery, schemas, annotations, fresh execution, stdio/HTTP behavior, shared-runtime attachment, client isolation, and direct action conformance |
+| `tests/unit/` | Models, identifiers, Settings, browser lifecycle, pacing, operation-lock serialization, cursors, tool execution, and Playwright page objects |
+| `tests/contract/` | Tool discovery, schemas, annotations, fresh execution, process-local serialization, and direct action conformance |
 | `tests/simulator/` | Stateful LinkedIn-like data, synthetic HTML routing, controlled failures, and mutations |
 | `tests/workflows/` | Multi-tool job, referral, connection, messaging, publishing, and engagement journeys |
 | `tests/package/` | Wheel contents, CLI entry point, forbidden dependencies, and secret/profile exclusion |
@@ -25,7 +25,7 @@ official MCP client                 Playwright Chromium
         │                                   │
 production FastMCP tools             production page objects
         │                                   │
-Scheduler / Worker                   synthetic LinkedIn HTML
+OperationManager lock                synthetic LinkedIn HTML
         │                                   │
 stateful typed providers             accessible DOM assertions
 ```
@@ -79,7 +79,7 @@ direct Playwright upload behavior.
 ## Network isolation
 
 `tests/conftest.py` rejects non-loopback Python socket connections. Loopback
-and Unix sockets remain available for Playwright and local MCP transport tests.
+and Unix sockets remain available for Playwright and MCP protocol tests.
 The semantic browser aborts any document route not registered by its scenario.
 
 ## Run the suite

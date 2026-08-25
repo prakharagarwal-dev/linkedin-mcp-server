@@ -37,7 +37,7 @@ from linkedin_mcp.tools.messaging.send.models import (
     MessageSendPayload,
 )
 from linkedin_mcp.tools.messaging.send.page import MessageSendPage
-from tests.support.playwright import adapt_browser, empty_browser
+from tests.support.playwright import adapt_browser, empty_ui
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 MESSAGING_FIXTURES = FIXTURES / "messaging" / "latest"
@@ -340,7 +340,7 @@ async def test_inbox_and_conversation_fixtures_extract_both_message_directions()
                 name="Conversation with Jane Doe",
             )
             observation = await ConversationGetPage(
-                empty_browser(Settings(browser_action_delay_seconds=0)),
+                empty_ui(Settings(browser_action_delay_seconds=0)),
                 max_history_rounds=1,
             )._extract(  # pyright: ignore[reportPrivateUsage]
                 page,
@@ -404,7 +404,7 @@ async def test_current_thread_sender_names_resolve_outgoing_grouped_messages() -
         try:
             await page.set_content(html)
             observation = await ConversationGetPage(
-                empty_browser(Settings(browser_action_delay_seconds=0)),
+                empty_ui(Settings(browser_action_delay_seconds=0)),
                 max_history_rounds=1,
             )._extract(  # pyright: ignore[reportPrivateUsage]
                 page,
@@ -434,7 +434,7 @@ async def test_conversation_history_collects_virtualized_older_messages() -> Non
         try:
             await page.set_content(html)
             observation = await ConversationGetPage(
-                empty_browser(Settings(browser_action_delay_seconds=0)),
+                empty_ui(Settings(browser_action_delay_seconds=0)),
                 max_history_rounds=8,
             )._extract(  # pyright: ignore[reportPrivateUsage]
                 page,
@@ -1746,7 +1746,7 @@ async def test_composer_fallbacks_and_message_extraction_remain_bounded() -> Non
                 == "draft"
             )
             observation = await ConversationGetPage(
-                empty_browser(Settings(browser_action_delay_seconds=0)),
+                empty_ui(Settings(browser_action_delay_seconds=0)),
                 max_history_rounds=1,
             )._extract(  # pyright: ignore[reportPrivateUsage]
                 page,

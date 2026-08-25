@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable
-from typing import Annotated, Any
+from typing import Annotated
 
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from linkedin_mcp.errors import InternalServerError, LinkedInMCPError
-from linkedin_mcp.infra.queue import Scheduler, Task
+from linkedin_mcp.operations import OperationManager
 from linkedin_mcp.tools.companies.get.evidence import sources_from_company_profile
 from linkedin_mcp.tools.companies.get.models import CompanyGetInput, CompanyGetOutput
 from linkedin_mcp.tools.companies.get.page import CompanyProfilePage
@@ -42,7 +42,7 @@ async def execute(request: CompanyGetInput, page: CompanyProfilePage) -> Company
 
 def register(
     mcp: FastMCP[None],
-    scheduler: Scheduler,
+    operations: OperationManager,
     page: CompanyProfilePage,
 ) -> None:
     @mcp.tool(
@@ -73,21 +73,18 @@ def register(
                 description="Public LinkedIn company slug from /company/{company_slug}/.",
             ),
         ],
-        ctx: Context[Any, Any, Any],
     ) -> CompanyGetOutput:
-        await ctx.report_progress(0, 100, "Validating LinkedIn company target")
         request = CompanyGetInput(
             context_id=context_id,
             request_id=request_id,
             company_slug=company_slug,
         )
-        task = Task(
-            name="linkedin.companies.get",
-            execute=lambda: execute(request, page),
+        result = await tool_result(
+            operations.run(
+                "linkedin.companies.get",
+                lambda: execute(request, page),
+            )
         )
-        await scheduler.schedule(task)
-        result = await tool_result(task.result())
-        await ctx.report_progress(100, 100, "LinkedIn company profile complete")
         return result
 
     del _get_company

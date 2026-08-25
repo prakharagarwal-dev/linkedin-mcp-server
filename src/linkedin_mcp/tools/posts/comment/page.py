@@ -8,11 +8,8 @@ from datetime import UTC, datetime
 from playwright.async_api import Locator, Page
 from pydantic import HttpUrl
 
-from linkedin_mcp.browser.urls import (
-    canonical_post_url,
-    canonical_profile_url,
-)
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
+from linkedin_mcp.tools.people.urls import canonical_profile_url
 from linkedin_mcp.tools.posts.comment.models import (
     ActionCommand,
     ActionInspection,
@@ -38,6 +35,7 @@ from linkedin_mcp.tools.posts.surface import (
     comment_regions,
     discussion_post_reference,
 )
+from linkedin_mcp.tools.posts.urls import canonical_post_url
 
 _COMMENT_ATTACHMENT_SELECTOR = (
     "[data-comment-attachment], [data-test-comment-attachment], "
@@ -161,7 +159,7 @@ class PostCommentPage(PostEngagementSurface):
         request: PostCommentInput,
     ) -> ActionInspection:
         target_url = canonical_post_url(request.post_ref)
-        async with self._browser.page() as page:
+        async with self._ui.page() as page:
             await self._paced.goto(page, target_url)
             target = await self._resolve_target(page, request.post_ref)
             composer = await self._open_comment_composer(page, target.region)
@@ -177,7 +175,7 @@ class PostCommentPage(PostEngagementSurface):
     async def perform_comment(self, command: ActionCommand) -> ActionPageResult:
         payload = command.payload
         target_url = canonical_post_url(payload.post_ref)
-        async with self._browser.page() as page:
+        async with self._ui.page() as page:
             await self._paced.goto(page, target_url)
             target = await self._resolve_target(page, payload.post_ref)
             if not self._matches_inspected_target(command.target, target):

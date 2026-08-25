@@ -12,7 +12,6 @@ from pydantic import ValidationError
 
 import linkedin_mcp.tools.jobs.search.page as jobs_page_module
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.infra.playwright import Paced
 from linkedin_mcp.tools.jobs.get.evidence import source_from_job_detail
 from linkedin_mcp.tools.jobs.get.models import (
     JobApplyMethod,
@@ -36,6 +35,7 @@ from linkedin_mcp.tools.jobs.search.models import (
     JobWorkplaceType as SearchJobWorkplaceType,
 )
 from linkedin_mcp.tools.jobs.search.page import JobSearchPage
+from linkedin_mcp.ui import Pacer
 from tests.support.playwright import adapt_browser
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
@@ -208,7 +208,7 @@ async def test_current_job_search_cards_extract_exact_typed_fields_and_evidence(
             await page.set_content(
                 (FIXTURES / "jobs/latest/search.html").read_text(encoding="utf-8")
             )
-            jobs = await JobSearchPage.extract_visible_jobs(Paced(0), page)
+            jobs = await JobSearchPage.extract_visible_jobs(Pacer(0), page)
         finally:
             await browser.close()
 
@@ -266,7 +266,7 @@ async def test_current_job_card_supports_aria_title_company_link_and_plain_locat
                 </main>
                 """
             )
-            jobs = await JobSearchPage.extract_visible_jobs(Paced(0), page)
+            jobs = await JobSearchPage.extract_visible_jobs(Pacer(0), page)
         finally:
             await browser.close()
 
@@ -293,13 +293,13 @@ async def test_job_search_cards_fail_closed_on_identity_and_title_corruption() -
             )
             await page.set_content(f"<main><ul>{duplicate}{duplicate}</ul></main>")
             with pytest.raises(ParserDriftError, match="duplicate result-card identities"):
-                await JobSearchPage.extract_visible_jobs(Paced(0), page)
+                await JobSearchPage.extract_visible_jobs(Pacer(0), page)
 
             await page.set_content(
                 f"<main><ul>{_current_job_card('invalid-id', 'Invalid', 'Observed')}</ul></main>"
             )
             with pytest.raises(ParserDriftError, match="invalid result-card identity"):
-                await JobSearchPage.extract_visible_jobs(Paced(0), page)
+                await JobSearchPage.extract_visible_jobs(Pacer(0), page)
 
             await page.set_content(
                 """
@@ -340,7 +340,7 @@ async def test_job_search_cards_fail_closed_on_identity_and_title_corruption() -
                 """
             )
             with pytest.raises(ParserDriftError, match="without visible title"):
-                await JobSearchPage.extract_visible_jobs(Paced(0), page)
+                await JobSearchPage.extract_visible_jobs(Pacer(0), page)
         finally:
             await browser.close()
 
@@ -1056,7 +1056,7 @@ async def test_current_job_parsers_fail_closed_on_missing_structural_contracts()
                 """
             )
             with pytest.raises(ParserDriftError, match="visible location field"):
-                await JobSearchPage.extract_visible_jobs(Paced(0), page)
+                await JobSearchPage.extract_visible_jobs(Pacer(0), page)
 
             await page.set_content(
                 "<main><a href='/company/acme/'>Acme</a><p>Old layout</p></main>"

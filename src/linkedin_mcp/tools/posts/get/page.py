@@ -10,10 +10,6 @@ from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
-from linkedin_mcp.browser import BrowserManager
-from linkedin_mcp.browser.urls import (
-    canonical_post_url,
-)
 from linkedin_mcp.errors import ParserDriftError
 from linkedin_mcp.tools.posts.get.models import (
     PostDetailCoverage,
@@ -40,6 +36,10 @@ from linkedin_mcp.tools.posts.surface import (
 from linkedin_mcp.tools.posts.surface import (
     PostContentType as SurfacePostContentType,
 )
+from linkedin_mcp.tools.posts.urls import (
+    canonical_post_url,
+)
+from linkedin_mcp.ui.manager import UIManager
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,7 +57,7 @@ class _ParsedPostDetail:
 
 
 async def _expand_exact_post_body(
-    browser: BrowserManager,
+    ui: UIManager,
     page: Page,
     body: Locator | None,
 ) -> bool:
@@ -83,7 +83,7 @@ async def _expand_exact_post_body(
         if re.search(r"\b(?:comments?|repl(?:y|ies))\b", label, re.IGNORECASE):
             continue
         try:
-            await browser.paced.click(button, timeout=2_000)
+            await ui.click(button, timeout=2_000)
             await page.wait_for_timeout(100)
         except PlaywrightTimeoutError as error:
             if not await button.is_visible():
@@ -239,7 +239,7 @@ def _post_evidence(
 
 
 async def _original_post_reference(
-    browser: BrowserManager,
+    ui: UIManager,
     *,
     requested_post_ref: str,
     displayed_post_ref: str,
@@ -248,7 +248,7 @@ async def _original_post_reference(
     if displayed_post_ref != requested_post_ref:
         return displayed_post_ref
     embedded_region = await _embedded_post_region(embedded_body)
-    original_post_ref = await post_reference_for_region(browser.paced, embedded_region)
+    original_post_ref = await post_reference_for_region(ui, embedded_region)
     if original_post_ref is None or original_post_ref == requested_post_ref:
         raise ParserDriftError(
             "LinkedIn repost has no distinct stable visible original-post reference."
@@ -257,7 +257,7 @@ async def _original_post_reference(
 
 
 async def _parse_post_detail_page(
-    browser: BrowserManager,
+    ui: UIManager,
     page: Page,
     *,
     requested_post_ref: str,
@@ -265,7 +265,7 @@ async def _parse_post_detail_page(
     allow_repost_wrapper: bool,
 ) -> _ParsedPostDetail:
     region, displayed_post_ref = await detail_region_for_post(
-        browser.paced,
+        ui,
         page,
         requested_post_ref,
     )
@@ -277,7 +277,7 @@ async def _parse_post_detail_page(
         raise ParserDriftError("LinkedIn repost nesting exceeded the two-page safety bound.")
     original_post_ref = (
         await _original_post_reference(
-            browser,
+            ui,
             requested_post_ref=requested_post_ref,
             displayed_post_ref=displayed_post_ref,
             embedded_body=body_boxes[1],
@@ -286,12 +286,12 @@ async def _parse_post_detail_page(
         else None
     )
     top_body = body_boxes[0] if body_boxes else None
-    text_expanded = await _expand_exact_post_body(browser, page, top_body)
+    text_expanded = await _expand_exact_post_body(ui, page, top_body)
 
     # Expansion can rerender the post. Reacquire exact locators and assert that its
     # stable visible identity and wrapper shape did not change under us.
     region, stable_displayed_post_ref = await detail_region_for_post(
-        browser.paced,
+        ui,
         page,
         requested_post_ref,
     )
@@ -363,16 +363,16 @@ def _combined_post_capture(details: tuple[_ParsedPostDetail, ...]) -> str:
 
 
 class PostDetailPage:
-    def __init__(self, browser: BrowserManager) -> None:
-        self._browser = browser
-        self._paced = browser.paced
+    def __init__(self, ui: UIManager) -> None:
+        self._ui = ui
+        self._paced = ui
 
     async def read(self, request: PostGetInput) -> PostObservation:
         target = canonical_post_url(request.post_ref)
-        async with self._browser.page() as page:
+        async with self._ui.page() as page:
             await self._paced.goto(page, target)
             requested_detail = await _parse_post_detail_page(
-                self._browser,
+                self._ui,
                 page,
                 requested_post_ref=request.post_ref,
                 source_url=HttpUrl(target),
@@ -385,7 +385,7 @@ class PostDetailPage:
                 original_target = canonical_post_url(requested_detail.original_post_ref)
                 await self._paced.goto(page, original_target)
                 original_detail = await _parse_post_detail_page(
-                    self._browser,
+                    self._ui,
                     page,
                     requested_post_ref=requested_detail.original_post_ref,
                     source_url=HttpUrl(original_target),

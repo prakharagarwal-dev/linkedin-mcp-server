@@ -12,12 +12,12 @@ from mcp.server.fastmcp.exceptions import ToolError
 from pydantic import HttpUrl
 
 from linkedin_mcp.config import Settings
+from linkedin_mcp.cursors import CursorManager
 from linkedin_mcp.errors import (
     InvalidCursorError,
     InvalidTargetError,
     ParserDriftError,
 )
-from linkedin_mcp.infra.cursor import CursorStore
 from linkedin_mcp.tools.companies.get import tool as company_get_tool
 from linkedin_mcp.tools.companies.get.models import (
     CompanyGetInput,
@@ -915,9 +915,7 @@ class FakeInvitationList:
         request: InvitationListInput,
         *,
         result_limit: int | None = None,
-        progress: object | None = None,
     ) -> tuple[tuple[InvitationSummary, ...], InvitationListCoverage, str, str]:
-        del progress
         self.calls += 1
         limit = request.page_size if result_limit is None else result_limit
         now = datetime.now(UTC)
@@ -1002,9 +1000,7 @@ class PaginatedFakeInvitationList(FakeInvitationList):
         request: InvitationListInput,
         *,
         result_limit: int | None = None,
-        progress: object | None = None,
     ) -> tuple[tuple[InvitationSummary, ...], InvitationListCoverage, str, str]:
-        del progress
         self.calls += 1
         limit = request.page_size if result_limit is None else result_limit
         self.result_limits.append(limit)
@@ -1095,9 +1091,7 @@ class ImplicitEmptyInvitationList(FakeInvitationList):
         request: InvitationListInput,
         *,
         result_limit: int | None = None,
-        progress: object | None = None,
     ) -> tuple[tuple[InvitationSummary, ...], InvitationListCoverage, str, str]:
-        del progress
         self.calls += 1
         assert request.direction is InvitationDirection.SENT
         assert request.resolved_filter is InvitationFilter.PEOPLE
@@ -1589,7 +1583,7 @@ class _ToolHarness:
         conversation_page: FakeConversation,
     ) -> None:
         self._settings = settings
-        self._cursor_store = CursorStore(
+        self._cursors = CursorManager(
             ttl_seconds=settings.pagination_cursor_ttl_seconds,
             max_active_cursors=settings.pagination_max_active_cursors,
             max_seen_items_per_cursor=settings.pagination_max_seen_items_per_cursor,
@@ -1620,7 +1614,7 @@ class _ToolHarness:
         return await job_search.execute(
             request,
             page=self._job_search,
-            cursor_store=self._cursor_store,
+            cursors=self._cursors,
             account_id=self._settings.account_id,
         )
 
@@ -1631,7 +1625,7 @@ class _ToolHarness:
         return await people_search.execute(
             request,
             page=self._people_search,
-            cursor_store=self._cursor_store,
+            cursors=self._cursors,
             account_id=self._settings.account_id,
         )
 
@@ -1642,7 +1636,7 @@ class _ToolHarness:
         return await connections_search.execute(
             request,
             page=self._connections_search,
-            cursor_store=self._cursor_store,
+            cursors=self._cursors,
             account_id=self._settings.account_id,
         )
 
@@ -1653,7 +1647,7 @@ class _ToolHarness:
         return await company_search.execute(
             request,
             page=self._company_search,
-            cursor_store=self._cursor_store,
+            cursors=self._cursors,
             account_id=self._settings.account_id,
         )
 
@@ -1664,7 +1658,7 @@ class _ToolHarness:
         return await post_search.execute(
             request,
             page=self._post_search,
-            cursor_store=self._cursor_store,
+            cursors=self._cursors,
             account_id=self._settings.account_id,
         )
 
@@ -1678,7 +1672,7 @@ class _ToolHarness:
         return await post_comments_list.execute(
             request,
             page=self._post_comments,
-            cursor_store=self._cursor_store,
+            cursors=self._cursors,
             account_id=self._settings.account_id,
         )
 
@@ -1686,7 +1680,7 @@ class _ToolHarness:
         return await invitations_list.execute(
             request,
             page=self._invitation_list,
-            cursor_store=self._cursor_store,
+            cursors=self._cursors,
             account_id=self._settings.account_id,
         )
 
@@ -1694,7 +1688,7 @@ class _ToolHarness:
         return await connections_list.execute(
             request,
             page=self._connections_list,
-            cursor_store=self._cursor_store,
+            cursors=self._cursors,
             account_id=self._settings.account_id,
         )
 
@@ -1705,7 +1699,7 @@ class _ToolHarness:
         return await messaging_search.execute(
             request,
             page=self._conversation_search,
-            cursor_store=self._cursor_store,
+            cursors=self._cursors,
             account_id=self._settings.account_id,
         )
 

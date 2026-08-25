@@ -9,11 +9,8 @@ from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import Locator, Page
 from pydantic import HttpUrl
 
-from linkedin_mcp.browser.urls import (
-    canonical_post_url,
-    canonical_profile_url,
-)
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
+from linkedin_mcp.tools.people.urls import canonical_profile_url
 from linkedin_mcp.tools.posts.engagement_surface import (
     PostEngagementSurface,
     VisiblePostTarget,
@@ -27,6 +24,7 @@ from linkedin_mcp.tools.posts.react.models import (
     PostReactionInput,
     ReactionState,
 )
+from linkedin_mcp.tools.posts.urls import canonical_post_url
 
 _REACTION_LABELS = {
     ReactionState.LIKE: "Like",
@@ -143,7 +141,7 @@ class PostReactionPage(PostEngagementSurface):
         request: PostReactionInput,
     ) -> ActionInspection:
         target_url = canonical_post_url(request.post_ref)
-        async with self._browser.page() as page:
+        async with self._ui.page() as page:
             await self._paced.goto(page, target_url)
             target = await self._resolve_target(page, request.post_ref)
             controls = await self._wait_for_visible_reaction_controls(target.region)
@@ -167,7 +165,7 @@ class PostReactionPage(PostEngagementSurface):
 
     async def perform_reaction(self, command: ActionCommand) -> ActionPageResult:
         payload = command.payload
-        async with self._browser.page() as page:
+        async with self._ui.page() as page:
             await self._paced.goto(page, canonical_post_url(payload.post_ref))
             target = await self._resolve_target(page, payload.post_ref)
             if not self._matches_inspected_target(command.target, target):

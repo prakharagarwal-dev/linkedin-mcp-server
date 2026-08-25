@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from linkedin_mcp.browser import BrowserManager
 from linkedin_mcp.tools.connections.search.models import (
     ConnectionsSearchInput,
     PeopleSearchCoverage,
@@ -10,13 +9,14 @@ from linkedin_mcp.tools.connections.search.models import (
 )
 from linkedin_mcp.tools.people.search.models import PeopleSearchInput as ProviderSearchInput
 from linkedin_mcp.tools.people.search.page import PeopleSearchPage
+from linkedin_mcp.ui.manager import UIManager
 
 
 class ConnectionsSearchPage:
     """Run the first-degree-only connection search on LinkedIn's People surface."""
 
-    def __init__(self, browser: BrowserManager, *, max_pages: int) -> None:
-        self._people = PeopleSearchPage(browser, max_pages=max_pages)
+    def __init__(self, ui: UIManager, *, max_pages: int) -> None:
+        self._people = PeopleSearchPage(ui, max_pages=max_pages)
 
     async def collect(
         self,

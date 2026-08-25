@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable
-from typing import Annotated, Any
+from typing import Annotated
 
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from linkedin_mcp.cursors import CursorManager
 from linkedin_mcp.errors import InternalServerError, LinkedInMCPError
-from linkedin_mcp.infra.cursor import CursorStore
-from linkedin_mcp.infra.queue import Scheduler, Task
+from linkedin_mcp.operations import OperationManager
 from linkedin_mcp.tools.connections.search.models import (
     ConnectionsSearchFilters,
     ConnectionsSearchInput,
@@ -60,9 +60,9 @@ async def tool_result[ResultT](awaitable: Awaitable[ResultT]) -> ResultT:
 
 def register(
     mcp: FastMCP[None],
-    scheduler: Scheduler,
+    operations: OperationManager,
     page: ConnectionsSearchPage,
-    cursor_store: CursorStore,
+    cursors: CursorManager,
     account_id: str,
 ) -> None:
     @mcp.tool(
@@ -87,7 +87,6 @@ def register(
     async def _search_connections(  # pyright: ignore[reportUnusedFunction]
         context_id: IdentifierArgument,
         request_id: IdentifierArgument,
-        ctx: Context[Any, Any, Any],
         query: (
             Annotated[
                 str,
@@ -103,7 +102,6 @@ def register(
         page_size: PageSizeArgument = 25,
         cursor: CursorArgument | None = None,
     ) -> ConnectionsSearchOutput:
-        await ctx.report_progress(0, 100, "Queued LinkedIn connection search")
         request = ConnectionsSearchInput(
             context_id=context_id,
             request_id=request_id,
@@ -112,18 +110,17 @@ def register(
             page_size=page_size,
             cursor=cursor,
         )
-        task = Task(
-            name="linkedin.connections.search",
-            execute=lambda: execute(
-                request,
-                page=page,
-                cursor_store=cursor_store,
-                account_id=account_id,
-            ),
+        result = await tool_result(
+            operations.run(
+                "linkedin.connections.search",
+                lambda: execute(
+                    request,
+                    page=page,
+                    cursors=cursors,
+                    account_id=account_id,
+                ),
+            )
         )
-        await scheduler.schedule(task)
-        result = await tool_result(task.result())
-        await ctx.report_progress(100, 100, "LinkedIn connection search complete")
         return result
 
     del _search_connections

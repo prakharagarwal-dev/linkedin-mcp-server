@@ -1,4 +1,4 @@
-"""Safe structured logging configuration for stdio and HTTP transports."""
+"""Safe structured logging configuration for the HTTP server."""
 
 from __future__ import annotations
 

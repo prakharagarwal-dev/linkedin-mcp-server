@@ -1,1 +1,0 @@
-"""MCP protocol transport adapters."""

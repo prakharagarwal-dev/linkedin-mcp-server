@@ -6,16 +6,16 @@ import asyncio
 import uuid
 from collections.abc import Awaitable
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import Annotated
 
 import structlog
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from linkedin_mcp.errors import InternalServerError, LinkedInMCPError
-from linkedin_mcp.infra.queue import Scheduler, Task
+from linkedin_mcp.operations import OperationManager
 from linkedin_mcp.tools.posts.comment.evidence import source_from_action_execution
 from linkedin_mcp.tools.posts.comment.models import (
     ActionCommand,
@@ -115,7 +115,7 @@ async def execute(
 
 def register(
     mcp: FastMCP[None],
-    scheduler: Scheduler,
+    operations: OperationManager,
     page: PostCommentPage,
 ) -> None:
     @mcp.tool(
@@ -140,12 +140,10 @@ def register(
             str,
             Field(pattern=r"^(?:activity|share|ugc-post):[0-9]{5,30}$"),
         ],
-        ctx: Context[Any, Any, Any],
         text: Annotated[str, Field(min_length=1, max_length=3_000)] | None = None,
         mentions: Annotated[tuple[PostMentionInput, ...], Field(max_length=20)] = (),
         attachment: CommentAttachment | None = None,
     ) -> ActionOutput:
-        await ctx.report_progress(0, 100, "Publishing LinkedIn comment")
         request = PostCommentInput(
             context_id=context_id,
             request_id=request_id,
@@ -154,14 +152,12 @@ def register(
             mentions=mentions,
             attachment=attachment,
         )
-        task = Task(
-            name="linkedin.posts.comment",
-            execute=lambda: execute(request, page),
-            interruptible=False,
+        result = await tool_result(
+            operations.run_write(
+                "linkedin.posts.comment",
+                lambda: execute(request, page),
+            )
         )
-        await scheduler.schedule(task)
-        result = await tool_result(task.result())
-        await ctx.report_progress(100, 100, "Comment action reached a terminal outcome")
         return result
 
     del _comment_on_post

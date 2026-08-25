@@ -6,8 +6,11 @@ from urllib.parse import urlsplit
 
 from playwright.async_api import Page
 
-from linkedin_mcp.browser.urls import validate_linkedin_url
-from linkedin_mcp.errors import AuthenticationRequiredError, RestrictionDetectedError
+from linkedin_mcp.errors import (
+    AuthenticationRequiredError,
+    InvalidTargetError,
+    RestrictionDetectedError,
+)
 
 _RESTRICTION_PATHS = ("/checkpoint/", "/authwall")
 _LOGIN_PATHS = ("/login", "/uas/login")
@@ -21,8 +24,13 @@ _RESTRICTION_PHRASES = (
 
 
 async def assert_linkedin_access(page: Page, allowed_hosts: tuple[str, ...]) -> None:
-    validated = validate_linkedin_url(page.url, allowed_hosts)
-    path = urlsplit(validated).path.lower()
+    parsed = urlsplit(page.url)
+    host = (parsed.hostname or "").lower().rstrip(".")
+    if parsed.scheme != "https" or host not in allowed_hosts:
+        raise InvalidTargetError("LinkedIn targets must use HTTPS and an allowed exact host.")
+    if parsed.username or parsed.password or parsed.port not in {None, 443}:
+        raise InvalidTargetError("LinkedIn targets cannot contain credentials or custom ports.")
+    path = parsed.path.lower()
     if any(marker in path for marker in _RESTRICTION_PATHS):
         raise RestrictionDetectedError(
             "LinkedIn presented a security checkpoint or access restriction."

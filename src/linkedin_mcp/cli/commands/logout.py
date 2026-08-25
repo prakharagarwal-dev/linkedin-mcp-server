@@ -4,8 +4,8 @@ import argparse
 import asyncio
 import json
 
+from linkedin_mcp.browser import BrowserManager
 from linkedin_mcp.config import Settings
-from linkedin_mcp.host.manager import HostManager
 
 
 def configure(command: argparse.ArgumentParser) -> None:
@@ -13,7 +13,11 @@ def configure(command: argparse.ArgumentParser) -> None:
 
 
 async def execute(settings: Settings) -> None:
-    logged_out = await HostManager(settings).logout()
+    browser = BrowserManager(settings)
+    try:
+        logged_out = await browser.logout()
+    finally:
+        await browser.close()
     print(
         json.dumps(
             {

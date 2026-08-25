@@ -11,12 +11,6 @@ from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
-from linkedin_mcp.browser import BrowserManager
-from linkedin_mcp.browser.urls import (
-    canonical_job_url,
-    canonical_profile_url,
-    profile_slug_from_url,
-)
 from linkedin_mcp.errors import ParserDriftError
 from linkedin_mcp.tools.jobs.get.models import (
     EvidenceField,
@@ -37,6 +31,9 @@ from linkedin_mcp.tools.jobs.surface import (
 from linkedin_mcp.tools.jobs.surface import (
     lines as visible_text_lines,
 )
+from linkedin_mcp.tools.jobs.urls import canonical_job_url
+from linkedin_mcp.tools.people.urls import canonical_profile_url, profile_slug_from_url
+from linkedin_mcp.ui.manager import UIManager
 
 _EMPLOYMENT_TYPES = (
     "Full-time",
@@ -280,12 +277,12 @@ async def _visible_description(description_box: Locator) -> str:
 
 
 class JobDetailPage:
-    def __init__(self, browser: BrowserManager) -> None:
-        self._browser = browser
-        self._paced = browser.paced
+    def __init__(self, ui: UIManager) -> None:
+        self._ui = ui
+        self._paced = ui
 
     async def read(self, request: JobDetailInput) -> JobDetailObservation:
-        async with self._browser.page() as page:
+        async with self._ui.page() as page:
             await self._paced.goto(page, canonical_job_url(request.job_id))
             await self._wait_until_ready(page, request.job_id)
             await self._expand_description(page)

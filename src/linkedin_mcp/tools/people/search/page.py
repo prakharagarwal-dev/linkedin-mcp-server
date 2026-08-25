@@ -13,15 +13,7 @@ from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
-from linkedin_mcp.browser import BrowserManager
-from linkedin_mcp.browser.urls import canonical_profile_url, profile_slug_from_url
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.infra.playwright import Paced
-from linkedin_mcp.infra.playwright.collections import (
-    CollectionSettleOutcome,
-    visible_locator_signature,
-    wait_for_collection_initial_state,
-)
 from linkedin_mcp.tools.people.search.models import (
     PeopleSearchConnectionDegree,
     PeopleSearchCoverage,
@@ -43,6 +35,14 @@ from linkedin_mcp.tools.people.surface import (
 from linkedin_mcp.tools.people.surface import (
     lines as visible_text_lines,
 )
+from linkedin_mcp.tools.people.urls import canonical_profile_url, profile_slug_from_url
+from linkedin_mcp.ui.collections import (
+    CollectionSettleOutcome,
+    visible_locator_signature,
+    wait_for_collection_initial_state,
+)
+from linkedin_mcp.ui.manager import UIManager
+from linkedin_mcp.ui.pacer import Pacer
 
 _CONNECTION_FILTER_CODES = {
     PeopleSearchConnectionDegree.FIRST: "F",
@@ -362,7 +362,7 @@ async def _exact_modern_checkbox(
 
 
 async def _check_modern_names(
-    paced: Paced,
+    paced: Pacer,
     panel: Locator,
     requested_names: tuple[str, ...],
     *,
@@ -498,7 +498,7 @@ async def _modern_typeahead_option(
 
 
 async def _select_modern_typeahead_names(
-    paced: Paced,
+    paced: Pacer,
     page: Page,
     panel: Locator,
     requested_names: tuple[str, ...],
@@ -687,7 +687,7 @@ def _validate_modern_resolved_facets(
 
 
 async def _resolve_modern_named_facets(
-    browser: BrowserManager,
+    ui: UIManager,
     page: Page,
     panel: Locator,
     filters: PeopleSearchFilters,
@@ -709,7 +709,7 @@ async def _resolve_modern_named_facets(
         (filters.service_category_names, _SERVICE_CATEGORY_FACET),
     ):
         await _select_modern_typeahead_names(
-            browser.paced,
+            ui,
             page,
             panel,
             requested_names,
@@ -717,7 +717,7 @@ async def _resolve_modern_named_facets(
             force_reapply=force_reapply,
         )
     await _check_modern_names(
-        browser.paced,
+        ui,
         panel,
         filters.profile_language_names,
         id_field_name="profile_language_ids",
@@ -741,10 +741,10 @@ async def _resolve_modern_named_facets(
                 "LinkedIn did not expose the requested actively_hiring filter for this account."
             )
         if force_reapply and await actively_hiring.is_checked():
-            await browser.paced.uncheck(actively_hiring)
+            await ui.uncheck(actively_hiring)
             await page.wait_for_timeout(200)
         if not await actively_hiring.is_checked():
-            await browser.paced.check(actively_hiring)
+            await ui.check(actively_hiring)
             await page.wait_for_timeout(200)
 
     show_results = page.get_by_role(
@@ -759,7 +759,7 @@ async def _resolve_modern_named_facets(
         raise ParserDriftError(
             "LinkedIn's visible Show results control was unavailable for People search."
         ) from error
-    submitted_url = await browser.paced.click_and_wait_for_navigation(
+    submitted_url = await ui.click_and_wait_for_navigation(
         page,
         show_results.first,
     )
@@ -769,7 +769,7 @@ async def _resolve_modern_named_facets(
 
 
 async def _resolve_named_facets(
-    browser: BrowserManager,
+    ui: UIManager,
     page: Page,
     filters: PeopleSearchFilters,
     *,
@@ -781,7 +781,7 @@ async def _resolve_named_facets(
     )
     try:
         await all_filters.first.wait_for(state="visible", timeout=5_000)
-        await browser.paced.click(all_filters.first)
+        await ui.click(all_filters.first)
     except PlaywrightTimeoutError as error:
         raise ParserDriftError(
             "LinkedIn's visible All filters control was unavailable for People search."
@@ -791,7 +791,7 @@ async def _resolve_named_facets(
         panel = await _modern_filter_panel(page)
         if panel is not None:
             return await _resolve_modern_named_facets(
-                browser,
+                ui,
                 page,
                 panel,
                 filters,
@@ -819,11 +819,11 @@ def _profile_name(link_text: str, aria_label: str | None) -> str | None:
 
 
 class PeopleSearchPage:
-    def __init__(self, browser: BrowserManager, *, max_pages: int) -> None:
+    def __init__(self, ui: UIManager, *, max_pages: int) -> None:
         if max_pages < 1:
             raise ValueError("People search must allow at least one internal page.")
-        self._browser = browser
-        self._paced = browser.paced
+        self._ui = ui
+        self._paced = ui
         self._max_pages = max_pages
 
     @staticmethod
@@ -856,13 +856,13 @@ class PeopleSearchPage:
         unidentifiable_result_count = 0
         stop_reason = StopReason.SAFETY_BOUND
         resolved_facets = _ResolvedPeopleSearchFacets()
-        async with self._browser.page() as page:
+        async with self._ui.page() as page:
             if _requires_visible_filter_resolution(request.filters):
                 await self._paced.goto(page, self.build_url(request))
                 for resolution_attempt in range(2):
                     try:
                         resolved_facets = await _resolve_named_facets(
-                            self._browser,
+                            self._ui,
                             page,
                             request.filters,
                             force_reapply=resolution_attempt > 0,

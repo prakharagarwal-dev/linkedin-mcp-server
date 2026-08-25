@@ -23,7 +23,7 @@ from linkedin_mcp.errors import (
     LinkedInMCPError,
     RestrictionDetectedError,
 )
-from linkedin_mcp.infra.playwright import Paced
+from linkedin_mcp.ui import Pacer
 
 logger = structlog.get_logger(__name__)
 
@@ -47,13 +47,13 @@ class BrowserManager:
     def __init__(
         self,
         settings: Settings,
-        paced: Paced,
+        pacer: Pacer | None = None,
         *,
         browser_bootstrap: BrowserBootstrap | None = None,
         browser_profile: BrowserProfileManager | None = None,
     ) -> None:
         self._settings = settings
-        self._paced = paced
+        self._pacer = pacer or Pacer(settings.browser_action_delay_seconds)
         self._bootstrap: BrowserBootstrap | None = browser_bootstrap or BrowserBootstrap(settings)
         self._profile: BrowserProfileManager | None = browser_profile or BrowserProfileManager(
             settings,
@@ -74,7 +74,7 @@ class BrowserManager:
     def for_testing(
         cls,
         settings: Settings,
-        paced: Paced,
+        pacer: Pacer,
         *,
         page_factory: PageFactory,
         assert_access: AccessHook | None = None,
@@ -83,7 +83,7 @@ class BrowserManager:
 
         instance = cls.__new__(cls)
         instance._settings = settings
-        instance._paced = paced
+        instance._pacer = pacer
         instance._bootstrap = None
         instance._profile = None
         instance._playwright = None
@@ -97,10 +97,6 @@ class BrowserManager:
         instance._paused = False
         instance._pause_reason = None
         return instance
-
-    @property
-    def paced(self) -> Paced:
-        return self._paced
 
     @property
     def started(self) -> bool:
@@ -155,12 +151,12 @@ class BrowserManager:
         profile.require_initialized()
         context = await self._open_context()
         try:
-            await validate_saved_session(context, self._settings, self._paced)
+            await validate_saved_session(context, self._settings, self._pacer)
         except AuthenticationRequiredError:
             await self._close_browser()
-            await login_interactively(self._settings, self._paced, bootstrap)
+            await login_interactively(self._settings, self._pacer, bootstrap)
             context = await self._open_context()
-            await validate_saved_session(context, self._settings, self._paced)
+            await validate_saved_session(context, self._settings, self._pacer)
         self._mark_authenticated()
         return context
 
@@ -218,7 +214,7 @@ class BrowserManager:
         bootstrap = self._bootstrap
         if bootstrap is None:
             raise BrowserUnavailableError("The offline browser provider cannot log in.")
-        await login_interactively(self._settings, self._paced, bootstrap)
+        await login_interactively(self._settings, self._pacer, bootstrap)
         self._mark_authenticated()
 
     async def logout(self) -> bool:
@@ -228,7 +224,7 @@ class BrowserManager:
         bootstrap = self._bootstrap
         if bootstrap is None:
             raise BrowserUnavailableError("The offline browser provider cannot log out.")
-        logged_out = await logout_interactively(self._settings, self._paced, bootstrap)
+        logged_out = await logout_interactively(self._settings, self._pacer, bootstrap)
         self._authentication_state = AuthenticationState.LOGIN_REQUIRED
         self._authentication_status_message = "LinkedIn login is required."
         return logged_out

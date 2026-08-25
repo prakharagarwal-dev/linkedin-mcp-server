@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable
-from typing import Annotated, Any
+from typing import Annotated
 
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from linkedin_mcp.errors import InternalServerError, LinkedInMCPError
-from linkedin_mcp.infra.queue import Scheduler, Task
+from linkedin_mcp.operations import OperationManager
 from linkedin_mcp.tools.posts.get.evidence import source_from_post
 from linkedin_mcp.tools.posts.get.models import PostGetInput, PostGetOutput
 from linkedin_mcp.tools.posts.get.page import PostDetailPage
@@ -42,7 +42,7 @@ async def execute(request: PostGetInput, page: PostDetailPage) -> PostGetOutput:
 
 def register(
     mcp: FastMCP[None],
-    scheduler: Scheduler,
+    operations: OperationManager,
     page: PostDetailPage,
 ) -> None:
     @mcp.tool(
@@ -73,21 +73,18 @@ def register(
                 description="Stable post reference returned by LinkedIn post search.",
             ),
         ],
-        ctx: Context[Any, Any, Any],
     ) -> PostGetOutput:
-        await ctx.report_progress(0, 100, "Validating LinkedIn post target")
         request = PostGetInput(
             context_id=context_id,
             request_id=request_id,
             post_ref=post_ref,
         )
-        task = Task(
-            name="linkedin.posts.get",
-            execute=lambda: execute(request, page),
+        result = await tool_result(
+            operations.run(
+                "linkedin.posts.get",
+                lambda: execute(request, page),
+            )
         )
-        await scheduler.schedule(task)
-        result = await tool_result(task.result())
-        await ctx.report_progress(100, 100, "LinkedIn post detail complete")
         return result
 
     del _get_post

@@ -8,17 +8,7 @@ from datetime import UTC, datetime
 from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
-from linkedin_mcp.browser import BrowserManager
-from linkedin_mcp.browser.urls import (
-    canonical_post_url,
-    post_reference_from_comment_ref,
-)
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.infra.playwright import Paced
-from linkedin_mcp.infra.playwright.collections import (
-    visible_locator_signature,
-    wait_for_collection_change,
-)
 from linkedin_mcp.tools.posts.comments.list.models import (
     CommentObservation,
     CommentSort,
@@ -36,6 +26,16 @@ from linkedin_mcp.tools.posts.surface import (
     internal_comment_from_region,
     prepare_visible_content,
 )
+from linkedin_mcp.tools.posts.urls import (
+    canonical_post_url,
+    post_reference_from_comment_ref,
+)
+from linkedin_mcp.ui.collections import (
+    visible_locator_signature,
+    wait_for_collection_change,
+)
+from linkedin_mcp.ui.manager import UIManager
+from linkedin_mcp.ui.pacer import Pacer
 
 _COLLECTION_POLL_ATTEMPTS = 8
 
@@ -48,7 +48,7 @@ async def _visible_comment_signature(page: Page) -> tuple[str, ...]:
     )
 
 
-async def _expand_visible_content(paced: Paced, page: Page) -> None:
+async def _expand_visible_content(paced: Pacer, page: Page) -> None:
     """Preserve bounded best-effort expansion for the discussion collection."""
 
     await prepare_visible_content(page)
@@ -135,11 +135,11 @@ async def _visible_comment_regions(page: Page) -> tuple[Locator, ...]:
 
 
 class PostCommentsPage:
-    def __init__(self, browser: BrowserManager, *, max_expansion_rounds: int) -> None:
+    def __init__(self, ui: UIManager, *, max_expansion_rounds: int) -> None:
         if max_expansion_rounds < 0:
             raise ValueError("Comment expansion bound cannot be negative.")
-        self._browser = browser
-        self._paced = browser.paced
+        self._ui = ui
+        self._paced = ui
         self._max_expansion_rounds = max_expansion_rounds
 
     async def collect(
@@ -158,7 +158,7 @@ class PostCommentsPage:
             raise ValueError("Post-comment result limit must be positive.")
         target = canonical_post_url(request.post_ref)
         expansion_rounds = 0
-        async with self._browser.page() as page:
+        async with self._ui.page() as page:
             await self._paced.goto(page, target)
             await _expand_visible_content(self._paced, page)
             post_region, displayed_post_ref = await detail_region_for_post(

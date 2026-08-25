@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable
-from typing import Annotated, Any
+from typing import Annotated
 
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from linkedin_mcp.cursors import CursorManager
 from linkedin_mcp.errors import InternalServerError, LinkedInMCPError
-from linkedin_mcp.infra.cursor import CursorStore
-from linkedin_mcp.infra.queue import Scheduler, Task
+from linkedin_mcp.operations import OperationManager
 from linkedin_mcp.tools.posts.comments.list.models import (
     CommentSort,
     PostCommentsListInput,
@@ -60,9 +60,9 @@ async def tool_result[ResultT](awaitable: Awaitable[ResultT]) -> ResultT:
 
 def register(
     mcp: FastMCP[None],
-    scheduler: Scheduler,
+    operations: OperationManager,
     page: PostCommentsPage,
-    cursor_store: CursorStore,
+    cursors: CursorManager,
     account_id: str,
 ) -> None:
     @mcp.tool(
@@ -87,13 +87,11 @@ def register(
             str,
             Field(pattern=r"^(?:activity|share|ugc-post):[0-9]{5,30}$"),
         ],
-        ctx: Context[Any, Any, Any],
         sort_by: CommentSort = CommentSort.MOST_RELEVANT,
         page_size: PageSizeArgument = 25,
         cursor: CursorArgument | None = None,
         max_replies_per_comment: Annotated[int, Field(ge=0, le=100)] = 25,
     ) -> PostCommentsListOutput:
-        await ctx.report_progress(0, 100, "Opening visible LinkedIn post discussion")
         request = PostCommentsListInput(
             context_id=context_id,
             request_id=request_id,
@@ -103,18 +101,17 @@ def register(
             cursor=cursor,
             max_replies_per_comment=max_replies_per_comment,
         )
-        task = Task(
-            name="linkedin.posts.comments.list",
-            execute=lambda: execute(
-                request,
-                page=page,
-                cursor_store=cursor_store,
-                account_id=account_id,
-            ),
+        result = await tool_result(
+            operations.run(
+                "linkedin.posts.comments.list",
+                lambda: execute(
+                    request,
+                    page=page,
+                    cursors=cursors,
+                    account_id=account_id,
+                ),
+            )
         )
-        await scheduler.schedule(task)
-        result = await tool_result(task.result())
-        await ctx.report_progress(100, 100, "LinkedIn post discussion complete")
         return result
 
     del _list_post_comments

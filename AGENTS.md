@@ -30,10 +30,11 @@
 
 - Python 3.12+, strict Pyright, Ruff, Pydantic v2, and async I/O.
 - Use the official `mcp` Python SDK and official Playwright async API.
-- Use an in-process `asyncio.Queue` for local capability execution. Do not store
-  call results, observations, or evidence. The browser profile is the only
-  server-owned authentication persistence. Client approval choices are not stored
-  as server authorization records. Do not add a database or external work queue.
+- Serialize local capability execution with one app-scoped `asyncio.Lock`. Do not
+  add a task queue, scheduler, worker pool, database, or external work queue. Do
+  not store call results, observations, or evidence. The browser profile is the
+  only server-owned authentication persistence. Client approval choices are not
+  stored as server authorization records.
 - Keep MCP transport wiring, policy, browser mechanics, page extraction, and domain
   contracts in separate modules.
 - Return immutable field-level evidence with source URL and capture time in the

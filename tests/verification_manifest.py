@@ -140,7 +140,7 @@ MOCK_VERIFICATION: dict[str, ToolVerification] = {
         _READ,
         "tests/contract/test_mcp_protocol.py",
         "tests/unit/test_invitation_pages.py",
-        "tests/unit/test_cursor_store.py",
+        "tests/unit/test_cursors.py",
     ),
     "linkedin.connections.list": _entry(
         "connections",

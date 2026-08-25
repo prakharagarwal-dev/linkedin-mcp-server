@@ -161,12 +161,12 @@ Verification proceeds from narrowest to broadest:
 
 1. Pure parsing and count-binding tests.
 2. Real Playwright page-object tests against semantic fixtures.
-3. Convergence, queue, pacing, cancellation, and safety-bound tests.
+3. Convergence, operation-lock, pacing, cancellation, and safety-bound tests.
 4. Executor tests for coverage, completion reasons, evidence, error mapping,
    and cumulative live traversal targets across cursor pages.
 5. Official MCP client tests for schemas and structured output.
 6. Cursor workflow tests proving disjoint identities, cumulative counts,
-   client/account/filter binding, pre-queue reservation, single-use cursors,
+   client/account/filter binding, operation-lock serialization, single-use cursors,
    fresh repeated invocation, terminal metadata, and honest truncation.
 7. Semantic simulator workflows using production page objects.
 8. The complete offline verification suite and package build.

@@ -12,15 +12,14 @@ from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
-from linkedin_mcp.browser import BrowserManager
-from linkedin_mcp.browser.urls import (
-    canonical_conversation_url,
-    canonical_profile_url,
-    conversation_id_from_url,
-    profile_slug_from_url,
-)
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
 from linkedin_mcp.tools.messaging.search.page import ConversationSearchPage
+from linkedin_mcp.tools.messaging.urls import (
+    canonical_conversation_url,
+    conversation_id_from_url,
+)
+from linkedin_mcp.tools.people.urls import canonical_profile_url, profile_slug_from_url
+from linkedin_mcp.ui.manager import UIManager
 
 _COMPOSER_SELECTOR = '[contenteditable]:not([contenteditable="false"]), textarea'
 
@@ -278,15 +277,15 @@ class ConversationSurface:
 
     def __init__(
         self,
-        browser: BrowserManager,
+        ui: UIManager,
         *,
         conversation_search: ConversationSearchPage | None = None,
         max_history_rounds: int = 100,
     ) -> None:
         if max_history_rounds < 1:
             raise ValueError("Conversation history traversal must be bounded.")
-        self._browser = browser
-        self._paced = browser.paced
+        self._ui = ui
+        self._paced = ui
         self._conversation_search = conversation_search
         self._max_history_rounds = max_history_rounds
 

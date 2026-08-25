@@ -18,9 +18,8 @@ from pydantic import HttpUrl
 from linkedin_mcp import __version__
 from linkedin_mcp.browser import BrowserManager
 from linkedin_mcp.config import Settings
-from linkedin_mcp.infra.cursor import CursorStore
-from linkedin_mcp.infra.queue import Scheduler, Worker
-from linkedin_mcp.tools import attach_tool_implementations
+from linkedin_mcp.cursors import CursorManager
+from linkedin_mcp.operations import OperationManager
 from linkedin_mcp.tools.companies.get.models import (
     CompanyGetInput,
     CompanyProfileCoverage,
@@ -296,7 +295,7 @@ from linkedin_mcp.tools.posts.search.models import (
     StopReason as PostStopReason,
 )
 from linkedin_mcp.tools.posts.search.page import PostSearchPage
-from linkedin_mcp.transport.server import create_mcp_server
+from tests.support.mcp import create_mcp_fixture
 from tests.support.playwright import empty_browser
 
 ROOT = Path(__file__).parents[2]
@@ -647,9 +646,8 @@ class ProtocolNetwork:
         request: InvitationListInput | ConnectionsListInput | ConversationSearchInput,
         *,
         result_limit: int | None = None,
-        progress: object | None = None,
     ) -> tuple[tuple[object, ...], object, str, str]:
-        del result_limit, progress
+        del result_limit
         captured_at = datetime.now(UTC)
         if isinstance(request, InvitationListInput):
             entity = InvitationEntity(
@@ -933,29 +931,16 @@ class ProtocolNetwork:
 
 def protocol_server(
     root: Path,
-) -> tuple[FastMCP[None], Scheduler, BrowserManager, CursorStore]:
+) -> tuple[FastMCP[None], OperationManager, BrowserManager, CursorManager]:
     settings = Settings(
         browser_auto_install=False,
         browser_profile_path=root / "profile",
         browser_action_delay_seconds=0,
-        runtime_lock_path=root / "runtime.lock",
     )
     browser = empty_browser(settings)
     network = ProtocolNetwork()
-    cursor_store = CursorStore(
-        ttl_seconds=settings.pagination_cursor_ttl_seconds,
-        max_active_cursors=settings.pagination_max_active_cursors,
-        max_seen_items_per_cursor=settings.pagination_max_seen_items_per_cursor,
-    )
-    worker = Worker()
-    scheduler = Scheduler(worker, capacity=settings.queue_capacity)
-    mcp = create_mcp_server(settings)
-    attach_tool_implementations(
-        mcp,
-        settings=settings,
-        browser=browser,
-        scheduler=scheduler,
-        cursor_store=cursor_store,
+    fixture = create_mcp_fixture(settings, browser)
+    fixture.tools.register_implementations(
         job_search=cast(JobSearchPage, ProtocolJobSearch()),
         job_detail=cast(JobDetailPage, ProtocolJobDetail()),
         people_search=cast(PeopleSearchPage, ProtocolPeopleSearch()),
@@ -978,13 +963,12 @@ def protocol_server(
         conversation_read=cast(ConversationGetPage, network),
         message_send=cast(MessageSendPage, network),
     )
-    return mcp, scheduler, browser, cursor_store
+    return fixture.mcp, fixture.operations, browser, fixture.cursors
 
 
 @asynccontextmanager
 async def protocol_session(root: Path) -> AsyncGenerator[ClientSession]:
-    mcp, scheduler, browser, cursor_store = protocol_server(root)
-    await scheduler.start()
+    mcp, _, browser, _ = protocol_server(root)
     server_to_client_send, server_to_client_receive = anyio.create_memory_object_stream[
         SessionMessage
     ](50)
@@ -1008,8 +992,6 @@ async def protocol_session(root: Path) -> AsyncGenerator[ClientSession]:
                 yield session
             task_group.cancel_scope.cancel()
     finally:
-        await scheduler.close()
-        await cursor_store.close()
         await browser.close()
 
 

@@ -6,7 +6,6 @@ import json
 
 from linkedin_mcp.browser import BrowserProfileManager
 from linkedin_mcp.config import Settings
-from linkedin_mcp.host.lock import run_owned_operation
 
 
 def configure(command: argparse.ArgumentParser) -> None:
@@ -14,16 +13,10 @@ def configure(command: argparse.ArgumentParser) -> None:
 
 
 async def execute(settings: Settings) -> None:
-    async def create_profile() -> tuple[bool, bool, str]:
-        profile = BrowserProfileManager(settings)
-        created = await profile.create()
-        return created, profile.inspect().initialized, str(profile.path)
-
-    created, initialized, path = await run_owned_operation(
-        settings,
-        command="profile-create",
-        operation=create_profile,
-    )
+    profile = BrowserProfileManager(settings)
+    created = await profile.create()
+    initialized = profile.inspect().initialized
+    path = str(profile.path)
     print(
         json.dumps(
             {

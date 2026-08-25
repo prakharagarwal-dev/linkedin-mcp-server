@@ -12,14 +12,8 @@ from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
-from linkedin_mcp.browser import BrowserManager
-from linkedin_mcp.browser.urls import (
-    canonical_post_url,
-    canonical_profile_url,
-    post_reference_from_value,
-    profile_slug_from_url,
-)
 from linkedin_mcp.errors import InvalidTargetError, ParserDriftError
+from linkedin_mcp.tools.people.urls import canonical_profile_url, profile_slug_from_url
 from linkedin_mcp.tools.posts.create.models import (
     ActionCommand,
     ActionInspection,
@@ -53,6 +47,8 @@ from linkedin_mcp.tools.posts.create.models import (
     VideoCaptionMode,
     VideoPostContent,
 )
+from linkedin_mcp.tools.posts.urls import canonical_post_url, post_reference_from_value
+from linkedin_mcp.ui.manager import UIManager
 
 _HOME_URL = "https://www.linkedin.com/feed/"
 _AUDIENCE_LABELS = {
@@ -155,16 +151,16 @@ async def _unique_visible_or_hidden(locator: Locator, description: str) -> Locat
 class PostPublishingPage:
     """Narrow personal-member composer adapter; it never publishes as a Page."""
 
-    def __init__(self, browser: BrowserManager) -> None:
-        self._browser = browser
-        self._paced = browser.paced
+    def __init__(self, ui: UIManager) -> None:
+        self._ui = ui
+        self._paced = ui
 
     async def inspect_post(
         self,
         request: PostCreateInput,
     ) -> ActionInspection:
         self._validate_schedule(request.scheduled_at)
-        async with self._browser.page() as page:
+        async with self._ui.page() as page:
             await self._paced.goto(page, _HOME_URL)
             dialog, slug, name = await self._open_composer(page)
             await self._assert_mode_available(page, dialog, request.content)
@@ -192,7 +188,7 @@ class PostPublishingPage:
     async def perform_post(self, command: ActionCommand) -> ActionPageResult:
         payload = command.payload
         self._validate_schedule(payload.scheduled_at)
-        async with self._browser.page() as page:
+        async with self._ui.page() as page:
             try:
                 await self._paced.goto(page, _HOME_URL)
                 dialog, slug, name = await self._open_composer(page)

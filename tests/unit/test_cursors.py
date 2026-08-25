@@ -5,8 +5,8 @@ from enum import StrEnum
 
 import pytest
 
+from linkedin_mcp.cursors import CursorManager, CursorState, cursor_binding, select_page
 from linkedin_mcp.errors import InvalidCursorError
-from linkedin_mcp.infra.cursor import CursorState, CursorStore, cursor_binding, select_page
 from linkedin_mcp.tools.connections.list.models import ConnectionsListInput
 from linkedin_mcp.tools.invitations.list.models import InvitationFilter, InvitationListInput
 from linkedin_mcp.tools.jobs.search.models import JobSearchInput
@@ -38,8 +38,8 @@ def _manager(
     clock: MutableClock | None = None,
     max_active_cursors: int = 4,
     max_seen_items: int = 100,
-) -> CursorStore:
-    return CursorStore(
+) -> CursorManager:
+    return CursorManager(
         ttl_seconds=60,
         max_active_cursors=max_active_cursors,
         max_seen_items_per_cursor=max_seen_items,
@@ -47,8 +47,8 @@ def _manager(
     )
 
 
-async def _start(
-    store: CursorStore,
+def _start(
+    store: CursorManager,
     *,
     account_id: str,
     capability_name: CapabilityName,
@@ -61,7 +61,7 @@ async def _start(
     if isinstance(request, InvitationListInput):
         arguments["invitation_filter"] = request.resolved_filter.value
     operation = capability_name.value
-    return await store.start(
+    return store.start(
         account_id=account_id,
         operation=operation,
         binding=cursor_binding(operation, arguments),
@@ -77,7 +77,7 @@ async def test_cursor_continuation_is_single_use_and_preserves_scan_identity() -
         request_id="page-1",
         page_size=2,
     )
-    first_state = await _start(
+    first_state = _start(
         manager,
         account_id="personal",
         capability_name=CapabilityName.CONNECTIONS_LIST,
@@ -95,7 +95,7 @@ async def test_cursor_continuation_is_single_use_and_preserves_scan_identity() -
     assert page.has_lookahead is True
     assert manager.traversal_limit(first_state, first_request.page_size) == 3
 
-    first = await manager.finish(
+    first = manager.finish(
         first_state,
         page_size=first_request.page_size,
         returned_keys=page.keys,
@@ -112,7 +112,7 @@ async def test_cursor_continuation_is_single_use_and_preserves_scan_identity() -
         page_size=1,
         cursor=first.next_cursor,
     )
-    second_state = await _start(
+    second_state = _start(
         manager,
         account_id="personal",
         capability_name=CapabilityName.CONNECTIONS_LIST,
@@ -124,13 +124,13 @@ async def test_cursor_continuation_is_single_use_and_preserves_scan_identity() -
 
     # The one worker serializes collection tasks, so starting pagination does
     # not reserve a cursor. A failed task can start that cursor again.
-    retry_state = await _start(
+    retry_state = _start(
         manager,
         account_id="personal",
         capability_name=CapabilityName.CONNECTIONS_LIST,
         request=continuation.model_copy(update={"request_id": "page-2-retry"}),
     )
-    terminal = await manager.finish(
+    terminal = manager.finish(
         retry_state,
         page_size=continuation.page_size,
         returned_keys=("carol",),
@@ -142,7 +142,7 @@ async def test_cursor_continuation_is_single_use_and_preserves_scan_identity() -
     assert terminal.has_more is False
     assert terminal.next_cursor is None
     with pytest.raises(InvalidCursorError, match="invalid, expired, consumed"):
-        await _start(
+        _start(
             manager,
             account_id="personal",
             capability_name=CapabilityName.CONNECTIONS_LIST,
@@ -160,13 +160,13 @@ async def test_cursor_is_bound_to_account_capability_and_semantic_filters() -> N
         location="India",
         page_size=2,
     )
-    state = await _start(
+    state = _start(
         manager,
         account_id="personal",
         capability_name=CapabilityName.JOBS_SEARCH,
         request=request,
     )
-    first = await manager.finish(
+    first = manager.finish(
         state,
         page_size=request.page_size,
         returned_keys=("job-1", "job-2"),
@@ -182,28 +182,28 @@ async def test_cursor_is_bound_to_account_capability_and_semantic_filters() -> N
     )
 
     with pytest.raises(InvalidCursorError, match="does not match"):
-        await _start(
+        _start(
             manager,
             account_id="other-account",
             capability_name=CapabilityName.JOBS_SEARCH,
             request=continuation,
         )
     with pytest.raises(InvalidCursorError, match="does not match"):
-        await _start(
+        _start(
             manager,
             account_id="personal",
             capability_name=CapabilityName.PEOPLE_SEARCH,
             request=continuation,
         )
     with pytest.raises(InvalidCursorError, match="does not match"):
-        await _start(
+        _start(
             manager,
             account_id="personal",
             capability_name=CapabilityName.JOBS_SEARCH,
             request=continuation.model_copy(update={"query": "rust"}),
         )
 
-    valid = await _start(
+    valid = _start(
         manager,
         account_id="personal",
         capability_name=CapabilityName.JOBS_SEARCH,
@@ -220,13 +220,13 @@ async def test_invitation_cursor_binds_the_resolved_default_filter() -> None:
         request_id="invitations-page-1",
         page_size=1,
     )
-    state = await _start(
+    state = _start(
         manager,
         account_id="personal",
         capability_name=CapabilityName.INVITATIONS_LIST,
         request=request,
     )
-    first = await manager.finish(
+    first = manager.finish(
         state,
         page_size=1,
         returned_keys=("invitation-1",),
@@ -241,7 +241,7 @@ async def test_invitation_cursor_binds_the_resolved_default_filter() -> None:
             "invitation_filter": InvitationFilter.ALL,
         }
     )
-    continued = await _start(
+    continued = _start(
         manager,
         account_id="personal",
         capability_name=CapabilityName.INVITATIONS_LIST,
@@ -260,13 +260,13 @@ async def test_cursor_expires_and_does_not_survive_process_state_loss() -> None:
         request_id="page-1",
         page_size=1,
     )
-    state = await _start(
+    state = _start(
         manager,
         account_id="personal",
         capability_name=CapabilityName.CONNECTIONS_LIST,
         request=request,
     )
-    first = await manager.finish(
+    first = manager.finish(
         state,
         page_size=1,
         returned_keys=("alice",),
@@ -277,7 +277,7 @@ async def test_cursor_expires_and_does_not_survive_process_state_loss() -> None:
 
     clock.advance(61)
     with pytest.raises(InvalidCursorError):
-        await _start(
+        _start(
             manager,
             account_id="personal",
             capability_name=CapabilityName.CONNECTIONS_LIST,
@@ -286,7 +286,7 @@ async def test_cursor_expires_and_does_not_survive_process_state_loss() -> None:
 
     fresh_process = _manager()
     with pytest.raises(InvalidCursorError, match="another server process"):
-        await _start(
+        _start(
             fresh_process,
             account_id="personal",
             capability_name=CapabilityName.CONNECTIONS_LIST,
@@ -299,7 +299,7 @@ async def test_active_cursor_capacity_evicts_the_oldest_idle_cursor() -> None:
     clock = MutableClock()
     manager = _manager(clock=clock, max_active_cursors=1)
 
-    first_state = await _start(
+    first_state = _start(
         manager,
         account_id="personal",
         capability_name=CapabilityName.CONNECTIONS_LIST,
@@ -309,7 +309,7 @@ async def test_active_cursor_capacity_evicts_the_oldest_idle_cursor() -> None:
             page_size=1,
         ),
     )
-    first = await manager.finish(
+    first = manager.finish(
         first_state,
         page_size=1,
         returned_keys=("alice",),
@@ -318,7 +318,7 @@ async def test_active_cursor_capacity_evicts_the_oldest_idle_cursor() -> None:
     assert first.next_cursor is not None
     clock.advance(1)
 
-    second_state = await _start(
+    second_state = _start(
         manager,
         account_id="personal",
         capability_name=CapabilityName.CONNECTIONS_LIST,
@@ -328,7 +328,7 @@ async def test_active_cursor_capacity_evicts_the_oldest_idle_cursor() -> None:
             page_size=1,
         ),
     )
-    second = await manager.finish(
+    second = manager.finish(
         second_state,
         page_size=1,
         returned_keys=("bob",),
@@ -337,7 +337,7 @@ async def test_active_cursor_capacity_evicts_the_oldest_idle_cursor() -> None:
     assert second.next_cursor is not None
 
     with pytest.raises(InvalidCursorError):
-        await _start(
+        _start(
             manager,
             account_id="personal",
             capability_name=CapabilityName.CONNECTIONS_LIST,
@@ -348,7 +348,7 @@ async def test_active_cursor_capacity_evicts_the_oldest_idle_cursor() -> None:
                 cursor=first.next_cursor,
             ),
         )
-    retained = await _start(
+    retained = _start(
         manager,
         account_id="personal",
         capability_name=CapabilityName.CONNECTIONS_LIST,
@@ -370,7 +370,7 @@ async def test_seen_identity_bound_returns_an_honest_terminal_truncation() -> No
         request_id="bounded",
         page_size=10,
     )
-    state = await _start(
+    state = _start(
         manager,
         account_id="personal",
         capability_name=CapabilityName.CONNECTIONS_LIST,
@@ -383,7 +383,7 @@ async def test_seen_identity_bound_returns_an_honest_terminal_truncation() -> No
         seen_keys=state.seen_keys,
         page_size=manager.page_capacity(state, request.page_size),
     )
-    result = await manager.finish(
+    result = manager.finish(
         state,
         page_size=request.page_size,
         returned_keys=page.keys,
@@ -397,13 +397,13 @@ async def test_seen_identity_bound_returns_an_honest_terminal_truncation() -> No
     assert result.next_cursor is None
 
     terminal_manager = _manager(max_seen_items=3)
-    terminal_state = await _start(
+    terminal_state = _start(
         terminal_manager,
         account_id="personal",
         capability_name=CapabilityName.CONNECTIONS_LIST,
         request=request.model_copy(update={"request_id": "exact-terminal"}),
     )
-    terminal = await terminal_manager.finish(
+    terminal = terminal_manager.finish(
         terminal_state,
         page_size=request.page_size,
         returned_keys=("alice", "bob", "carol"),
@@ -420,14 +420,14 @@ async def test_cursor_state_rejects_duplicate_or_previously_seen_identities() ->
         request_id="duplicates",
         page_size=2,
     )
-    state = await _start(
+    state = _start(
         manager,
         account_id="personal",
         capability_name=CapabilityName.CONNECTIONS_LIST,
         request=request,
     )
     with pytest.raises(ValueError, match="duplicate"):
-        await manager.finish(
+        manager.finish(
             state,
             page_size=2,
             returned_keys=("alice", "alice"),

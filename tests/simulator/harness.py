@@ -10,9 +10,8 @@ from mcp.server.fastmcp import FastMCP
 
 from linkedin_mcp.browser import BrowserManager
 from linkedin_mcp.config import Settings
-from linkedin_mcp.infra.cursor import CursorStore
-from linkedin_mcp.infra.queue import Scheduler, Worker
-from linkedin_mcp.tools import attach_tool_implementations
+from linkedin_mcp.cursors import CursorManager
+from linkedin_mcp.operations import OperationManager
 from linkedin_mcp.tools.companies.get.page import CompanyProfilePage
 from linkedin_mcp.tools.companies.search.page import CompanySearchPage
 from linkedin_mcp.tools.connections.list.page import ConnectionsListPage
@@ -34,7 +33,6 @@ from linkedin_mcp.tools.posts.create.page import PostPublishingPage
 from linkedin_mcp.tools.posts.get.page import PostDetailPage
 from linkedin_mcp.tools.posts.react.page import PostReactionPage
 from linkedin_mcp.tools.posts.search.page import PostSearchPage
-from linkedin_mcp.transport.server import create_mcp_server
 from tests.contract.test_mcp_protocol import (
     ProtocolJobDetail,
     ProtocolPeopleSearch,
@@ -42,37 +40,25 @@ from tests.contract.test_mcp_protocol import (
 )
 from tests.simulator.providers import StatefulProtocolJobSearch, StatefulProtocolNetwork
 from tests.simulator.state import SimulatorState
+from tests.support.mcp import create_mcp_fixture
 from tests.support.playwright import empty_browser
 
 
 def create_simulator_server(
     root: Path,
     state: SimulatorState,
-) -> tuple[FastMCP[None], Scheduler, BrowserManager, CursorStore]:
+) -> tuple[FastMCP[None], OperationManager, BrowserManager, CursorManager]:
     suffix = uuid.uuid4().hex
     settings = Settings(
         browser_auto_install=False,
         browser_profile_path=root / f"profile-{suffix}",
         browser_action_delay_seconds=0,
-        runtime_lock_path=root / f"runtime-{suffix}.lock",
     )
     browser = empty_browser(settings)
     network = StatefulProtocolNetwork(state)
     people_search = ProtocolPeopleSearch()
-    cursor_store = CursorStore(
-        ttl_seconds=settings.pagination_cursor_ttl_seconds,
-        max_active_cursors=settings.pagination_max_active_cursors,
-        max_seen_items_per_cursor=settings.pagination_max_seen_items_per_cursor,
-    )
-    worker = Worker()
-    scheduler = Scheduler(worker, capacity=settings.queue_capacity)
-    mcp = create_mcp_server(settings)
-    attach_tool_implementations(
-        mcp,
-        settings=settings,
-        browser=browser,
-        scheduler=scheduler,
-        cursor_store=cursor_store,
+    fixture = create_mcp_fixture(settings, browser)
+    fixture.tools.register_implementations(
         job_search=cast(JobSearchPage, StatefulProtocolJobSearch(state)),
         job_detail=cast(JobDetailPage, ProtocolJobDetail()),
         people_search=cast(PeopleSearchPage, people_search),
@@ -95,4 +81,4 @@ def create_simulator_server(
         conversation_read=cast(ConversationGetPage, network),
         message_send=cast(MessageSendPage, network),
     )
-    return mcp, scheduler, browser, cursor_store
+    return fixture.mcp, fixture.operations, browser, fixture.cursors

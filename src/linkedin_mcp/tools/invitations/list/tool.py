@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable
-from typing import Annotated, Any
+from typing import Annotated
 
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from linkedin_mcp.cursors import CursorManager
 from linkedin_mcp.errors import InternalServerError, LinkedInMCPError
-from linkedin_mcp.infra.cursor import CursorStore
-from linkedin_mcp.infra.queue import Scheduler, Task
+from linkedin_mcp.operations import OperationManager
 from linkedin_mcp.tools.invitations.list.models import (
     InvitationDirection,
     InvitationFilter,
@@ -61,9 +61,9 @@ async def tool_result[ResultT](awaitable: Awaitable[ResultT]) -> ResultT:
 
 def register(
     mcp: FastMCP[None],
-    scheduler: Scheduler,
+    operations: OperationManager,
     page: InvitationListPage,
-    cursor_store: CursorStore,
+    cursors: CursorManager,
     account_id: str,
 ) -> None:
     @mcp.tool(
@@ -87,18 +87,11 @@ def register(
     async def _list_invitations(
         context_id: IdentifierArgument,
         request_id: IdentifierArgument,
-        ctx: Context[Any, Any, Any],
         direction: InvitationDirection = InvitationDirection.RECEIVED,
         invitation_filter: InvitationFilter | None = None,
         page_size: PageSizeArgument = 25,
         cursor: CursorArgument | None = None,
     ) -> InvitationListOutput:
-        await ctx.report_progress(0, 100, "Queued LinkedIn invitation read")
-
-        async def report_progress(current: int, total: int, message: str) -> None:
-            ratio = 1.0 if total == 0 else min(1.0, current / total)
-            await ctx.report_progress(5 + round(90 * ratio), 100, message)
-
         request = InvitationListInput(
             context_id=context_id,
             request_id=request_id,
@@ -107,19 +100,17 @@ def register(
             page_size=page_size,
             cursor=cursor,
         )
-        task = Task(
-            name="linkedin.invitations.list",
-            execute=lambda: execute(
-                request,
-                page=page,
-                cursor_store=cursor_store,
-                account_id=account_id,
-                progress=report_progress,
-            ),
+        result = await tool_result(
+            operations.run(
+                "linkedin.invitations.list",
+                lambda: execute(
+                    request,
+                    page=page,
+                    cursors=cursors,
+                    account_id=account_id,
+                ),
+            )
         )
-        await scheduler.schedule(task)
-        result = await tool_result(task.result())
-        await ctx.report_progress(100, 100, "LinkedIn invitation read complete")
         return result
 
     del _list_invitations

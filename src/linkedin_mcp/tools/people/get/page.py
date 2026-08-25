@@ -11,10 +11,7 @@ from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import HttpUrl
 
-from linkedin_mcp.browser import BrowserManager
-from linkedin_mcp.browser.urls import canonical_profile_url, profile_slug_from_url
 from linkedin_mcp.errors import ParserDriftError
-from linkedin_mcp.infra.playwright import Paced
 from linkedin_mcp.tools.people.get.models import (
     PROFILE_SLUG_SEGMENT_PATTERN,
     PeopleGetInput,
@@ -39,6 +36,9 @@ from linkedin_mcp.tools.people.surface import (
     first_text,
     unique_lines,
 )
+from linkedin_mcp.tools.people.urls import canonical_profile_url, profile_slug_from_url
+from linkedin_mcp.ui.manager import UIManager
+from linkedin_mcp.ui.pacer import Pacer
 
 _DATE_RANGE_PATTERN = re.compile(
     r"\b(?:19|20)\d{2}\b|\bPresent\b|\b(?:\d+\s+)?(?:mos?|yrs?)\b",
@@ -693,7 +693,7 @@ def _parse_education(
     return tuple(values)
 
 
-async def _expand_and_scroll(paced: Paced, page: Page) -> None:
+async def _expand_and_scroll(paced: Pacer, page: Page) -> None:
     main = page.locator("main")
     source_path = urlsplit(page.url).path.rstrip("/")
     for scroll_index in range(8):
@@ -912,11 +912,11 @@ def _merge_sections(
 
 
 class PersonProfilePage:
-    def __init__(self, browser: BrowserManager, *, max_detail_pages: int) -> None:
+    def __init__(self, ui: UIManager, *, max_detail_pages: int) -> None:
         if max_detail_pages < 0:
             raise ValueError("Profile detail-page bound cannot be negative.")
-        self._browser = browser
-        self._paced = browser.paced
+        self._ui = ui
+        self._paced = ui
         self._max_detail_pages = max_detail_pages
 
     async def read(
@@ -935,7 +935,7 @@ class PersonProfilePage:
                 if section is not PersonProfileSectionSelector.OVERVIEW
             }
         )
-        async with self._browser.page() as page:
+        async with self._ui.page() as page:
             await self._paced.goto(page, canonical_profile_url(request.profile_slug))
             try:
                 await (

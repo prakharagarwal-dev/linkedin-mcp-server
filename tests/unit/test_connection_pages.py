@@ -64,7 +64,7 @@ from linkedin_mcp.tools.invitations.send.models import (
     InvitationSendPayload,
 )
 from linkedin_mcp.tools.invitations.send.page import SendInvitationPage
-from tests.support.playwright import adapt_browser, empty_browser
+from tests.support.playwright import adapt_browser, empty_ui
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "linkedin"
 ACTION_FIXTURES = FIXTURES / "invitations" / "actions" / "latest"
@@ -1235,7 +1235,7 @@ async def test_incoming_actions_require_their_distinct_fresh_profile_postconditi
 
 @pytest.mark.asyncio
 async def test_connection_action_payload_types_and_references_are_enforced() -> None:
-    browser = empty_browser(Settings(browser_action_delay_seconds=0))
+    browser = empty_ui(Settings(browser_action_delay_seconds=0))
     accept = AcceptInvitationPage(browser)
     ignore = IgnoreInvitationPage(browser)
 

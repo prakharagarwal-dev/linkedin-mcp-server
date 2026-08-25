@@ -84,7 +84,7 @@ message reactions are outside the current contract.
 
 | Tool | Purpose |
 | --- | --- |
-| `linkedin.server.status` | Read safe shared-runtime, queue, and active-operation state |
+| `linkedin.server.status` | Read safe process-local lock and active-operation state |
 | `linkedin.session.status` | Read safe browser setup and LinkedIn authentication state |
 
 MCP clients discover this complete tool surface, including input schemas and
